@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"C:\\\\Users\\\\micha\\\\Desktop\\\\crawl command\\\\\" 2>/dev/null || echo \"EMPTY_DIR\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import pygame; print\\('pygame', pygame.version.ver, 'OK'\\)\")",
+      "Bash(pip install *)",
+      "Bash(python -m pip install pygame-ce --prefer-binary)"
+    ]
+  }
+}

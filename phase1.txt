@@ -1,0 +1,50 @@
+Create a playable Python 3 terminal RPG skeleton in the current folder.
+
+Use no external packages.
+
+Create these files:
+main.py
+character.py
+classes.py
+features.py
+items.py
+monsters.py
+combat.py
+dungeon.py
+rooms.py
+utils.py
+
+The game must run with:
+python main.py
+
+Game title:
+CRAWL PROTOCOL
+
+Implement:
+- main menu
+- new game
+- load game placeholder
+- quit
+- character creation
+- 8 classes: Warrior, Rogue, Ranger, Mage, Cleric, Warlock, Engineer, Psion
+- abilities: STR, DEX, CON, INT, WIS, CHA
+- ability modifiers
+- HP, AC, XP, level, proficiency bonus
+- starting weapons
+- procedural dungeon rooms
+- combat with d20 attack rolls
+- enemies
+- loot
+- level up to level 5
+- basic save/load if possible
+
+Use d20 mechanics:
+attack roll = d20 + ability modifier + proficiency bonus + weapon bonus
+hit if attack roll >= target AC
+
+Make it actually playable, not just architecture.
+
+After coding, run:
+python -m py_compile *.py
+
+Fix all errors.
