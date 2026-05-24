@@ -28,9 +28,13 @@ GROUP_OBJECTS   = "objects"
 GROUP_ENTITIES  = "entities"
 GROUP_INVENTORY = "inventory"
 GROUP_CRAFTING  = "crafting"
+# Prompt 22 — safehouse services as their own tab so the player has
+# a discoverable surface for "talk to the receptionist / buy coffee /
+# rest" instead of typing a number from memory.
+GROUP_PERSONEL  = "personel"
 
 ALL_GROUPS = (GROUP_ACTIONS, GROUP_EXITS, GROUP_OBJECTS, GROUP_ENTITIES,
-              GROUP_INVENTORY, GROUP_CRAFTING)
+              GROUP_PERSONEL, GROUP_INVENTORY, GROUP_CRAFTING)
 
 
 @dataclass
@@ -80,6 +84,7 @@ _GROUP_LABEL_KEYS = {
     GROUP_EXITS:     ("ui_group_exits",     "Wyjścia"),
     GROUP_OBJECTS:   ("ui_group_objects",   "Obiekty"),
     GROUP_ENTITIES:  ("ui_group_entities",  "Postacie"),
+    GROUP_PERSONEL:  ("ui_group_personel",  "Personel"),
     GROUP_INVENTORY: ("ui_group_inventory", "Ekwipunek"),
     GROUP_CRAFTING:  ("ui_group_crafting",  "Crafting"),
 }
@@ -121,6 +126,7 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
     exits     = _exit_options(world, room)
     objects   = _object_options(world, room)
     entities  = _entity_options(world, room)
+    personel  = _personel_options(world, room)
     inv       = _inventory_options(world)
     crafting  = _crafting_options(world)
 
@@ -130,6 +136,7 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
         (GROUP_EXITS,     exits),
         (GROUP_OBJECTS,   objects),
         (GROUP_ENTITIES,  entities),
+        (GROUP_PERSONEL,  personel),
         (GROUP_INVENTORY, inv),
         (GROUP_CRAFTING,  crafting),
     ):
@@ -249,27 +256,36 @@ def _object_options(world, room) -> List[SelectableOption]:
         if e.entity_type in ("monster", "crawler", "npc"):
             continue
         state = e.state or {}
+        tags = e.tags or []
         # Prompt 22 fix: hide fully-dismantled / depleted objects so
         # the action bar doesn't keep showing "rozdzielnia" after it's
         # been reduced to parts. We still surface them if they're a
         # container (loot remnants may still be inside).
         fully_consumed = (state.get("stripped") or state.get("depleted")) and \
-                         not (("container" in (e.tags or [])) or
-                              ("corpse" in (e.tags or [])) or
+                         not (("container" in tags) or ("corpse" in tags) or
                               e.entity_type == "corpse")
         if fully_consumed:
             continue
+        # Prompt 22 fix: hide safehouse `service` entities from Obiekty.
+        # Their interaction is mediated by the numbered safehouse-pick
+        # menu, not by generic inspect/use. Otherwise we'd offer
+        # "Sprawdź recepcja kliniki" / "Użyj recepcja kliniki" that
+        # don't do anything meaningful — pure noise.
+        if "service" in tags:
+            continue
         name = e.display_name()
-        tags = e.tags or []
         affs = e.affordances or []
-        # Inspect is universally cheap; always offer it.
-        out.append(SelectableOption(
-            option_id=f"inspect_{e.entity_id}",
-            label=f"Sprawdź: {name}",
-            command=f"sprawdź {name}",
-            group=GROUP_OBJECTS, target_id=e.entity_id,
-            action_type="inspect",
-        ))
+        # Inspect: always offer when the entity has a description to
+        # display. Decorations with no desc would just print a generic
+        # line — keep them out of the action bar.
+        if e.fallback_desc or e.desc_key:
+            out.append(SelectableOption(
+                option_id=f"inspect_{e.entity_id}",
+                label=f"Sprawdź: {name}",
+                command=f"sprawdź {name}",
+                group=GROUP_OBJECTS, target_id=e.entity_id,
+                action_type="inspect",
+            ))
         # Prompt 22 fix: distinguish PORTABLE items (player picks them
         # up with "podnieś") from CONTAINERS / CORPSES (player searches
         # them with "przeszukaj"). Previously both rendered as
@@ -357,6 +373,68 @@ def _entity_options(world, room) -> List[SelectableOption]:
                 group=GROUP_ENTITIES, target_id=e.entity_id,
                 action_type="attack",
             ))
+    return out
+
+
+def _personel_options(world, room) -> List[SelectableOption]:
+    """Prompt 22 — Personel (safehouse-staff / services) tab.
+
+    Surfaces the safehouse-pick menu as labeled, navigable options
+    instead of forcing the player to type numbers. Empty list when
+    the current room isn't a safehouse — the tab disappears entirely
+    in that case.
+    """
+    out: List[SelectableOption] = []
+    subtype = getattr(room, "safehouse_subtype", None)
+    if not subtype:
+        return out
+    try:
+        from ..systems.safehouses import services as _services
+    except Exception:
+        return out
+
+    # Polish-only labels per service action_key. The safehouse menu
+    # already uses these strings via numeric-pick locale lookups; here
+    # we re-render them in human form for the action bar.
+    SERVICE_LABEL_PL = {
+        "coffee":  ("Kawa (5 kr)",              "kawa"),
+        "food":    ("Coś do jedzenia (12 kr)",  "jedzenie"),
+        "chat":    ("Pogadaj z obsługą",        "pogadaj"),
+        "wash":    ("Umyj się",                 "umyj się"),
+        "hide":    ("Schowaj się tu",           "ukryj się"),
+        "mirror":  ("Spójrz w lustro",          "spójrz w lustro"),
+        "drink":   ("Drink (8 kr)",             "drink"),
+        "schmooze":("Powiedz coś ciepłego",     "rozmowa"),
+        "heal":    ("Opatrunek (20 kr)",        "opatrunek"),
+        "cure":    ("Lek (30 kr)",              "lek"),
+        "full":    ("Pełna kuracja (60 kr)",    "pełna kuracja"),
+        "buy":     ("Kup coś",                  "kup"),
+        "sell":    ("Sprzedaj",                 "sprzedaj"),
+        "info":    ("Kup informację (15 kr)",   "informacja"),
+        "ad":      ("Włącz reklamę sponsora",   "reklama"),
+        "intel":   ("Zamów raport (10 kr)",     "raport"),
+        "read":    ("Czytaj ogłoszenia",        "ogłoszenia"),
+        "rest_short": ("Krótki odpoczynek",     "odpocznij"),
+        "rumor":   ("Posłuchaj plotek",         "plotki"),
+        "rest":    ("Odpocznij",                "odpocznij"),
+    }
+
+    svc_list = _services(subtype) or []
+    for idx, svc in enumerate(svc_list, start=1):
+        action_key = svc[0] if isinstance(svc, (tuple, list)) else svc
+        label_text, cmd = SERVICE_LABEL_PL.get(
+            action_key, (action_key, action_key))
+        # Command is the numeric quick-pick — already wired through
+        # the existing safehouse menu code path. Falls back to the
+        # named verb if the player types it directly.
+        out.append(SelectableOption(
+            option_id=f"svc_{action_key}",
+            label=label_text,
+            command=str(idx),
+            group=GROUP_PERSONEL,
+            target_id=None,
+            action_type="safehouse_service",
+        ))
     return out
 
 

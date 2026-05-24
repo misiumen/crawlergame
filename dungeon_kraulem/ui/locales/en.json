@@ -500,5 +500,9 @@
   "ui_monitor_header":     "Available displays (active: {idx}):",
   "ui_monitor_hint":       "  Switch: 'monitor N' (takes effect on next launch).",
   "ui_monitor_set":        "Monitor: {idx}. Takes effect on next launch.",
-  "ui_monitor_out_of_range":"No such monitor. Available: 0..{max}."
+  "ui_monitor_out_of_range":"No such monitor. Available: 0..{max}.",
+
+  "ui_group_personel":      "Personnel",
+
+  "feedback_inspect_empty": "You look at: {name}. Nothing more."
 }

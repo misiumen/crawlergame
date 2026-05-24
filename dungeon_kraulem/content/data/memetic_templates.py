@@ -330,7 +330,7 @@ EFFECT_TEMPLATES = {
     "crawler_panic":            {"chance": 0.30, "value": 1,
                                  "fallback_pl": "Crawler panikuje, rozprasza się."},
     "safehouse_gossip":         {"chance": 0.60, "value": 1,
-                                 "fallback_pl": "W safehouse już o tym mówią."},
+                                 "fallback_pl": "W kryjówce już o tym mówią."},
     "black_market_interest":    {"chance": 0.40, "value": 1,
                                  "fallback_pl": "Czarny rynek się interesuje."},
     "hostility_shift":          {"chance": 0.40, "value": -1,

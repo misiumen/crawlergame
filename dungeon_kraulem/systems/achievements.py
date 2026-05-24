@@ -114,7 +114,7 @@ _add(AchievementDef(
     fallback_name_pl="Kradzież armatury",
     fallback_name_en="Plumbing Heist",
     description_key="ach_kradziez_armatury_d",
-    fallback_description_pl="Rozebrałeś coś, co należało do toalety safehouse. Nikt ci tego nie zapomni.",
+    fallback_description_pl="Rozebrałeś coś, co należało do toalety w kryjówce. Nikt ci tego nie zapomni.",
     fallback_description_en="You dismantled something that belonged in a safehouse bathroom.",
     category="theft",
 ))

@@ -510,6 +510,42 @@ def test_monitor_bare_lists_displays():
     print("  bare 'monitor' -> set_monitor (list mode): OK")
 
 
+def test_safehouse_service_entities_hidden_from_objects():
+    """Prompt 22: entities tagged 'service' (safehouse vendors like
+    `clinic_counter`) should NOT appear in Obiekty — they were noise
+    because Sprawdź / Użyj on them did nothing. The Personel tab now
+    surfaces them properly."""
+    from ..ui import ui_nav
+    from ..engine.world import WorldState
+    from ..engine.character import Character
+    from ..engine.floor import FloorState
+    from ..engine.room import RoomState
+    from ..engine.entity import Entity, T_OBJECT
+    w = WorldState()
+    w.character = Character(name="N", background="janitor")
+    f = FloorState(floor_id="f1", floor_number=1)
+    r = RoomState(room_id="r0", fallback_short_title="Klinika")
+    r.safehouse_subtype = "clinic"
+    f.add_room(r); f.start_room_id="r0"; f.current_room_id="r0"
+    w.current_floor = f
+    counter = Entity(key="clinic_counter", entity_type=T_OBJECT,
+                     fallback_name="recepcja kliniki",
+                     fallback_desc="Recepcja.",
+                     tags=["safehouse","service","clinic"],
+                     affordances=["inspect","use","talk"],
+                     location_id="r0")
+    r.entities.append(counter); w.register(counter)
+
+    state = ui_nav.build_play_options(w)
+    obj_opts = state.options_in("objects")
+    assert not any("recepcja" in o.label.lower() for o in obj_opts), \
+        f"service entity should NOT appear in Obiekty; got {[o.label for o in obj_opts]}"
+    # It SHOULD appear (via the service menu) in Personel.
+    personel = state.options_in("personel")
+    assert personel, "Personel tab should be populated in a safehouse"
+    print(f"  service hidden from Obiekty, surfaced in Personel: OK ({len(personel)} services)")
+
+
 def test_monitor_with_index_switches():
     """`monitor 1` switches to monitor index 1."""
     intent = parse("monitor 1", world=None)
@@ -589,6 +625,7 @@ def main():
     test_podnies_wszystko_routes_to_mass_loot()
     test_portable_item_labeled_podnies_in_navpanel()
     test_stripped_object_hidden_from_navpanel()
+    test_safehouse_service_entities_hidden_from_objects()
     test_monitor_mid_phrase_does_not_route_to_settings()
     test_monitor_bare_lists_displays()
     test_monitor_with_index_switches()

@@ -431,11 +431,11 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                     "kicked_out":     t("feedback_safe_kicked_out",
                                         fallback="Wypraszają cię. Dyskretnie. Definitywnie."),
                     "prices_up":      t("feedback_safe_prices_up",
-                                        fallback="Cennik się przegrupował. Na twoją niekorzyść."),
+                                        fallback="Ceny idą w górę. Patrzą na ciebie zimno."),
                     "service_denied": t("feedback_safe_service_denied",
                                         fallback="Obsługa odmawia. Bez wyjaśnień."),
                 }.get(cons, t("feedback_safe_consequence",
-                              fallback="Coś w safehouse zmienia się — nie na lepsze.")))
+                              fallback="Coś w kryjówce się zmienia — nie na lepsze.")))
 
         elif kind == "gain_rumor":
             cat = eff.get("category")

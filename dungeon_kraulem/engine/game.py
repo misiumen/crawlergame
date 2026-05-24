@@ -1009,6 +1009,30 @@ class Game:
                 self.pending_disambiguation = None
             return
 
+        # Prompt 22 bug fix: `sprawdź X` was silent — inspect had no
+        # handler that printed the entity's description. Affordances
+        # resolve happily but no line lands in the log. Now we
+        # surface the desc directly when the player inspects a
+        # matched entity.
+        if intent.intent == "inspect" and v.matched_entities:
+            ent = v.matched_entities[0]
+            from ..ui.lang import t as _t
+            desc = ""
+            if getattr(ent, "desc_key", ""):
+                desc = _t(ent.desc_key, fallback=ent.fallback_desc or "")
+            else:
+                desc = ent.fallback_desc or ""
+            if desc:
+                self.log(desc, LOG_NORMAL)
+            else:
+                # Fallback when content omits a desc: at least don't
+                # be silent — say something neutral.
+                self.log(t("feedback_inspect_empty",
+                           fallback=f"Patrzysz na: {ent.display_name()}. "
+                                    f"Nic ponad to.",
+                           name=ent.display_name()),
+                         LOG_NORMAL)
+
         r = resolve(v, self.world)
         if r.fallback_description and (v.required_checks or r.level != "success"):
             self.log(r.line(), LOG_SYSTEM)
@@ -1248,7 +1272,7 @@ class Game:
             narr_key = "safehouse_theft_attempt" if warns == 0 else "safehouse_theft_escalation"
             line = narrate(narr_key) or narrate("safehouse_theft") or \
                 t("feedback_safehouse_theft_warn",
-                  fallback=f"„{target.display_name()}” należy do safehouse — patrzą na to.",
+                  fallback=f"„{target.display_name()}” należy do kryjówki — patrzą na to.",
                   name=target.display_name())
             self.log(line, LOG_WARN)
             if warns == 0:
@@ -1815,7 +1839,7 @@ class Game:
                 # Surface the social cost once, then continue — the player
                 # explicitly chose mass salvage.
                 self.log(t("feedback_mass_salvage_safehouse_warn",
-                           fallback="Część tych rzeczy należy do safehouse — będą konsekwencje."),
+                           fallback="Część tych rzeczy należy do kryjówki — będą konsekwencje."),
                          LOG_WARN)
                 warned_safehouse = True
             table_key = _pick_salvage_table_key(ent)
@@ -1991,7 +2015,7 @@ class Game:
                      or st.get("theft_sensitive") is True)
             if owned and not warned_safehouse:
                 self.log(t("feedback_mass_loot_safehouse_warn",
-                           fallback="Niektóre z tych rzeczy należą do safehouse — ktoś patrzy."),
+                           fallback="Niektóre z tych rzeczy należą do kryjówki — ktoś patrzy."),
                          LOG_WARN)
                 warned_safehouse = True
             # Move into inventory.

@@ -65,7 +65,7 @@
   "feedback_mass_salvage_results_h": "Rozebrano:",
   "feedback_mass_salvage_skipped_h": "Pominięto:",
   "feedback_mass_salvage_nothing": "Nie widzisz tu niczego, co da się sensownie rozebrać.",
-  "feedback_mass_salvage_safehouse_warn": "Część tych rzeczy należy do safehouse — będą konsekwencje.",
+  "feedback_mass_salvage_safehouse_warn": "Część tych rzeczy należy do kryjówki — będą konsekwencje.",
   "feedback_mass_salvage_summary": "Czas: ok. {minutes} min. Hałas: wysoki.",
   "feedback_mass_search_intro": "Przeszukujesz wszystko, co wygląda na warte uwagi.",
   "feedback_mass_search_results_h": "Przeszukano:",
@@ -75,7 +75,7 @@
   "feedback_mass_loot_results_h": "Zabrane:",
   "feedback_mass_loot_skipped_h": "Pominięto:",
   "feedback_mass_loot_nothing": "Nic tu się nie nadaje do zabrania.",
-  "feedback_mass_loot_safehouse_warn": "Niektóre z tych rzeczy należą do safehouse — ktoś patrzy.",
+  "feedback_mass_loot_safehouse_warn": "Niektóre z tych rzeczy należą do kryjówki — ktoś patrzy.",
   "feedback_mass_break_intro": "Rozglądasz się, biorąc głęboki oddech. To narobi hałasu.",
   "feedback_mass_break_results_h": "Roztrzaskane:",
   "feedback_mass_break_skipped_h": "Pominięto:",
@@ -190,7 +190,7 @@
   "narrator_safehouse_theft_attempt_1": "Patrzą. Nie reagują od razu. Reagują wolno, jak każdy zły wynajmujący.",
   "narrator_safehouse_theft_attempt_2": "Coś, co należało do tego miejsca, opuszcza je razem z tobą. Ktoś zapisał to do księgi.",
   "narrator_safehouse_theft_escalation_1": "To już drugi raz. Trzeci raz nie będzie ostrzeżeniem.",
-  "narrator_safehouse_theft_escalation_2": "Cierpliwość safehouse spadła pod minimum operacyjne. Cennik się przegrupował.",
+  "narrator_safehouse_theft_escalation_2": "Cierpliwość obsługi kryjówki spadła pod zero. Ceny rosną z każdym kolejnym ruchem.",
   "narrator_sponsor_property_salvage_1": "Sponsor dostaje notyfikację. Sponsor nie lubi notyfikacji.",
   "narrator_sponsor_property_salvage_2": "To była ich kamera. Teraz to twoje przewody. Konsekwencje są w drodze.",
   "narrator_sponsor_files_complaint_1": "Dział prawny sponsora otwiera nową teczkę. Ma już twój kolor podświetlenia.",
@@ -246,7 +246,7 @@
   "narrator_belief_spreads_2": "Coś, co wymyśliłeś, znalazło nowych nosicieli. Nikt z nich cię nie zna.",
   "narrator_belief_distorts_1": "Twoja teza wraca po drugiej stronie pokoju z trzema błędami i większą pewnością siebie.",
   "narrator_machine_confusion_1": "Maszyny przez chwilę milczą. To nie jest błąd. To gorzej.",
-  "narrator_crawler_gossip_shift_1": "W safehouse rozmowa zmienia kierunek. To nie ty pchnąłeś — ty zostawiłeś pchnięcie tu wcześniej.",
+  "narrator_crawler_gossip_shift_1": "W kryjówce rozmowa zmienia kierunek. To nie ty pchnąłeś — ty zostawiłeś pchnięcie tu wcześniej.",
   "narrator_sponsor_notices_propaganda_1": "Sponsor wyraża zdziwienie. Zdziwienie ma już znacznik czasu, kategorię i numer sprawy.",
   "narrator_absurd_idea_takes_root_1": "Nie powinno zadziałać. Zadziałało. Skąd się bierze coś takiego — to już inne pytanie.",
 
@@ -538,5 +538,9 @@
   "ui_monitor_header":     "Dostępne ekrany (aktywny: {idx}):",
   "ui_monitor_hint":       "  Przełącz: 'monitor N' (zacznie działać po restarcie).",
   "ui_monitor_set":        "Monitor: {idx}. Zacznie działać po restarcie gry.",
-  "ui_monitor_out_of_range":"Nie ma takiego monitora. Dostępne: 0..{max}."
+  "ui_monitor_out_of_range":"Nie ma takiego monitora. Dostępne: 0..{max}.",
+
+  "ui_group_personel":      "Personel",
+
+  "feedback_inspect_empty": "Patrzysz na: {name}. Nic ponad to."
 }
