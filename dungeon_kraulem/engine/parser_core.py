@@ -92,6 +92,9 @@ _QUICK_INTENTS = {
     "show_resolutions":   ["rozdzielczość","rozdzielczosc","resolution","resolutions"],
     "set_fullscreen":     ["fullscreen","pełny ekran","pelny ekran","ekran"],
     "set_windowed":       ["windowed","tryb okna","okno","tryb okien"],
+    # Prompt 22: monitor / display picker. `monitor` alone lists displays;
+    # `monitor 0` / `monitor 1` switches and requires a restart to apply.
+    "set_monitor":        ["monitor","ekran nr","display","wyświetlacz","wyswietlacz"],
     # Prompt 10: journal overlay
     "journal_open":       ["dziennik","journal","notatki","notes"],
     "journal_close":      ["zamknij","close","wyjdź","wyjdz","zamknij dziennik"],
@@ -302,6 +305,22 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.verb = "talk"
         intent.targets.append(_strip_articles(tm.group(1)))
         intent.confidence = 0.9
+        return intent
+
+    # ── Prompt 22: "monitor 1" / "ekran nr 2" / "display 0" — switch monitor.
+    mon_re = re.compile(
+        r"^(?:monitor|ekran(?:\s+nr)?|display|wyświetlacz|wyswietlacz)"
+        r"\s+(?P<idx>\d{1,2})$"
+    )
+    mm = mon_re.match(folded)
+    if mm:
+        intent.intent = "set_monitor"
+        intent.verb = "set_monitor"
+        try:
+            intent.modifiers.append(f"index:{int(mm.group('idx'))}")
+        except (ValueError, TypeError):
+            pass
+        intent.confidence = 0.95
         return intent
 
     # ── Prompt 09: "ustaw rozdzielczość 1600x900" / "set resolution 1600x900" ──

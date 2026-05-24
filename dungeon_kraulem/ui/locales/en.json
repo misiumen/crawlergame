@@ -495,5 +495,10 @@
   "ent_collector_n":             "Debt Collector",
   "ent_chief_editor_n":          "Chief Editor",
   "ent_recycler_pilgrim_n":      "Recycler Pilgrim",
-  "ent_antihost_n":              "Anti-Host"
+  "ent_antihost_n":              "Anti-Host",
+
+  "ui_monitor_header":     "Available displays (active: {idx}):",
+  "ui_monitor_hint":       "  Switch: 'monitor N' (takes effect on next launch).",
+  "ui_monitor_set":        "Monitor: {idx}. Takes effect on next launch.",
+  "ui_monitor_out_of_range":"No such monitor. Available: 0..{max}."
 }

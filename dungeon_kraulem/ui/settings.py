@@ -51,6 +51,11 @@ def _defaults() -> Dict[str, Any]:
         # Prompt 13: per-machine LLM runtime mode. Defaults to
         # "performance" so a fresh install never depends on a model.
         "llm_mode":          LLM_MODE,
+        # Prompt 22: which physical monitor the game window opens on.
+        # 0 = primary display. Multi-monitor users can override by
+        # editing the settings file or via the in-game "monitor"
+        # command (TODO).
+        "monitor_index":     0,
     }
 
 
@@ -95,6 +100,13 @@ def load_settings() -> Dict[str, Any]:
     mode = str(data.get("llm_mode", out["llm_mode"]) or out["llm_mode"]).lower()
     if mode in LLM_MODES:
         out["llm_mode"] = mode
+    # Prompt 22: monitor index — clamped non-negative; ≥ num_displays
+    # falls back to 0 at apply-time in main.py.
+    try:
+        idx = int(data.get("monitor_index", out["monitor_index"]))
+        out["monitor_index"] = max(0, idx)
+    except (TypeError, ValueError):
+        pass
     return out
 
 
@@ -152,4 +164,11 @@ def set_resolution(w: int, h: int) -> bool:
 def set_fullscreen(enabled: bool) -> bool:
     s = load_settings()
     s["fullscreen"] = bool(enabled)
+    return save_settings(s)
+
+
+def set_monitor_index(idx: int) -> bool:
+    """Prompt 22: persist which monitor the game opens on."""
+    s = load_settings()
+    s["monitor_index"] = max(0, int(idx))
     return save_settings(s)

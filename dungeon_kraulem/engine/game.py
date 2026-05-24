@@ -447,13 +447,20 @@ class Game:
             fullscreen = _settings.load_settings().get("fullscreen", False)
         if fullscreen:
             flags |= pygame.FULLSCREEN
+        # Prompt 22: keep the window on the player's chosen monitor when
+        # they change resolution mid-game.
+        monitor = int(_settings.load_settings().get("monitor_index", 0) or 0)
         try:
-            self.screen = pygame.display.set_mode((w, h), flags)
-        except pygame.error:
-            self.log(t("feedback_resolution_fail",
-                       fallback="Nie udało się zmienić rozdzielczości."),
-                     LOG_DANGER)
-            return False
+            self.screen = pygame.display.set_mode((w, h), flags,
+                                                  display=monitor)
+        except (pygame.error, TypeError):
+            try:
+                self.screen = pygame.display.set_mode((w, h), flags)
+            except pygame.error:
+                self.log(t("feedback_resolution_fail",
+                           fallback="Nie udało się zmienić rozdzielczości."),
+                         LOG_DANGER)
+                return False
         _settings.set_resolution(w, h)
         _settings.set_fullscreen(bool(fullscreen))
         self._refresh_layout()
@@ -700,6 +707,60 @@ class Game:
                    fallback="  Komendy: fullscreen / tryb okna / ustaw rozdzielczość WxH"),
                  LOG_NORMAL)
 
+    def _handle_monitor_command(self, idx) -> None:
+        """Prompt 22: list available monitors OR switch to monitor `idx`.
+
+        Bare `monitor` (idx=None) prints the current and available
+        monitors with their resolutions. `monitor N` saves
+        monitor_index=N to settings and notes the next launch will
+        place the window on that monitor — SDL can't reparent an
+        existing window cleanly without a full re-init, so we don't
+        try to apply it live.
+        """
+        from ..ui import settings as _settings
+        import pygame as _pg
+        try:
+            num = _pg.display.get_num_displays()
+        except Exception:
+            num = 1
+        cur = int(_settings.load_settings().get("monitor_index", 0) or 0)
+
+        # List displays.
+        if idx is None:
+            self.log(t("ui_monitor_header",
+                       fallback=f"Dostępne ekrany (aktywny: {cur}):"),
+                     LOG_SYSTEM)
+            for i in range(num):
+                try:
+                    size = _pg.display.get_desktop_sizes()[i]
+                    size_s = f"{size[0]}x{size[1]}"
+                except Exception:
+                    size_s = "?"
+                marker = "▶" if i == cur else " "
+                self.log(f"  {marker} monitor {i}  ({size_s})", LOG_NORMAL)
+            self.log(t("ui_monitor_hint",
+                       fallback="  Przełącz: 'monitor N' (zacznie działać po restarcie)."),
+                     LOG_NORMAL)
+            return
+
+        # Switch.
+        if idx < 0 or idx >= num:
+            self.log(t("ui_monitor_out_of_range",
+                       fallback=f"Nie ma monitora {idx}. Dostępne: 0..{num-1}."),
+                     LOG_WARN)
+            return
+        # Persist via the settings helper. If `set_monitor_index` doesn't
+        # exist yet (this is its first user), fall back to direct write.
+        if hasattr(_settings, "set_monitor_index"):
+            _settings.set_monitor_index(idx)
+        else:
+            s = _settings.load_settings()
+            s["monitor_index"] = int(idx)
+            _settings.save_settings(s)
+        self.log(t("ui_monitor_set",
+                   fallback=f"Monitor: {idx}. Zacznie działać po restarcie gry."),
+                 LOG_SUCCESS)
+
     def submit_generated_command(self, command: str):
         """Prompt 08: route a cursor/option-selected command through the
         same submit_input path used by typed text. The command is logged
@@ -826,6 +887,18 @@ class Game:
             self.toggle_fullscreen(True); return
         if intent.intent == "set_windowed":
             self.toggle_fullscreen(False); return
+        # Prompt 22: monitor picker. Bare "monitor" lists displays;
+        # "monitor N" sets monitor_index in settings (takes effect on
+        # next launch — SDL can't re-parent an existing window).
+        if intent.intent == "set_monitor":
+            idx = None
+            for m in intent.modifiers or []:
+                if isinstance(m, str) and m.startswith("index:"):
+                    try:
+                        idx = int(m.split(":", 1)[1])
+                    except ValueError:
+                        pass
+            self._handle_monitor_command(idx); return
         if intent.intent == "set_resolution":
             w = h = None
             for m in intent.modifiers or []:

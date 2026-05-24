@@ -31,11 +31,33 @@ def main():
     s = _settings.load_settings()
     w, h = s["resolution_width"], s["resolution_height"]
     flags = pygame.FULLSCREEN if s.get("fullscreen") else 0
+    # Prompt 22: pick the monitor explicitly. By default the game opens
+    # on the primary display (index 0); the user can override
+    # `monitor_index` in dungeon_kraulem_settings.json. Without this,
+    # SDL would place the window on whichever monitor the cursor
+    # happens to be on or wherever Windows last remembered — which is
+    # why playtesters saw the game open on monitor 2.
+    monitor = int(s.get("monitor_index", 0) or 0)
     try:
-        screen = pygame.display.set_mode((w, h), flags)
-    except pygame.error:
-        from .config import DEFAULT_RESOLUTION
-        screen = pygame.display.set_mode(DEFAULT_RESOLUTION)
+        num_displays = pygame.display.get_num_displays()
+    except Exception:
+        num_displays = 1
+    if monitor < 0 or monitor >= num_displays:
+        if monitor != 0:
+            print(f"[dungeon_kraulem] monitor_index={monitor} out of range "
+                  f"(0..{num_displays-1}); falling back to primary.")
+        monitor = 0
+    try:
+        screen = pygame.display.set_mode((w, h), flags, display=monitor)
+    except (pygame.error, TypeError):
+        # Older pygame builds don't accept `display=` kwarg — retry
+        # without it and let SDL choose. Or set_mode failed for some
+        # other reason: try the default resolution as a last resort.
+        try:
+            screen = pygame.display.set_mode((w, h), flags)
+        except pygame.error:
+            from .config import DEFAULT_RESOLUTION
+            screen = pygame.display.set_mode(DEFAULT_RESOLUTION)
     pygame.key.set_repeat(400, 50)
 
     audio.init()

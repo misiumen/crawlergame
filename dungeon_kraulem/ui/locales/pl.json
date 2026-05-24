@@ -533,5 +533,10 @@
   "ent_collector_n":             "Windykator",
   "ent_chief_editor_n":          "Redaktor Naczelny",
   "ent_recycler_pilgrim_n":      "Pielgrzym Recyklera",
-  "ent_antihost_n":              "Anty-gospodarz"
+  "ent_antihost_n":              "Anty-gospodarz",
+
+  "ui_monitor_header":     "Dostępne ekrany (aktywny: {idx}):",
+  "ui_monitor_hint":       "  Przełącz: 'monitor N' (zacznie działać po restarcie).",
+  "ui_monitor_set":        "Monitor: {idx}. Zacznie działać po restarcie gry.",
+  "ui_monitor_out_of_range":"Nie ma takiego monitora. Dostępne: 0..{max}."
 }
