@@ -73,6 +73,59 @@ ENCOUNTER_TEMPLATES = {
         }
     },
 
+    "ambush_in_dark": {
+        "type": "hostile_monster",
+        "weight": 4,
+        "floor_min": 1,
+        "tags": ["monster", "stealth", "darkness", "avoidance"],
+        "fallback_title": "Coś czeka w ciemności",
+        "intro": [
+            "Latarka mruga raz, dwa razy, i wtedy widzisz, że nie patrzysz na ścianę — patrzysz na coś, co stoi nieruchomo, bo wie, że jeszcze nie musi się ruszać.",
+            "W ciemności słychać własny oddech wracający odbiciem od cudzych zębów.",
+        ],
+        "participants": ["monster"],
+        "possible_resolutions": {
+            "fight": {"stat": "STR", "dc": 13, "time": 6, "effects": ["combat"]},
+            "sneak_past": {"stat": "DEX", "dc": 13, "time": 8, "effects": ["bypass", "stealth_affinity"]},
+            "blind_with_light": {"requires_item_tag": "light", "stat": "DEX", "dc": 10, "time": 2, "effects": ["disable_temporary"]},
+            "throw_decoy": {"requires_item_tag": "throwable", "stat": "DEX", "dc": 11, "time": 3, "effects": ["bypass", "lose_item"]},
+            "back_off": {"time": 2, "effects": ["retreat"]},
+        },
+        "partial_success": [
+            "Mijasz go bokiem, ale słyszy uderzenie twojego pulsu szybciej niż twoje kroki.",
+        ],
+        "failure": [
+            "Patrzysz mu w oczy. To był błąd, ale przynajmniej krótki.",
+        ],
+    },
+
+    "merchant_haggle_blocked": {
+        "type": "social_obstacle",
+        "weight": 5,
+        "floor_min": 1,
+        "tags": ["crawler", "social", "negotiation", "trade", "non_combat"],
+        "fallback_title": "Handlarz blokuje przejście",
+        "intro": [
+            "Crawler ustawił skrzynki w poprzek korytarza i robi za sklep. Z uśmiechem, który mówi: 'opłata albo wycena.'",
+            "Pod ścianą leży tabliczka: PRZEJŚCIE = 30 cr LUB ZWROT. Z dopiskiem: 'ZWROTÓW NIE PRZYJMUJEMY.'",
+        ],
+        "participants": ["crawler"],
+        "possible_resolutions": {
+            "pay": {"requires_credits": 30, "time": 5, "effects": ["pass", "lose_credits"]},
+            "haggle": {"stat": "CHA", "dc": 12, "time": 8, "effects": ["pass", "diplomacy_affinity"]},
+            "intimidate": {"stat": "CHA", "dc": 13, "time": 3, "effects": ["pass", "audience_up", "relationship_down"]},
+            "trade_info": {"requires_rumor": True, "stat": "WIS", "dc": 10, "time": 5, "effects": ["pass", "relationship_up"]},
+            "force_through": {"stat": "STR", "dc": 14, "time": 4, "effects": ["combat_crawler"]},
+            "go_around": {"time": 15, "effects": ["long_detour", "time_passes"]},
+        },
+        "partial_success": [
+            "Przepuszcza cię, ale notuje twoją twarz i cenę następnego razu.",
+        ],
+        "failure": [
+            "Sprzedawca uśmiecha się szerzej. To rzadko jest sygnał sukcesu.",
+        ],
+    },
+
     "terminal_locked_exit": {
         "type": "blocked_path",
         "weight": 5,

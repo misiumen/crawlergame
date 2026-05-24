@@ -161,3 +161,79 @@ Klucze logiczne po angielsku:
 - `objective_find_keycard`.
 
 Teksty widoczne po polsku przez `t(key, fallback=...)`.
+
+---
+
+## Procedural Floor Design
+
+Piętra **nie są ręcznie układaną mapą**. Piętra są **generowane** z kontrolowanych
+puli szablonów. Ręcznie wykonane Piętro 1 (15 pokoi w `revamp/data/room_templates.py`)
+istnieje wyłącznie jako **slice pionowy / harness testowy** — nowa zawartość
+nie powinna być do niego doklejana, tylko trafiać do puli, z których generator
+piętra może wybierać.
+
+### Reguły procedurality
+
+- **Piętra są generowane z kontrolowanych szablonów.**
+  Generator dobiera pokoje z `room_pool`, NPC z `npc_templates`, encountery
+  z `encounter_templates`, plotki z `rumor_templates`, klucze fabularne
+  z `clue_templates`, safehouse'y z `safehouse_templates`, cele z
+  `floor_objective_templates`, obiekty środowiskowe z `entity_templates`.
+
+- **Typ pokoju nie powinien być ujawniony przed odkryciem.**
+  UI mapy nie pokazuje "Combat Room" ani "Boss". Pokazuje stan
+  (`unknown` / `hinted` / `scouted` / `visited` / `searched` / `cleared`)
+  i ewentualną podpowiedź zmysłową (`public_hint`).
+
+- **Każde piętro musi pozwalać na backtrack.**
+  Krawędzie grafu są dwukierunkowe domyślnie. Po odwiedzeniu pokój zostaje
+  ze swoim stanem (loot zużyty, NPC zapamiętany, pułapka rozbrojona albo nie).
+
+- **Każde piętro musi mieć:**
+  - strefy bezpieczne (przynajmniej jeden safehouse, zwykle 2-3),
+  - strefy niebezpieczne (combat / hazard / locked),
+  - tropy (rumor + clue) prowadzące do celu piętra,
+  - sekrety (przejścia ukryte za `Look`/`Search`),
+  - wiele dróg postępu (graf nie jest liniowy; cel piętra ma >=2 ścieżki rozwiązania).
+
+- **Piętro 1 ma gwarancje projektowe, nie ustalony układ.**
+  Po wygenerowaniu Piętra 1 generator gwarantuje:
+  - >= 12 pokoi,
+  - >= 1 cafe lub bathroom safehouse,
+  - >= 1 black-market lub kiosk-like safe room,
+  - >= 2 spotkania z crawlerami,
+  - >= 2 spotkania z potworami z wariantami non-combat,
+  - >= 1 zamknięta lub zablokowana trasa,
+  - >= 1 sekretna trasa,
+  - >= 1 cel piętra z >=2 ścieżkami rozwiązania.
+
+- **Treść ma być wielokrotnego użytku.**
+  Pokoje, NPC, plotki, obiekty, encountery, safehouse'y i cele są
+  **szablonami** (dataclasses lub dictsy ze stabilnymi kluczami ASCII).
+  Generator instancjonuje je z losowymi nazwami z poola, losowymi
+  rozstawkami i losową treścią — ale nigdy nie zmienia ich klucza.
+
+### Anty-wzorce
+
+- Hardcodowanie konkretnego pokoju w konkretnym miejscu mapy.
+- Cel piętra z **jednym** rozwiązaniem.
+- Statyczny boss bez non-combat opcji.
+- Pokój, którego typ widać przed wejściem.
+- Loot, którego nie da się użyć do problemu inaczej niż "+1 damage".
+- Encounter, który ma tylko "fight" w `possible_resolutions`.
+
+### Tagi pool-template'ów
+
+Każdy template w puli (pokój, encounter, NPC) ma `tags: list[str]`.
+Generator filtruje pule po tagach przy budowie piętra:
+- `safe`, `dangerous`, `loot`, `social`, `secret`, `boss`, `objective`,
+  `non_combat`, `stealth`, `environment`, `lore`, `trap`.
+
+Tagi są dokumentacją kontraktu, nie magią — generator po prostu pyta
+puli "daj mi pokój z tagiem X" i dobiera ważoną losowość.
+
+### Klucze i fallbacky
+
+Wszystkie szablony używają stabilnych angielskich kluczy oraz polskich
+`fallback_*` tekstów. UI woła `t(key, fallback=fallback_*)`. Pula nie
+zawiera lokalizowanych nazw — lokalizacja jest robiona przez `lang.tr()`.

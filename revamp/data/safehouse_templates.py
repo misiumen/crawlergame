@@ -25,6 +25,33 @@ SAFEHOUSE_TEMPLATES = {
             "Na suszarce do rąk widnieje naklejka: NIE SUSZYĆ AMPUTOWANYCH KOŃCZYN."
         ]
     },
+    "clinic": {
+        "name_pool": ["Klinika Bez Pytań", "Punkt Sanitarny 7", "NovaChem Triage"],
+        "entry_descriptions": [
+            "Zapach środków dezynfekujących walczy z czymś gorszym i wygrywa tylko techniczne. Lampy halogenowe odbijają się od białych płytek z mściwą czystością.",
+            "Cennik wisi obok defibrylatora, jakby były tej samej kategorii produktów.",
+        ],
+        "services": ["heal", "cure", "full", "rumor", "rest_short"],
+        "ambient_lines": [
+            "Maszyna recepcji prosi o uśmiech do kamery. Nie określa którą.",
+            "Z głośnika płynie spokojny głos: 'Państwa zgon jest dla nas wyzwaniem statystycznym.'",
+            "W kącie ktoś czyta ulotkę o kosztach utraty kończyny.",
+            "Pielęgniarz patrzy ci w oczy zbyt długo, jakby przypominał sobie czyjś sufit.",
+        ],
+    },
+    "sponsor_kiosk": {
+        "name_pool": ["Punkt Informacyjny NovaChem", "Kiosk Sponsorski A-2", "Strefa Promocji"],
+        "entry_descriptions": [
+            "Małe okienko z ekranem pełnym reklam i tabliczką: PYTAJ O CIEKAWE OFERTY. Wszystkie oferty są ciekawe inaczej.",
+            "Plastikowe ulotki z napisem 'NIE DAJ SIĘ ZASKOCZYĆ' układają się w stos, który właśnie kogoś zaskoczył.",
+        ],
+        "services": ["ad", "intel", "rumor"],
+        "ambient_lines": [
+            "Animowany maskotka sponsora macha do ciebie zbyt szybko, żeby wyglądało to przyjaźnie.",
+            "Z głośników: 'Każdy zgon na tym piętrze sponsorowany jest przez NovaChem™.'",
+            "Tabliczka pod ekranem: 'OPINIE NEGATYWNE BĘDĄ WYKORZYSTANE PRZECIWKO TOBIE.'",
+        ],
+    },
     "black_market": {
         "name_pool": ["Bez Paragonu", "Gwarancja Martwa", "Rynek Pod Zlewem", "Legalnie Prawie"],
         "entry_descriptions": [

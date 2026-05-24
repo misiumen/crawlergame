@@ -228,3 +228,76 @@ def random_floor_objective() -> Optional[Tuple[str, Dict]]:
         return None
     key = random.choice(list(table.keys()))
     return key, table[key]
+
+
+# ── Room pool (procedural floor generator) ──────────────────────────────────
+
+def all_room_templates() -> List[Dict]:
+    try:
+        from .data.room_pool import ROOM_POOL
+        return list(ROOM_POOL)
+    except Exception:
+        return []
+
+
+def room_templates_for_role(role: str) -> List[Dict]:
+    return [t for t in all_room_templates() if t.get("role") == role]
+
+
+def room_templates_with_tag(tag: str) -> List[Dict]:
+    return [t for t in all_room_templates() if tag in t.get("tags", [])]
+
+
+def random_room_template(role: Optional[str] = None,
+                         required_tag: Optional[str] = None,
+                         floor_num: int = 1,
+                         exclude_template_ids: Optional[List[str]] = None
+                         ) -> Optional[Dict]:
+    """Weighted random pick from the room pool. Filters by role and tag."""
+    pool = all_room_templates()
+    if not pool:
+        return None
+    if role:
+        pool = [t for t in pool if t.get("role") == role]
+    if required_tag:
+        pool = [t for t in pool if required_tag in t.get("tags", [])]
+    pool = [t for t in pool if t.get("floor_min", 1) <= floor_num]
+    if exclude_template_ids:
+        pool = [t for t in pool if t.get("template_id") not in exclude_template_ids]
+    if not pool:
+        return None
+    weights = [max(1, int(t.get("weight", 1))) for t in pool]
+    return random.choices(pool, weights=weights, k=1)[0]
+
+
+# ── Clues ────────────────────────────────────────────────────────────────────
+
+def all_clue_templates() -> Dict[str, Dict]:
+    try:
+        from .data.clue_templates import CLUE_TEMPLATES
+        return CLUE_TEMPLATES
+    except Exception:
+        return {}
+
+
+def get_clue(key: str) -> Optional[Dict]:
+    return all_clue_templates().get(key)
+
+
+def clues_for_objective(objective_key: str) -> List[Tuple[str, Dict]]:
+    """Pull the explicit `clue_chains` listed under a floor objective."""
+    obj_table = all_floor_objectives().get(objective_key, {})
+    chain_keys = obj_table.get("clue_chains", []) or []
+    clues = all_clue_templates()
+    return [(k, clues[k]) for k in chain_keys if k in clues]
+
+
+def random_clue(source: Optional[str] = None) -> Optional[Tuple[str, Dict]]:
+    table = all_clue_templates()
+    if not table:
+        return None
+    pool = [(k, v) for k, v in table.items()
+            if source is None or v.get("source") == source]
+    if not pool:
+        return None
+    return random.choice(pool)

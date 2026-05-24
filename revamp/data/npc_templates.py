@@ -42,7 +42,52 @@ CRAWLER_ARCHETYPES = {
             "Nie kradnę. Przesuwam zasoby w stronę talentu.",
             "Możemy się podzielić. Ty bierzesz ryzyko, ja biorę rzeczy."
         ]
-    }
+    },
+    "broken_celebrity": {
+        "fallback_name_pool": ["Były Mistrz", "Drugi Sezon", "Pan z Reklamy"],
+        "personality": "celebrity",
+        "survival_style": "social_manipulation",
+        "wants": ["widownię", "darmowe drinki", "powtórki własnych klipów"],
+        "fears": ["bycia wymazanym z rankingu", "ciszy"],
+        "secret": ["produkcja kazała mu udawać, że jeszcze nie umarł", "wie, gdzie sponsor chowa scenariusze"],
+        "helps_if": ["audience_high", "offered_camera_time"],
+        "betrays_if": ["audience_too_low", "another_celebrity_present"],
+        "dialogue": [
+            "Kiedyś robiłem to lepiej. Teraz robię to taniej.",
+            "Daj mi minutę na kamerze, a ja oddam ci coś znacznie mniej wartego niż minuta.",
+        ],
+    },
+    "quiet_killer": {
+        "fallback_name_pool": ["Nikt", "Cichy Drugi Etat", "Patrz w Inną Stronę"],
+        "personality": "silent_killer",
+        "survival_style": "stealth",
+        "wants": ["pozostać niezauważonym", "skończyć kontrakt", "zniknąć przed finałem"],
+        "fears": ["sponsorów", "audycji własnej śmierci na żywo"],
+        "secret": ["zlikwidował 4 innych zawodników z polecenia", "ma listę celów na to piętro"],
+        "helps_if": ["player_quiet", "player_useful_as_alibi"],
+        "betrays_if": ["player_witness", "player_too_loud"],
+        "dialogue": [
+            "Nie patrz na mnie. Patrz w stronę kamery, jak wszyscy.",
+            "Nie pytaj, co tu robię. Pytaj, kiedy stąd wyjdę.",
+        ],
+    },
+    "preaching_witness": {
+        "fallback_name_pool": ["Kaznodzieja z Korytarza", "Ostatni Świadek",
+                                "Brat Ode Mnie"],
+        "personality": "zealot",
+        "survival_style": "diplomacy",
+        "wants": ["kogoś, kto wysłucha", "raport z poprzedniego piętra",
+                  "świadectwo na żywo"],
+        "fears": ["cisza widowni", "moralna obojętność"],
+        "secret": ["wie, że Syndykat fałszuje statystyki śmierci",
+                   "ma fragment kontraktu z pieczęcią"],
+        "helps_if": ["player_listens", "player_shared_grief"],
+        "betrays_if": ["player_mocks", "player_too_violent"],
+        "dialogue": [
+            "Każdy crawler to dwa testimonia: jedno żywe, jedno po. Ja słucham obu.",
+            "Powiedz mi imię. Tylko imię. Reszta dopisuje się sama.",
+        ],
+    },
 }
 
 SAFEHOUSE_NPCS = {
@@ -61,7 +106,34 @@ SAFEHOUSE_NPCS = {
         "services": ["coffee", "food", "rumor", "listen"],
         "dialogue": [
             "Kawa jest czarna, gorzka i zgodna z regulaminem przeżycia.",
-            "Nie pytaj, skąd mleko. Pytaj, czy działa."
-        ]
-    }
+            "Nie pytaj, skąd mleko. Pytaj, czy działa.",
+        ],
+    },
+    "clinic_intake": {
+        "role": "clinic_intake",
+        "fallback_names": ["Recepcjonista", "Sanitariusz", "Pan z Cennikiem"],
+        "services": ["heal", "cure", "full", "rumor"],
+        "dialogue": [
+            "Cennik jest negocjowalny tylko w zakresie monety.",
+            "Państwa rana jest dla nas wyzwaniem statystycznym.",
+        ],
+    },
+    "blackmarket_vendor": {
+        "role": "blackmarket_vendor",
+        "fallback_names": ["Sprzedawca Bez Imienia", "Pan Pod Ladą", "Trzecie Krzesło"],
+        "services": ["buy", "sell", "rumor", "illegal_goods"],
+        "dialogue": [
+            "Gwarancja jest tylko na nazwę. Reszta — twoja sprawa.",
+            "Nie pytaj, skąd to mam. Pytaj, czy chcesz dwa.",
+        ],
+    },
+    "sponsor_clerk": {
+        "role": "sponsor_clerk",
+        "fallback_names": ["Pan z Kiosku", "Reprezentant NovaChem", "Voice Of Sponsor"],
+        "services": ["ad", "intel", "rumor"],
+        "dialogue": [
+            "Sponsor cieszy się z państwa udziału. Cieszy się umiarkowanie.",
+            "Mamy ciekawą ofertę. Wszystkie nasze oferty są ciekawe.",
+        ],
+    },
 }
