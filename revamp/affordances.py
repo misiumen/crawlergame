@@ -178,9 +178,29 @@ register(Affordance("loot",
     time_cost=2))
 
 register(Affordance("craft",
-    verbs_pl=["zrób","zrob","wytwórz","wytworz","craftuj"],
-    verbs_en=["craft","make","build"],
+    verbs_pl=["zrób","zrob","wytwórz","wytworz","craftuj","skleć","sklec","skleic",
+              "robię","robie","tworzę","tworze","owijam"],
+    verbs_en=["craft","make","build","fashion","tape together"],
     stat="INT", base_dc=11, time_cost=TIME_CRAFT, class_affinity="crafting"))
+
+register(Affordance("salvage",
+    verbs_pl=["zdemontuj","odzyskaj","rozbierz","rozłóż","rozloz","rozkręć","rozkrec",
+              "rozwal i weź","rozbij na części","odzyskuję części"],
+    verbs_en=["salvage","dismantle","break down","recover","strip down"],
+    stat="STR", base_dc=10, time_cost=20, class_affinity="survival",
+    risk_tags=["noise","damages_item"]))
+
+register(Affordance("strip",
+    verbs_pl=["zerwij","zedrzyj","zdejmij ubrania","przeszukaj i zedrzyj"],
+    verbs_en=["strip","pry off","tear off"],
+    stat="DEX", base_dc=10, time_cost=15, class_affinity="survival",
+    risk_tags=["social_suspicion"]))
+
+register(Affordance("harvest",
+    verbs_pl=["pozyskaj","wycinam","wytnij","zbieraj organy","wytnij kości"],
+    verbs_en=["harvest","carve","reap"],
+    stat="WIS", base_dc=11, time_cost=20, class_affinity="survival",
+    risk_tags=["disease_risk"]))
 
 register(Affordance("repair",
     verbs_pl=["napraw"],

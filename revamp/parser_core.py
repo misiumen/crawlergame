@@ -59,6 +59,9 @@ _QUICK_INTENTS = {
     "save":          ["zapisz","save"],
     "help":          ["pomoc","help","?"],
     "flee":          ["uciekaj","spierdalaj","run","flee","wycofaj"],
+    "check_materials": ["materiały","materialy","materials","surowce"],
+    "craft_help":      ["pomoc craftingu","craft help"],
+    "salvage_help":    ["pomoc odzyskiwania","salvage help"],
 }
 
 

@@ -33,6 +33,10 @@ class Character:
     inventory_ids: List[int] = field(default_factory=list)
     credits: int = 25
 
+    # Materials inventory (Prompt 06): qty-only, dict[material_key] -> int.
+    # Items crafted FROM materials become Entities in inventory_ids above.
+    materials: Dict[str, int] = field(default_factory=dict)
+
     # Audience rating (sponsor-facing)
     audience_rating: int = 0
 
@@ -79,6 +83,7 @@ class Character:
             "species_picked_at_floor": self.species_picked_at_floor,
             "affinity": dict(self.affinity),
             "inventory_ids": list(self.inventory_ids),
+            "materials": dict(self.materials),
             "credits": self.credits, "audience_rating": self.audience_rating,
             "unlocked_achievements": list(self.unlocked_achievements),
             "journal": {k: list(v) for k, v in self.journal.items()},
@@ -97,6 +102,7 @@ class Character:
         c.conditions = list(d.get("conditions", []))
         c.affinity = {**c.affinity, **d.get("affinity", {})}
         c.inventory_ids = list(d.get("inventory_ids", []))
+        c.materials = dict(d.get("materials", {}))
         c.unlocked_achievements = list(d.get("unlocked_achievements", []))
         c.journal = {k: list(v) for k, v in d.get("journal", {}).items()}
         c.relationships = dict(d.get("relationships", {}))

@@ -158,6 +158,21 @@ class Game:
             self.log(t("log_save_done", fallback="Zapisano.") if ok else
                      t("log_save_fail", fallback="Zapis nie powiódł się."), LOG_SUCCESS if ok else LOG_DANGER)
             return
+        # Prompt 06 quick intents
+        if intent.intent == "check_materials":
+            self._show_materials(); return
+        if intent.intent == "craft_help":
+            self._show_craft_help(); return
+        if intent.intent == "salvage_help":
+            self._show_salvage_help(); return
+
+        # Crafting intent: route to crafting engine, NOT generic validate/resolve
+        if intent.intent == "craft":
+            self._attempt_craft(intent); return
+
+        # Salvage / strip / harvest: validate target, then run salvage flow
+        if intent.intent in ("salvage", "strip", "harvest"):
+            self._attempt_salvage(intent); return
 
         # Standard pipeline: validate → resolve → apply
         v = validate(intent, self.world)
@@ -261,9 +276,257 @@ class Game:
             t("help_1", fallback="Polecenia: rozejrzyj się, sprawdź X, przeszukaj, nasłuchuj wyjście,"),
             t("help_2", fallback="           idź do <pokój>, użyj X, zaatakuj X, pogadaj z X,"),
             t("help_3", fallback="           wepchnij X do Y, ukryj się, uciekaj, odpocznij, czekaj,"),
-            t("help_4", fallback="           plecak, postać, mapa, zapisz, pomoc"),
+            t("help_4", fallback="           plecak, materiały, postać, mapa, zapisz, pomoc"),
+            t("help_5", fallback="           rozbierz X, zdemontuj X, pozyskaj kości z X,"),
+            t("help_6", fallback="           zrób pułapkę / broń / dystrakcję / narzędzie / przebranie,"),
+            t("help_7", fallback="           pomoc craftingu, pomoc odzyskiwania"),
         ]:
             self.log(line, LOG_SYSTEM)
+
+    # ── Prompt 06: materials / salvage / crafting commands ─────────────────
+
+    def _show_materials(self):
+        from . import materials
+        rows = materials.inventory_summary(self.world.character)
+        if not rows:
+            self.log(t("ui_materials_empty", fallback="Materiały: brak."), LOG_NORMAL)
+            return
+        self.log(t("ui_materials_header", fallback="Materiały:"), LOG_SYSTEM)
+        for r in rows:
+            self.log(r, LOG_NORMAL)
+
+    def _show_craft_help(self):
+        from .crafting import all_recipes, improvised_categories
+        self.log(t("ui_craft_help_h", fallback="Crafting:"), LOG_SYSTEM)
+        self.log("  Znane przepisy:", LOG_NORMAL)
+        for k, v in all_recipes().items():
+            self.log(f"    {k}  ({v.get('name_pl','?')})", LOG_NORMAL)
+        self.log("  Improwizowane kategorie:", LOG_NORMAL)
+        for k, v in improvised_categories().items():
+            tagsets = " | ".join("+".join(s) for s in v.get("required_tag_sets", []))
+            self.log(f"    {k}  → wymaga {tagsets}", LOG_NORMAL)
+        self.log("  Przykłady: 'zrób pułapkę z kabli i baterii', 'skleć broń ze szkła i drewna'.", LOG_DIM if hasattr(self, 'LOG_DIM') else LOG_NORMAL)
+
+    def _show_salvage_help(self):
+        self.log(t("ui_salvage_help_h", fallback="Odzyskiwanie surowców:"), LOG_SYSTEM)
+        self.log("  rozbierz X        — rozkłada na materiały (czas + hałas)", LOG_NORMAL)
+        self.log("  zdemontuj X       — to samo, bardziej technicznie", LOG_NORMAL)
+        self.log("  pozyskaj X        — organika z ciał i potworów", LOG_NORMAL)
+        self.log("  zerwij X          — odzyskanie obudów / pancerzy", LOG_NORMAL)
+        self.log("  ograb / przeszukaj X — przedmioty, nie surowce", LOG_NORMAL)
+
+    def _attempt_salvage(self, intent):
+        """Resolve a salvage / strip / harvest action against the current room."""
+        from .validation import validate as validate_action
+        from .resolution import resolve
+        from .consequences import apply
+        from . import time_system as ts, materials, content_loader as cl, risk_reward
+        import random
+
+        # Use the validator to pick a target entity (it already supports ambiguity)
+        v = validate_action(intent, self.world)
+        if not v.valid:
+            self.log(v.message() or "—", LOG_WARN)
+            if v.possible_interpretations:
+                self.log("  ? " + " | ".join(v.possible_interpretations), LOG_NORMAL)
+            return
+
+        target = v.matched_entities[0] if v.matched_entities else None
+        if target is None:
+            self.log(t("feedback_no_target",
+                       fallback="Nie widzisz tu tego, czego szukasz."), LOG_WARN)
+            return
+
+        # Pick a salvage table based on target tags
+        table_key = _pick_salvage_table_key(target)
+        if table_key is None:
+            self.log(t("feedback_no_salvage",
+                       fallback=f"„{target.display_name()}” nie ma z czego ciągnąć surowców."),
+                     LOG_WARN)
+            return
+
+        from .data.salvage_tables import SALVAGE_TABLES
+        table = SALVAGE_TABLES.get(table_key, {})
+        # No infinite farming: refuse if already stripped/depleted
+        state = target.state or {}
+        if state.get("stripped") or state.get("depleted"):
+            self.log(t("feedback_already_stripped",
+                       fallback=f"„{target.display_name()}” jest już rozebrane na części."),
+                     LOG_WARN)
+            return
+
+        # Run a stat check
+        stat = table.get("stat", v.required_checks[0]["stat"] if v.required_checks else "STR")
+        dc = int(table.get("dc", 10))
+        from .utils_compat import roll_d20
+        raw = roll_d20()
+        ch = self.world.character
+        mod = ch.stat_mod(stat)
+        total = raw + mod
+        crit = (raw == 20); fumble = (raw == 1)
+        if crit:               level = "critical_success"
+        elif fumble:           level = "critical_failure"
+        elif total >= dc + 5:  level = "critical_success"
+        elif total >= dc:      level = "success"
+        elif total >= dc - 3:  level = "partial_success"
+        else:                  level = "failure"
+
+        self.log(f"  [{intent.intent}] d20({raw}) + {stat}({mod:+d}) = {total} vs DC {dc} → {level}", LOG_SYSTEM)
+
+        # Determine drops by level
+        drops = {}
+        rare = {}
+        if level in ("critical_success", "success", "partial_success"):
+            for mat, span in (table.get("drops") or {}).items():
+                lo, hi = (span if isinstance(span, list) else [span, span])
+                qty = random.randint(int(lo), int(hi))
+                # Partial = floor (qty/2); crit = qty + 1
+                if level == "partial_success": qty = max(0, qty // 2)
+                elif level == "critical_success": qty += 1
+                if qty > 0:
+                    drops[mat] = qty
+            for mat, chance in (table.get("rare") or {}).items():
+                if random.random() < float(chance):
+                    rare[mat] = 1
+
+        # Apply drops
+        if drops or rare:
+            materials.add_materials(ch, drops)
+            materials.add_materials(ch, rare)
+            row = ", ".join(f"{q}x {materials.get(k).name() if materials.get(k) else k}"
+                            for k, q in {**drops, **rare}.items())
+            self.log(t("feedback_salvage_got",
+                       fallback=f"Zebrane: {row}", row=row),
+                     LOG_SUCCESS)
+
+        # Time + noise
+        ts.advance(self.world, int(table.get("time_minutes", 15)))
+        room = self.world.current_floor.current_room()
+        if room: room.noise_level += int(table.get("noise", 1))
+
+        # Mark entity depleted/stripped (no farming)
+        target.state = state
+        if level in ("critical_success", "success"):
+            target.state["stripped"] = True
+            target.state["depleted"] = True
+        elif level == "partial_success":
+            target.state["damaged"] = True
+        # Failure leaves entity intact but the player loses time
+
+        # Apply risks through the risk_reward mapper (uses shared consequence engine)
+        risks = list(table.get("risks", []))
+        if level == "critical_failure":
+            risks.extend(["self_damage"])
+        risk_effs = risk_reward.risk_effects(risks)
+        if risk_effs:
+            lines = apply(risk_effs, self.world, time_system=ts)
+            for ln in lines: self.log(str(ln), LOG_WARN)
+
+        # Affinity nudge: salvage feeds survival
+        ch.affinity["survival"] = ch.affinity.get("survival", 0) + 1
+
+    def _attempt_craft(self, intent):
+        """Try a known recipe by name, otherwise improvise by category from the player's text."""
+        from . import crafting, materials, risk_reward
+        from .consequences import apply
+        from . import time_system as ts
+        from .utils_compat import roll_d20
+        import random
+
+        text = (intent.raw_text or "").lower()
+        tokens = [tok.strip(",.!?") for tok in text.split()]
+
+        # Pass 1: exact recipe key match
+        rec_keys = list(crafting.all_recipes().keys())
+        plan = None
+        for rk in rec_keys:
+            if rk in text:
+                plan = crafting.try_known_recipe(self.world.character, rk)
+                break
+
+        # Pass 2: name match in Polish
+        if plan is None:
+            for rk, rv in crafting.all_recipes().items():
+                nm = (rv.get("name_pl","") or "").lower()
+                if nm and nm in text:
+                    plan = crafting.try_known_recipe(self.world.character, rk)
+                    break
+
+        # Pass 3: improvise by category keyword
+        if plan is None:
+            cat_keywords = {
+                "trap":        ["pułap","pulap","trap"],
+                "weapon":      ["broń","bron","włóczni","wlocz","nóż","noz","spear","weapon","oręż","orez"],
+                "distraction": ["dystrak","wabik","bait","decoy","odwrócenie","odwrocenie"],
+                "tool":        ["narzęd","narzed","lockpick","wytrych","tool"],
+                "disguise":    ["przebran","mund","disguise","badge","plakiet"],
+            }
+            chosen = None
+            for cat, cues in cat_keywords.items():
+                if any(c in text for c in cues):
+                    chosen = cat; break
+            if chosen is None:
+                self.log(t("feedback_craft_unknown",
+                           fallback="Nie rozumiem co próbujesz zrobić. Spróbuj: pułapka / broń / dystrakcja / narzędzie / przebranie."),
+                         LOG_WARN); return
+            plan = crafting.try_improvise(self.world.character, chosen)
+
+        if not plan["valid"]:
+            self.log(plan.get("fallback_message", "—"), LOG_WARN); return
+
+        # Run the stat check
+        stat = plan["stat"]; dc = plan["dc"]
+        raw = roll_d20()
+        mod = self.world.character.stat_mod(stat)
+        total = raw + mod
+        if   raw == 20:        level = "critical_success"
+        elif raw == 1:         level = "critical_failure"
+        elif total >= dc + 5:  level = "critical_success"
+        elif total >= dc:      level = "success"
+        elif total >= dc - 3:  level = "partial_success"
+        else:                  level = "failure"
+        self.log(f"  [craft:{plan['category_label_pl']}] d20({raw}) + {stat}({mod:+d}) = {total} vs DC {dc} → {level}", LOG_SYSTEM)
+
+        # Materials: consume on success/partial; half-waste on failure; full loss on crit-fail
+        if level in ("critical_success", "success", "partial_success"):
+            crafting.consume_for(plan, self.world.character)
+        elif level == "failure":
+            crafting.waste_for(plan, self.world.character)
+        else:   # critical_failure
+            crafting.consume_for(plan, self.world.character)
+
+        ts.advance(self.world, plan["time_cost"])
+
+        # Produce result item on success / crit-success / partial
+        result_key = plan.get("result_item")
+        if level in ("critical_success", "success", "partial_success") and result_key:
+            ent = crafting.make_crafted_entity(
+                result_key,
+                quality="good" if level == "critical_success" else "normal",
+                damaged=(level == "partial_success"),
+                unstable=(level == "partial_success" and random.random() < 0.4),
+            )
+            self.world.register(ent)
+            self.world.character.inventory_ids.append(ent.entity_id)
+            self.log(t("feedback_crafted_item",
+                       fallback=f"Wytworzone: {ent.display_name()}",
+                       name=ent.display_name()), LOG_SUCCESS)
+
+        # Risks on partial / failure / critical_failure
+        if level in ("partial_success", "failure", "critical_failure"):
+            risks = list(plan.get("risks", []))
+            if level == "critical_failure":
+                risks.extend(["self_damage", "unsafe_crafting"])
+            effs = risk_reward.risk_effects(risks)
+            if effs:
+                lines = apply(effs, self.world, time_system=ts)
+                for ln in lines: self.log(str(ln), LOG_WARN)
+
+        # Affinity: crafting feeds crafting
+        ch = self.world.character
+        ch.affinity["crafting"] = ch.affinity.get("crafting", 0) + 1
+        if plan["category"] == "trap":
+            ch.affinity["trap"] = ch.affinity.get("trap", 0) + 1
 
     # ── Event handling ───────────────────────────────────────────────────────
 
@@ -424,3 +687,44 @@ class Game:
         ui.text(self.screen, t("end_press_enter", fallback="[Enter] Powrót do menu"),
                 SCREEN_W//2 - 200, SCREEN_H - 80, (90,110,130), 14)
         pygame.display.flip()
+
+
+# ── Prompt 06: salvage-target -> table-key resolver ────────────────────────
+
+# Maps a few entity tag-sets to salvage table keys. Keep it conservative —
+# the templates in revamp/data/salvage_tables.py already enumerate the
+# obvious correspondences.
+_SALVAGE_TAG_RULES = [
+    # (set of tags any of which must match, table_key)
+    ({"corpse_humanoid", "crawler"},           "corpse_humanoid"),
+    ({"corpse_monster", "monster_remains"},    "corpse_monster"),
+    ({"corpse"},                               "corpse_humanoid"),
+    ({"sponsor","camera"},                     "sponsor_camera"),
+    ({"vending","machine"},                    "vending_machine"),
+    ({"bathroom","fixture","ceramic"},         "bathroom_fixture"),
+    ({"electrical","panel"},                   "electrical_panel"),
+    ({"chemical","acid","hazard"},             "chemical_hazard"),
+    ({"furniture","metal"},                    "furniture_metal"),
+    ({"furniture","wood"},                     "furniture_wood"),
+    ({"metal","scrap","heavy"},                "furniture_metal"),
+    ({"wood","handle"},                        "furniture_wood"),
+]
+
+
+def _pick_salvage_table_key(entity):
+    """Return a salvage-table key for the entity, or None if not salvageable."""
+    if entity is None:
+        return None
+    # Explicit pointer on the entity wins
+    if entity.state and entity.state.get("salvage_table"):
+        return entity.state["salvage_table"]
+    tags = set(entity.tags or [])
+    # Monster-type corpses
+    if entity.entity_type == "monster" and not entity.is_alive():
+        tags.add("corpse_monster")
+    if entity.entity_type == "crawler" and not getattr(entity, "alive", True):
+        tags.add("corpse_humanoid")
+    for required, table_key in _SALVAGE_TAG_RULES:
+        if any(t in tags for t in required):
+            return table_key
+    return None
