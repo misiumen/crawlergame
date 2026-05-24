@@ -1,11 +1,10 @@
 @echo off
-title CRAWL PROTOCOL - Revamp
+title CRAWL PROTOCOL v2
 cd /d "%~dp0"
 
-REM Ensure pygame is available (pygame-ce preferred on Windows)
 python -c "import pygame" 2>nul
 if errorlevel 1 (
-    echo pygame not found. Attempting to install pygame-ce...
+    echo pygame not found. Attempting to install...
     pip install pygame-ce --prefer-binary
     if errorlevel 1 (
         pip install pygame --prefer-binary
@@ -18,5 +17,5 @@ if errorlevel 1 (
     )
 )
 
-python main_revamp.py
+python main.py
 pause

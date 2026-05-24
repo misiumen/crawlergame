@@ -51,7 +51,7 @@ python -m PyInstaller ^
     --collect-submodules revamp ^
     --collect-submodules revamp.data ^
     --hidden-import pygame ^
-    main_revamp.py
+    main.py
 
 if errorlevel 1 (
     echo.

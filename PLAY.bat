@@ -1,10 +1,11 @@
 @echo off
-title CRAWL PROTOCOL v2
+title CRAWL PROTOCOL
 cd /d "%~dp0"
 
+REM Ensure pygame is available (pygame-ce preferred on Windows)
 python -c "import pygame" 2>nul
 if errorlevel 1 (
-    echo pygame not found. Attempting to install...
+    echo pygame not found. Attempting to install pygame-ce...
     pip install pygame-ce --prefer-binary
     if errorlevel 1 (
         pip install pygame --prefer-binary
