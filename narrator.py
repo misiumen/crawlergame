@@ -125,6 +125,55 @@ _LINES = {
         "Mutation acquired. You are now 12% less human. The audience loves it.",
         "Genetic variance confirmed. You are becoming something the dungeon hasn't seen before.",
     ],
+    # Step 12 — new categories
+    "env_kill": [
+        "Środowisko zrobiło robotę za ciebie. Widownia bije brawo.",
+        "Kreatywne. Bestialskie. Wysoka oglądalność.",
+        "Loch sam się skarży na ciebie do działu prawnego.",
+        "Sponsor ledwo nadążył z reklamą. Bardzo zadowolony.",
+        "Niewybredna metoda. Widownia kocha niewybredne metody.",
+    ],
+    "creative_solution": [
+        "Syndykat zapisuje. To było zaskakująco eleganckie.",
+        "Widownia: 'znowu to zrobi?' Syndykat: 'lepiej dla wszystkich, jeśli tak.'",
+        "Twoja kreatywność zmienia plany scenarzystów na następny tydzień.",
+    ],
+    "race_pick": [
+        "Loch zarejestrował twoją nową formę. To go zaintrygowało.",
+        "Twoja klasyfikacja gatunkowa: zaktualizowana. Klucz zmieniony.",
+        "Sponsor zmienił kontrakt w połowie zdania. To dobry znak.",
+    ],
+    "class_suggested": [
+        "Syndykat sugeruje klasę. Widownia już głosuje.",
+        "Twój styl gry został rozpoznany. Loch ma propozycje.",
+        "Analiza behawioralna: gotowe. Wybór klasy: czeka na ciebie.",
+    ],
+    "crawler_encountered": [
+        "Inny zawodnik. Widownia podwaja zakłady.",
+        "Spotkanie zawodników. Liczba widzów rośnie skokowo.",
+        "Statystycznie: jeden z was nie wyjdzie. Tym bardziej ciekawie.",
+    ],
+    "safehouse_visit": [
+        "Safehouse. Reklamy sponsorów aktywne. Kamery uprzejme.",
+        "Bezpieczna strefa. To znaczy, że jest tylko trochę niebezpiecznie.",
+        "Loch zawiesza wrogi tryb. Tylko tu. Tylko teraz.",
+    ],
+    "language_switched": [
+        "Język transmisji zmieniony. Sponsorzy obu rynków zadowoleni.",
+        "Transkrypcja zaktualizowana w 47 językach jednocześnie.",
+    ],
+    "achievement_unlock": [
+        "Osiągnięcie. Widownia notuje. Sponsor wpłaca premię.",
+        "Loch zarejestrował twoje osiągnięcie. Algorytm cię polubił.",
+    ],
+    "dialog_tense": [
+        "Słychać kliknięcie bezpiecznika. Widownia wstrzymuje oddech.",
+        "Rozmowa zaczyna pachnieć krwią. Wskaźnik widowni rośnie.",
+    ],
+    "dialog_friendly": [
+        "Ktoś tu komuś ufa. Loch nie wie, jak to obsłużyć.",
+        "Współpraca zawodników: rzadkie. Audytoryjne. Zyski sponsorów.",
+    ],
 }
 
 

@@ -212,6 +212,30 @@ class Character:
         # Flags
         self.class_box_choices: List[str] = []  # pending class choice
 
+        # ── v3 additions ──────────────────────────────────────────────────
+        # Race (picked on Floor 3 entry)
+        self.race: Optional[str] = None
+        self.race_features: List[str] = []
+        self.race_picked_at_floor: Optional[int] = None
+
+        # Player language preference (persists across sessions)
+        self.language_pref: str = "pl"
+
+        # Affinity tracking (Step 11 - dynamic class suggestions)
+        self.affinity: Dict[str, int] = {
+            "melee": 0, "ranged": 0, "stealth": 0, "magic": 0,
+            "tech": 0, "trap": 0, "env": 0, "support": 0, "social": 0,
+        }
+        self.kill_method_history: List[str] = []
+
+        # NPC tracking (Step 8 - crawlers)
+        self.known_npcs: List[str] = []         # crawler ids met
+        self.relationships: Dict[str, int] = {} # id -> rep score
+
+        # Crafting / materials (Step 7 area)
+        self.materials: Dict[str, int] = {}
+        self.known_recipes: List[str] = []
+
     # ── Derived stats ──────────────────────────────────────────────────────────
 
     def stat_mod(self, stat):
@@ -428,6 +452,17 @@ class Character:
             "mutations": list(self.mutations),
             "unlocked_achievements": list(self.unlocked_achievements),
             "conditions": list(self.conditions),
+            # v3 additions
+            "race": self.race,
+            "race_features": list(self.race_features),
+            "race_picked_at_floor": self.race_picked_at_floor,
+            "language_pref": self.language_pref,
+            "affinity": dict(self.affinity),
+            "kill_method_history": list(self.kill_method_history),
+            "known_npcs": list(self.known_npcs),
+            "relationships": dict(self.relationships),
+            "materials": dict(self.materials),
+            "known_recipes": list(self.known_recipes),
         }
 
     @classmethod
@@ -460,6 +495,19 @@ class Character:
         c.mutations = d.get("mutations", [])
         c.unlocked_achievements = d.get("unlocked_achievements", [])
         c.conditions = d.get("conditions", [])
+        # v3 additions (default values match __init__)
+        c.race = d.get("race")
+        c.race_features = list(d.get("race_features", []))
+        c.race_picked_at_floor = d.get("race_picked_at_floor")
+        c.language_pref = d.get("language_pref", "pl")
+        default_aff = {"melee": 0, "ranged": 0, "stealth": 0, "magic": 0,
+                       "tech": 0, "trap": 0, "env": 0, "support": 0, "social": 0}
+        c.affinity = {**default_aff, **(d.get("affinity") or {})}
+        c.kill_method_history = list(d.get("kill_method_history", []))
+        c.known_npcs = list(d.get("known_npcs", []))
+        c.relationships = dict(d.get("relationships") or {})
+        c.materials = dict(d.get("materials") or {})
+        c.known_recipes = list(d.get("known_recipes", []))
         return c
 
     # ── Display helpers ────────────────────────────────────────────────────────
@@ -474,10 +522,12 @@ class Character:
         return lines
 
     def gear_lines(self):
+        from lang import tr
+        none = tr("common_none")
         lines = []
-        lines.append(f"Weapon : {self.weapon.display() if self.weapon else 'None'}")
-        lines.append(f"Armor  : {self.armor.display() if self.armor else 'None'}")
-        lines.append(f"Trinket: {self.trinket.display() if self.trinket else 'None'}")
+        lines.append(f"{tr('ui_weapon')} : {self.weapon.display() if self.weapon else none}")
+        lines.append(f"{tr('ui_armor')}  : {self.armor.display() if self.armor else none}")
+        lines.append(f"{tr('ui_trinket')}: {self.trinket.display() if self.trinket else none}")
         return lines
 
     def feature_lines(self):

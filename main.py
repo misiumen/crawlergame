@@ -8,12 +8,26 @@ except ImportError:
     print("pygame is required. Run: pip install pygame")
     sys.exit(1)
 
-from config import SCREEN_W, SCREEN_H, FPS, TITLE
+from config import SCREEN_W, SCREEN_H, FPS, TITLE, LANGUAGE, LANG_DEBUG_MISSING
+import lang
+import audio
 
 
 def main():
+    # Initialize localization before anything renders.
+    lang.set_debug_missing(LANG_DEBUG_MISSING)
+    lang.set_language(LANGUAGE)
+
     pygame.init()
     pygame.display.set_caption(TITLE)
+
+    # Initialize audio after pygame.init(); safe no-op if no soundcard.
+    audio.init()
+    audio.preload_sfx(
+        "hit", "miss", "crit", "level_up", "box_open", "room_enter",
+        "button_click", "dialog_start", "door_close",
+        "item_pickup", "dice_roll",
+    )
     screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
 
     # Enable key repeat for text editing

@@ -3,6 +3,7 @@ import pygame
 import math
 from config import *
 from utils import wrap_text, rating_label, box_tier_color, ability_modifier
+from lang import tr
 
 
 # ── Font cache ─────────────────────────────────────────────────────────────────
@@ -13,10 +14,19 @@ _fonts = {}
 def get_font(size=FONT_SIZE_MD, bold=False):
     key = (size, bold)
     if key not in _fonts:
-        try:
-            _fonts[key] = pygame.font.SysFont(FONT_MONO, size, bold=bold)
-        except Exception:
-            _fonts[key] = pygame.font.Font(None, size + 4)
+        # Try fonts known to ship Polish diacritics on Windows/macOS/Linux.
+        candidates = [FONT_MONO, "Consolas", "Lucida Console", "DejaVu Sans Mono"]
+        font = None
+        for name in candidates:
+            try:
+                font = pygame.font.SysFont(name, size, bold=bold)
+                if font is not None:
+                    break
+            except Exception:
+                continue
+        if font is None:
+            font = pygame.font.Font(None, size + 4)
+        _fonts[key] = font
     return _fonts[key]
 
 
@@ -205,7 +215,7 @@ def draw_info_panel(surf, player, current_room=None, combat_state=None):
     cy += 6
 
     # Gear
-    draw_text(surf, "GEAR", cx, cy, ACCENT, FONT_SIZE_SM, bold=True)
+    draw_text(surf, tr("ui_gear"), cx, cy, ACCENT, FONT_SIZE_SM, bold=True)
     cy += sm_line_h
     for line in player.gear_lines():
         draw_text(surf, line, cx, cy, NORMAL_TEXT, FONT_SIZE_SM)
@@ -215,7 +225,7 @@ def draw_info_panel(surf, player, current_room=None, combat_state=None):
     # Features
     pygame.draw.line(surf, BORDER, (cx, cy), (x + w - 10, cy), 1)
     cy += 6
-    draw_text(surf, "FEATURES", cx, cy, ACCENT, FONT_SIZE_SM, bold=True)
+    draw_text(surf, tr("ui_features"), cx, cy, ACCENT, FONT_SIZE_SM, bold=True)
     cy += sm_line_h
     for i, feat in enumerate(player.features):
         avail_color = NORMAL_TEXT if feat.is_available() else DIM_TEXT
@@ -228,7 +238,7 @@ def draw_info_panel(surf, player, current_room=None, combat_state=None):
     # Conditions
     if player.conditions:
         cy += 4
-        cond_str = "Status: " + ", ".join(player.conditions)
+        cond_str = tr("ui_status", conds=", ".join(player.conditions))
         draw_text(surf, cond_str, cx, cy, DANGER, FONT_SIZE_SM)
         cy += sm_line_h
 
@@ -236,7 +246,7 @@ def draw_info_panel(surf, player, current_room=None, combat_state=None):
     if combat_state and combat_state.active_enemies():
         pygame.draw.line(surf, BORDER, (cx, cy), (x + w - 10, cy), 1)
         cy += 6
-        draw_text(surf, "ENEMIES", cx, cy, DANGER, FONT_SIZE_SM, bold=True)
+        draw_text(surf, tr("ui_enemies"), cx, cy, DANGER, FONT_SIZE_SM, bold=True)
         cy += sm_line_h
         for enemy in combat_state.active_enemies():
             draw_bar(surf, cx, cy, w - 20, 12, enemy.hp, enemy.max_hp,
@@ -249,7 +259,7 @@ def draw_info_panel(surf, player, current_room=None, combat_state=None):
     if current_room and not combat_state:
         pygame.draw.line(surf, BORDER, (cx, cy), (x + w - 10, cy), 1)
         cy += 6
-        draw_text(surf, f"ROOM: {current_room.name}", cx, cy, ACCENT, FONT_SIZE_SM, bold=True)
+        draw_text(surf, f"{tr('ui_room')}: {current_room.name}", cx, cy, ACCENT, FONT_SIZE_SM, bold=True)
         cy += sm_line_h
         draw_text(surf, current_room.description(), cx, cy, DIM_TEXT, FONT_SIZE_SM)
         cy += sm_line_h + 2
@@ -270,7 +280,7 @@ def draw_info_panel(surf, player, current_room=None, combat_state=None):
 def draw_log_panel(surf, log_lines, scroll_offset=0):
     x, y, w, h = LOG_RECT
     draw_panel(surf, LOG_RECT, bg=LOG_BG)
-    draw_text(surf, "BROADCAST LOG", x + 8, y + 4, ACCENT, FONT_SIZE_SM, bold=True)
+    draw_text(surf, tr("log_broadcast"), x + 8, y + 4, ACCENT, FONT_SIZE_SM, bold=True)
 
     font = get_font(FONT_SIZE_SM)
     line_h = font.get_height() + 1
@@ -375,33 +385,68 @@ def draw_title_screen(surf):
     """Full-screen title splash."""
     surf.fill(DARK_BG)
     lines = [
-        ("CRAWL PROTOCOL", ACCENT, FONT_SIZE_XL, True),
-        ("", NORMAL_TEXT, FONT_SIZE_MD, False),
-        ("A televised megadungeon experience.", NORMAL_TEXT, FONT_SIZE_MD, False),
-        ("Survival is not guaranteed.", DIM_TEXT, FONT_SIZE_MD, False),
-        ("Your participation is not optional.", DIM_TEXT, FONT_SIZE_MD, False),
-        ("", NORMAL_TEXT, FONT_SIZE_MD, False),
-        ("[1] Build Character", BRIGHT_TEXT, FONT_SIZE_LG, True),
-        ("[2] Random Start",    ACCENT,      FONT_SIZE_LG, True),
-        ("[3] Load Game",       BRIGHT_TEXT, FONT_SIZE_LG, True),
-        ("[4] How to Play",     BRIGHT_TEXT, FONT_SIZE_LG, True),
-        ("[5] Quit",            BRIGHT_TEXT, FONT_SIZE_LG, True),
+        ("CRAWL PROTOCOL",            ACCENT,      FONT_SIZE_XL, True),
+        ("",                          NORMAL_TEXT, FONT_SIZE_MD, False),
+        (tr("title_tagline_1"),       NORMAL_TEXT, FONT_SIZE_MD, False),
+        (tr("title_tagline_2"),       DIM_TEXT,    FONT_SIZE_MD, False),
+        (tr("title_tagline_3"),       DIM_TEXT,    FONT_SIZE_MD, False),
+        ("",                          NORMAL_TEXT, FONT_SIZE_MD, False),
+        (tr("title_build_character"), BRIGHT_TEXT, FONT_SIZE_LG, True),
+        (tr("title_random_start"),    ACCENT,      FONT_SIZE_LG, True),
+        (tr("title_load_game"),       BRIGHT_TEXT, FONT_SIZE_LG, True),
+        (tr("title_how_to_play"),     BRIGHT_TEXT, FONT_SIZE_LG, True),
+        (tr("title_quit"),            BRIGHT_TEXT, FONT_SIZE_LG, True),
     ]
     total_h = sum(get_font(size).get_height() + 6 for _, _, size, _ in lines)
-    cy = (SCREEN_H - total_h) // 2 - 20
+    cy = (SCREEN_H - total_h) // 2 - 30
     for text, color, size, bold in lines:
         font = get_font(size, bold)
         img = font.render(text, True, color)
         surf.blit(img, ((SCREEN_W - img.get_width()) // 2, cy))
         cy += img.get_height() + 6
 
-    hint = "Press 1 - 5"
+    hint = tr("title_press_15")
     hint_img = get_font(FONT_SIZE_SM).render(hint, True, DIM_TEXT)
     surf.blit(hint_img, ((SCREEN_W - hint_img.get_width()) // 2, cy + 10))
 
-    tag = "The Syndicate is watching. The Protocol is running."
+    # Language toggle hint (top-right corner)
+    from lang import get_language, lang_label
+    lang_str = f"{tr('title_toggle_lang')}   [ {lang_label(get_language())} ]"
+    lang_img = get_font(FONT_SIZE_SM).render(lang_str, True, ACCENT2)
+    surf.blit(lang_img, (SCREEN_W - lang_img.get_width() - 20, 20))
+
+    tag = tr("title_syndicate_footer")
     draw_text(surf, tag, (SCREEN_W - get_font(FONT_SIZE_SM).size(tag)[0]) // 2,
               SCREEN_H - 30, DIM_TEXT, FONT_SIZE_SM)
+
+
+def draw_race_pick(surf, data):
+    """Render the race selection screen. data = {"races": [Race,...]}."""
+    races = data.get("races", [])
+    lines = [tr("race_pick_intro"), ""]
+    for i, r in enumerate(races, 1):
+        lines.append(f"  [{i}] {r.name}")
+        lines.append(f"       {r.description}")
+        lines.append(f"       {r.passive_description}")
+    lines.append("")
+    lines.append(tr("race_pick_choose", n=len(races)))
+    draw_popup(surf, tr("race_pick_title"), lines, width=900, height=None)
+
+
+def draw_dialog(surf, npc, node):
+    """Render an NPC dialog popup."""
+    # Translate disposition/archetype labels
+    arch = tr(f"arch_{npc.archetype}")
+    dispo = tr(f"dispo_{npc.disposition}")
+    header = tr("dialog_npc_appears", name=npc.name, arch=arch, dispo=dispo)
+
+    lines = [header, "", f"  \"{node.get('say','...')}\"", ""]
+    for i, (label, _) in enumerate(node.get("options", []), 1):
+        lines.append(f"  [{i}] {label}")
+    lines.append("")
+    lines.append(tr("dialog_choose"))
+
+    draw_popup(surf, "DIALOG", lines, width=700)
 
 
 def draw_intro_screen(surf, player, backstory, page=0):
@@ -544,37 +589,41 @@ def draw_intro_screen(surf, player, backstory, page=0):
 
 
 def draw_char_creation(surf, state):
-    """
-    Character creation screen.
-    state is a dict managed by game.py with keys:
-      step, name_input, selected_bg, stats, point_pool, cursor
-    """
+    """Character creation screen — fully localized."""
     surf.fill(DARK_BG)
-    draw_text(surf, "CHARACTER CREATION", 40, 20, ACCENT, FONT_SIZE_XL, bold=True)
-    draw_text(surf, "CRAWL PROTOCOL - Contestant Registration", 40, 50, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("create_title"),    40, 20, ACCENT, FONT_SIZE_XL, bold=True)
+    draw_text(surf, tr("create_subtitle"), 40, 50, DIM_TEXT, FONT_SIZE_SM)
 
     step = state.get("step", "name")
 
     if step == "name":
-        draw_text(surf, "Enter your name:", 100, 200, NORMAL_TEXT, FONT_SIZE_LG)
+        draw_text(surf, tr("create_enter_name"), 100, 200, NORMAL_TEXT, FONT_SIZE_LG)
         name = state.get("name_input", "")
         pygame.draw.rect(surf, INPUT_BG, (100, 240, 400, 40))
         pygame.draw.rect(surf, ACCENT, (100, 240, 400, 40), 2)
         draw_text(surf, name + "|", 110, 252, BRIGHT_TEXT, FONT_SIZE_LG)
-        draw_text(surf, "[Enter] Confirm", 100, 300, DIM_TEXT, FONT_SIZE_SM)
+        draw_text(surf, tr("common_enter_to_continue"), 100, 300, DIM_TEXT, FONT_SIZE_SM)
 
     elif step == "background":
         from character import BACKGROUNDS
-        draw_text(surf, "Select Background:", 60, 100, NORMAL_TEXT, FONT_SIZE_LG)
+        draw_text(surf, tr("create_select_bg"), 60, 100, NORMAL_TEXT, FONT_SIZE_LG)
         selected = state.get("selected_bg", 0)
         bg_keys = list(BACKGROUNDS.keys())
         for i, key in enumerate(bg_keys):
             bg = BACKGROUNDS[key]
             color = ACCENT if i == selected else NORMAL_TEXT
             y_pos = 140 + i * 44
-            draw_text(surf, f"[{i+1}] {key}", 80, y_pos, color, FONT_SIZE_MD, bold=(i == selected))
-            draw_text(surf, bg["desc"], 80, y_pos + 18, DIM_TEXT, FONT_SIZE_SM)
-        draw_text(surf, "[Up/Down] Navigate   [Enter] Select", 80, SCREEN_H - 50, DIM_TEXT, FONT_SIZE_SM)
+            # Background names are localized via bg_<key>_n, descriptions via _d
+            label = tr(f"bg_{key.lower()}_n")
+            desc  = tr(f"bg_{key.lower()}_d")
+            # Fallback: if localization missing, use the catalog English
+            if label == f"bg_{key.lower()}_n":
+                label = key
+            if desc == f"bg_{key.lower()}_d":
+                desc = bg.get("desc", "")
+            draw_text(surf, f"[{i+1}] {label}", 80, y_pos, color, FONT_SIZE_MD, bold=(i == selected))
+            draw_text(surf, desc, 80, y_pos + 18, DIM_TEXT, FONT_SIZE_SM)
+        draw_text(surf, tr("create_keys_bg"), 80, SCREEN_H - 50, DIM_TEXT, FONT_SIZE_SM)
 
     elif step == "stats":
         from config import BASE_STATS, STAT_COST
@@ -582,8 +631,8 @@ def draw_char_creation(surf, state):
         stats = state.get("stats", {s: 8 for s in BASE_STATS})
         cursor = state.get("cursor", 0)
 
-        draw_text(surf, "Allocate Stats (Point Buy)", 60, 100, NORMAL_TEXT, FONT_SIZE_LG)
-        draw_text(surf, f"Points remaining: {pool}", 60, 130, ACCENT, FONT_SIZE_MD)
+        draw_text(surf, tr("create_assign_stats"), 60, 100, NORMAL_TEXT, FONT_SIZE_LG)
+        draw_text(surf, tr("create_points_left", pool=pool), 60, 130, ACCENT, FONT_SIZE_MD)
 
         for i, stat in enumerate(BASE_STATS):
             val = stats[stat]
@@ -594,10 +643,10 @@ def draw_char_creation(surf, state):
             cost = STAT_COST.get(val + 1, 99)
             draw_text(surf, f"{stat}:", 80, y_pos, color, FONT_SIZE_MD, bold=(i == cursor))
             draw_text(surf, f"{val}  ({sign}{mod})", 160, y_pos, color, FONT_SIZE_LG, bold=(i == cursor))
-            draw_text(surf, f"[cost to raise: {cost}]", 260, y_pos + 4, DIM_TEXT, FONT_SIZE_SM)
+            draw_text(surf, tr("create_cost_label", cost=cost), 260, y_pos + 4, DIM_TEXT, FONT_SIZE_SM)
 
-        draw_text(surf, "[Up/Down] Select stat   [Left/Right] Adjust   [Enter] Confirm", 60, SCREEN_H - 50, DIM_TEXT, FONT_SIZE_SM)
-        draw_text(surf, "Min 8, Max 15 before background bonuses", 60, SCREEN_H - 70, DIM_TEXT, FONT_SIZE_SM)
+        draw_text(surf, tr("create_keys_stats"), 60, SCREEN_H - 50, DIM_TEXT, FONT_SIZE_SM)
+        draw_text(surf, tr("create_min_max"),    60, SCREEN_H - 70, DIM_TEXT, FONT_SIZE_SM)
 
     elif step == "confirm":
         from character import BACKGROUNDS
@@ -605,78 +654,70 @@ def draw_char_creation(surf, state):
         bg = BACKGROUNDS.get(bg_key, {})
         name = state.get("name", "Unknown")
         stats = state.get("stats", {})
-        draw_text(surf, "Confirm Character", 60, 100, NORMAL_TEXT, FONT_SIZE_LG)
-        draw_text(surf, f"Name: {name}", 80, 150, BRIGHT_TEXT, FONT_SIZE_MD)
-        draw_text(surf, f"Background: {bg_key}", 80, 180, BRIGHT_TEXT, FONT_SIZE_MD)
-        draw_text(surf, f"Perk: {bg.get('perk_desc', '')}", 80, 200, DIM_TEXT, FONT_SIZE_SM)
+        draw_text(surf, tr("create_confirm"), 60, 100, NORMAL_TEXT, FONT_SIZE_LG)
+        draw_text(surf, f"{tr('create_name_label')} {name}",    80, 150, BRIGHT_TEXT, FONT_SIZE_MD)
+        bg_label = tr(f"bg_{bg_key.lower()}_n")
+        if bg_label == f"bg_{bg_key.lower()}_n":
+            bg_label = bg_key
+        draw_text(surf, f"{tr('create_bg_label')} {bg_label}",   80, 180, BRIGHT_TEXT, FONT_SIZE_MD)
+        perk_desc = tr(f"bg_{bg_key.lower()}_perk_d")
+        if perk_desc == f"bg_{bg_key.lower()}_perk_d":
+            perk_desc = bg.get("perk_desc", "")
+        draw_text(surf, f"{tr('create_perk_label')} {perk_desc}", 80, 200, DIM_TEXT, FONT_SIZE_SM)
         y_s = 240
         for stat, val in stats.items():
             mod = ability_modifier(val)
-            sign = "+" if mod >= 0 else ""
             bonus = bg.get("stat_bonus", {}).get(stat, 0)
             final = val + bonus
             final_mod = ability_modifier(final)
             fsign = "+" if final_mod >= 0 else ""
-            draw_text(surf, f"{stat}: {val} + {bonus} bg = {final} ({fsign}{final_mod})", 80, y_s, NORMAL_TEXT, FONT_SIZE_SM)
+            draw_text(surf, f"{stat}: {val} + {bonus} bg = {final} ({fsign}{final_mod})",
+                      80, y_s, NORMAL_TEXT, FONT_SIZE_SM)
             y_s += 22
-        draw_text(surf, "[Enter] Start   [Backspace] Back", 80, SCREEN_H - 50, DIM_TEXT, FONT_SIZE_SM)
+        draw_text(surf, tr("create_keys_confirm"), 80, SCREEN_H - 50, DIM_TEXT, FONT_SIZE_SM)
 
 
 def draw_victory_screen(surf, player):
     surf.fill(DARK_BG)
-    draw_text(surf, "SIGNAL TERMINATED. SUBJECT WINS.", SCREEN_W // 2 - 200, 200, SUCCESS, FONT_SIZE_XL, bold=True)
-    draw_text(surf, f"{player.name} has survived the CRAWL PROTOCOL.", 300, 280, NORMAL_TEXT, FONT_SIZE_LG)
-    draw_text(surf, f"Final level     : {player.level}", 320, 330, ACCENT, FONT_SIZE_MD)
-    draw_text(surf, f"Audience rating : {player.audience_rating}  ({rating_label(player.audience_rating)})", 320, 360, ACCENT, FONT_SIZE_MD)
-    draw_text(surf, f"Credits earned  : {player.credits}", 320, 390, ACCENT, FONT_SIZE_MD)
-    draw_text(surf, f"Rooms cleared   : {player.rooms_cleared}", 320, 420, ACCENT, FONT_SIZE_MD)
-    draw_text(surf, "The Protocol did not expect this.", 320, 470, DIM_TEXT, FONT_SIZE_MD)
-    draw_text(surf, "It is recalibrating.", 320, 500, DIM_TEXT, FONT_SIZE_SM)
-    draw_text(surf, "[Enter] Return to menu", 320, 580, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("victory_title"), SCREEN_W // 2 - 280, 200, SUCCESS, FONT_SIZE_XL, bold=True)
+    draw_text(surf, tr("victory_survived", name=player.name), 300, 280, NORMAL_TEXT, FONT_SIZE_LG)
+    draw_text(surf, tr("victory_level",   level=player.level), 320, 330, ACCENT, FONT_SIZE_MD)
+    draw_text(surf, tr("victory_rating",
+                       rating=player.audience_rating,
+                       label=rating_label(player.audience_rating)),
+              320, 360, ACCENT, FONT_SIZE_MD)
+    draw_text(surf, tr("victory_credits", cr=player.credits), 320, 390, ACCENT, FONT_SIZE_MD)
+    draw_text(surf, tr("victory_rooms",   rooms=player.rooms_cleared), 320, 420, ACCENT, FONT_SIZE_MD)
+    draw_text(surf, tr("victory_flavor1"), 320, 470, DIM_TEXT, FONT_SIZE_MD)
+    draw_text(surf, tr("victory_flavor2"), 320, 500, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("victory_return"),  320, 580, DIM_TEXT, FONT_SIZE_SM)
 
 
 def draw_defeat_screen(surf, player):
     surf.fill(DARK_BG)
-    draw_text(surf, "PARTICIPANT RECORD CLOSED.", SCREEN_W // 2 - 200, 200, DANGER, FONT_SIZE_XL, bold=True)
-    draw_text(surf, f"{player.name} did not survive.", 300, 280, NORMAL_TEXT, FONT_SIZE_LG)
-    draw_text(surf, f"Level reached   : {player.level}", 320, 330, WARN, FONT_SIZE_MD)
-    draw_text(surf, f"Floor reached   : {player.current_floor}", 320, 360, WARN, FONT_SIZE_MD)
-    draw_text(surf, f"Audience rating : {player.audience_rating}", 320, 390, WARN, FONT_SIZE_MD)
-    draw_text(surf, f"Credits earned  : {player.credits}", 320, 420, WARN, FONT_SIZE_MD)
-    draw_text(surf, "The dungeon recycles its resources efficiently.", 300, 480, DIM_TEXT, FONT_SIZE_MD)
-    draw_text(surf, "[Enter] Return to menu", 320, 560, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("defeat_title"), SCREEN_W // 2 - 250, 200, DANGER, FONT_SIZE_XL, bold=True)
+    draw_text(surf, tr("defeat_died", name=player.name), 300, 280, NORMAL_TEXT, FONT_SIZE_LG)
+    draw_text(surf, tr("defeat_level",   level=player.level),         320, 330, WARN, FONT_SIZE_MD)
+    draw_text(surf, tr("defeat_floor",   floor=player.current_floor), 320, 360, WARN, FONT_SIZE_MD)
+    draw_text(surf, tr("defeat_rating",  rating=player.audience_rating), 320, 390, WARN, FONT_SIZE_MD)
+    draw_text(surf, tr("defeat_credits", cr=player.credits),          320, 420, WARN, FONT_SIZE_MD)
+    draw_text(surf, tr("defeat_flavor"), 300, 480, DIM_TEXT, FONT_SIZE_MD)
+    draw_text(surf, tr("defeat_return"), 320, 560, DIM_TEXT, FONT_SIZE_SM)
 
 
 def draw_howtoplay(surf):
     surf.fill(DARK_BG)
-    draw_text(surf, "HOW TO PLAY", 60, 30, ACCENT, FONT_SIZE_XL, bold=True)
+    draw_text(surf, tr("help_title"), 60, 30, ACCENT, FONT_SIZE_XL, bold=True)
     sections = [
-        ("OVERVIEW", [
-            "You are a contestant in the CRAWL PROTOCOL, a megadungeon broadcast",
-            "operated by The Syndicate. Descend 5 floors, defeat bosses, survive.",
-        ]),
-        ("INPUT", [
-            "Type any action in the input bar. The system parses your intent.",
-            "  'attack the guard'  'shove it into the acid'  'use medkit'",
-            "  'try to disarm the trap'  'intimidate the enemy'",
-            "Or press numbers: [1] Attack  [2] Use Item  [3] Defend  [4] Flee",
-        ]),
-        ("COMBAT", [
-            "d20 + stat modifier + proficiency vs enemy AC to hit.",
-            "Natural 20 = critical hit (double damage).",
-            "Natural 1  = critical miss.",
-            "Creative actions use the environment for bonus audience rating.",
-        ]),
-        ("CLASSES", [
-            "Start as Unclassified. Open a Class Box to earn a class.",
-            "Classes: Warrior Rogue Ranger Mage Cleric Warlock Engineer Psion",
-            "Level 5: choose to Specialize or Hybridize.",
-        ]),
-        ("EXPLORATION", [
-            "Click a connected room node on the map to move there.",
-            "Or type: 'move to room 3'  'go to checkpoint'  'navigate forward'",
-            "Checkpoints are safe zones with faction shops.",
-        ]),
+        (tr("help_overview_h"), [tr("help_overview_1"), tr("help_overview_2")]),
+        (tr("help_input_h"),    [tr("help_input_1"), tr("help_input_2"),
+                                 tr("help_input_3"), tr("help_input_4")]),
+        (tr("help_combat_h"),   [tr("help_combat_1"), tr("help_combat_2"),
+                                 tr("help_combat_3"), tr("help_combat_4")]),
+        (tr("help_classes_h"),  [tr("help_classes_1"), tr("help_classes_2"),
+                                 tr("help_classes_3")]),
+        (tr("help_explore_h"),  [tr("help_explore_1"), tr("help_explore_2"),
+                                 tr("help_explore_3")]),
     ]
     cy = 80
     for title, lines in sections:
@@ -686,57 +727,61 @@ def draw_howtoplay(surf):
             draw_text(surf, line, 80, cy, NORMAL_TEXT, FONT_SIZE_SM)
             cy += get_font(FONT_SIZE_SM).get_height() + 2
         cy += 10
-    draw_text(surf, "[Enter] or [Esc] Back", 60, SCREEN_H - 40, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("help_back"), 60, SCREEN_H - 40, DIM_TEXT, FONT_SIZE_SM)
 
 
 def draw_box_open(surf, tier, items):
     """Popup for box opening animation/reveal."""
-    tier_color = box_tier_color(tier)
-    lines = [f"  {tier.upper()} BOX OPENED", ""]
+    lines = [f"  {tier.upper()} {tr('box_opened_label')}", ""]
     if not items:
-        lines.append("  Nothing. The Syndicate is embarrassed for you.")
+        lines.append(f"  {tr('box_empty')}")
     for item in items:
         if isinstance(item, tuple) and item[0] == "credits":
-            lines.append(f"  + {item[1]} Credits")
+            lines.append(f"  + {item[1]} {tr('ui_credits')}")
         elif hasattr(item, "display"):
             lines.append(f"  + {item.display()}")
         else:
             lines.append(f"  + {item}")
     lines.append("")
-    lines.append("  [Enter] Continue")
-    draw_popup(surf, f"{tier} Box", lines)
+    lines.append(f"  {tr('common_enter_to_continue')}")
+    draw_popup(surf, f"{tier}", lines)
 
 
 def draw_class_choice(surf, choices):
     """Popup for choosing a class from 3 options."""
     from character import CLASSES
-    lines = ["  A Class Box has been opened!", "  Choose your class designation:"]
-    lines.append("")
+    lines = [f"  {tr('popup_class_intro')}", f"  {tr('popup_class_choose')}", ""]
     options = []
     for i, key in enumerate(choices[:3]):
         cls = CLASSES.get(key, {})
-        lines.append(f"  [{i+1}] {cls.get('name', key)}")
-        lines.append(f"       {cls.get('desc', '')}")
-        options.append((str(i + 1), cls.get("name", key)))
-    draw_popup(surf, "CLASS DESIGNATION", lines, options)
+        cls_name = tr(f"class_{key}_n")
+        if cls_name == f"class_{key}_n":
+            cls_name = cls.get("name", key)
+        cls_desc = tr(f"class_{key}_d")
+        if cls_desc == f"class_{key}_d":
+            cls_desc = cls.get("desc", "")
+        lines.append(f"  [{i+1}] {cls_name}")
+        lines.append(f"       {cls_desc}")
+        options.append((str(i + 1), cls_name))
+    draw_popup(surf, tr("popup_class_title"), lines, options)
 
 
 def draw_level_up(surf, player, new_level):
     lines = [
-        f"  Level {new_level} reached.",
-        f"  HP: {player.max_hp}  Prof: +{player.prof()}",
+        f"  {tr('level_up_reached', level=new_level)}",
+        f"  {tr('ui_hp')}: {player.max_hp}  Prof: +{player.prof()}",
         "",
-        "  [Enter] Continue",
+        f"  {tr('common_enter_to_continue')}",
     ]
-    draw_popup(surf, "LEVEL UP", lines)
+    draw_popup(surf, tr("level_up_title"), lines)
 
 
 def draw_merchant(surf, player, stock, selected=0):
     surf.fill(DARK_BG)
     draw_panel(surf, (60, 60, SCREEN_W - 120, SCREEN_H - 120))
-    draw_text(surf, "MERCHANT", 80, 80, ACCENT, FONT_SIZE_XL, bold=True)
-    draw_text(surf, f"Credits: {player.credits}", 80, 120, GOLD_COLOR, FONT_SIZE_MD)
-    draw_text(surf, "The Syndicate takes its cut.", SCREEN_W - 320, 120, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("merchant_title"), 80, 80, ACCENT, FONT_SIZE_XL, bold=True)
+    draw_text(surf, f"{tr('ui_credits')}: {player.credits}", 80, 120, GOLD_COLOR, FONT_SIZE_MD)
+    draw_text(surf, tr("merchant_cut"), SCREEN_W - 320, 120, DIM_TEXT, FONT_SIZE_SM)
 
     cy = 160
     for i, (item, price) in enumerate(stock):
@@ -748,21 +793,19 @@ def draw_merchant(surf, player, stock, selected=0):
         cy += get_font(FONT_SIZE_MD).get_height() + 4
 
     cy += 20
-    draw_text(surf, "[S] Sell item from inventory", 80, cy, DIM_TEXT, FONT_SIZE_SM)
-    cy += 24
-    draw_text(surf, "[H] Heal (30 CR per 10 HP)", 80, cy, DIM_TEXT, FONT_SIZE_SM)
-    cy += 24
-    draw_text(surf, "[Enter] Buy selected   [Esc] Leave", 80, cy, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("merchant_sell"),  80, cy, DIM_TEXT, FONT_SIZE_SM); cy += 24
+    draw_text(surf, tr("merchant_heal"),  80, cy, DIM_TEXT, FONT_SIZE_SM); cy += 24
+    draw_text(surf, tr("merchant_keys"),  80, cy, DIM_TEXT, FONT_SIZE_SM)
 
 
 def draw_inventory(surf, player, selected=0):
     surf.fill(DARK_BG)
     draw_panel(surf, (60, 60, SCREEN_W - 120, SCREEN_H - 120))
-    draw_text(surf, "INVENTORY", 80, 80, ACCENT, FONT_SIZE_XL, bold=True)
-    draw_text(surf, f"Credits: {player.credits}", 80, 120, GOLD_COLOR, FONT_SIZE_MD)
+    draw_text(surf, tr("inv_title"), 80, 80, ACCENT, FONT_SIZE_XL, bold=True)
+    draw_text(surf, f"{tr('ui_credits')}: {player.credits}", 80, 120, GOLD_COLOR, FONT_SIZE_MD)
 
     if not player.inventory:
-        draw_text(surf, "  (empty)", 80, 160, DIM_TEXT, FONT_SIZE_MD)
+        draw_text(surf, f"  {tr('common_empty')}", 80, 160, DIM_TEXT, FONT_SIZE_MD)
     else:
         cy = 160
         for i, item in enumerate(player.inventory):
@@ -771,13 +814,13 @@ def draw_inventory(surf, player, selected=0):
                 draw_text(surf, f"[{i+1}] {item.display()}", 80, cy, color, FONT_SIZE_MD, bold=(i == selected))
             cy += get_font(FONT_SIZE_MD).get_height() + 4
 
-    draw_text(surf, "[U] Use  [E] Equip  [Esc] Back", 80, SCREEN_H - 100, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("inv_keys"), 80, SCREEN_H - 100, DIM_TEXT, FONT_SIZE_SM)
 
 
 def draw_faction_hall(surf, faction_data, player):
     """Faction checkpoint interaction."""
     name, tag, desc = faction_data
     draw_panel(surf, (100, 80, SCREEN_W - 200, SCREEN_H - 160))
-    draw_text(surf, f"FACTION: {name}", 120, 100, ACCENT2, FONT_SIZE_LG, bold=True)
+    draw_text(surf, f"{tr('faction_label')}: {name}", 120, 100, ACCENT2, FONT_SIZE_LG, bold=True)
     draw_text(surf, desc, 120, 138, NORMAL_TEXT, FONT_SIZE_MD)
-    draw_text(surf, "[1] Trade with faction  [2] Learn intel  [3] Leave", 120, 240, DIM_TEXT, FONT_SIZE_SM)
+    draw_text(surf, tr("faction_keys"), 120, 240, DIM_TEXT, FONT_SIZE_SM)

@@ -79,11 +79,22 @@ def wrap_text(text, max_chars):
 
 def rating_label(rating):
     from config import RATING_LABELS
+    from lang import tr
+    # Map RATING_LABELS English names to stable i18n keys
+    key_map = {
+        "Dead Air":         "rating_dead_air",
+        "Minor Interest":   "rating_minor",
+        "Gaining Viewers":  "rating_gaining",
+        "Popular":          "rating_popular",
+        "Sensation":        "rating_sensation",
+        "Phenomenon":       "rating_phenomenon",
+        "Legendary":        "rating_legendary",
+    }
     label = RATING_LABELS[0][1]
     for threshold, name in RATING_LABELS:
         if rating >= threshold:
             label = name
-    return label
+    return tr(key_map.get(label, "rating_dead_air"))
 
 
 def box_tier_color(tier):

@@ -254,9 +254,16 @@ def _resolve_drop(category, table):
     return None
 
 
-def open_class_box(available_classes):
-    """Returns 3 random class keys from available_classes list."""
+def open_class_box(available_classes, player=None):
+    """
+    Step 11: return 3 class keys. If player is provided and has any affinity,
+    suggestions are weighted by play style; otherwise falls back to random.
+    """
     pool = list(available_classes)
+    if player is not None and any(getattr(player, "affinity", {}).values()):
+        from affinity import suggest_classes
+        suggested = suggest_classes(player, n=3, available_keys=pool)
+        return suggested
     random.shuffle(pool)
     return pool[:3]
 

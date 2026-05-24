@@ -6,6 +6,20 @@ SCREEN_H = 720
 FPS = 60
 TITLE = "CRAWL PROTOCOL"
 
+# --- Localization ---
+LANGUAGE = "pl"            # default UI language ("pl" | "en")
+LANG_DEBUG_MISSING = False  # render missing keys as "[?key]" when True
+
+# --- Audio (reserved — implemented in Step 1) ---
+AUDIO_ENABLED = True
+MASTER_VOLUME = 0.7
+MUSIC_VOLUME  = 0.5
+SFX_VOLUME    = 0.8
+ASSET_DIR  = "assets"
+SFX_DIR    = "assets/sfx"
+MUSIC_DIR  = "assets/music"
+ICON_DIR   = "assets/icons"
+
 # --- Panel layout ---
 MAP_W = 480
 INFO_W = SCREEN_W - MAP_W          # 800

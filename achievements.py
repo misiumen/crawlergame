@@ -1,169 +1,88 @@
-"""Achievement system for CRAWL PROTOCOL."""
-import random
-from dataclasses import dataclass, field
-from typing import Optional
+"""CRAWL PROTOCOL - Achievement system (Step 3, bilingual).
+
+Achievements have stable ASCII keys; names/descriptions live in
+locales/pl.json and locales/en.json via tr().
+
+Saves store only a list of unlocked keys (Character.unlocked_achievements),
+so this module can grow new entries without breaking old saves.
+
+Usage:
+    from achievements import unlock, is_unlocked, catalog_keys
+    unlock(player, "first_blood", log_callback=game.msg)
+"""
+from dataclasses import dataclass
+from typing import Optional, Callable, List
+
+from lang import tr
 
 
 @dataclass
 class Achievement:
-    name: str
-    description: str
-    unlocked: bool = False
-    reward_type: str = "none"   # none, xp, credits, mutation_chance
+    key: str                  # stable ASCII id; never displayed
+    reward_type: str = "none" # none | xp | credits
     reward_value: int = 0
 
+    @property
+    def name(self) -> str:
+        return tr(f"achievement_{self.key}_n")
 
+    @property
+    def description(self) -> str:
+        return tr(f"achievement_{self.key}_d")
+
+
+# Catalog keyed by stable id. Localized strings live in JSON.
 ACHIEVEMENT_CATALOG = {
-    "First Blood": Achievement(
-        "First Blood",
-        "Kill your first enemy.",
-        reward_type="xp", reward_value=25
-    ),
-    "Barely Breathing": Achievement(
-        "Barely Breathing",
-        "Survive combat with 1 HP remaining.",
-        reward_type="xp", reward_value=50
-    ),
-    "Trap Enthusiast": Achievement(
-        "Trap Enthusiast",
-        "Trigger 3 traps. Intentionally or otherwise.",
-        reward_type="xp", reward_value=30
-    ),
-    "Critical Problem": Achievement(
-        "Critical Problem",
-        "Land a critical hit.",
-        reward_type="xp", reward_value=20
-    ),
-    "Natural Disaster": Achievement(
-        "Natural Disaster",
-        "Roll a natural 1 in combat.",
-        reward_type="none", reward_value=0
-    ),
-    "Boss Breaker": Achievement(
-        "Boss Breaker",
-        "Defeat a floor boss.",
-        reward_type="xp", reward_value=100
-    ),
-    "Mutation Accepted": Achievement(
-        "Mutation Accepted",
-        "Gain your first mutation.",
-        reward_type="xp", reward_value=40
-    ),
-    "Questionable Snack": Achievement(
-        "Questionable Snack",
-        "Use a Mystery Ration.",
-        reward_type="none", reward_value=0
-    ),
-    "Wrong Lever": Achievement(
-        "Wrong Lever",
-        "Trigger a trap while trying to disarm it.",
-        reward_type="xp", reward_value=15
-    ),
-    "Unfair Trade": Achievement(
-        "Unfair Trade",
-        "Spend 50 or more credits at a merchant.",
-        reward_type="xp", reward_value=30
-    ),
-    "Still Standing": Achievement(
-        "Still Standing",
-        "Reach floor 2.",
-        reward_type="xp", reward_value=75
-    ),
-    "Floor One Survivor": Achievement(
-        "Floor One Survivor",
-        "Clear floor 1 completely.",
-        reward_type="credits", reward_value=25
-    ),
-    "Collector": Achievement(
-        "Collector",
-        "Carry 5 or more items in inventory.",
-        reward_type="xp", reward_value=20
-    ),
-    "Cowardice Is Strategy": Achievement(
-        "Cowardice Is Strategy",
-        "Successfully flee from combat.",
-        reward_type="xp", reward_value=15
-    ),
-    "Overkill": Achievement(
-        "Overkill",
-        "Deal 20+ damage in a single hit.",
-        reward_type="xp", reward_value=50
-    ),
-    "Hybrid Theory": Achievement(
-        "Hybrid Theory",
-        "Unlock a hybrid class.",
-        reward_type="xp", reward_value=75
-    ),
-    "Disarmed": Achievement(
-        "Disarmed",
-        "Successfully disarm a trap.",
-        reward_type="xp", reward_value=25
-    ),
-    "Merchant of Death": Achievement(
-        "Merchant of Death",
-        "Buy 3 items from merchants.",
-        reward_type="credits", reward_value=15
-    ),
+    "first_blood":      Achievement("first_blood",      "xp", 25),
+    "floor_1":          Achievement("floor_1",          "xp", 100),
+    "still_standing":   Achievement("still_standing",   "xp", 150),
+    "hybrid":           Achievement("hybrid",           "xp", 75),
+    "env_kill":         Achievement("env_kill",         "credits", 40),
+    "safehouse":        Achievement("safehouse",        "xp", 30),
+    "crawler_friend":   Achievement("crawler_friend",   "credits", 50),
+    "crawler_enemy":    Achievement("crawler_enemy",    "xp", 60),
+    "race_picked":      Achievement("race_picked",      "xp", 50),
 }
 
 
-class AchievementManager:
-    def __init__(self):
-        self.achievements = {k: Achievement(v.name, v.description,
-                                            v.unlocked, v.reward_type, v.reward_value)
-                             for k, v in ACHIEVEMENT_CATALOG.items()}
-        self.counters = {
-            "traps_triggered": 0,
-            "merchant_buys": 0,
-            "credits_spent": 0,
-        }
+def catalog_keys() -> List[str]:
+    return list(ACHIEVEMENT_CATALOG.keys())
 
-    def unlock(self, name):
-        """Unlock an achievement. Returns (reward_type, reward_value) or None if already unlocked."""
-        ach = self.achievements.get(name)
-        if ach and not ach.unlocked:
-            ach.unlocked = True
-            from narrator import get_narrator
-            n = get_narrator()
-            print(f"\n  [ACHIEVEMENT] {name}: {ach.description}")
-            n.say("achievement")
-            return ach.reward_type, ach.reward_value
-        return None
 
-    def is_unlocked(self, name):
-        ach = self.achievements.get(name)
-        return ach.unlocked if ach else False
+def is_unlocked(player, key: str) -> bool:
+    return key in getattr(player, "unlocked_achievements", [])
 
-    def check_inventory(self, inventory):
-        if len(inventory) >= 5:
-            self.unlock("Collector")
 
-    def check_credits_spent(self, amount):
-        self.counters["credits_spent"] += amount
-        if self.counters["credits_spent"] >= 50:
-            self.unlock("Unfair Trade")
+def unlock(player, key: str, log_callback: Optional[Callable] = None) -> bool:
+    """
+    Mark an achievement as unlocked on the player. Applies reward and logs
+    via the callback (typically Game.msg). Returns True if newly unlocked.
+    """
+    if not hasattr(player, "unlocked_achievements"):
+        return False
+    if key in player.unlocked_achievements:
+        return False
+    ach = ACHIEVEMENT_CATALOG.get(key)
+    if ach is None:
+        return False
 
-    def check_merchant_buy(self):
-        self.counters["merchant_buys"] += 1
-        if self.counters["merchant_buys"] >= 3:
-            self.unlock("Merchant of Death")
+    player.unlocked_achievements.append(key)
 
-    def check_trap_trigger(self):
-        self.counters["traps_triggered"] += 1
-        if self.counters["traps_triggered"] >= 3:
-            self.unlock("Trap Enthusiast")
+    # Apply reward
+    if ach.reward_type == "xp" and ach.reward_value:
+        try:
+            player.add_xp(ach.reward_value)
+        except Exception:
+            pass
+    elif ach.reward_type == "credits" and ach.reward_value:
+        player.credits = getattr(player, "credits", 0) + ach.reward_value
 
-    def to_dict(self):
-        return {
-            "achievements": {k: v.unlocked for k, v in self.achievements.items()},
-            "counters": dict(self.counters),
-        }
+    if log_callback:
+        line = tr("achievement_unlocked", name=ach.name)
+        try:
+            log_callback(line, "success")
+        except TypeError:
+            # callback may have a different signature
+            log_callback(line)
 
-    @classmethod
-    def from_dict(cls, data):
-        mgr = cls()
-        for name, unlocked in data.get("achievements", {}).items():
-            if name in mgr.achievements:
-                mgr.achievements[name].unlocked = unlocked
-        mgr.counters.update(data.get("counters", {}))
-        return mgr
+    return True

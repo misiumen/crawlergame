@@ -22,6 +22,12 @@ class Monster:
         self.floor_min = floor_min
         self.conditions: list = []
         self.is_boss: bool = False
+        # Step 7 - non-combat resolution
+        # Derived DCs scale with AC. Mechanical/undead enemies can't be talked to.
+        self.social_dc = ac + 4
+        self.stealth_dc = ac + 2
+        self.skill_dc = ac + 3
+        self.negotiable = not any(t in (self.tags or []) for t in ("mechanical","undead"))
 
     def is_alive(self):
         return self.hp > 0

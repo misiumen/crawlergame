@@ -70,6 +70,15 @@ class Room:
         self.faction = None        # for checkpoint rooms
         self.is_boss_room = False  # flag
 
+        # ── v3 additions ────────────────────────────────────────────────────
+        self.env_objects: list = []       # list of EnvObject dicts/instances
+        self.npcs: list = []              # list of Crawler dicts/instances
+        self.safehouse_subtype: str = None
+        self.resolution_modes: list = ["combat"]   # combat | social | stealth | skill
+        self.inspected: bool = False
+        # Loose lore-fragments visible only after first Look on hidden objects
+        self.fragments_revealed: list = []
+
     def symbol(self):
         if self.cleared:
             return ROOM_SYMBOLS[self.room_type].lower()
@@ -107,6 +116,13 @@ class Room:
             "loot_tier": self.loot_tier,
             "lore_text": self.lore_text,
             "is_boss_room": self.is_boss_room,
+            # v3 additions
+            "env_objects": [_serialize_env(o) for o in self.env_objects],
+            "npcs": [_serialize_npc(n) for n in self.npcs],
+            "safehouse_subtype": self.safehouse_subtype,
+            "resolution_modes": list(self.resolution_modes),
+            "inspected": self.inspected,
+            "fragments_revealed": list(self.fragments_revealed),
         }
 
     @classmethod
@@ -121,7 +137,49 @@ class Room:
         r.loot_tier = d.get("loot_tier", "Copper")
         r.lore_text = d.get("lore_text", "")
         r.is_boss_room = d.get("is_boss_room", False)
+        r.env_objects = [_deserialize_env(o) for o in d.get("env_objects", [])]
+        r.npcs = [_deserialize_npc(n) for n in d.get("npcs", [])]
+        r.safehouse_subtype = d.get("safehouse_subtype")
+        r.resolution_modes = list(d.get("resolution_modes") or ["combat"])
+        r.inspected = d.get("inspected", False)
+        r.fragments_revealed = list(d.get("fragments_revealed", []))
         return r
+
+
+# ── EnvObject / Crawler (de)serialization helpers ──────────────────────────
+# These bounce through dataclasses defined in environment.py / npcs.py.
+# Import is deferred to avoid circular dependency at module load.
+
+def _serialize_env(o):
+    if hasattr(o, "to_dict"):
+        return o.to_dict()
+    return o if isinstance(o, dict) else None
+
+
+def _deserialize_env(d):
+    if not isinstance(d, dict):
+        return None
+    try:
+        from environment import EnvObject
+        return EnvObject.from_dict(d)
+    except Exception:
+        return d  # leave as raw dict if module not loadable
+
+
+def _serialize_npc(n):
+    if hasattr(n, "to_dict"):
+        return n.to_dict()
+    return n if isinstance(n, dict) else None
+
+
+def _deserialize_npc(d):
+    if not isinstance(d, dict):
+        return None
+    try:
+        from npcs import Crawler
+        return Crawler.from_dict(d)
+    except Exception:
+        return d
 
 
 # ── Trap definitions ───────────────────────────────────────────────────────────

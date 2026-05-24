@@ -50,6 +50,12 @@ INTENTS = {
     "rest":          {"stat": "CON", "dc": 8,  "aud": 0,  "combat": False, "label": "Rest"},
     "navigate":      {"stat": "WIS", "dc": 11, "aud": 0,  "combat": False, "label": "Navigate"},
     "loot":          {"stat": "WIS", "dc": 10, "aud": 1,  "combat": False, "label": "Loot"},
+    # Step 6 additions
+    "look":          {"stat": "WIS", "dc": 8,  "aud": 0,  "combat": False, "label": "Look"},
+    "strip":         {"stat": "INT", "dc": 11, "aud": 1,  "combat": False, "label": "Strip"},
+    "env_use":       {"stat": "INT", "dc": 12, "aud": 3,  "combat": True,  "label": "Env. use"},
+    "env_combo":     {"stat": "INT", "dc": 14, "aud": 5,  "combat": True,  "label": "Env. combo"},
+    "clarify":       {"stat": "WIS", "dc": 0,  "aud": 0,  "combat": False, "label": "Clarify"},
 }
 
 # Keyword → intent mapping  (order matters — first match wins per phrase)
@@ -96,10 +102,68 @@ _VERB_MAP: List[tuple] = [
     (r"\b(loot|take|grab|collect|pick.up)\b",             "loot"),
 ]
 
+# ── Polish verb map (Step 6) ──────────────────────────────────────────────────
+# Matches root + most conjugations via permissive suffix patterns.
+# Word boundaries kept loose because Polish forms attach suffixes directly.
+_VERB_MAP_PL = [
+    # Combat verbs
+    (r"\b(atak\w*|uderz\w*|wal\w*|tlucz\w*|tłucz\w*)\b",   "attack"),
+    (r"\b(dzgnij\w*|dźgnij\w*|przebij\w*|pchnij\w*)\b",     "stab"),
+    (r"\b(tnij\w*|ciac\w*|tnac\w*|rozcina\w*)\b",           "slash"),
+    (r"\b(strzel\w*|strzal\w*|strzała\w*|odpal\w*)\b",      "shoot"),
+    (r"\b(uderz\w+ piesc|pies\w*|pięs\w*|pięść\w*)\b",      "punch"),
+    (r"\b(kopnij\w*|kopnac\w*|kopniac\w*)\b",               "kick"),
+    (r"\b(popchnij\w*|spchnij\w*|wepchn\w*|wepch\w*)\b",    "shove"),
+    (r"\b(chwy[cć]\w*|złap\w*|zlap\w*|trzymaj\w*)\b",       "grapple"),
+    (r"\b(potkn\w*|przewroc\w*|obal\w*)\b",                 "trip"),
+    (r"\b(rozbroj\w*|odbierz\w*|wytrac\w*)\b",              "disarm"),
+    (r"\b(rzuc\w*|cisnij\w*|ciska\w*|miota\w*)\b",          "throw"),
+    (r"\b(szarz\w*|naciera\w*|natrzyj\w*)\b",               "charge"),
+    (r"\b(prowoku\w*|prowokuj\w*|obraz\w*|oblec\w*)\b",     "taunt"),
+    (r"\b(zastrasz\w*|grozic\w*|grozić\w*|strasz\w*)\b",    "intimidate"),
+    (r"\b(oslep\w*|oślep\w*|zasłon\w*|zaslon\w*)\b",        "blind"),
+    (r"\b(zwiedz\w*|zwiódź\w*|odciagnij\w*|odciągnij\w*)\b","distract"),
+    (r"\b(uskocz\w*|unik\w*|odskocz\w*)\b",                 "dodge"),
+    (r"\b(ucieka\w*|uciek\w*|wycofa\w*|spierd\w*)\b",       "flee"),
+    (r"\b(broni\w*|obroni\w*|zaslon\w*|zasłon\w*|gard\w*)\b","defend"),
+    (r"\b(zbadaj\w*|zbada\w*|sprawdz\w*)\b",                "inspect"),
+    (r"\b(uzyj\w* zdoln\w*|użyj\w* zdoln\w*|aktywuj\w*|rzuć\w* czar\w*|rzuc\w* czar\w*)\b", "use_ability"),
+    (r"\b(uzyj\w*|użyj\w*|wypij\w*|wypić\w*|zjedz\w*|zjedź\w*)\b", "use_item"),
+    (r"\b(środowis\w*|srodowis\w*|wykorzysta\w* otoczeni\w*)\b", "environment"),
+    # Exploration
+    (r"\b(szukaj\w*|przeszuk\w*|sprawdz\w* pokój\w*|sprawdz\w* pokoj\w*)\b","search"),
+    (r"\b(otworz\w* zamk\w*|otwórz\w* zamk\w*|wytrych\w*)\b", "pick_lock"),
+    (r"\b(rozbroj\w* pułapk\w*|rozbroj\w* pulapk\w*|defuz\w*)\b", "disarm_trap"),
+    (r"\b(wykryj\w* pułapk\w*|wykryj\w* pulapk\w*|znajdz\w* pułapk\w*)\b", "detect_trap"),
+    (r"\b(porozmaw\w*|rozmaw\w*|gadaj\w*|powiedz\w*)\b",    "talk"),
+    (r"\b(targuj\w*|negocj\w*|cena\w*)\b",                  "haggle"),
+    (r"\b(rozejrzy\w*|rozglada\w*|obejrz\w*|zbadaj\w*)\b",  "examine"),
+    (r"\b(wspina\w*|wespnij\w*|wdrap\w*)\b",                "climb"),
+    (r"\b(skradaj\w*|skradnij\w*|cicho\w*)\b",              "sneak"),
+    (r"\b(rozwal\w*|rozbij\w*|zniszcz\w*)\b",               "break"),
+    (r"\b(hakuj\w*|włam\w*|wlam\w*|przejmij\w*)\b",         "hack"),
+    (r"\b(stworz\w*|stwórz\w*|skonstruuj\w*|zbuduj\w*)\b",  "craft"),
+    (r"\b(odpocznij\w*|odpoczyn\w*|przespać\w*|przespać się\w*)\b", "rest"),
+    (r"\b(idź\w*|idz\w*|przejdz\w*|przejdź\w*|przemiesc\w*)\b", "navigate"),
+    (r"\b(zabier\w*|wez\w*|weź\w*|podnies\w*|podnieś\w*)\b","loot"),
+    # New: strip / harvest for crafting
+    (r"\b(zerwij\w*|rozkrec\w*|rozkręć\w*|rozmontuj\w*|wyrwij\w*)\b", "strip"),
+    (r"\b(rozejrzyj się|rozejrzyj sie|spójrz\w*|spojrz\w*|patrz\w*)\b", "look"),
+]
+
+# English: add strip and look intents as well
+_VERB_MAP.extend([
+    (r"\b(strip|harvest|salvage|scavenge|tear.+off|pry.+off)\b", "strip"),
+    (r"\b(^look$|look around|look at room|survey room)\b",       "look"),
+])
+
 # Environment keywords that boost audience rating
 _ENV_WORDS = [
     "acid", "pool", "fire", "pit", "spike", "wall", "ledge", "barrel",
     "machinery", "cable", "gravity", "ceiling", "window", "container",
+    # Polish
+    "kwas", "kalu", "kałuż", "ogień", "ognia", "kabl", "rur", "para",
+    "regał", "regal", "szkło", "szklo", "amunicj",
 ]
 
 # Hostile/target words (help disambiguate vs self-referential actions)
@@ -109,25 +173,24 @@ _TARGET_WORDS = [
 ]
 
 
-def parse_input(text: str, context: str = "explore") -> Dict[str, Any]:
+def parse_input(text: str, context: str = "explore", room=None) -> Dict[str, Any]:
     """
     Parse free-text player input and return action dict.
 
     context: "combat" or "explore"
+    room:    optional Room — used to resolve env_object references and
+             to avoid "pretending" actions on objects that don't exist.
 
-    Returns dict:
-      intent     : str (intent key)
-      stat       : str (e.g. "STR")
-      dc         : int (difficulty class)
-      label      : str (human-readable)
-      aud_bonus  : int
-      raw_text   : str
-      is_combat  : bool
-      has_env    : bool (uses environment — higher DC but bonus aud)
-      numeric    : Optional[int]  (if player typed just a number)
-      item_name  : Optional[str]  (if "use item X")
-      ability_name: Optional[str]
-      keyword_matched: str
+    Returns dict including:
+      intent           - str
+      stat, dc, label, aud_bonus
+      raw_text, is_combat, has_env
+      numeric          - int if input was just a number
+      item_name        - extracted "use X" name
+      ability_name     - extracted "cast X" name
+      env_target_key   - resolved EnvObject key in room (or None)
+      env_combo        - tuple (objA_key, objB_key, label) if a combo is implied
+      keyword_matched  - debug
     """
     lower = text.lower().strip()
 
@@ -164,14 +227,55 @@ def parse_input(text: str, context: str = "explore") -> Dict[str, Any]:
     if abl_m:
         ability_name = abl_m.group(1).strip()
 
-    # Match intent via verb patterns
+    # Match intent via verb patterns — Polish first (we're Polish-primary),
+    # then English. First hit wins.
     matched_intent = None
     keyword_matched = ""
-    for pattern, intent_key in _VERB_MAP:
-        if re.search(pattern, lower):
-            matched_intent = intent_key
-            keyword_matched = pattern
+    from lang import get_language
+    primary = _VERB_MAP_PL if get_language() == "pl" else _VERB_MAP
+    secondary = _VERB_MAP if get_language() == "pl" else _VERB_MAP_PL
+    for table in (primary, secondary):
+        for pattern, intent_key in table:
+            if re.search(pattern, lower):
+                matched_intent = intent_key
+                keyword_matched = pattern
+                break
+        if matched_intent is not None:
             break
+
+    # ── Object targeting (Step 6) ─────────────────────────────────────────────
+    env_target_key = None
+    env_combo = None
+    if room is not None and hasattr(room, "env_objects"):
+        try:
+            from environment import find_object, available_combo
+        except ImportError:
+            find_object = None
+            available_combo = None
+        if find_object is not None:
+            obj = find_object(room, lower)
+            if obj is not None:
+                env_target_key = obj.key
+        if available_combo is not None and any(
+                w in lower for w in ("combine","mix","połącz","polacz","kombinuj","wrzuc","wrzuć")):
+            combo = available_combo(room)
+            if combo:
+                env_combo = (combo[0].key, combo[1].key, combo[2].get("label_key","combo_shock"))
+
+    # If user invokes 'environment' / 'env_use' but no object found, force clarify.
+    if matched_intent in ("environment", "env_use", "strip") and env_target_key is None and env_combo is None:
+        # Allow generic 'use environment' to still work in combat as before
+        # only when no room was supplied (legacy callers); otherwise clarify.
+        if room is not None:
+            matched_intent = "clarify"
+            keyword_matched = "clarify_no_target"
+
+    if env_combo is not None:
+        matched_intent = "env_combo"
+        keyword_matched = "combo_detected"
+    elif env_target_key is not None and matched_intent in ("environment","strip","use_item"):
+        matched_intent = "strip" if matched_intent == "strip" else "env_use"
+        keyword_matched = "object_target"
 
     # Fallback
     if matched_intent is None:
@@ -211,6 +315,9 @@ def parse_input(text: str, context: str = "explore") -> Dict[str, Any]:
         "item_name": item_name,
         "ability_name": ability_name,
         "keyword_matched": keyword_matched,
+        # Step 6 additions
+        "env_target_key": env_target_key,
+        "env_combo": env_combo,
     }
 
 
@@ -400,5 +507,23 @@ def combat_action_from_result(result: Dict[str, Any], action: Dict[str, Any]) ->
         effect["type"] = "damage"
         from utils import parse_dice
         effect["damage"] = parse_dice("1d6")
+
+    elif intent == "env_use":
+        effect["type"] = "env_use"
+
+    elif intent == "env_combo":
+        effect["type"] = "env_combo"
+
+    elif intent == "strip":
+        effect["type"] = "strip"
+
+    elif intent == "clarify":
+        effect["type"] = "clarify"
+
+    elif intent == "talk":
+        effect["type"] = "social"
+
+    elif intent == "sneak":
+        effect["type"] = "stealth"
 
     return effect

@@ -190,6 +190,20 @@ class Floor:
         rtype = room.room_type
         tier = floor_loot_tier(floor_num)
 
+        # ── Environmental objects (Step 5) ────────────────────────────────────
+        try:
+            from environment import populate_environment
+            populate_environment(room, floor_num)
+        except Exception:
+            pass  # never block room generation if env catalog fails
+
+        # ── NPC crawlers (Step 8) ─────────────────────────────────────────────
+        try:
+            from npcs import populate_npc
+            populate_npc(room, floor_num)
+        except Exception:
+            pass
+
         if rtype == ROOM_COMBAT:
             room.enemies = get_encounter(floor_num)
 
@@ -212,6 +226,14 @@ class Floor:
 
         elif rtype == ROOM_CHECKPOINT:
             room.faction = random.choice(self.factions) if self.factions else None
+            # Step 9: assign a safehouse subtype, never repeating last floor
+            try:
+                from safehouses import assign_subtype_to_checkpoint
+                # We don't know the previous floor's subtype here — track on Floor
+                prev = getattr(self, "prev_safehouse_subtype", None)
+                assign_subtype_to_checkpoint(room, floor_num, prev)
+            except Exception:
+                pass
 
         elif rtype == ROOM_BOSS:
             room.enemies = [get_floor_boss(floor_num)]

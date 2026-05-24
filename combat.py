@@ -6,6 +6,18 @@ from narrator import get_narrator
 
 # ── Condition helpers ──────────────────────────────────────────────────────────
 
+def _record_kill_method(player, target, kind: str):
+    """Track how a kill was achieved (affinity, step 11 reads this)."""
+    if not hasattr(player, "affinity"):
+        return
+    if not target.is_alive():
+        player.affinity[kind] = player.affinity.get(kind, 0) + 1
+        if hasattr(player, "kill_method_history"):
+            player.kill_method_history.append(kind)
+            # Cap history
+            player.kill_method_history = player.kill_method_history[-50:]
+
+
 def _apply_condition(target, condition):
     if condition and condition not in target.conditions:
         target.conditions.append(condition)
@@ -110,9 +122,10 @@ def resolve_feature(feat, attacker, target, log):
 # ── Combat state ───────────────────────────────────────────────────────────────
 
 class CombatState:
-    def __init__(self, player, enemies):
+    def __init__(self, player, enemies, room=None):
         self.player = player
         self.enemies = list(enemies)
+        self.room = room  # Step 7: env/social/stealth resolution needs room context
         self.log_lines = []        # accumulated message log
         self.round = 0
         self.result = None         # "victory" | "defeat" | "fled"
@@ -220,6 +233,9 @@ def process_player_action(state: CombatState, action_dict: dict):
                 if target.condition_on_hit:
                     _apply_condition(target, target.condition_on_hit)
                     state.log(f"  {target.name} is now {target.condition_on_hit}.", "warn")
+                # Affinity: melee/ranged based on weapon stat
+                kind = "ranged" if (player.weapon and player.weapon.stat == "DEX") else "melee"
+                _record_kill_method(player, target, kind)
             else:
                 state.log(f"  Missed {target.name} (roll {roll} vs AC {target.effective_ac()}).", "combat")
 
@@ -281,6 +297,112 @@ def process_player_action(state: CombatState, action_dict: dict):
         state.log(f"  Environmental damage: {dmg} to {target.name}.", "combat")
         state.log(f"  {get_narrator().say('audience_up')}", "syndicate")
         player.add_audience(5)
+
+    elif effect["type"] == "env_use":
+        # Single env object used as a weapon/condition source.
+        from utils import parse_dice
+        room = state.room
+        ekey = action_dict.get("env_target_key")
+        obj = next((o for o in (room.env_objects if room else []) if o.key == ekey and not o.consumed), None)
+        if obj is None or obj.combat_effect is None:
+            state.log("  Nothing usable there.", "warn")
+        else:
+            ce = obj.combat_effect
+            dmg = parse_dice(ce.get("damage", "1d4"))
+            target.take_damage(dmg)
+            if ce.get("condition"):
+                _apply_condition(target, ce["condition"])
+            obj.consumed = True
+            state.log(f"  {obj.name} -> {dmg} dmg to {target.name}.", "combat")
+            player.add_audience(3)
+            _record_kill_method(player, target, "env")
+
+    elif effect["type"] == "env_combo":
+        from utils import parse_dice
+        room = state.room
+        combo = action_dict.get("env_combo")
+        if combo and room is not None:
+            a_key, b_key, _label = combo
+            objs = [o for o in room.env_objects if o.key in (a_key, b_key) and not o.consumed]
+            if len(objs) >= 2:
+                from environment import COMBO_TABLE
+                tag_set = set(objs[0].combine_tags) | set(objs[1].combine_tags)
+                eff = None
+                for cset, e in COMBO_TABLE.items():
+                    if cset.issubset(tag_set):
+                        eff = e; break
+                if eff:
+                    dmg = parse_dice(eff.get("damage", "2d6"))
+                    affected = state.active_enemies() if eff.get("aoe") else [target]
+                    for e in affected:
+                        e.take_damage(dmg)
+                        if eff.get("condition"):
+                            _apply_condition(e, eff["condition"])
+                    objs[0].consumed = True
+                    objs[1].consumed = True
+                    state.log(f"  COMBO! {dmg} dmg ({'AoE' if eff.get('aoe') else 'single'}).", "syndicate")
+                    player.add_audience(8)
+                    for e in affected:
+                        _record_kill_method(player, e, "env")
+                else:
+                    state.log("  No combo possible.", "warn")
+            else:
+                state.log("  Objects no longer available.", "warn")
+        else:
+            state.log("  No combo target.", "warn")
+
+    elif effect["type"] == "strip":
+        room = state.room
+        ekey = action_dict.get("env_target_key")
+        obj = next((o for o in (room.env_objects if room else []) if o.key == ekey and not o.stripped), None)
+        if obj is None or not obj.strip_yield:
+            state.log("  Nothing to strip.", "warn")
+        else:
+            for mat, qty in obj.strip_yield.items():
+                player.materials[mat] = player.materials.get(mat, 0) + qty
+            obj.stripped = True
+            yields = ", ".join(f"{q}x {m}" for m, q in obj.strip_yield.items())
+            state.log(f"  Stripped {obj.name}: {yields}", "loot")
+
+    elif effect["type"] == "clarify":
+        state.log("  ?  No such object here.", "warn")
+        # Refund the turn: enemy does not attack.
+        return
+
+    elif effect["type"] == "social":
+        # Talk / negotiate / threaten. Need result.success against enemy.social_dc.
+        if not target.negotiable:
+            state.log(f"  {target.name} cannot be reasoned with.", "warn")
+        else:
+            from utils import d20
+            cha_mod = player.stat_mod("CHA")
+            roll = d20() + cha_mod
+            ok = roll >= target.social_dc
+            if ok:
+                # Enemy yields. Reduced rewards, no combat resolution.
+                state.log(f"  {target.name} stands down. (CHA {roll} vs DC {target.social_dc})", "system")
+                target.hp = 0   # remove from field — but flag as non-violent so XP scales
+                target._resolved_socially = True
+                _record_kill_method(player, target, "social")
+                player.add_audience(2)
+            else:
+                state.log(f"  Failed to negotiate ({roll} vs DC {target.social_dc}). They attack.", "combat")
+
+    elif effect["type"] == "stealth":
+        from utils import d20
+        dex_mod = player.stat_mod("DEX")
+        roll = d20() + dex_mod
+        ok = roll >= target.stealth_dc
+        if ok:
+            # Sneak attack: high damage from initial hit; eliminates a single target.
+            from utils import parse_dice
+            dmg = parse_dice("3d6") + dex_mod
+            target.take_damage(dmg)
+            state.log(f"  Sneak attack: {dmg} dmg ({roll} vs DC {target.stealth_dc}).", "combat")
+            player.add_audience(2)
+            _record_kill_method(player, target, "stealth")
+        else:
+            state.log(f"  Spotted. ({roll} vs DC {target.stealth_dc})", "warn")
 
     # Audience delta
     delta = effect.get("aud_delta", 0) + result.get("aud_delta", 0)
@@ -359,6 +481,8 @@ def _find_feature(player, name):
 
 
 def _find_consumable(player, name):
+    if not name:
+        return None
     name_lower = name.lower()
     for item in player.inventory:
         from items import Consumable
