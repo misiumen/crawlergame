@@ -284,40 +284,38 @@ register(Affordance("companion_lure",
 
 
 def find_affordance_by_verb(verb: str, lang: str = "pl") -> Optional[Affordance]:
-    """Match a verb root against any affordance's verb list. Polish-stem aware."""
+    """Match a verb root against any affordance's verb list. Polish-stem aware.
+
+    Prompt 19 audit fix S3: stem-matching delegates to
+    `engine.polish_text.verb_stem_match` so all verb-side matching in
+    the codebase uses one strategy. Behavior is unchanged: scaled 4/5/6
+    stem length based on candidate length.
+    """
     if not verb:
         return None
-    v = verb.lower().strip()
-    # Apply ASCII fold for Polish flexibility
-    folded = _fold(v)
+    from .polish_text import fold as _f, verb_stem_match
+    folded = _f(verb)
+    if not folded:
+        return None
 
     best = None
     for aff in AFFORDANCE_CATALOG.values():
         candidates = aff.verbs_pl if lang == "pl" else aff.verbs_en
         for cand in candidates:
-            cf = _fold(cand)
-            # Exact match
+            cf = _f(cand)
             if cf == folded:
                 return aff
-            # Prefix match - covers Polish conjugations (uderz / uderzam / uderzył).
-            # Prompt 18: scale stem length to verb length so long verbs like
-            # "przeszukaj" don't over-match unrelated nouns ("przejście") via
-            # a too-short 4-char "prze" prefix.
-            stem = cf.split()[0] if " " in cf else cf
-            stem_len = 4 if len(stem) <= 6 else 5
-            if len(stem) >= 7:
-                stem_len = 6
-            if folded.startswith(stem[:stem_len]) and len(stem) >= 3:
+            if verb_stem_match(folded, cf):
                 best = aff if best is None else best
-        # Try the other lang as fallback
     if best:
         return best
-    # Cross-lang fallback
+    # Cross-lang fallback (exact match only — keeps EN players' English
+    # verbs working even when running with lang="pl").
     other = "en" if lang == "pl" else "pl"
     if other != lang:
         for aff in AFFORDANCE_CATALOG.values():
             for cand in (aff.verbs_en if other == "en" else aff.verbs_pl):
-                if _fold(cand) == folded:
+                if _f(cand) == folded:
                     return aff
     return None
 

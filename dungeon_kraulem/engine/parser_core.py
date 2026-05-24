@@ -147,6 +147,40 @@ def parse(text: str, world=None) -> ActionIntent:
 
     folded = fold(lower)
 
+    # Prompt 19 audit fix N1: rewrite the player's pet alias to the
+    # generic word `zwierzę` so commands like "sprawdź gęś" /
+    # "nakarm szczura" / "uspokój papugę" route into the companion
+    # quick-intents below. Only fires when the player actually has an
+    # active pet whose catalog aliases include the typed token.
+    if world is not None:
+        try:
+            from . import companion as _comp
+            from ..content.data.pets import get_pet_template
+            pet = _comp.active_pet(world)
+            if pet is not None:
+                tmpl = get_pet_template(pet.species_key)
+                aliases = list(tmpl.get("name_aliases_pl") or [])
+                aliases.append(pet.display_name_pl or "")
+                aliases_folded = sorted(
+                    {fold(a) for a in aliases if a},
+                    key=len, reverse=True   # longer aliases first
+                )
+                for af in aliases_folded:
+                    if not af:
+                        continue
+                    # Match the alias as a standalone token (start/end
+                    # of string OR surrounded by non-word chars).
+                    import re as _re
+                    pattern = r"(?:^|(?<=\W))" + _re.escape(af) + r"(?=\W|$)"
+                    if _re.search(pattern, folded):
+                        folded = _re.sub(pattern, "zwierze", folded)
+                        # Also touch lower so downstream patterns see it.
+                        lower = _re.sub(pattern, "zwierze",
+                                        fold(lower))
+                        break
+        except Exception:
+            pass
+
     # ── Prompt 16: mass-action detection ─────────────────────────────────────
     # Recognize "wszystko / cały pokój / all / everything" as room-wide
     # targets. These commands ALWAYS take priority over the LLM enrichment

@@ -188,6 +188,9 @@ def alive_hostiles_in(room) -> List:
 
 def start_combat(room, world, *, triggered_by: str = "player_attack") -> CombatState:
     """Build a fresh CombatState for the current hostiles in the room."""
+    # Prompt 19 audit fix S1: drain pending sponsor hunters into this
+    # encounter before banding is set, so they participate from round 1.
+    _inject_pending_hunters(room, world)
     hostiles = alive_hostiles_in(room)
     cs = CombatState(active=True, round=1, side="player")
     cs.participants = [e.entity_id for e in hostiles]
@@ -200,6 +203,50 @@ def start_combat(room, world, *, triggered_by: str = "player_attack") -> CombatS
     cs.last_action = triggered_by
     set_combat(room, cs)
     return cs
+
+
+def _inject_pending_hunters(room, world) -> None:
+    """Spawn each pending sponsor hunter into `room` as a fresh monster
+    entity. Pulls from `world.pending_sponsor_hunters` and consumes the
+    queue. Hunter entity templates live in
+    `content.data.entity_templates.MON`; if the key isn't known the
+    entry stays on the queue for a later combat.
+    """
+    pending = list(getattr(world, "pending_sponsor_hunters", None) or [])
+    if not pending or room is None:
+        return
+    leftover = []
+    try:
+        from ..content.data.entity_templates import MON
+        from .entity import Entity, T_MONSTER
+    except Exception:
+        return
+    for entry in pending:
+        hunter_key = str(entry.get("hunter_key") or "")
+        if not hunter_key:
+            continue
+        tmpl = MON.get(hunter_key)
+        if not tmpl:
+            # Template not authored yet — keep on queue for a later
+            # content drop.
+            leftover.append(entry)
+            continue
+        try:
+            ent = Entity(
+                key=hunter_key,
+                entity_type=T_MONSTER,
+                fallback_name=tmpl.get("fallback_name", hunter_key),
+                hp=int(tmpl.get("hp", 6)),
+                max_hp=int(tmpl.get("max_hp", tmpl.get("hp", 6))),
+                tags=list(tmpl.get("tags") or []) + ["sponsor_hunter"],
+                affordances=list(tmpl.get("affordances") or ["attack"]),
+                location_id=room.room_id,
+            )
+            world.register(ent)
+            room.entities.append(ent)
+        except Exception:
+            leftover.append(entry)
+    world.pending_sponsor_hunters = leftover
 
 
 def end_combat(room, world, *, outcome: str = "ended") -> None:

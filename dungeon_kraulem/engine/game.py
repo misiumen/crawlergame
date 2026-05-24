@@ -203,7 +203,9 @@ class Game:
         _comp.register_companion(self.world, pet)
         intro = tmpl.get("intro_line_pl") or \
             f"Twój towarzysz: {tmpl['display_name_pl']}."
-        self.log(intro, LOG_SYNDIC)
+        # Prompt 19 audit fix N3: pet intro is in-world ambient text, not
+        # a Syndicate broadcast — use the normal log category.
+        self.log(intro, LOG_NORMAL)
 
     def submit_input(self):
         text_val = self.input_text.strip()
@@ -390,8 +392,18 @@ class Game:
             }
             fn = fallbacks.get(tab_key)
             if fn:
-                try: fn()
-                except Exception: pass
+                # Prompt 19 audit fix B2: surface tab-renderer crashes
+                # to the player log instead of silently swallowing them.
+                # Previously a broken locale key or missing field in any
+                # journal tab would silently nuke the overlay.
+                try:
+                    fn()
+                except Exception as exc:
+                    self.log(
+                        t("feedback_journal_render_failed",
+                          fallback=f"(Dziennik: zakładka „{tab_key}” "
+                                   f"nie wyrenderowała się: {exc})"),
+                        LOG_WARN)
 
     def _journal_handle_key(self, key, shift_held: bool) -> bool:
         """Consume a keydown while the journal is open. Returns True iff
@@ -3057,9 +3069,9 @@ class Game:
                 elif key == pygame.K_ESCAPE:
                     self.state = STATE_TITLE
             elif step == "background":
-                bgs = ["office_worker","mechanic","nurse","cook","security_guard",
-                       "courier","student","streamer","soldier","unemployed_hustler",
-                       "janitor","paramedic","opiekun_zwierzaka"]
+                # Prompt 19 audit fix S2: single source from character.py.
+                from .character import BACKGROUNDS
+                bgs = list(BACKGROUNDS)
                 # Arrow navigation for the background list.
                 if key in (pygame.K_UP, pygame.K_w):
                     self.cc["selected_bg"] = (self.cc.get("selected_bg",0) - 1) % len(bgs)

@@ -121,7 +121,7 @@ def change_audience(world, delta: int, source: str = "",
     char.audience_rating = after
 
     # Reset the idle-decay counter — something interesting happened.
-    setattr(world, "_audience_idle_minutes", 0)
+    setattr(world, "audience_idle_minutes", 0)
 
     if emit_log and hasattr(world, "log"):
         sign = "+" if delta > 0 else ""
@@ -159,28 +159,28 @@ def tick_decay(world, minutes_elapsed: int) -> None:
     if not isinstance(minutes_elapsed, int) or minutes_elapsed <= 0:
         return
 
-    idle = int(getattr(world, "_audience_idle_minutes", 0) or 0)
+    idle = int(getattr(world, "audience_idle_minutes", 0) or 0)
     idle += minutes_elapsed
     rating = int(world.character.audience_rating or 0)
 
     # Grace period — no decay yet.
     if idle < _IDLE_DECAY_GRACE_MINUTES:
-        setattr(world, "_audience_idle_minutes", idle)
+        setattr(world, "audience_idle_minutes", idle)
         return
 
     # Past grace: every additional `_IDLE_DECAY_MINUTES_PER_TICK` minutes
-    # subtracts 1. Track the remainder in `_audience_idle_minutes`.
+    # subtracts 1. Track the remainder in `audience_idle_minutes`.
     over = idle - _IDLE_DECAY_GRACE_MINUTES
     decay_steps = over // _IDLE_DECAY_MINUTES_PER_TICK
     if decay_steps > 0 and rating > _AUDIENCE_MIN:
         change_audience(world, -int(decay_steps), source="boredom",
                         emit_log=False)
         # Consume the steps from the accumulator.
-        setattr(world, "_audience_idle_minutes",
+        setattr(world, "audience_idle_minutes",
                 _IDLE_DECAY_GRACE_MINUTES +
                 (over - decay_steps * _IDLE_DECAY_MINUTES_PER_TICK))
     else:
-        setattr(world, "_audience_idle_minutes", idle)
+        setattr(world, "audience_idle_minutes", idle)
 
 
 def safehouse_rest_decay(world, hours: int) -> None:

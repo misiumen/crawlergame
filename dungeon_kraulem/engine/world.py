@@ -46,7 +46,7 @@ class WorldState:
     pending_sponsor_gifts:   List[Dict[str, Any]] = field(default_factory=list)
     pending_sponsor_hunters: List[Dict[str, Any]] = field(default_factory=list)
     # Internal: minutes since last audience event, for idle decay.
-    _audience_idle_minutes: int = 0
+    audience_idle_minutes: int = 0
 
     # Prompt 19 — companion registry. Keyed by companion_id. Owned
     # companions are tracked via `character.companion_ids`. Old saves
@@ -104,8 +104,8 @@ class WorldState:
             "sponsor_interventions_used": _serialize_interventions(self),
             "pending_sponsor_gifts":   list(self.pending_sponsor_gifts or []),
             "pending_sponsor_hunters": list(self.pending_sponsor_hunters or []),
-            "_audience_idle_minutes":  int(getattr(self,
-                                                   "_audience_idle_minutes", 0) or 0),
+            "audience_idle_minutes":  int(getattr(self,
+                                                   "audience_idle_minutes", 0) or 0),
             # Prompt 19 — companions.
             "companions": _serialize_companions(self),
         }
@@ -140,7 +140,14 @@ class WorldState:
         _deserialize_interventions(w, d.get("sponsor_interventions_used") or [])
         w.pending_sponsor_gifts   = list(d.get("pending_sponsor_gifts") or [])
         w.pending_sponsor_hunters = list(d.get("pending_sponsor_hunters") or [])
-        w._audience_idle_minutes  = int(d.get("_audience_idle_minutes") or 0)
+        # Prompt 19 audit fix N4: field renamed from
+        # `_audience_idle_minutes` (underscore-prefixed) to
+        # `audience_idle_minutes` because it's persistent state, not
+        # transient. Saves from Prompt 18 used the old key — read it
+        # too so old saves load without losing decay accumulator.
+        w.audience_idle_minutes = int(
+            d.get("audience_idle_minutes",
+                  d.get("_audience_idle_minutes", 0)) or 0)
         # Migrate legacy bool sponsor_attention -> dict by touching the
         # accessor (does the conversion if needed).
         try:

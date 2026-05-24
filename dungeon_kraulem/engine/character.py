@@ -4,6 +4,17 @@ from typing import Dict, List, Optional, Any
 from ..config import BASE_STATS, AFFINITY_KINDS
 
 
+# Prompt 19 audit fix S2: single source of truth for the playable
+# backgrounds. Imported by engine.game (stat-adjust + starter-items)
+# and ui.ui (creation render). Order is the order shown to the player.
+BACKGROUNDS = (
+    "office_worker", "mechanic", "nurse", "cook", "security_guard",
+    "courier", "student", "streamer", "soldier", "unemployed_hustler",
+    "janitor", "paramedic",
+    "opiekun_zwierzaka",   # Prompt 19
+)
+
+
 @dataclass
 class Character:
     name: str = ""
@@ -32,6 +43,8 @@ class Character:
     # Inventory: list of Entity dicts (Entities with entity_type=T_ITEM, location_id="inventory:<owner>")
     inventory_ids: List[int] = field(default_factory=list)
     credits: int = 25
+    # NOTE: BACKGROUNDS is the single source of truth for the
+    # character-creation list. game.py and ui.py both import it.
 
     # Prompt 19 — companion ids the player currently owns. Companions
     # themselves live on world.companions; this list just references

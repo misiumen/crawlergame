@@ -153,9 +153,9 @@ def draw_creation(surf, state):
     elif step == "background":
         text(surf, t("create_select_bg", fallback="Wybierz tło (nie klasę):"),
              60, 100, NORMAL_TEXT, body_size + 2)
-        bgs = ["office_worker","mechanic","nurse","cook","security_guard",
-               "courier","student","streamer","soldier","unemployed_hustler",
-               "janitor","paramedic","opiekun_zwierzaka"]
+        # Prompt 19 audit fix S2: single source from engine.character.
+        from ..engine.character import BACKGROUNDS
+        bgs = list(BACKGROUNDS)
         sel = state.get("selected_bg", 0)
         cy = 140
         for i, key in enumerate(bgs):
@@ -205,8 +205,13 @@ def draw_topbar(surf, world, layout=None):
         from ..engine import sponsors as _sp
         sk = _sp.current_floor_sponsor_key(world)
         if sk:
+            # Prompt 19 audit fix N2: strip a trailing period from the
+            # sponsor line before appending the mood, so we don't get
+            # "Sponsoruje: NovaChem Biotech. — życzliwy" with a stray
+            # full-stop floating in the middle.
+            base = sponsor_label.rstrip().rstrip(".").rstrip()
             mood = _sp.sponsor_mood(world, sk)
-            sponsor_label = f"{sponsor_label} — {mood}"
+            sponsor_label = f"{base} — {mood}"
     except Exception:
         pass
     text(surf, sponsor_label, x + 12, y + 32, DIM_TEXT, L.font_small - 1)

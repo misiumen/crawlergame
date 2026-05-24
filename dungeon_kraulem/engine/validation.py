@@ -332,57 +332,14 @@ def _find_inventory_item_with_tags(world, required_tags) -> Optional[Entity]:
 
 # Prompt 18: Polish-grammar helpers for exit/destination matching.
 
-# Polish prepositions that commonly precede a destination noun. Stripped
-# so "do przejścia" / "w korytarz" / "przez korytarz" / "na półkę"
-# resolve to the noun.
-_MOVE_PREPOSITIONS = {
-    "do","w","we","na","przez","ku","ku temu","w stronę","w strone","w stron",
-    "to","into","through","toward","towards","at","via",
-}
-
-
-def _strip_movement_prepositions(text: str) -> str:
-    """Return `text` with any leading Polish prepositional phrase trimmed.
-    "do przejścia" -> "przejścia"; "idź do przejścia" -> "idź" stays first
-    (the nav regex already trims the verb; this is the noun-side cleanup)."""
-    if not text:
-        return ""
-    parts = [t for t in re.split(r"\s+", text.strip()) if t]
-    while parts and parts[0].lower() in _MOVE_PREPOSITIONS:
-        parts.pop(0)
-    return " ".join(parts).strip()
-
-
-def _polish_match(typed_folded: str, label_folded: str, *,
-                  stem_chars: int = 5) -> bool:
-    """Loose Polish noun match. Treats two words as matching if either
-    is a substring of the other, OR if they share a common prefix of
-    `stem_chars` chars after diacritic-fold. Handles common case
-    inflections (e.g. "przejście" / "przejścia" / "przejściu" all share
-    "przej" / "przejs" stems)."""
-    if not typed_folded or not label_folded:
-        return False
-    if typed_folded == label_folded:
-        return True
-    if typed_folded in label_folded or label_folded in typed_folded:
-        return True
-    # Token-wise stem match: every word in `typed_folded` must find a
-    # stem-compatible word in `label_folded`.
-    typed_tokens  = [t for t in re.split(r"[^a-z0-9]+", typed_folded) if t]
-    label_tokens  = [t for t in re.split(r"[^a-z0-9]+", label_folded) if t]
-    if not typed_tokens or not label_tokens:
-        return False
-    for t in typed_tokens:
-        stem = t[:stem_chars]
-        if len(stem) < 3:
-            continue
-        matched_word = False
-        for lt in label_tokens:
-            if lt.startswith(stem) or t.startswith(lt[:stem_chars]):
-                matched_word = True; break
-        if not matched_word:
-            return False
-    return True
+# Prompt 19 audit fix S3: matcher logic now lives in engine.polish_text.
+# These thin wrappers keep the existing _polish_match /
+# _strip_movement_prepositions import sites in this module + parser_core
+# working unchanged.
+from .polish_text import (
+    strip_movement_prepositions as _strip_movement_prepositions,
+    polish_match as _polish_match,
+)
 
 
 def _is_secret_revealed(room, label) -> bool:

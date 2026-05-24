@@ -37,6 +37,17 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                                 lines.append(extra)
                         except Exception:
                             pass
+                    # Prompt 19 audit fix S1: materialize pending sponsor
+                    # gifts when the player enters a safehouse. The gifts
+                    # were queued by engine.sponsors when the sponsor
+                    # decided to send something; we drop them as floor
+                    # entities so the player loots them on arrival.
+                    if r.safehouse_subtype:
+                        try:
+                            _consume_pending_gifts(world, r, lines)
+                        except Exception as exc:
+                            lines.append(
+                                f"(Sponsor: paczka się zgubiła w transporcie: {exc})")
                     # Prompt 1: encounter-template intro (combat rooms)
                     if r.encounter_intro_fallback:
                         lines.append(r.encounter_intro_fallback)
@@ -510,3 +521,54 @@ def _resolve_entity(world, room, entity_id):
             if e.entity_id == entity_id:
                 return e
     return world.entities.get(entity_id)
+
+
+# ── Prompt 19 audit fix S1: sponsor gift consumer ─────────────────────────
+
+def _consume_pending_gifts(world, room, lines) -> None:
+    """Materialize every pending sponsor gift into the current
+    safehouse room as a loot item, and log a narrator line per gift.
+
+    The queue lives on `world.pending_sponsor_gifts` (populated by
+    `engine.sponsors._queue_safehouse_gift`). Each entry is
+    `{"sponsor_key": ..., "item_key": ...}`.
+    """
+    pending = list(getattr(world, "pending_sponsor_gifts", None) or [])
+    if not pending:
+        return
+    from ..content.items import make_item
+    from ..content.data.sponsors import get_sponsor
+    from ..ui.lang import t
+    delivered: list = []
+    leftover: list = []
+    for entry in pending:
+        item_key = str(entry.get("item_key") or "")
+        sponsor_key = str(entry.get("sponsor_key") or "")
+        if not item_key:
+            continue
+        try:
+            ent = make_item(item_key, location_id=room.room_id)
+            world.register(ent)
+            room.entities.append(ent)
+            sponsor_name = ""
+            if sponsor_key:
+                sdata = get_sponsor(sponsor_key)
+                sponsor_name = t(sdata.get("name_key", ""),
+                                 fallback=sdata.get("name_fallback",
+                                                    sponsor_key))
+            name = ent.display_name() if hasattr(ent, "display_name") else \
+                   getattr(ent, "fallback_name", item_key) or item_key
+            if sponsor_name:
+                lines.append(t("sponsor_gift_delivered",
+                               fallback=f"{sponsor_name} podrzucił ci coś w "
+                                        f"safehouse: „{name}”.",
+                               sponsor=sponsor_name, item=name))
+            else:
+                lines.append(f"W kącie safehouse znajdujesz: „{name}”.")
+            delivered.append(entry)
+        except Exception:
+            # Unknown item_key — keep it on the queue so future code can
+            # try again (e.g. when the item template is later added).
+            leftover.append(entry)
+    # Replace queue with only the leftovers.
+    world.pending_sponsor_gifts = leftover

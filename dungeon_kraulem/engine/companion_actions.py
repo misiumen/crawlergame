@@ -255,16 +255,22 @@ def _h_scout(game, intent, pet) -> None:
 
 
 def _h_lure(game, intent, pet) -> None:
-    """Combat: set companion_advantage_pending on combat state.
+    """Combat: set companion_advantage_pending on the room's CombatState.
     Exploration: distract an NPC for 5 minutes + audience +3.
-    Stress cost +3 either way. Emits 'spectacle' tag."""
-    # Combat path
-    combat = getattr(game, "combat_state", None) or \
-             getattr(game.world, "combat_state", None)
-    in_combat = combat is not None and getattr(combat, "active", False)
-    if in_combat:
-        # Flag the next player roll for +2.
-        setattr(combat, "companion_advantage_pending", True)
+    Stress cost +3 either way. Emits 'spectacle' tag.
+
+    Prompt 19 audit fix B1: previously checked `game.combat_state` /
+    `game.world.combat_state` which don't exist — combat lives on
+    `room.state["combat"]` and must be fetched via `combat.get_combat`.
+    Also ends the player's combat turn so enemies get their reaction,
+    matching every other in-combat action.
+    """
+    from . import combat as _cmb
+    floor = game.world.current_floor
+    room  = floor.current_room() if floor else None
+    cs = _cmb.get_combat(room) if room is not None else None
+    if cs is not None:
+        cs.companion_advantage_pending = True
         pet.adjust_stress(+3)
         game.log(t("companion_lure_combat",
                    fallback=f"{pet.display_name_pl} robi scenę. "
@@ -273,6 +279,13 @@ def _h_lure(game, intent, pet) -> None:
         _add_audience(game, 3, source="pet_lure_combat")
         _emit_sponsor_tags(game, pet, "spectacle")
         _advance_time(game, 1)
+        # End the player's combat turn so enemies react — the player
+        # spent their action on the lure.
+        if hasattr(game, "_combat_after_player_action"):
+            try:
+                game._combat_after_player_action(cs)
+            except Exception as exc:
+                game.log(f"(combat tick failed: {exc})", LOG_WARN)
         return
     # Exploration path
     pet.adjust_stress(+3)

@@ -57,21 +57,24 @@ def _give_pet(w: WorldState, species_key: str) -> _comp.Companion:
 # ── Background ────────────────────────────────────────────────────────────
 
 def test_background_in_lists():
-    """opiekun_zwierzaka must appear in the cc bg list AND in
-    game.py's stat-adjustment + starter-items dicts (we check the keys
-    end up where the engine reads them)."""
-    from ..engine import game as g
-    assert "opiekun_zwierzaka" in g.Game.__init__.__code__.co_consts or True
-    # The lists are duplicated inline; verify directly through ui:
-    from ..ui import ui as _u
-    src = _u.draw_creation.__code__.co_consts
-    flat = []
-    for c in src:
-        if isinstance(c, (tuple, list)):
-            flat.extend(c)
-    assert "opiekun_zwierzaka" in flat, \
-        "opiekun_zwierzaka missing from ui.draw_creation bg list"
-    print("  background present in cc bg list: OK")
+    """opiekun_zwierzaka must appear in the central BACKGROUNDS tuple,
+    and via that import path in both the cc handler (game.py) and the
+    creation render (ui.py). Prompt 19 audit fix S2 centralized this
+    list — previously it was duplicated in three places."""
+    from ..engine.character import BACKGROUNDS
+    assert "opiekun_zwierzaka" in BACKGROUNDS, \
+        f"opiekun_zwierzaka missing from BACKGROUNDS: {BACKGROUNDS}"
+    # Verify the import sites pull from the central tuple (both files
+    # do `from ...character import BACKGROUNDS`).
+    import dungeon_kraulem.engine.game as _g
+    import dungeon_kraulem.ui.ui as _u
+    g_src = open(_g.__file__, "r", encoding="utf-8").read()
+    u_src = open(_u.__file__, "r", encoding="utf-8").read()
+    assert "from .character import BACKGROUNDS" in g_src, \
+        "engine.game must import BACKGROUNDS from character module"
+    assert "from ..engine.character import BACKGROUNDS" in u_src, \
+        "ui.ui must import BACKGROUNDS from engine.character"
+    print(f"  background centralized: OK ({len(BACKGROUNDS)} backgrounds)")
 
 
 # ── Catalog hygiene ───────────────────────────────────────────────────────
