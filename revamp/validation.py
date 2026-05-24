@@ -118,13 +118,36 @@ def validate(intent, world) -> ValidationResult:
 
     matched: Optional[Entity] = None
     if intent.targets:
-        matched = _resolve_entity(room, intent.targets[0], world=world)
+        # Prompt 03: ambiguous targets get a clarify response instead of a guess.
+        candidates = _resolve_entities(room, intent.targets[0])
+        if len(candidates) > 1:
+            result.valid = False
+            result.reason = "ambiguous_target"
+            result.message_key = "feedback_ambiguous_target"
+            result.fallback_message = (
+                f"„{intent.targets[0]}” — może chodzi o jedno z: "
+                + ", ".join(c.display_name() for c in candidates[:5])
+                + ". Doprecyzuj."
+            )
+            result.possible_interpretations = [c.display_name() for c in candidates[:5]]
+            return result
+        matched = candidates[0] if candidates else None
     elif intent.intent in ("inspect","attack","talk","intimidate","bribe","loot",
                            "force","hack","lockpick","open","close","use"):
-        # No explicit target — if the room has only one matching entity, use it
+        # No explicit target — if the room has only one matching entity, use it.
         candidates = [e for e in room.visible_entities() if intent.intent in e.affordances]
         if len(candidates) == 1:
             matched = candidates[0]
+        elif len(candidates) > 1:
+            result.valid = False
+            result.reason = "ambiguous_target"
+            result.message_key = "feedback_ambiguous_target"
+            result.fallback_message = (
+                "Co dokładnie? "
+                + ", ".join(c.display_name() for c in candidates[:5])
+            )
+            result.possible_interpretations = [c.display_name() for c in candidates[:5]]
+            return result
 
     if matched is None and intent.intent in ("inspect","attack","talk","intimidate","bribe",
                                               "force","hack","lockpick","open","close","use",
@@ -177,29 +200,43 @@ def validate(intent, world) -> ValidationResult:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _resolve_entity(room, fragment: str, world=None) -> Optional[Entity]:
-    """Find a visible entity in the room whose key/name matches the fragment."""
-    if not fragment:
-        return None
+    """Find one visible entity matching the fragment, or None.
+    Kept for back-compat; new callers should use _resolve_entities."""
+    matches = _resolve_entities(room, fragment)
+    return matches[0] if matches else None
+
+
+def _resolve_entities(room, fragment: str) -> list:
+    """Return ALL visible entities matching the fragment (ambiguity-aware)."""
+    if not fragment or room is None:
+        return []
     f = fold(fragment)
     tokens = [t for t in re.split(r"[^a-z0-9]+", f) if len(t) >= 3]
     visible = room.visible_entities()
+    matches = []
 
-    # Direct full-name match first
+    # Direct full-name match first — exact match short-circuits to single hit
     for e in visible:
         if fold(e.display_name()) == f or fold(e.key) == f:
-            return e
+            return [e]
 
-    # Token-level prefix match (Polish-friendly)
+    # Token-level prefix match (Polish-friendly). Collect all matches.
+    seen_ids = set()
     for e in visible:
         names = [fold(e.key.replace("_", " ")), fold(e.display_name())]
+        hit = False
         for n in names:
+            if hit: break
             n_tokens = [tt for tt in re.split(r"[^a-z0-9]+", n) if len(tt) >= 3]
             for tok in tokens:
+                if hit: break
                 stem = tok[:4]
                 for nt in n_tokens:
                     if nt.startswith(stem) or tok.startswith(nt[:4]):
-                        return e
-    return None
+                        hit = True; break
+        if hit and id(e) not in seen_ids:
+            matches.append(e); seen_ids.add(id(e))
+    return matches
 
 
 def _find_inventory_item_with_tags(world, required_tags) -> Optional[Entity]:

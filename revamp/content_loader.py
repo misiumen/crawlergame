@@ -173,43 +173,36 @@ def item_template(key: str) -> Optional[Dict]:
     return all_item_templates().get(key)
 
 
-# ── Failure / partial-success narration ─────────────────────────────────────
+# ── Failure / partial-success narration (context-driven, Prompt 03) ─────────
 
-def _failure_table(level: str) -> Dict[str, List[str]]:
+def pick_fail_outcome(level: str, context: Optional[Dict] = None) -> Optional[Dict]:
+    """Context-aware picker. Returns a full template dict
+    (with text + effects) or None. `level` ∈ partial / failure / critical_failure.
+    """
     try:
-        from .data import failure_templates as ft
+        from .data.failure_templates import pick_outcome
     except Exception:
-        return {}
-    return {
-        "partial":  getattr(ft, "PARTIAL_SUCCESS_TEMPLATES", {}),
-        "failure":  getattr(ft, "FAILURE_TEMPLATES", {}),
-        "crit_fail":getattr(ft, "CRITICAL_FAILURE_TEMPLATES", {}),
-    }.get(level, {})
+        return None
+    return pick_outcome(level, context or {})
 
 
+def pick_fail_line(level: str, context: Optional[Dict] = None) -> Optional[str]:
+    """Backward-compat helper: returns only the text. Effects are dropped."""
+    t = pick_fail_outcome(level, context)
+    return t.get("text") if t else None
+
+
+# Aliases for older call sites
 def random_partial_success_line(category: Optional[str] = None) -> Optional[str]:
-    return _pick_failure_line("partial", category)
+    return pick_fail_line("partial", {"intent_category": category} if category else None)
 
 
 def random_failure_line(category: Optional[str] = None) -> Optional[str]:
-    return _pick_failure_line("failure", category)
+    return pick_fail_line("failure", {"intent_category": category} if category else None)
 
 
 def random_critical_failure_line(category: Optional[str] = None) -> Optional[str]:
-    return _pick_failure_line("crit_fail", category)
-
-
-def _pick_failure_line(level: str, category: Optional[str]) -> Optional[str]:
-    table = _failure_table(level)
-    if not table:
-        return None
-    if category and category in table:
-        bucket = table[category]
-    else:
-        bucket = [line for arr in table.values() for line in arr]
-    if not bucket:
-        return None
-    return random.choice(bucket)
+    return pick_fail_line("critical_failure", {"intent_category": category} if category else None)
 
 
 # ── Floor objectives ─────────────────────────────────────────────────────────

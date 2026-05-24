@@ -72,28 +72,117 @@ def resolve(validation_result, world) -> ResolutionResult:
     result.fallback_description = (
         f"[{aff_key}] d20({raw}) + {stat}({mod:+d}) + tła({bonus:+d}) = {total} vs DC {dc} → {level}"
     )
-    # Prompt 1: enrich partial / failure / critical_failure with a narrative
-    # line pulled from failure_templates. Never blocks if missing.
-    flavor = _content_flavor(level)
-    if flavor:
-        result.fallback_description += "\n  " + flavor
-    result.effects = _effects_for_level(level, aff_key, validation_result, world)
+    # Prompt 3: pick a context-aware fail-forward template; both narrative
+    # line AND additional effects come from it.
+    if level in (PARTIAL, FAILURE, CRIT_FAILURE):
+        outcome = _context_outcome(level, aff_key, validation_result, world)
+        if outcome:
+            txt = outcome.get("text")
+            if txt:
+                result.fallback_description += "\n  " + txt
+            # Pull template effects in alongside the affordance-driven ones
+            for eff in (outcome.get("effects") or []):
+                result.effects.append(dict(eff))
+            # For audit / debugging
+            result.fallback_description += f"\n  [template={outcome.get('key','?')}]"
+
+    # Affordance-driven effects (combat damage, hack-state change, etc.)
+    result.effects.extend(_effects_for_level(level, aff_key, validation_result, world))
     return result
 
 
-def _content_flavor(level: str) -> str:
-    """Return a narrative line from failure_templates matching the level, or ''."""
+# ── Context builder for fail-forward picker (Prompt 03) ─────────────────────
+
+def _context_outcome(level: str, aff_key: str, validation_result, world):
+    """Build a context dict from world/room/entity/intent and ask the picker
+    for an outcome template. Always safe — returns None on any failure."""
     try:
         from . import content_loader
     except Exception:
-        return ""
-    if level == PARTIAL:
-        return content_loader.random_partial_success_line() or ""
-    if level == FAILURE:
-        return content_loader.random_failure_line() or ""
-    if level == CRIT_FAILURE:
-        return content_loader.random_critical_failure_line() or ""
-    return ""
+        return None
+
+    ctx = _build_context(aff_key, validation_result, world)
+    return content_loader.pick_fail_outcome(
+        level if level != CRIT_FAILURE else "critical_failure",
+        ctx,
+    )
+
+
+def _build_context(aff_key: str, validation_result, world) -> dict:
+    floor = getattr(world, "current_floor", None)
+    room  = floor.current_room() if floor else None
+
+    room_tags = []
+    visible_crawler = False
+    visible_sponsor_cam = False
+    entity_tags = []
+    entity_types = []
+    if room is not None:
+        room_tags = list(getattr(room, "sensory_tags", []) or [])
+        if room.actual_type:
+            room_tags.append(room.actual_type)
+        if room.safehouse_subtype:
+            room_tags.extend(["safehouse", room.safehouse_subtype])
+        for e in getattr(room, "entities", []) or []:
+            entity_types.append(getattr(e, "entity_type", ""))
+            entity_tags.extend(getattr(e, "tags", []) or [])
+            etype = getattr(e, "entity_type", "")
+            if etype == "crawler":
+                visible_crawler = True
+            if "camera" in (getattr(e, "tags", []) or []) or e.key == "sponsor_camera":
+                visible_sponsor_cam = True
+
+    # Target-specific tags
+    targets = validation_result.matched_entities or []
+    for t in targets:
+        entity_tags.extend(getattr(t, "tags", []) or [])
+        entity_types.append(getattr(t, "entity_type", ""))
+
+    # Player tools
+    tools = []
+    try:
+        for eid in world.character.inventory_ids:
+            ent = world.entities.get(eid)
+            if ent:
+                tools.extend(getattr(ent, "tags", []) or [])
+    except Exception:
+        pass
+
+    # Intent category (rough bucket)
+    category = _affordance_category(aff_key)
+
+    return {
+        "room_tags": room_tags,
+        "entity_tags": entity_tags,
+        "entity_types": entity_types,
+        "encounter_type": getattr(room, "encounter_key", "") if room else "",
+        "safehouse_subtype": getattr(room, "safehouse_subtype", None) if room else None,
+        "noise_level": getattr(room, "noise_level", 0) if room else 0,
+        "available_exits": len(getattr(room, "exits", {})) if room else 0,
+        "visible_crawler": visible_crawler,
+        "visible_sponsor_cam": visible_sponsor_cam,
+        "floor_objective": getattr(floor, "objective_key", "") if floor else "",
+        "affordance_key": aff_key,
+        "intent_category": category,
+        "tools": tools,
+    }
+
+
+def _affordance_category(aff_key: str) -> str:
+    table = {
+        "attack": "combat", "shoot": "combat",
+        "flee":   "combat_escape",
+        "talk":   "social", "intimidate": "social", "bribe": "social",
+        "sneak":  "stealth", "hide": "stealth",
+        "hack":   "mechanical", "force": "mechanical", "lockpick": "mechanical",
+        "repair": "mechanical", "use": "mechanical",
+        "push_into": "environment", "throw_at": "environment", "lure": "environment",
+        "rest_short": "safehouse", "rest_long": "safehouse",
+        "look": "general", "inspect": "general", "search": "general",
+        "listen": "general", "wait": "general",
+        "perform": "social", "loot": "general", "craft": "mechanical",
+    }
+    return table.get(aff_key, "general")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

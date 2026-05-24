@@ -47,6 +47,16 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
         elif kind == "look":
             if room:
                 lines.append(room.display_look())
+                # Prompt 2: layer a safehouse ambient line on look
+                if room.safehouse_subtype:
+                    import random as _r
+                    try:
+                        from . import content_loader
+                        ambient = content_loader.safehouse_ambient_line(room.safehouse_subtype)
+                        if ambient and _r.random() < 0.7:
+                            lines.append(ambient)
+                    except Exception:
+                        pass
             if time_system:
                 time_system.advance(world, eff.get("time_cost", 1))
 
@@ -193,6 +203,128 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
 
         elif kind == "add_journal":
             world.character.journal.setdefault(room.room_id if room else "_", []).append(eff.get("text",""))
+
+        # ── Prompt 03 effect types ──────────────────────────────────────────
+
+        elif kind == "alert_patrol":
+            if floor:
+                floor.floor_alert_level = min(10, floor.floor_alert_level + 2)
+                # Stash a one-shot "patrol_inbound" event
+                floor.active_events.append({
+                    "minute": floor.current_minute,
+                    "kind":   "patrol_inbound",
+                    "args":   {"source_room": room.room_id if room else ""},
+                })
+            lines.append(t("feedback_patrol_alerted",
+                           fallback="Patrol odebrał sygnał. Idą tu."))
+
+        elif kind == "block_route":
+            if room and room.exits:
+                # Pick a random non-already-locked exit and lock it
+                import random as _r
+                candidates = [(lbl, ed) for lbl, ed in room.exits.items()
+                              if not ed.get("locked")]
+                if candidates:
+                    lbl, ed = _r.choice(candidates)
+                    ed["locked"] = True
+                    ed["fallback_hint"] = "Zawalone albo zaryglowane. Nie tędy."
+                    lines.append(t("feedback_route_blocked",
+                                   fallback=f"Droga '{lbl}' jest teraz zablokowana.",
+                                   exit=lbl))
+
+        elif kind == "unblock_route":
+            if room and room.exits:
+                locked = [(lbl, ed) for lbl, ed in room.exits.items() if ed.get("locked")]
+                if locked:
+                    import random as _r
+                    lbl, ed = _r.choice(locked)
+                    ed["locked"] = False
+                    lines.append(t("feedback_route_unblocked",
+                                   fallback=f"Droga '{lbl}' otwiera się.",
+                                   exit=lbl))
+
+        elif kind == "safehouse_consequence":
+            cons = eff.get("consequence", "")
+            if room and room.safehouse_subtype:
+                room.state = getattr(room, "state", {}) or {}
+                # Stash a flag in the room's fragments (visible on Look) and on the
+                # floor state for later service modifiers
+                marker = f"safehouse:{cons}"
+                if marker not in room.fragments:
+                    room.fragments.append(marker)
+                lines.append({
+                    "kicked_out":     t("feedback_safe_kicked_out",
+                                        fallback="Wypraszają cię. Dyskretnie. Definitywnie."),
+                    "prices_up":      t("feedback_safe_prices_up",
+                                        fallback="Cennik się przegrupował. Na twoją niekorzyść."),
+                    "service_denied": t("feedback_safe_service_denied",
+                                        fallback="Obsługa odmawia. Bez wyjaśnień."),
+                }.get(cons, t("feedback_safe_consequence",
+                              fallback="Coś w safehouse zmienia się — nie na lepsze.")))
+
+        elif kind == "gain_rumor":
+            cat = eff.get("category")
+            try:
+                from . import content_loader
+                rumor = content_loader.random_rumor(category=cat)
+            except Exception:
+                rumor = None
+            if rumor:
+                rkey = rumor.get("key")
+                if floor and rkey and rkey not in floor.rumors:
+                    floor.rumors.append(rkey)
+                text = rumor.get("text", "")
+                if text:
+                    lines.append(text)
+
+        elif kind == "reveal_clue":
+            # Pick any clue not yet placed in the current room
+            try:
+                from . import content_loader
+                picked = content_loader.random_clue()
+            except Exception:
+                picked = None
+            if picked and room:
+                ckey, clue = picked
+                if ckey not in room.fragments:
+                    room.fragments.append(ckey)
+                # Reveal tags on the character's known facts
+                ch = world.character
+                ch.flags.setdefault("known_clues", [])
+                ch.flags.setdefault("known_facts", [])
+                if ckey not in ch.flags["known_clues"]:
+                    ch.flags["known_clues"].append(ckey)
+                for tag in clue.get("reveals", []) or []:
+                    if tag not in ch.flags["known_facts"]:
+                        ch.flags["known_facts"].append(tag)
+                line = clue.get("text", "")
+                if line:
+                    lines.append(line)
+
+        elif kind == "class_affinity_shift":
+            kind_id = eff.get("kind")
+            amt = int(eff.get("amount", 1))
+            if kind_id and kind_id in world.character.affinity:
+                world.character.affinity[kind_id] += amt
+
+        elif kind == "item_damage":
+            # Degrade a random inventory item whose tag matches `tag` (or any with "*").
+            tag = eff.get("tag", "*")
+            import random as _r
+            candidates = []
+            for eid in world.character.inventory_ids:
+                ent = world.entities.get(eid)
+                if ent is None:
+                    continue
+                if tag == "*" or tag in (ent.tags or []):
+                    candidates.append(ent)
+            if candidates:
+                victim = _r.choice(candidates)
+                # We don't have a condition field on Entity yet; flag via state.
+                victim.state["damaged"] = victim.state.get("damaged", 0) + 1
+                lines.append(t("feedback_item_damaged",
+                               fallback=f"{victim.display_name()}: uszkodzone.",
+                               name=victim.display_name()))
 
     return lines
 
