@@ -36,6 +36,8 @@ field is missing:
 CLUE_DEFAULTS = {
     "weight": 1, "floor_min": 1, "floor_max": 5,
     "tags": [], "risks": [], "rewards": ["partial_information"],
+    "requires_clues": [],          # prerequisite clue keys (sequence support)
+    "can_skip_sequence": False,    # if True, this clue is always revealable
 }
 
 CLUE_TEMPLATES = {
@@ -56,6 +58,7 @@ CLUE_TEMPLATES = {
         "reveals": ["keycard_in_maintenance", "keycard_in_blackmarket",
                     "keycard_color_red"],
         "enables_paths": ["loot_corpse", "black_market", "steal"],
+        "requires_clues": ["keycard_chain_start"],
     },
 
     "warden_pattern": {

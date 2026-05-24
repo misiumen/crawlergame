@@ -161,6 +161,16 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
         elif kind == "add_credits":
             world.character.credits += int(eff.get("amount", 0))
 
+        elif kind == "world_flag":
+            # Generic world-state flag, used by risks/rewards. Lives on
+            # the floor's active_events as well as character.flags so both
+            # game and save/load see it. Never overrides existing value
+            # unless explicitly set.
+            key = eff.get("key")
+            value = eff.get("value", True)
+            if key:
+                world.character.flags[key] = value
+
         elif kind == "loot":
             eid = eff.get("entity_id")
             ent = _resolve_entity(world, room, eid)
@@ -278,20 +288,36 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                     lines.append(text)
 
         elif kind == "reveal_clue":
-            # Pick any clue not yet placed in the current room
+            # Pick a clue not yet placed; respect chain prerequisites
+            # (Prompt 06a, gap #6). If a clue's requires_clues aren't all
+            # in known_clues and it isn't can_skip_sequence, fall back to
+            # a vague hint or drop the reveal entirely.
             try:
                 from . import content_loader
-                picked = content_loader.random_clue()
             except Exception:
-                picked = None
-            if picked and room:
+                content_loader = None
+            ch = world.character
+            ch.flags.setdefault("known_clues", [])
+            ch.flags.setdefault("known_facts", [])
+            picked = None
+            if content_loader is not None:
+                # Try up to 4 picks looking for a clue whose prereqs are met
+                for _ in range(4):
+                    cand = content_loader.random_clue()
+                    if cand is None: break
+                    ck, cd = cand
+                    if ck in ch.flags["known_clues"]:
+                        continue
+                    req = cd.get("requires_clues") or []
+                    if cd.get("can_skip_sequence") or all(r in ch.flags["known_clues"] for r in req):
+                        picked = cand; break
+            if picked is None:
+                lines.append(t("feedback_vague_hint",
+                               fallback="Zauważasz coś, czego jeszcze nie potrafisz nazwać."))
+            else:
                 ckey, clue = picked
-                if ckey not in room.fragments:
+                if room and ckey not in room.fragments:
                     room.fragments.append(ckey)
-                # Reveal tags on the character's known facts
-                ch = world.character
-                ch.flags.setdefault("known_clues", [])
-                ch.flags.setdefault("known_facts", [])
                 if ckey not in ch.flags["known_clues"]:
                     ch.flags["known_clues"].append(ckey)
                 for tag in clue.get("reveals", []) or []:

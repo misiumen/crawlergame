@@ -1,10 +1,25 @@
 """Rumor templates for sandbox floor gameplay.
 
-Each rumor has:
+Each rumor has at minimum:
   key          -- stable id used to dedupe + drive consequences
   truth        -- 0..1; lower means more likely false/biased
   text         -- the visible Polish line
   reveals_tags -- (optional) tags the player learns about
+
+Defaults applied at lookup time (Prompt 06a, gap #5) when not set on a
+rumor explicitly:
+  tags          = []
+  weight        = 1
+  floor_min     = 1
+  floor_max     = 5
+  reliability   = same as `truth` (0..1)
+  source_types  = ["npc_dialogue","rumor","graffiti"]
+  objective_tags= []
+  false_or_partial = (truth < 0.5)
+
+Use get_rumor(key) or list_rumors(category=..., floor=..., source=..., tags=...)
+to read with defaults applied. Direct access to RUMOR_TEMPLATES is still
+supported but bypasses defaults.
 
 Buckets are by category so the engine can ask for a specific kind:
   floor_hint    — about the floor layout / shortcut / hazards
@@ -14,6 +29,56 @@ Buckets are by category so the engine can ask for a specific kind:
   npc_hint      — about a specific crawler/NPC
   false_or_biased — deliberately wrong or self-serving info
 """
+
+RUMOR_DEFAULTS = {
+    "tags": [], "weight": 1, "floor_min": 1, "floor_max": 5,
+    "source_types": ["npc_dialogue", "rumor", "graffiti"],
+    "objective_tags": [],
+}
+
+
+def _with_defaults(category: str, rumor: dict) -> dict:
+    """Return rumor with category injected and missing fields filled in."""
+    merged = dict(RUMOR_DEFAULTS)
+    merged.update(rumor)
+    merged["category"] = category
+    truth = float(merged.get("truth", 0.5))
+    merged.setdefault("reliability", truth)
+    merged.setdefault("false_or_partial", truth < 0.5)
+    return merged
+
+
+def get_rumor(key: str):
+    """Lookup by stable key; applies defaults."""
+    for cat, items in RUMOR_TEMPLATES.items():
+        for r in items:
+            if r.get("key") == key:
+                return _with_defaults(cat, r)
+    return None
+
+
+def list_rumors(category=None, floor=None, source=None, tags=None):
+    """Filter rumors by category, floor range, source type, or tag overlap.
+    Returns a flat list of enriched dicts."""
+    out = []
+    for cat, items in RUMOR_TEMPLATES.items():
+        if category and cat != category:
+            continue
+        for r in items:
+            enriched = _with_defaults(cat, r)
+            if floor is not None:
+                if not (enriched["floor_min"] <= floor <= enriched["floor_max"]):
+                    continue
+            if source and source not in enriched["source_types"]:
+                continue
+            if tags:
+                rumor_tag_pool = set(enriched.get("tags", []) +
+                                     enriched.get("reveals_tags", []) +
+                                     enriched.get("objective_tags", []))
+                if not any(t in rumor_tag_pool for t in tags):
+                    continue
+            out.append(enriched)
+    return out
 
 RUMOR_TEMPLATES = {
     "floor_hint": [

@@ -131,6 +131,28 @@ def validate_floor(floor: FloorState) -> List[str]:
     if non_combat_count < 2:
         errs.append("no_non_combat_paths")
 
+    # Prompt 06a, gap #4: objective.required_tags must be satisfiable
+    if floor.objective_key:
+        obj = cl.all_floor_objectives().get(floor.objective_key, {})
+        required = list(obj.get("required_tags", []))
+        if required:
+            present = set()
+            for r in floor.rooms.values():
+                present.update(r.sensory_tags or [])
+                present.add(r.actual_type)
+                if r.safehouse_subtype:
+                    present.update(["safehouse", r.safehouse_subtype])
+                for e in r.entities:
+                    present.update(e.tags or [])
+                for ckey in r.fragments:
+                    cd = cl.get_clue(ckey) if hasattr(cl, "get_clue") else None
+                    if cd:
+                        present.update(cd.get("reveals", []) or [])
+                        present.update(cd.get("tags", []) or [])
+            missing = [t for t in required if t not in present]
+            if missing:
+                errs.append("missing_required_tag:" + ",".join(missing))
+
     return errs
 
 
@@ -180,6 +202,12 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
 
     # Step 8: clue chain (place clues onto appropriate rooms as fragments)
     _place_clue_chain(f, rng)
+
+    # Step 9: place encounters in combat rooms, weighted by objective tags
+    _place_encounters(f, rng)
+
+    # Step 10: ensure objective.required_tags are present somewhere on the floor
+    _ensure_required_tags(f, rng)
 
     # Step 12 (rumors): seed one or two rumor keys onto the floor for safehouse chats
     _seed_initial_rumors(f, rng)
@@ -567,33 +595,56 @@ def _place_locks(f: FloorState, arch: Dict, rng: random.Random):
 
 
 def _place_clue_chain(f: FloorState, rng: random.Random):
-    """Distribute clues from the objective's chain across appropriate rooms."""
+    """Distribute clues from the objective's chain across appropriate rooms.
+
+    Prompt 06a (gap #2): when a candidate room is a safehouse, prefer it
+    only if its template's `possible_clue_sources` includes the clue's
+    source. Plain actual_type fallback still applies."""
     if not f.objective_key:
         return
     chain = cl.clues_for_objective(f.objective_key)
     if not chain:
         return
-    # Map source -> preferred actual_type tags
+    # Generic actual_type fallback (used when safehouse metadata doesn't match)
     source_pref = {
         "rumor":         {"safehouse"},
-        "terminal":      {"loot","lore"},
-        "graffiti":      {"safehouse","secret"},
+        "terminal":      {"loot", "lore"},
+        "graffiti":      {"safehouse", "secret"},
         "corpse_note":   {"combat"},
-        "npc_dialogue":  {"safehouse","social"},
+        "npc_dialogue":  {"safehouse", "social"},
         "lore_fragment": {"lore"},
     }
+
+    # Pull safehouse subtype -> possible_clue_sources from templates
+    safehouse_sources = {}
+    for subtype, tmpl in cl.all_safehouse_templates().items():
+        srcs = tmpl.get("possible_clue_sources") or []
+        if srcs:
+            safehouse_sources[subtype] = set(srcs)
+
     rooms_list = list(f.rooms.values())
     for ckey, clue in chain:
         src = clue.get("source", "rumor")
-        prefs = source_pref.get(src, set())
-        candidates = [r for r in rooms_list
-                      if r.actual_type in prefs and ckey not in r.fragments]
-        if not candidates:
-            candidates = [r for r in rooms_list
-                          if r.actual_type != "start" and ckey not in r.fragments]
-        if not candidates:
+        # Priority 1: safehouse rooms whose template declares this source
+        prio_candidates = []
+        for r in rooms_list:
+            if ckey in r.fragments:
+                continue
+            sub = getattr(r, "safehouse_subtype", None)
+            if sub and src in safehouse_sources.get(sub, set()):
+                prio_candidates.append(r)
+        # Priority 2: actual_type fallback
+        if not prio_candidates:
+            prefs = source_pref.get(src, set())
+            prio_candidates = [r for r in rooms_list
+                               if r.actual_type in prefs and ckey not in r.fragments]
+        # Priority 3: anything non-start
+        if not prio_candidates:
+            prio_candidates = [r for r in rooms_list
+                               if r.actual_type != "start" and ckey not in r.fragments]
+        if not prio_candidates:
             continue
-        chosen = rng.choice(candidates)
+        chosen = rng.choice(prio_candidates)
         chosen.fragments.append(ckey)
 
 
@@ -657,6 +708,100 @@ def _pick_from_pool(pool, rng: random.Random):
 
 def _generic_exit_labels():
     return ["wschód","zachód","północ","południe","drzwi","korytarz","przejście"]
+
+
+# ── Encounter placement (Prompt 06a, gap #3) ─────────────────────────────────
+
+def _place_encounters(f: FloorState, rng: random.Random):
+    """Pick one encounter per combat room, weighting by objective tags."""
+    obj = cl.all_floor_objectives().get(f.objective_key, {}) if f.objective_key else {}
+    obj_tags = set(obj.get("tags", []) + obj.get("required_tags", []))
+
+    combat_rooms = [r for r in f.rooms.values()
+                    if r.actual_type == "combat" and not r.encounter_intro_fallback]
+    if not combat_rooms:
+        return
+
+    pool = cl.all_encounter_templates()
+    if not pool:
+        return
+
+    for room in combat_rooms:
+        room_tags = set(room.sensory_tags or []) | {room.actual_type}
+        # Score each encounter: tag overlap with (objective + room) wins
+        scored = []
+        for key, etmpl in pool.items():
+            if etmpl.get("floor_min", 1) > f.floor_number:
+                continue
+            etags = set(etmpl.get("tags", []))
+            overlap_obj  = len(etags & obj_tags)
+            overlap_room = len(etags & room_tags)
+            base_w = max(1, int(etmpl.get("weight", 1)))
+            scored.append((key, etmpl, base_w + overlap_obj * 3 + overlap_room * 2))
+        if not scored:
+            continue
+        keys = [(k, t) for k, t, _ in scored]
+        weights = [w for _, _, w in scored]
+        ekey, etmpl = rng.choices(keys, weights=weights, k=1)[0]
+        intro = cl.encounter_intro_line(etmpl)
+        room.encounter_key = ekey
+        if intro:
+            room.encounter_intro_fallback = intro
+
+
+# ── Required-tag guarantee (Prompt 06a, gap #4) ──────────────────────────────
+
+def _ensure_required_tags(f: FloorState, rng: random.Random):
+    """Make sure every tag listed in objective.required_tags is present
+    somewhere on the floor. If not, plant a synthetic env entity carrying
+    the missing tag in a non-start room."""
+    if not f.objective_key:
+        return
+    obj = cl.all_floor_objectives().get(f.objective_key, {})
+    required = list(obj.get("required_tags", []))
+    if not required:
+        return
+    present = set()
+    for r in f.rooms.values():
+        present.update(r.sensory_tags or [])
+        present.add(r.actual_type)
+        if r.safehouse_subtype:
+            present.update(["safehouse", r.safehouse_subtype])
+        for e in r.entities:
+            present.update(e.tags or [])
+            present.add(e.entity_type)
+        # Clue-revealed facts count too — for objective purposes
+        for ckey in r.fragments:
+            cd = cl.get_clue(ckey) if hasattr(cl, "get_clue") else None
+            if cd:
+                present.update(cd.get("reveals", []) or [])
+                present.update(cd.get("tags", []) or [])
+
+    missing = [t for t in required if t not in present]
+    if not missing:
+        return
+
+    # Plant a synthetic env entity carrying the missing tag(s) in a non-start room
+    candidates = [r for r in f.rooms.values() if r.room_id != f.start_room_id]
+    if not candidates:
+        return
+    target_room = rng.choice(candidates)
+    from .entity import Entity, T_OBJECT
+    plant_key = "objective_relevant_object_" + "_".join(missing)[:24]
+    plant = Entity(
+        key=plant_key, entity_type=T_OBJECT,
+        fallback_name="coś ważnego dla zadania",
+        fallback_desc="Element, który wygląda na powiązany z celem piętra.",
+        tags=list(missing) + ["objective_path"],
+        affordances=["inspect", "use", "loot"],
+        location_id=target_room.room_id,
+    )
+    target_room.entities.append(plant)
+    # Record the repair in active_events so debugging is easy
+    f.active_events.append({
+        "minute": 0, "kind": "gen_required_tag_repair",
+        "args": {"missing": missing, "planted_in": target_room.room_id},
+    })
 
 
 # ── Summary for debug printing ───────────────────────────────────────────────
