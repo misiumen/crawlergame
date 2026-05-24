@@ -50,7 +50,12 @@ FLOOR_OBJECTIVE_TEMPLATES = {
                         "vent_shortcut_path", "merchant_password"],
         "rumor_hooks": ["keycard_seen_in_cafe", "crawler_has_keycard",
                         "blackmarket_keycard", "warden_keycard"],
+        "tags": ["loot", "social", "objective", "tradeable"],
+        "risks": ["theft_caught", "relationship_down", "alert_patrol"],
+        "rewards": ["floor_exit", "trade_credits", "stealth_affinity"],
         "required_tags": ["objective_path"],
+        "floor_min": 1, "floor_max": 4,
+        "weight": 5,
     },
 
     "bypass_warden": {
@@ -69,7 +74,12 @@ FLOOR_OBJECTIVE_TEMPLATES = {
         "clue_chains": ["boss_weakness_noise", "warden_pattern",
                         "vent_shortcut_path"],
         "rumor_hooks": ["boss_likes_noise", "boss_bribe_route", "patrol_timer"],
+        "tags": ["combat", "stealth", "objective", "boss"],
+        "risks": ["combat_loss", "self_damage", "alert_patrol"],
+        "rewards": ["floor_exit", "audience_high", "boss_loot"],
         "required_tags": ["boss", "secret"],
+        "floor_min": 1, "floor_max": 5,
+        "weight": 4,
     },
 
     "repair_elevator": {
@@ -84,8 +94,14 @@ FLOOR_OBJECTIVE_TEMPLATES = {
             "hack_override",
         ],
         "minimum_solution_paths": 2,
-        "clue_chains": ["acid_pool_metal"],
+        "clue_chains": ["acid_pool_metal", "warden_pattern", "vent_shortcut_path"],
+        "rumor_hooks": ["patrol_timer", "wiring_corridor"],
+        "tags": ["mechanical", "objective", "tech"],
+        "risks": ["alert_patrol", "self_damage", "item_damage"],
+        "rewards": ["floor_exit", "tech_affinity"],
         "required_tags": ["power", "cable", "control_panel"],
+        "floor_min": 1, "floor_max": 3,
+        "weight": 4,
     },
 
     "complete_faction_favour": {
@@ -99,8 +115,14 @@ FLOOR_OBJECTIVE_TEMPLATES = {
             "faction_betray_them_back",
         ],
         "minimum_solution_paths": 2,
-        "clue_chains": ["merchant_password"],
+        "clue_chains": ["merchant_password", "warden_pattern", "vent_shortcut_path"],
+        "rumor_hooks": ["wounded_brawler_trade", "loot_goblin_betrays"],
+        "tags": ["social", "objective", "faction"],
+        "risks": ["relationship_down", "betrayal", "audience_swing"],
+        "rewards": ["floor_exit", "faction_rep", "social_affinity"],
         "required_tags": ["faction"],
+        "floor_min": 1, "floor_max": 5,
+        "weight": 3,
     },
 
     "broadcast_stunt": {
@@ -114,7 +136,14 @@ FLOOR_OBJECTIVE_TEMPLATES = {
             "audience_environment_kill",
         ],
         "minimum_solution_paths": 2,
+        "clue_chains": ["acid_pool_metal", "boss_weakness_noise"],
+        "rumor_hooks": ["env_class_hint", "social_class_hint"],
+        "tags": ["sponsor", "audience", "objective"],
+        "risks": ["audience_swing", "self_damage"],
+        "rewards": ["floor_exit", "audience_high", "showmanship_affinity"],
         "required_tags": ["sponsor", "audience", "environment"],
+        "floor_min": 1, "floor_max": 5,
+        "weight": 3,
     },
 }
 

@@ -1,7 +1,21 @@
-"""Safehouse templates for CRAWL PROTOCOL revamp."""
+"""Safehouse templates for CRAWL PROTOCOL revamp.
+
+Each subtype has metadata that the floor generator and rumor systems can read:
+  tags        -- short ASCII tags used by filters (cafe/quiet/social/...)
+  weight      -- pick-weight when generator picks a safehouse subtype
+  floor_min   -- earliest floor where this subtype can appear
+  risks       -- short list of bad outcomes the player can trigger here
+  rewards     -- short list of services the safehouse offers
+  possible_clue_sources -- where clues can land in this kind of safehouse
+"""
 
 SAFEHOUSE_TEMPLATES = {
     "cafe": {
+        "tags": ["safehouse","cafe","social","rumor_source","crowded"],
+        "weight": 6, "floor_min": 1,
+        "risks": ["overheard","relationship_down","prices_up"],
+        "rewards": ["coffee","food","rumor","short_rest"],
+        "possible_clue_sources": ["rumor","graffiti","npc_dialogue"],
         "name_pool": ["Ostatni Łyk", "Kawa Przed Przemocą", "Mugs & Munitions", "Bufet Neutralności"],
         "entry_descriptions": [
             "Za drzwiami pachnie kawą, ozonem i mokrym strachem. Kilku crawlerów siedzi przy stolikach, udając, że nie liczy dróg ucieczki.",
@@ -14,6 +28,11 @@ SAFEHOUSE_TEMPLATES = {
         ]
     },
     "bathroom": {
+        "tags": ["safehouse","bathroom","quiet","graffiti_source","secret_entry"],
+        "weight": 5, "floor_min": 1,
+        "risks": ["mirror_event","ambush_in_stall"],
+        "rewards": ["wash","minor_heal","graffiti_clue","short_rest"],
+        "possible_clue_sources": ["graffiti","corpse_note","npc_dialogue"],
         "name_pool": ["Autoryzowana Łazienka 7", "Sanitarny Rozejm", "Kabiny Bez Gwarancji"],
         "entry_descriptions": [
             "Łazienka jest za czysta. To pierwszy i najgorszy znak. Lustra pokazują cię z opóźnieniem o pół sekundy.",
@@ -26,6 +45,11 @@ SAFEHOUSE_TEMPLATES = {
         ]
     },
     "clinic": {
+        "tags": ["safehouse","clinic","heal","expensive","clinical"],
+        "weight": 4, "floor_min": 1,
+        "risks": ["overpriced","kicked_out_no_credits","sponsored_drug"],
+        "rewards": ["heal","cure","full_heal","short_rest"],
+        "possible_clue_sources": ["npc_dialogue","terminal"],
         "name_pool": ["Klinika Bez Pytań", "Punkt Sanitarny 7", "NovaChem Triage"],
         "entry_descriptions": [
             "Zapach środków dezynfekujących walczy z czymś gorszym i wygrywa tylko techniczne. Lampy halogenowe odbijają się od białych płytek z mściwą czystością.",
@@ -40,6 +64,11 @@ SAFEHOUSE_TEMPLATES = {
         ],
     },
     "sponsor_kiosk": {
+        "tags": ["safehouse","sponsor","intel","ads","quiet"],
+        "weight": 4, "floor_min": 1,
+        "risks": ["sponsor_brand_damage","audience_swing"],
+        "rewards": ["intel","ad_credit","floor_hint"],
+        "possible_clue_sources": ["terminal","npc_dialogue"],
         "name_pool": ["Punkt Informacyjny NovaChem", "Kiosk Sponsorski A-2", "Strefa Promocji"],
         "entry_descriptions": [
             "Małe okienko z ekranem pełnym reklam i tabliczką: PYTAJ O CIEKAWE OFERTY. Wszystkie oferty są ciekawe inaczej.",
@@ -53,6 +82,11 @@ SAFEHOUSE_TEMPLATES = {
         ],
     },
     "black_market": {
+        "tags": ["safehouse","black_market","trade","contraband","sponsor_free"],
+        "weight": 3, "floor_min": 1,
+        "risks": ["overpriced","fake_goods","tracked_by_sponsor"],
+        "rewards": ["contraband","keycard","rumor","illegal_goods"],
+        "possible_clue_sources": ["npc_dialogue","corpse_note"],
         "name_pool": ["Bez Paragonu", "Gwarancja Martwa", "Rynek Pod Zlewem", "Legalnie Prawie"],
         "entry_descriptions": [
             "Czarny rynek mieści się tam, gdzie mapa pokazuje ścianę. To dobry znak albo bardzo zły, zależnie od twojego budżetu.",

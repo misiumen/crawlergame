@@ -22,7 +22,21 @@ Engine usage:
 Clues compose with rumors — a rumor can be the *source* of a clue but
 clues are stronger: their `reveals` tags are treated as factual by the
 validator, even if the rumor that delivered them had `truth < 1.0`.
+
+Defaults applied to every clue at lookup time (via get_clue) when the
+field is missing:
+  weight       = 1
+  floor_min    = 1
+  floor_max    = 5
+  tags         = []
+  risks        = []
+  rewards      = ["partial_information"]
 """
+
+CLUE_DEFAULTS = {
+    "weight": 1, "floor_min": 1, "floor_max": 5,
+    "tags": [], "risks": [], "rewards": ["partial_information"],
+}
 
 CLUE_TEMPLATES = {
     # ── Keycard chain (for the find_keycard objective) ──────────────────────
@@ -99,7 +113,15 @@ def all_clue_keys():
 
 
 def get_clue(key: str):
-    return CLUE_TEMPLATES.get(key)
+    """Return clue dict with CLUE_DEFAULTS layered in for missing fields."""
+    c = CLUE_TEMPLATES.get(key)
+    if c is None:
+        return None
+    merged = dict(CLUE_DEFAULTS)
+    merged.update(c)
+    # Ensure key always present
+    merged["key"] = key
+    return merged
 
 
 def clues_unlocking_path(path_key: str):

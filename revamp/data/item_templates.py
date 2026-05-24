@@ -1,4 +1,29 @@
-"""Problem-solving item templates for CRAWL PROTOCOL revamp."""
+"""Problem-solving item templates for CRAWL PROTOCOL revamp.
+
+Defaults applied to every entry at lookup time (via get_item) for fields
+not explicitly set in the dict:
+  weight     = 1     (selection weight in loot tables)
+  floor_min  = 1
+  floor_max  = 5
+  risks      = []    (what can go wrong if mishandled)
+  rewards    = ["utility"]
+"""
+
+ITEM_DEFAULTS = {
+    "weight": 1, "floor_min": 1, "floor_max": 5,
+    "risks": [], "rewards": ["utility"],
+}
+
+
+def get_item(key: str):
+    proto = ITEM_TEMPLATES.get(key)
+    if proto is None:
+        return None
+    merged = dict(ITEM_DEFAULTS)
+    merged.update(proto)
+    merged["key"] = key
+    return merged
+
 
 ITEM_TEMPLATES = {
     "cracked_mug": {
