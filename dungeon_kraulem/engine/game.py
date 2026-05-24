@@ -183,6 +183,91 @@ class Game:
                  LOG_SYSTEM)
         self.state = STATE_PLAY
 
+    def _show_prep_readout(self) -> None:
+        """Prompt 20 — print a structured 'what can I do right now?'
+        list focused on combat prep. Lists:
+          * time remaining to next scheduled arrival (if any)
+          * deployable items in inventory
+          * environmental hooks (objects with `push`/`break`/`hack`
+            affordances) in the current room
+          * visible exits
+          * any armed traps already in place
+        Does NOT advance time (1-min cost is cheap and the player will
+        actually inspect things after this anyway).
+        """
+        floor = self.world.current_floor
+        room = floor.current_room() if floor else None
+        if room is None:
+            self.log("Nigdzie nie jesteś.", LOG_WARN)
+            return
+        self.log("— Plan obrony —", LOG_SYSTEM)
+
+        # Time remaining.
+        try:
+            from . import encounter as _enc
+            rem = _enc.time_until_next(self.world)
+            if rem is not None:
+                if rem <= 0:
+                    self.log(
+                        "  Patrol jest już pod drzwiami.", LOG_DANGER)
+                elif rem <= 5:
+                    self.log(f"  Mniej niż {rem} min do przybycia.",
+                             LOG_WARN)
+                else:
+                    self.log(f"  ~{rem} min do przybycia.", LOG_NORMAL)
+            else:
+                self.log("  Nic nie nadchodzi. (Na razie.)", LOG_NORMAL)
+        except Exception:
+            pass
+
+        # Deployable items in inventory.
+        deployable = []
+        for eid in (self.world.character.inventory_ids or []):
+            it = self.world.get(eid)
+            if it is None:
+                continue
+            tags = list(it.tags or [])
+            affs = list(it.affordances or [])
+            if "trap" in tags or "smoke" in tags or "tripwire" in tags or \
+               "deploy" in affs:
+                deployable.append(it.display_name())
+        if deployable:
+            self.log("  Do rozstawienia: " + ", ".join(deployable),
+                     LOG_NORMAL)
+
+        # Environmental hooks — objects you can interact with in
+        # spectacle-friendly ways (push, break, hack, force).
+        hooks = []
+        for e in room.visible_entities():
+            if e.entity_type in ("monster", "crawler", "npc"):
+                continue
+            affs = set(e.affordances or [])
+            if affs & {"push_into","throw_at","break","force","hack"}:
+                # Highlight which moves apply.
+                actions = ", ".join(sorted(affs &
+                    {"push_into","throw_at","break","force","hack"}))
+                hooks.append(f"{e.display_name()} ({actions})")
+        if hooks:
+            self.log("  W otoczeniu: " + " · ".join(hooks), LOG_NORMAL)
+
+        # Already-armed traps.
+        armed = []
+        for trap in ((room.state or {}).get("player_traps") or []):
+            if not trap.get("triggered"):
+                armed.append(trap.get("display_name", "pułapka"))
+        if armed:
+            self.log("  Już rozstawione: " + ", ".join(armed),
+                     LOG_SUCCESS)
+
+        # Visible exits.
+        exit_labels = [lbl for lbl, ed in (room.exits or {}).items()
+                       if not ed.get("hidden")]
+        if exit_labels:
+            self.log("  Wyjścia: " + ", ".join(exit_labels), LOG_NORMAL)
+
+        if not (deployable or hooks or armed or exit_labels):
+            self.log("  Pusto. Naprawdę pusto.", LOG_WARN)
+
     def _resolve_disambiguation(self, text_val: str) -> bool:
         """Prompt 20: handle a short reply that picks among the candidates
         from a previous ambiguous_target. Returns True iff the reply was
@@ -729,6 +814,10 @@ class Game:
             from . import companion_actions as _ca
             _ca.handle(self, intent.intent, intent)
             return
+        # Prompt 20: encounter-prep readout. Always available; especially
+        # useful when an alarm has scheduled an arrival.
+        if intent.intent == "prep_room":
+            self._show_prep_readout(); return
 
         # Prompt 09 — display settings
         if intent.intent == "show_resolutions":

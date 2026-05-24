@@ -22,6 +22,14 @@ def advance(world, minutes: int):
     except Exception:
         pass
 
+    # Prompt 20: drain scheduled encounters — emit T-15/T-5/T-1 warnings,
+    # fire any that came due. Safe when no encounters are queued.
+    try:
+        from . import encounter as _enc
+        _enc.tick_due(world, minutes)
+    except Exception:
+        pass
+
     # Day-change event
     if f.day_number() != prev_day:
         world.log_msg(_day_change_line(f), "syndicate")

@@ -49,6 +49,11 @@ class FloorState:
     # Prompt 07: belief seeds active on this floor (subset of world.belief_seeds).
     active_belief_seed_ids: List[str] = field(default_factory=list)
 
+    # Prompt 20: pending scheduled encounters (alarms → arrivals).
+    # Elements are `engine.encounter.ScheduledEncounter` instances.
+    # `time_system.advance` drains this list each tick.
+    scheduled_encounters: List = field(default_factory=list)
+
     # ── Helpers ──────────────────────────────────────────────────────────────
 
     def current_room(self) -> Optional[RoomState]:

@@ -123,6 +123,12 @@ _QUICK_INTENTS = {
 
     # Quick journal tab nav.
     "journal_companions": ["towarzysze","chowańce","chowance","pupile","companions"],
+
+    # Prompt 20 — encounter prep.
+    "prep_room":  ["przygotuj się","przygotuj sie","oceń pokój","ocen pokoj",
+                   "zaplanuj","zaplanuj obronę","zaplanuj obrone",
+                   "rozeznaj","co tu mam","co mam tu",
+                   "prepare","prep","assess","plan defense"],
 }
 
 

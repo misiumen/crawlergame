@@ -353,4 +353,90 @@ MON = {
         affordances=["inspect","attack","intimidate","bribe","talk","sneak"],
         hp=32, max_hp=32, ac=14, attack_bonus=6, damage_dice="2d6+1",
     ),
+
+    # ── Prompt 20 — alarm responders ────────────────────────────────────────
+    "patrol_security": dict(
+        name_key="ent_patrol_security_n", fallback_name="Ochroniarz patrolu",
+        desc_key="ent_patrol_security_d",
+        fallback_desc="Standardowy ochroniarz. Pałka, kamizelka, słabe morale.",
+        tags=["monster","humanoid","corporate","responder"],
+        affordances=["inspect","attack","intimidate","bribe","talk"],
+        hp=14, max_hp=14, ac=12, attack_bonus=3, damage_dice="1d6+1",
+    ),
+    "silent_response": dict(
+        name_key="ent_silent_response_n", fallback_name="Agent ds. wycieków",
+        desc_key="ent_silent_response_d",
+        fallback_desc="Czarna kurtka, tłumik na pistolecie, nie mówi.",
+        tags=["monster","humanoid","corporate","stealth","responder"],
+        affordances=["inspect","attack","sneak"],
+        hp=12, max_hp=12, ac=13, attack_bonus=4, damage_dice="1d8",
+    ),
+    "biotech_inspector": dict(
+        name_key="ent_biotech_inspector_n", fallback_name="Inspektor NovaChem",
+        desc_key="ent_biotech_inspector_d",
+        fallback_desc="Hełm z osłoną twarzy, kombinezon, podkładka. Notuje cię.",
+        tags=["monster","humanoid","corporate","novachem","responder"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=18, max_hp=18, ac=13, attack_bonus=4, damage_dice="1d6+2",
+    ),
+
+    # ── Prompt 18 (deferred) — sponsor hunters ──────────────────────────────
+    # These were declared in `content/data/sponsors.py` but the MON
+    # templates were never authored. With these in place, the
+    # sponsors.maybe_intervene → pending_sponsor_hunters → combat.py
+    # injection path now actually spawns enemies.
+    "agent_kontroli_jakosci": dict(
+        name_key="ent_qc_agent_n", fallback_name="Agent Kontroli Jakości",
+        desc_key="ent_qc_agent_d",
+        fallback_desc=("W białym fartuchu z planszetką. „Subiekcie, "
+                       "proszę nie ruszać się — to dla danych."),
+        tags=["monster","humanoid","corporate","novachem","sponsor_hunter"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=16, max_hp=16, ac=12, attack_bonus=4, damage_dice="1d8",
+    ),
+    "egzekutor_ligi": dict(
+        name_key="ent_league_executor_n", fallback_name="Egzekutor Ligi",
+        desc_key="ent_league_executor_d",
+        fallback_desc=("Numerowana tarcza, jednorazowy uśmiech, "
+                       "regulamin 4.2 wytatuowany na pięści."),
+        tags=["monster","humanoid","armored","sport","sponsor_hunter"],
+        affordances=["inspect","attack","intimidate"],
+        hp=22, max_hp=22, ac=14, attack_bonus=5, damage_dice="1d10+1",
+    ),
+    "windykator": dict(
+        name_key="ent_collector_n", fallback_name="Windykator",
+        desc_key="ent_collector_d",
+        fallback_desc=("Czarny garnitur, czarny notes, czarne pytanie: "
+                       "„Mamy chwilę?”"),
+        tags=["monster","humanoid","cunning","czarny_rynek","sponsor_hunter"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=18, max_hp=18, ac=12, attack_bonus=4, damage_dice="1d6+2",
+    ),
+    "redaktor_naczelny": dict(
+        name_key="ent_chief_editor_n", fallback_name="Redaktor Naczelny",
+        desc_key="ent_chief_editor_d",
+        fallback_desc=("Okulary, tablet, dyktafon. „Co właściwie próbujesz "
+                       "powiedzieć tym ludziom?"),
+        tags=["monster","humanoid","memetic","ministerstwo","sponsor_hunter"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=15, max_hp=15, ac=11, attack_bonus=3, damage_dice="1d6+1",
+    ),
+    "pielgrzym_recyklera": dict(
+        name_key="ent_recycler_pilgrim_n", fallback_name="Pielgrzym Recyklera",
+        desc_key="ent_recycler_pilgrim_d",
+        fallback_desc=("Patchworkowa szata z odzysku, święte koła "
+                       "łańcuchowe, oczy zbyt jasne."),
+        tags=["monster","humanoid","cult","recykling","sponsor_hunter"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=14, max_hp=14, ac=11, attack_bonus=3, damage_dice="1d8"
+    ),
+    "anty_gospodarz": dict(
+        name_key="ent_antihost_n", fallback_name="Anty-gospodarz",
+        desc_key="ent_antihost_d",
+        fallback_desc=("Idealne włosy, mikrofon, uśmiech wycelowany w "
+                       "kamerę, której nie widać."),
+        tags=["monster","humanoid","spectacle","kanal_7","sponsor_hunter"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=12, max_hp=12, ac=11, attack_bonus=3, damage_dice="1d6+2",
+    ),
 }

@@ -283,6 +283,17 @@ register(Affordance("companion_lure",
     risk_tags=["noise","pet_risk"], audience_effect=2))
 
 
+# ── Prompt 20 — encounter prep ────────────────────────────────────────────
+
+register(Affordance("prep_room",
+    verbs_pl=["przygotuj się","oceń pokój","ocen pokoj",
+              "zaplanuj","zaplanuj obronę","zaplanuj obrone",
+              "co mam tu","co tu mam","sprawdź pokój pod kątem",
+              "rozeznaj"],
+    verbs_en=["prepare","prep","assess","plan defense","scout room"],
+    time_cost=1))
+
+
 def find_affordance_by_verb(verb: str, lang: str = "pl") -> Optional[Affordance]:
     """Match a verb root against any affordance's verb list. Polish-stem aware.
 

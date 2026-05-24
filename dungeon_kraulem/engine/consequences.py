@@ -332,8 +332,21 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
 
         elif kind == "trigger_alarm":
             # Prompt 18: route through audience so band crossings fire.
+            # Prompt 20: schedule an arriving encounter. `alarm_type`
+            # picks delay + responder type from the alarm table; default
+            # is the generic 30-minute corp patrol.
             from . import audience as _aud
             _aud.change_audience(world, 2, source="alarm")
+            try:
+                from . import encounter as _enc
+                alarm_type = str(eff.get("alarm_type") or "default")
+                room_id = room.room_id if room is not None else \
+                          (floor.current_room_id if floor else "")
+                if room_id:
+                    _enc.schedule(world, room_id, alarm_type,
+                                  source="alarm")
+            except Exception as exc:
+                lines.append(f"(alarm scheduling failed: {exc})")
             if floor:
                 floor.floor_alert_level = min(10, floor.floor_alert_level + 1 + eff.get("amount", 0))
             lines.append(t("feedback_alarm", fallback="Gdzieś brzęczy alarm."))
