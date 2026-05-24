@@ -60,7 +60,7 @@ def is_ollama_available() -> bool:
     except (urllib.error.URLError, socket.timeout, socket.error, OSError):
         if not _warned_unavailable:
             _warned_unavailable = True
-            print("[revamp.llm] Ollama unavailable — falling back to deterministic parser.",
+            print("[dungeon_kraulem.llm] Ollama unavailable — falling back to deterministic parser.",
                   file=sys.stderr)
         return False
     except Exception:
@@ -173,7 +173,7 @@ def parse_with_ollama(player_text: str, compact_context: dict):
     except (urllib.error.URLError, socket.timeout, socket.error, OSError):
         if not _warned_http:
             _warned_http = True
-            print("[revamp.llm] Ollama HTTP error / timeout — falling back.",
+            print("[dungeon_kraulem.llm] Ollama HTTP error / timeout — falling back.",
                   file=sys.stderr)
         return None
     except Exception:
@@ -185,7 +185,7 @@ def parse_with_ollama(player_text: str, compact_context: dict):
     except (json.JSONDecodeError, ValueError):
         if not _warned_invalid_json:
             _warned_invalid_json = True
-            print("[revamp.llm] Ollama returned invalid envelope JSON.", file=sys.stderr)
+            print("[dungeon_kraulem.llm] Ollama returned invalid envelope JSON.", file=sys.stderr)
         return None
 
     response_text = ""
@@ -200,7 +200,7 @@ def parse_with_ollama(player_text: str, compact_context: dict):
     except (json.JSONDecodeError, ValueError):
         if not _warned_invalid_json:
             _warned_invalid_json = True
-            print("[revamp.llm] Ollama returned invalid inner JSON.", file=sys.stderr)
+            print("[dungeon_kraulem.llm] Ollama returned invalid inner JSON.", file=sys.stderr)
         return None
 
     return _normalize(parsed)

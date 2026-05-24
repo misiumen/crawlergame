@@ -19,9 +19,12 @@ from typing import List, Optional
 # Risks: bad-flavored effects + a short Polish hint line per key.
 _RISK_TABLE = {
     "tracked_by_sponsor": {
+        # Prompt 18: legacy bool world_flag still set for any old listener,
+        # but the real signal now goes through `sponsor_tag` so the
+        # current-floor sponsor's attention dict gets bumped.
         "effects": [
-            {"type": "add_audience", "amount": 1},
-            {"type": "world_flag",   "key": "sponsor_attention", "value": True},
+            {"type": "add_audience", "amount": 1, "source": "tracked_by_sponsor"},
+            {"type": "sponsor_tag", "tag": "spectacle", "weight": 1},
         ],
         "line": "Kamera sponsora notuje. Coś trafi w przyszły briefing.",
     },
@@ -168,6 +171,63 @@ _REWARD_TABLE = {
                         "line": "Coś, co było mgliste, robi się bardziej trójwymiarowe."},
     "partial_information":{"effects": [], "line": "To wiesz. Reszta jeszcze nie."},
     "utility":         {"effects": [], "line": ""},
+
+    # Prompt 18: sponsor-system reward keys. These declare tags that
+    # `sponsors.note_player_tag` routes to whichever sponsor cares.
+    "spectacle_moment": {
+        "effects": [
+            {"type": "add_audience", "amount": 2, "source": "spectacle",
+             "tag": "spectacle"},
+        ],
+        "line": "To zostanie w klipach.",
+    },
+    "crit_spectacle": {
+        "effects": [
+            {"type": "add_audience", "amount": 3, "source": "crit_hit",
+             "tag": "crit_hit"},
+            {"type": "sponsor_tag", "tag": "crit_success", "weight": 1},
+        ],
+        "line": "Sponsor podnosi brew. Widownia podnosi głos.",
+    },
+    "env_kill_spectacle": {
+        "effects": [
+            {"type": "add_audience", "amount": 5, "source": "env_kill",
+             "tag": "env_kill"},
+        ],
+        "line": "Top-rolka wieczoru.",
+    },
+    "recycling_act": {
+        "effects": [
+            {"type": "add_audience", "amount": 2, "source": "mass_salvage",
+             "tag": "mass_salvage"},
+            {"type": "sponsor_tag", "tag": "salvage", "weight": 1},
+        ],
+        "line": "Wszystko wraca. Sponsor recyklingu kiwa głową.",
+    },
+    "memetic_seed_planted": {
+        "effects": [
+            {"type": "add_audience", "amount": 1, "source": "belief_seed",
+             "tag": "memetic_seed"},
+            {"type": "sponsor_tag", "tag": "belief_invocation", "weight": 1},
+        ],
+        "line": "Ziarno padło. Ktoś gdzieś je powtórzy.",
+    },
+    "compliance_act": {
+        "effects": [
+            {"type": "add_audience", "amount": -1, "source": "compliance",
+             "tag": "compliance"},
+            {"type": "sponsor_tag", "tag": "pro_state_dialogue", "weight": 1},
+        ],
+        "line": "Robisz, co kazali. Ministerstwo zapamiętuje. Widownia zasypia.",
+    },
+    "theft_act": {
+        "effects": [
+            {"type": "add_audience", "amount": 1, "source": "theft",
+             "tag": "theft"},
+            {"type": "sponsor_tag", "tag": "lockpicking", "weight": 1},
+        ],
+        "line": "Cicho, ale ktoś tam liczy.",
+    },
 }
 
 

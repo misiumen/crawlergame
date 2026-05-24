@@ -88,7 +88,7 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0):
     body_size  = max(14, int(15 * L.font_scale))
     item_size  = max(18, int(20 * L.font_scale))
     cy = sh // 2 - 140
-    img = font(title_size, bold=True).render("CRAWL PROTOCOL", True, ACCENT)
+    img = font(title_size, bold=True).render("Dungeon Kraulem", True, ACCENT)
     surf.blit(img, ((sw - img.get_width())//2, cy)); cy += img.get_height() + 4
 
     for line, col in [
@@ -137,7 +137,7 @@ def draw_creation(surf, state):
     small_size = max(11, int(13 * L.font_scale))
     text(surf, t("create_title", fallback="REJESTRACJA UCZESTNIKA"),
          40, 24, ACCENT, title_size, True)
-    text(surf, t("create_subtitle", fallback="CRAWL PROTOCOL — Kontrakt zawodnika"),
+    text(surf, t("create_subtitle", fallback="Dungeon Kraulem — Kontrakt zawodnika"),
          40, 54, DIM_TEXT, small_size)
 
     step = state.get("step", "name")
@@ -197,15 +197,36 @@ def draw_topbar(surf, world, layout=None):
     if f is None: return
     title = t(f.title_key, fallback=f.title_fallback)
     text(surf, title, x + 12, y + 8, ACCENT, L.font_title - 4, True)
-    sponsor = t(f.sponsor_key, fallback=f.sponsor_fallback)
-    text(surf, sponsor, x + 12, y + 32, DIM_TEXT, L.font_small - 1)
+    # Prompt 18: show sponsor NAME + the player's mood with that
+    # sponsor, so the player has a constant visible signal of who's
+    # watching and how they feel about it.
+    sponsor_label = t(f.sponsor_key, fallback=f.sponsor_fallback)
+    try:
+        from ..engine import sponsors as _sp
+        sk = _sp.current_floor_sponsor_key(world)
+        if sk:
+            mood = _sp.sponsor_mood(world, sk)
+            sponsor_label = f"{sponsor_label} — {mood}"
+    except Exception:
+        pass
+    text(surf, sponsor_label, x + 12, y + 32, DIM_TEXT, L.font_small - 1)
     # Clock + deadline
     clock = format_clock(world)
     deadline = format_deadline(world)
     s = f"{t('ui_clock', fallback='Zegar')}: {clock}   {t('ui_deadline', fallback='Termin')}: {deadline}"
     img = font(L.font_small + 1).render(s, True, BRIGHT_TEXT)
     surf.blit(img, (x + w - img.get_width() - 16, y + 14))
-    aud = f"{t('ui_audience', fallback='Widownia')}: {world.character.audience_rating}"
+    # Prompt 18: replace raw audience number with BAND label + rating.
+    # The number stays visible (small) so power-players still see it.
+    try:
+        from ..engine import audience as _aud
+        rating = int(world.character.audience_rating or 0)
+        band = _aud.band_for(rating)
+        band_label = _aud.band_label(band)
+        aud = (f"{t('ui_audience', fallback='Widownia')}: "
+               f"{band_label} ({rating})")
+    except Exception:
+        aud = f"{t('ui_audience', fallback='Widownia')}: {world.character.audience_rating}"
     img = font(L.font_small - 1).render(aud, True, WARN)
     surf.blit(img, (x + w - img.get_width() - 16, y + 36))
 

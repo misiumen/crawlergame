@@ -14,6 +14,14 @@ def advance(world, minutes: int):
     prev_2h_bucket = f.current_minute // 120
     f.current_minute += minutes
 
+    # Prompt 18: audience idle decay tick. Safe-noop when audience module
+    # is missing (e.g. tests stubbing the engine).
+    try:
+        from . import audience as _aud
+        _aud.tick_decay(world, minutes)
+    except Exception:
+        pass
+
     # Day-change event
     if f.day_number() != prev_day:
         world.log_msg(_day_change_line(f), "syndicate")

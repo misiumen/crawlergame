@@ -1,4 +1,4 @@
-"""NPC and crawler archetypes for CRAWL PROTOCOL revamp."""
+"""NPC and crawler archetypes for Dungeon Kraulem."""
 
 CRAWLER_ARCHETYPES = {
     "paranoid_mapper": {

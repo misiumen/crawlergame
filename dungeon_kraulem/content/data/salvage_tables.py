@@ -1,4 +1,4 @@
-"""Salvage table templates for CRAWL PROTOCOL revamp.
+"""Salvage table templates for Dungeon Kraulem.
 
 These are data templates, not a full system implementation. Claude should integrate
 them with entities, validation, consequences, inventory/material storage and save/load.

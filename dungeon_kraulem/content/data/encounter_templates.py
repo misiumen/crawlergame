@@ -1,4 +1,4 @@
-"""Encounter templates for CRAWL PROTOCOL revamp.
+"""Encounter templates for Dungeon Kraulem.
 
 These are content-level templates, not full engine logic.
 """

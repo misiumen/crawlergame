@@ -258,9 +258,15 @@ def find_affordance_by_verb(verb: str, lang: str = "pl") -> Optional[Affordance]
             # Exact match
             if cf == folded:
                 return aff
-            # Prefix match - covers Polish conjugations (uderz / uderzam / uderzył)
+            # Prefix match - covers Polish conjugations (uderz / uderzam / uderzył).
+            # Prompt 18: scale stem length to verb length so long verbs like
+            # "przeszukaj" don't over-match unrelated nouns ("przejście") via
+            # a too-short 4-char "prze" prefix.
             stem = cf.split()[0] if " " in cf else cf
-            if folded.startswith(stem[:4]) and len(stem) >= 3:
+            stem_len = 4 if len(stem) <= 6 else 5
+            if len(stem) >= 7:
+                stem_len = 6
+            if folded.startswith(stem[:stem_len]) and len(stem) >= 3:
                 best = aff if best is None else best
         # Try the other lang as fallback
     if best:

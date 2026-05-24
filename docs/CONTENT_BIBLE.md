@@ -1,4 +1,4 @@
-# CRAWL PROTOCOL — Content Bible
+# Dungeon Kraulem — Content Bible
 
 ## Cel
 Gra ma być immersyjnym survival RPG o przeżyciu na piętrze megalochu przez wiele dni, a nie roguelite'em z wyborem jednej ścieżki. Gracz ma improwizować, zbierać informacje, wracać do znanych miejsc, używać otoczenia, rozmawiać, zdradzać, odpoczywać, handlować i planować.

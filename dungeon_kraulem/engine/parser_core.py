@@ -51,6 +51,12 @@ class ActionIntent:
     core_claim: Optional[str] = None         # the proposition the player asserts
     spread_channel: Optional[str] = None     # narrative channel for the claim
 
+    # Prompt 16: mass action flag. Set when the player explicitly targets
+    # everything in the room ("wszystko" / "cały pokój" / "all" / etc.).
+    # The validator skips entity-name matching; the game-layer handler
+    # iterates visible entities instead.
+    mass_target: bool = False
+
     def to_dict(self):
         return self.__dict__.copy()
 
@@ -116,6 +122,70 @@ def parse(text: str, world=None) -> ActionIntent:
         return intent
 
     folded = fold(lower)
+
+    # ── Prompt 16: mass-action detection ─────────────────────────────────────
+    # Recognize "wszystko / cały pokój / all / everything" as room-wide
+    # targets. These commands ALWAYS take priority over the LLM enrichment
+    # path so a model can never collapse "rozbierz wszystko" into "look".
+    # Verb determines the kind of mass action.
+    #
+    # Verbs → mass intents:
+    #   rozbierz / zdemontuj / pozyskaj                    → mass_salvage
+    #   przeszukaj                                          → mass_search
+    #   weź / zbierz / weź wszystko                         → mass_loot_take
+    #   ograb                                               → mass_loot_loose
+    #   rozbij / zniszcz / rozwal / roztrzaskaj / strzaskaj → mass_break
+    # Mass-target trigger. Either an explicit "everything"-style noun
+    # phrase OR a bare room reference ("pokoj" / "room") — the latter is
+    # OK because the verb-gate below means it only activates for mass
+    # verbs like "ogołoć pokój" / "rozbierz pokój".
+    _MASS_TARGET_RE = re.compile(
+        r"\b(wszystko|wszystkie|wszystkim|wszystkimi|"
+        r"cały\s+pokoj|caly\s+pokoj|"
+        r"cały\s+pokój|caly\s+pokój|"
+        r"cale\s+pomieszczenie|całe\s+pomieszczenie|"
+        r"wszystkie\s+rzeczy|"
+        r"pokoj|pokój|pomieszczenie|"
+        r"all|everything|every\s+single\s+thing)\b"
+    )
+    if _MASS_TARGET_RE.search(folded):
+        # Verb→intent map. Verbs are listed in canonical Polish forms +
+        # common conjugations. Match policy: exact equality OR full-verb
+        # prefix (`first_token.startswith(verb)`), NOT a fixed-length
+        # prefix — otherwise "rozbij" collides with "rozbierz" (both
+        # share the 5-char prefix "rozbi").
+        _MASS_VERB_MAP = [
+            # mass_break comes first so its short, distinctive verbs win
+            # before any longer stem accidentally matches.
+            (("rozbij","rozbijam","rozbic","rozbić","rozwal","rozwalam",
+              "rozwalic","rozwalić","roztrzaskaj","roztrzaskac","roztrzaskać",
+              "strzaskaj","strzaskac","strzaskać","zniszcz","zniszczyc",
+              "zniszczyć","niszcz","niszczyc","niszczyć",
+              "break","smash","destroy","wreck","shatter"),
+             "mass_break"),
+            (("rozbierz","rozbieram","rozbieraj","rozebrac","rozebrać",
+              "zdemontuj","zdemontowac","zdemontować","demontuj",
+              "pozyskaj","pozyskac","pozyskać","ogołoc","ogoloc","ogołoć",
+              "ogoloć","strip","dismantle","salvage","scrap","harvest"),
+             "mass_salvage"),
+            (("przeszukaj","przeszukac","przeszukać","przetrzasnij",
+              "przetrzasnac","przetrząsnij","przetrząsnąć",
+              "search","rifle","scan"),
+             "mass_search"),
+            (("wez","weź","zbierz","zbieram","pick","take","grab","collect"),
+             "mass_loot_take"),
+            (("ograb","obrabuj","obrabowac","obrabować","loot","rob"),
+             "mass_loot_loose"),
+        ]
+        first_token = folded.split()[0] if folded.strip() else ""
+        for verb_set, mass_intent in _MASS_VERB_MAP:
+            if any(first_token == v or first_token.startswith(v)
+                   for v in verb_set):
+                intent.intent = mass_intent
+                intent.verb = first_token
+                intent.mass_target = True
+                intent.confidence = 0.95
+                return intent
 
     # ── Fast-path quick intents ──────────────────────────────────────────────
     for ikey, cues in _QUICK_INTENTS.items():
@@ -454,6 +524,45 @@ def parse(text: str, world=None) -> ActionIntent:
             intent.confidence = 0.6 if intent.targets else 0.7
             return intent
 
+    # Prompt 16: bare exit-label / destination commands. If the player
+    # typed something that doesn't start with any known verb but matches
+    # an exit label or a known room title visible from here, treat it as
+    # a `move` intent. Prompt 18: also tolerate Polish inflections via
+    # _polish_match — "przejścia" matches an exit labeled "przejście".
+    if world is not None:
+        floor = getattr(world, "current_floor", None)
+        room = floor.current_room() if floor is not None else None
+        if room is not None and getattr(room, "exits", None):
+            from .validation import _polish_match, _strip_movement_prepositions
+            target_clean = _strip_movement_prepositions(folded)
+            target_f = fold(target_clean)
+            for label, ed in room.exits.items():
+                if ed.get("hidden"):
+                    continue
+                if _polish_match(target_f, fold(label)):
+                    intent.intent = "move"
+                    intent.verb = "move"
+                    intent.destination = label
+                    intent.confidence = 0.85
+                    return intent
+            # Also check destination room titles visible from here.
+            for label, ed in room.exits.items():
+                if ed.get("hidden"):
+                    continue
+                tgt_room = floor.rooms.get(ed.get("target", ""))
+                if tgt_room is None:
+                    continue
+                if ed.get("target", "") not in (floor.discovered_room_ids or set()) \
+                        and ed.get("target", "") not in (floor.known_room_ids or set()):
+                    continue
+                title_f = fold(tgt_room.display_short_title())
+                if title_f and _polish_match(target_f, title_f):
+                    intent.intent = "move"
+                    intent.verb = "move"
+                    intent.destination = label
+                    intent.confidence = 0.85
+                    return intent
+
     intent.intent = "unknown"
     intent.confidence = 0.0
     return intent
@@ -533,6 +642,15 @@ def parse_with_optional_llm(text: str, world=None) -> ActionIntent:
     enabled.
     """
     deterministic = parse(text, world)
+
+    # Prompt 16: mass-action commands MUST stay deterministic. The LLM is
+    # never asked to interpret "rozbierz wszystko" / "weź wszystko" /
+    # "rozbij wszystko" — a model that doesn't recognize "wszystko" as a
+    # mass-target keyword would otherwise collapse the verb into a
+    # generic "look" or similar and the playtest already showed this
+    # failure mode. Hard guardrail: deterministic wins, no enrichment.
+    if deterministic.mass_target or deterministic.intent.startswith("mass_"):
+        return deterministic
 
     # Intents where an LLM can usefully enrich even when the deterministic
     # parser was confident. Keep this list narrow — these are all already
@@ -733,4 +851,9 @@ _LLM_INTENT_PASSTHROUGH = {
     "show_resolutions","set_fullscreen","set_windowed","set_resolution",
     "journal_open","journal_close","journal_objectives","journal_crawlers",
     "journal_crafting","journal_achievements",
+    # Prompt 16: mass-action intents. The LLM is allowed to surface them
+    # but deterministic detection already runs first; the whitelist just
+    # prevents the validator from rejecting them as unknown if an LLM
+    # path produces one.
+    "mass_salvage","mass_search","mass_loot_take","mass_loot_loose","mass_break",
 }

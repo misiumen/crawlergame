@@ -92,19 +92,29 @@ def group_label(group_key: str) -> str:
 
 # ── Builder ─────────────────────────────────────────────────────────────────
 
-def build_play_options(world) -> UISelectionState:
+def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -> UISelectionState:
     """Build a `UISelectionState` from world snapshot. Only includes
     visible/known things — never reveals hidden objects, hidden exits, or
-    unidentified items."""
+    unidentified items.
+
+    Prompt 18: when `prev_state` is provided, the rebuilt state preserves
+    the previous group-tab selection (by group **key**, not raw index, since
+    visible groups can change) and per-group selected index. Without this,
+    every keystroke that calls `_ensure_nav_state` would yank the player
+    back to the Akcje tab — making Left/Right tab navigation feel broken
+    even though `cycle_group` was being called correctly.
+    """
     state = UISelectionState()
     if world is None or world.current_floor is None:
         state.groups = [GROUP_ACTIONS]
         state.options_by_group[GROUP_ACTIONS] = _basic_actions(world)
+        _restore_selection(state, prev_state)
         return state
     room = world.current_floor.current_room()
     if room is None:
         state.groups = [GROUP_ACTIONS]
         state.options_by_group[GROUP_ACTIONS] = _basic_actions(world)
+        _restore_selection(state, prev_state)
         return state
 
     actions   = _basic_actions(world, room=room)
@@ -130,7 +140,26 @@ def build_play_options(world) -> UISelectionState:
     # Default to Actions if present.
     if GROUP_ACTIONS in layout:
         state.current_group_index = layout.index(GROUP_ACTIONS)
+    _restore_selection(state, prev_state)
     return state
+
+
+def _restore_selection(state: "UISelectionState",
+                       prev: Optional["UISelectionState"]) -> None:
+    """Carry over prev group-tab + per-group selected index, if compatible
+    with the newly-built layout. If the previously-selected group is no
+    longer present (e.g. inventory just emptied), leaves the default."""
+    if prev is None or not prev.groups or not state.groups:
+        return
+    prev_group_key = prev.groups[prev.current_group_index % len(prev.groups)] \
+        if prev.groups else ""
+    if prev_group_key and prev_group_key in state.groups:
+        state.current_group_index = state.groups.index(prev_group_key)
+    # Preserve per-group cursor positions, clamped to new option counts.
+    for gk, idx in (prev.selected_index_by_group or {}).items():
+        opts = state.options_by_group.get(gk, [])
+        if opts:
+            state.selected_index_by_group[gk] = max(0, min(idx, len(opts) - 1))
 
 
 # ── Group builders ─────────────────────────────────────────────────────────

@@ -64,7 +64,7 @@ def _load(code: str) -> Dict[str, str]:
         return {str(k): str(v) for k, v in data.items()}
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
         if _DEBUG:
-            print(f"[revamp.lang] failed to load {p}: {e}", file=sys.stderr)
+            print(f"[dungeon_kraulem.lang] failed to load {p}: {e}", file=sys.stderr)
         return {}
 
 

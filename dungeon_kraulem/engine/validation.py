@@ -63,22 +63,39 @@ def validate(intent, world) -> ValidationResult:
     # ── Movement validation ─────────────────────────────────────────────────
     if intent.intent == "move":
         target_name = intent.destination or (intent.targets[0] if intent.targets else "")
-        target_name_f = fold(target_name)
-        # Resolve exit label
+        # Prompt 18: tolerate Polish inflection. The player's "przejścia",
+        # "do przejścia", or even "idź do przejścia" should all match an
+        # exit labeled "przejście". Strip leading prepositions, fold
+        # diacritics, then match by 5-char stem prefix.
+        target_clean = _strip_movement_prepositions(target_name)
+        target_name_f = fold(target_clean)
         chosen_exit = None
         for label, exit_data in room.exits.items():
             if exit_data.get("hidden") and not _is_secret_revealed(room, label):
                 continue
-            if fold(label) == target_name_f or target_name_f in fold(label):
+            if _polish_match(target_name_f, fold(label)):
                 chosen_exit = (label, exit_data); break
             target_room = floor.rooms.get(exit_data.get("target",""))
-            if target_room and target_name_f and target_name_f in fold(target_room.display_short_title()):
-                chosen_exit = (label, exit_data); break
+            if target_room and target_name_f:
+                if _polish_match(target_name_f, fold(target_room.display_short_title())):
+                    chosen_exit = (label, exit_data); break
         if chosen_exit is None:
             result.valid = False
             result.reason = "no_exit"
-            result.message_key = "feedback_no_exit"
-            result.fallback_message = f"Nie ma takiego wyjścia: „{target_name}”."
+            # Don't set message_key — the locale key has a {target}
+            # placeholder that t() doesn't substitute, leaking literal
+            # "{target}" into the log. The fallback already has the
+            # target name interpolated; use it directly.
+            result.message_key = ""
+            result.fallback_message = (
+                f"Nie ma takiego wyjścia: „{target_name}”. "
+                f"Widoczne: " + ", ".join(
+                    f"„{lbl}”" for lbl, ed in (room.exits or {}).items()
+                    if not ed.get("hidden")
+                )
+                if room.exits else
+                f"Nie ma takiego wyjścia: „{target_name}”."
+            )
             return result
         label, exit_data = chosen_exit
         if exit_data.get("locked"):
@@ -311,6 +328,61 @@ def _find_inventory_item_with_tags(world, required_tags) -> Optional[Entity]:
         if any(tag in ent.tags for tag in required_tags):
             return ent
     return None
+
+
+# Prompt 18: Polish-grammar helpers for exit/destination matching.
+
+# Polish prepositions that commonly precede a destination noun. Stripped
+# so "do przejścia" / "w korytarz" / "przez korytarz" / "na półkę"
+# resolve to the noun.
+_MOVE_PREPOSITIONS = {
+    "do","w","we","na","przez","ku","ku temu","w stronę","w strone","w stron",
+    "to","into","through","toward","towards","at","via",
+}
+
+
+def _strip_movement_prepositions(text: str) -> str:
+    """Return `text` with any leading Polish prepositional phrase trimmed.
+    "do przejścia" -> "przejścia"; "idź do przejścia" -> "idź" stays first
+    (the nav regex already trims the verb; this is the noun-side cleanup)."""
+    if not text:
+        return ""
+    parts = [t for t in re.split(r"\s+", text.strip()) if t]
+    while parts and parts[0].lower() in _MOVE_PREPOSITIONS:
+        parts.pop(0)
+    return " ".join(parts).strip()
+
+
+def _polish_match(typed_folded: str, label_folded: str, *,
+                  stem_chars: int = 5) -> bool:
+    """Loose Polish noun match. Treats two words as matching if either
+    is a substring of the other, OR if they share a common prefix of
+    `stem_chars` chars after diacritic-fold. Handles common case
+    inflections (e.g. "przejście" / "przejścia" / "przejściu" all share
+    "przej" / "przejs" stems)."""
+    if not typed_folded or not label_folded:
+        return False
+    if typed_folded == label_folded:
+        return True
+    if typed_folded in label_folded or label_folded in typed_folded:
+        return True
+    # Token-wise stem match: every word in `typed_folded` must find a
+    # stem-compatible word in `label_folded`.
+    typed_tokens  = [t for t in re.split(r"[^a-z0-9]+", typed_folded) if t]
+    label_tokens  = [t for t in re.split(r"[^a-z0-9]+", label_folded) if t]
+    if not typed_tokens or not label_tokens:
+        return False
+    for t in typed_tokens:
+        stem = t[:stem_chars]
+        if len(stem) < 3:
+            continue
+        matched_word = False
+        for lt in label_tokens:
+            if lt.startswith(stem) or t.startswith(lt[:stem_chars]):
+                matched_word = True; break
+        if not matched_word:
+            return False
+    return True
 
 
 def _is_secret_revealed(room, label) -> bool:

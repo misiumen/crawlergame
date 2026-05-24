@@ -1,5 +1,5 @@
 @echo off
-title CRAWL PROTOCOL
+title Dungeon Kraulem
 cd /d "%~dp0"
 
 REM Ensure pygame is available (pygame-ce preferred on Windows)

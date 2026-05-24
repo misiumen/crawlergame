@@ -47,11 +47,11 @@ def main():
     from .llm import llm_roles
     info = llm_roles.summary()
     if info["mode"] == "performance":
-        print(f"[revamp] LLM mode: performance (no model required)")
+        print(f"[dungeon_kraulem] LLM mode: performance (no model required)")
     else:
         enabled = [r for r, rd in info["roles"].items() if rd["enabled"]]
         present = [r for r, rd in info["roles"].items() if rd["available"]]
-        print(f"[revamp] LLM mode: {info['mode']} | "
+        print(f"[dungeon_kraulem] LLM mode: {info['mode']} | "
               f"reachable={info['ollama_reachable']} | "
               f"enabled={enabled} | available={present}")
 

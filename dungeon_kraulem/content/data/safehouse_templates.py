@@ -1,4 +1,4 @@
-"""Safehouse templates for CRAWL PROTOCOL revamp.
+"""Safehouse templates for Dungeon Kraulem.
 
 Each subtype has metadata that the floor generator and rumor systems can read:
   tags        -- short ASCII tags used by filters (cafe/quiet/social/...)

@@ -1,4 +1,4 @@
-"""Problem-solving item templates for CRAWL PROTOCOL revamp.
+"""Problem-solving item templates for Dungeon Kraulem.
 
 Defaults applied to every entry at lookup time (via get_item) for fields
 not explicitly set in the dict:

@@ -1,1 +1,1 @@
-"""Content data package for CRAWL PROTOCOL revamp."""
+"""Content data package for Dungeon Kraulem."""

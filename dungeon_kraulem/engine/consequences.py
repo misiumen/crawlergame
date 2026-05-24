@@ -222,7 +222,39 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                 room.noise_level += int(eff.get("amount", 1))
 
         elif kind == "add_audience":
-            world.character.audience_rating += int(eff.get("amount", 0))
+            # Prompt 18: route audience writes through the audience module
+            # so band crossings, decay reset, and sponsor interventions
+            # all fire from one place.
+            from . import audience as _aud
+            from . import sponsors as _sp
+            _aud.change_audience(world, int(eff.get("amount", 0)),
+                                 source=str(eff.get("source", "effect")))
+            # Tag routing — many "audience" effects also signal a tag the
+            # sponsors care about (e.g. spectacle, env_kill). Optional.
+            tag = eff.get("tag", "")
+            if tag:
+                _sp.note_player_tag(world, tag, weight=int(eff.get("weight", 1)))
+            _sp.maybe_intervene(world)
+
+        elif kind == "sponsor_attention":
+            # Prompt 18: direct attention bump for a specific sponsor.
+            # Used by risk_reward and content templates that want to
+            # poke one sponsor independent of any tag system.
+            from . import sponsors as _sp
+            sk = str(eff.get("sponsor_key", "") or "")
+            if sk:
+                _sp.adjust_attention(world, sk, int(eff.get("amount", 0)))
+                _sp.maybe_intervene(world)
+
+        elif kind == "sponsor_tag":
+            # Prompt 18: emit a player-action tag to all sponsors.
+            # Convenience wrapper around sponsors.note_player_tag().
+            from . import sponsors as _sp
+            tag = str(eff.get("tag", "") or "")
+            if tag:
+                _sp.note_player_tag(world, tag,
+                                    weight=int(eff.get("weight", 1)))
+                _sp.maybe_intervene(world)
 
         elif kind == "add_affinity":
             kind_id = eff.get("kind"); amt = int(eff.get("amount", 1))
@@ -288,7 +320,9 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                 ent.discovered = True; ent.visible = True
 
         elif kind == "trigger_alarm":
-            world.character.audience_rating += 2
+            # Prompt 18: route through audience so band crossings fire.
+            from . import audience as _aud
+            _aud.change_audience(world, 2, source="alarm")
             if floor:
                 floor.floor_alert_level = min(10, floor.floor_alert_level + 1 + eff.get("amount", 0))
             lines.append(t("feedback_alarm", fallback="Gdzieś brzęczy alarm."))

@@ -82,7 +82,7 @@ def load_settings() -> Dict[str, Any]:
     except (TypeError, ValueError):
         w, h = out["resolution_width"], out["resolution_height"]
     if not _is_supported(w, h):
-        print(f"[revamp.settings] resolution {w}x{h} not supported — "
+        print(f"[dungeon_kraulem.settings] resolution {w}x{h} not supported — "
               f"falling back to default.")
         w, h = out["resolution_width"], out["resolution_height"]
     out["resolution_width"] = w

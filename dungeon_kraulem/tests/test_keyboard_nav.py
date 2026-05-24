@@ -143,12 +143,64 @@ def test_input_mode_default_text():
     print("  default input_mode == text: OK")
 
 
+def test_tab_selection_survives_rebuild():
+    """Prompt 18: switching tabs (Akcje / Wyjścia / Ekwipunek / Crafting)
+    with Left/Right or Tab must NOT be reset by the next nav-state
+    rebuild. The old bug: `_ensure_nav_state()` rebuilt the state from
+    scratch on every keystroke and always reset `current_group_index` to
+    Akcje, making tab navigation feel broken even though `cycle_group`
+    was firing correctly."""
+    w, r = _mk_world()
+    s = ui_nav.build_play_options(w)
+    assert len(s.groups) >= 2, f"need 2+ groups to test tab switching, got {s.groups}"
+    initial_group = s.current_group()
+
+    # Switch to the next tab.
+    ui_nav.cycle_group(s, +1)
+    after_switch = s.current_group()
+    assert after_switch != initial_group, "cycle_group didn't change current group"
+
+    # Rebuild (this is what _ensure_nav_state does on every keystroke).
+    s2 = ui_nav.build_play_options(w, prev_state=s)
+    assert s2.current_group() == after_switch, \
+        f"tab selection lost on rebuild: was {after_switch!r}, became {s2.current_group()!r}"
+
+    # And again — a long sequence of rebuilds (simulating multiple
+    # keystrokes between user tab presses) must also preserve it.
+    s3 = ui_nav.build_play_options(w, prev_state=s2)
+    s4 = ui_nav.build_play_options(w, prev_state=s3)
+    assert s4.current_group() == after_switch
+    print(f"  tab selection survives rebuild: OK (sticky on {after_switch!r})")
+
+
+def test_per_group_cursor_survives_rebuild():
+    """Prompt 18: the per-group selected index must also be preserved
+    across rebuilds — moving the cursor down 3 times then triggering a
+    rebuild must NOT snap the cursor back to 0."""
+    w, r = _mk_world()
+    s = ui_nav.build_play_options(w)
+    # Move down 3 times in the current group.
+    ui_nav.move_selection(s, +1)
+    ui_nav.move_selection(s, +1)
+    ui_nav.move_selection(s, +1)
+    cur_group = s.current_group()
+    cur_idx = s.selected_index(cur_group)
+    assert cur_idx >= 1, f"cursor didn't move (got idx={cur_idx})"
+
+    s2 = ui_nav.build_play_options(w, prev_state=s)
+    assert s2.selected_index(cur_group) == cur_idx, \
+        f"cursor reset on rebuild: was {cur_idx}, became {s2.selected_index(cur_group)}"
+    print(f"  per-group cursor survives rebuild: OK (idx={cur_idx} on {cur_group!r})")
+
+
 def main():
     test_groups_contain_expected_options()
     test_move_and_cycle_wraps()
     test_commands_are_plain_polish()
     test_submit_generated_command_routes_through_submit_input()
     test_input_mode_default_text()
+    test_tab_selection_survives_rebuild()
+    test_per_group_cursor_survives_rebuild()
     print("Prompt 08 keyboard-nav smoke: OK")
 
 

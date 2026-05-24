@@ -1,10 +1,9 @@
-"""CRAWL PROTOCOL — Revamp package.
+"""Dungeon Kraulem — game package.
 
-This is a major reimagining of the project as a persistent-floor
-exploration RPG (vs the v2 roguelite node-picker). See README.md in the
-project root for design notes.
+A persistent-floor, text-driven dungeon survival RPG. Polish-first,
+LLM-optional. See `docs/CONTENT_BIBLE.md` for design notes.
 
-Entry point: `python main_revamp.py`  (or `python -m revamp.main_revamp`)
+Entry point: `python main.py`  (or `python -m dungeon_kraulem.main`).
 """
 
-__version__ = "0.1.0-revamp"
+__version__ = "0.2.0"

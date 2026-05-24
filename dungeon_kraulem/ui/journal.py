@@ -43,9 +43,10 @@ TAB_INVENTORY    = "inventory"
 TAB_MATERIALS    = "materials"
 TAB_CRAFTING     = "crafting"
 TAB_ACHIEVEMENTS = "achievements"
+TAB_SPONSORS     = "sponsors"   # Prompt 18 — sponsor / audience overview
 
 TABS = (TAB_LOG, TAB_MAP, TAB_OBJECTIVES, TAB_KNOWLEDGE, TAB_RUMORS,
-        TAB_BELIEFS, TAB_CRAWLERS, TAB_INVENTORY, TAB_MATERIALS,
+        TAB_BELIEFS, TAB_CRAWLERS, TAB_SPONSORS, TAB_INVENTORY, TAB_MATERIALS,
         TAB_CRAFTING, TAB_ACHIEVEMENTS)
 
 _TAB_LABEL_KEYS = {
@@ -56,6 +57,7 @@ _TAB_LABEL_KEYS = {
     TAB_RUMORS:       ("journal_tab_rumors",       "Plotki"),
     TAB_BELIEFS:      ("journal_tab_beliefs",      "Mity"),
     TAB_CRAWLERS:     ("journal_tab_crawlers",     "Crawlerzy"),
+    TAB_SPONSORS:     ("journal_tab_sponsors",     "Sponsorzy"),
     TAB_INVENTORY:    ("journal_tab_inventory",    "Ekwipunek"),
     TAB_MATERIALS:    ("journal_tab_materials",    "Materiały"),
     TAB_CRAFTING:     ("journal_tab_crafting",     "Crafting"),
@@ -687,6 +689,74 @@ def _collect_achievements(world) -> List[JournalEntry]:
     return out
 
 
+def _collect_sponsors(world) -> List[JournalEntry]:
+    """Prompt 18 — list every catalog sponsor with the player's current
+    mood-relationship, who's the floor primary, and recent interventions
+    by that sponsor."""
+    out: List[JournalEntry] = []
+    try:
+        from ..content.data.sponsors import SPONSORS
+        from ..engine import sponsors as _sp
+        from ..engine import audience as _aud
+    except Exception:
+        return out
+
+    primary = _sp.current_floor_sponsor_key(world)
+    # Aggregate fired interventions per sponsor for the body text.
+    by_sponsor: Dict[str, List[Any]] = {}
+    for rec in getattr(world, "sponsor_interventions_used", []) or []:
+        by_sponsor.setdefault(rec.sponsor_key, []).append(rec)
+
+    rating = int(world.character.audience_rating or 0)
+    band = _aud.band_for(rating)
+    band_label = _aud.band_label(band)
+
+    for skey, sdata in SPONSORS.items():
+        name = t(sdata.get("name_key", ""),
+                 fallback=sdata.get("name_fallback", skey))
+        tagline = t(sdata.get("tagline_key", ""),
+                    fallback=sdata.get("tagline_fallback", ""))
+        att = _sp.get_attention(world, skey)
+        mood = _sp.sponsor_mood(world, skey)
+        is_primary = (skey == primary)
+        sub_parts = [mood, f"uwaga {att:+d}"]
+        if is_primary:
+            sub_parts.append("PIĘTRO")
+        subtitle = "  •  ".join(sub_parts)
+
+        body_lines = [tagline] if tagline else []
+        body_lines.append(f"Tonacja: {sdata.get('tone','')}")
+        likes = ", ".join(sdata.get("likes_tags") or []) or "—"
+        dislikes = ", ".join(sdata.get("dislikes_tags") or []) or "—"
+        body_lines.append(f"Lubi: {likes}")
+        body_lines.append(f"Nie lubi: {dislikes}")
+        fired = by_sponsor.get(skey, [])
+        if fired:
+            body_lines.append("")
+            body_lines.append("Interwencje:")
+            for rec in fired[-5:]:
+                body_lines.append(
+                    f"  • {rec.kind} @ minuta {rec.fired_at_minute}"
+                )
+
+        body_lines.append("")
+        body_lines.append(
+            f"Aktualna widownia: {band_label} ({rating})."
+        )
+
+        out.append(JournalEntry(
+            title=name + (" ★" if is_primary else ""),
+            subtitle=subtitle,
+            body=tagline or "",
+            detail="\n".join(body_lines),
+            tags=["sponsor"] + (["primary"] if is_primary else []),
+            sort_key=(0 if is_primary else 1, name),
+            raw_ref=skey,
+        ))
+    out.sort(key=lambda e: e.sort_key)
+    return out
+
+
 _COLLECTORS = {
     TAB_LOG:          _collect_log,
     TAB_MAP:          _collect_map,
@@ -695,6 +765,7 @@ _COLLECTORS = {
     TAB_RUMORS:       _collect_rumors,
     TAB_BELIEFS:      _collect_beliefs,
     TAB_CRAWLERS:     _collect_crawlers,
+    TAB_SPONSORS:     _collect_sponsors,
     TAB_INVENTORY:    _collect_inventory,
     TAB_MATERIALS:    _collect_materials,
     TAB_CRAFTING:     _collect_crafting,
@@ -716,6 +787,7 @@ EMPTY_STATES = {
     TAB_MATERIALS:    "Nie masz jeszcze materiałów. Loch pozostaje chwilowo w jednym kawałku.",
     TAB_CRAFTING:     "Brak przepisów. Spróbuj 'pomoc craftingu'.",
     TAB_ACHIEVEMENTS: "Nie odblokowano jeszcze osiągnięć.",
+    TAB_SPONSORS:     "Żaden sponsor jeszcze cię nie zauważył.",
 }
 
 

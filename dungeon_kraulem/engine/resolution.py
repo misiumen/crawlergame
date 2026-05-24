@@ -255,17 +255,37 @@ def _effects_for_level(level, aff_key, validation, world):
             effects.append({"type":"damage_entity","entity_id":primary.entity_id,"amount":dmg})
             effects.append({"type":"add_noise","amount":3})
             effects.append({"type":"add_affinity","kind":"melee","amount":1})
+            # Prompt 18: combat spectacle hooks. Crit hits feed audience
+            # + the Sport / Kanał 7 / NovaChem sponsor tag system.
+            if level == CRIT_SUCCESS:
+                effects.append({"type":"add_audience","amount":3,
+                                "source":"crit_hit","tag":"crit_hit"})
+                effects.append({"type":"sponsor_tag","tag":"crit_success","weight":1})
+            else:
+                effects.append({"type":"add_audience","amount":1,
+                                "source":"heavy_hit","tag":"heavy_attack_hit"})
         elif aff_key == "shoot" and primary is not None:
             dmg = random.randint(4, 10) + world.character.stat_mod("DEX")
             if level == CRIT_SUCCESS: dmg *= 2
             effects.append({"type":"damage_entity","entity_id":primary.entity_id,"amount":dmg})
             effects.append({"type":"add_noise","amount":5})
             effects.append({"type":"add_affinity","kind":"ranged","amount":1})
+            if level == CRIT_SUCCESS:
+                effects.append({"type":"add_audience","amount":3,
+                                "source":"crit_hit","tag":"crit_hit"})
+                effects.append({"type":"sponsor_tag","tag":"crit_success","weight":1})
+            else:
+                effects.append({"type":"add_audience","amount":1,
+                                "source":"heavy_hit","tag":"heavy_attack_hit"})
         elif aff_key in ("push_into","throw_at","lure") and destination is not None:
             dmg = random.randint(6, 12)
             effects.append({"type":"damage_entity","entity_id":primary.entity_id,"amount":dmg})
             effects.append({"type":"add_affinity","kind":"environment","amount":2})
-            effects.append({"type":"add_audience","amount":aff.audience_effect if aff else 5})
+            # Prompt 18: environment kills are the marquee sponsor moment.
+            # Bump audience AND emit env_kill tag for Sport/Kanał 7.
+            effects.append({"type":"add_audience",
+                            "amount": aff.audience_effect if aff else 5,
+                            "source":"env_kill","tag":"env_kill"})
         elif aff_key == "hack" and primary is not None:
             effects.append({"type":"change_object_state","entity_id":primary.entity_id,
                             "state_update":{"hacked":True}})
@@ -278,6 +298,8 @@ def _effects_for_level(level, aff_key, validation, world):
             effects.append({"type":"change_object_state","entity_id":primary.entity_id,
                             "state_update":{"unlocked":True}})
             effects.append({"type":"add_affinity","kind":"stealth","amount":1})
+            # Prompt 18: lockpicking is a Czarny Rynek love / Ministerstwo hate.
+            effects.append({"type":"sponsor_tag","tag":"lockpicking","weight":1})
         elif aff_key == "talk" and primary is not None:
             effects.append({"type":"change_relationship","entity_id":primary.entity_id,"amount":1})
             effects.append({"type":"add_affinity","kind":"diplomacy","amount":1})

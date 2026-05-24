@@ -1,4 +1,4 @@
-# CRAWL PROTOCOL — Systems Addendum: Salvage, Improvised Crafting, Memetics, Mouse-Only Play
+# Dungeon Kraulem — Systems Addendum: Salvage, Improvised Crafting, Memetics, Mouse-Only Play
 
 This addendum extends `docs/CONTENT_BIBLE.md`.
 

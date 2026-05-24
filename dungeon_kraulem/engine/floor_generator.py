@@ -175,8 +175,24 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
     f.title_key = ""
     f.title_fallback = f"Piętro {floor_number} — {theme_label}"
     f.theme_fallback = theme_label
-    f.sponsor_key = "floor1_sponsor"
-    f.sponsor_fallback = "Sponsoruje: NovaChem Biotech."
+    # Prompt 18: pick floor sponsor from the sponsor catalog by
+    # floor-number rotation. `sponsor_key` holds the *catalog* key (e.g.
+    # "novachem_biotech") so engine.sponsors.current_floor_sponsor_key
+    # can find the record; the top-bar `t(sponsor_key, fallback=...)`
+    # call falls back to `sponsor_fallback` because catalog keys aren't
+    # locale keys themselves.
+    try:
+        from ..content.data.sponsors import sponsor_for_floor, get_sponsor
+        from ..ui.lang import t as _t
+        skey = sponsor_for_floor(floor_number)
+        sdata = get_sponsor(skey)
+        name_pl = _t(sdata.get("name_key", ""),
+                     fallback=sdata.get("name_fallback", skey))
+        f.sponsor_key = skey
+        f.sponsor_fallback = f"Sponsoruje: {name_pl}."
+    except Exception:
+        f.sponsor_key = "floor1_sponsor"
+        f.sponsor_fallback = "Sponsoruje: NovaChem Biotech."
 
     # Stash archetype on floor for inspection / save
     f.active_events.append({

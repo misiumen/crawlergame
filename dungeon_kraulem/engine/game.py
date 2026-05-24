@@ -59,6 +59,15 @@ class Game:
         from ..ui import journal as _journal
         self.journal_state = _journal.JournalState()
 
+        # Prompt 18: explicit arming for nav-option Enter activation.
+        # The Prompt-14 "empty input + Enter → fire selected option" UX
+        # was a foot-gun: after a failed command, additional Enter presses
+        # (autorepeat, accidental taps) would spam the selected nav option
+        # (usually 'rozejrzyj się'). Now Enter on empty only fires the
+        # nav option when the player has explicitly armed selection by
+        # pressing an arrow / Tab. Any typed character or submit disarms.
+        self._nav_selection_armed = False
+
         # Prompt 08: keyboard cursor navigation.
         # input_mode: "text" (default — typing goes to input_text and arrows
         # are inert) or "nav" (typing is suppressed except letters that
@@ -150,6 +159,9 @@ class Game:
     def submit_input(self):
         text_val = self.input_text.strip()
         self.input_text = ""
+        # Prompt 18: any submitted text disarms the nav-selection latch
+        # so a subsequent stray Enter can't fire the panel option.
+        self._nav_selection_armed = False
         if not text_val: return
         if self.state == STATE_PLAY:
             # Record to lightweight command history for Up/Down recall.
@@ -452,7 +464,22 @@ class Game:
 
     def _handle_play_input(self, text_val):
         intent = parse_with_optional_llm(text_val, self.world)
+        # Prompt 17: when combat is active, the combat router runs BEFORE
+        # the generic intent dispatch. Combat-flavored commands (attack /
+        # defend / dodge / flee / assess / use-environment / lure-into-
+        # trap) need to land in the combat layer even when the parser
+        # would normally route them elsewhere. Non-combat intents fall
+        # through and run as usual; the standard pipeline below will
+        # still see them.
+        from . import combat as _cmb
+        room_pre = self.world.current_floor.current_room() if self.world.current_floor else None
+        cs_pre = _cmb.get_combat(room_pre)
+        if cs_pre is not None:
+            if self._combat_route(intent, cs_pre):
+                return
         if intent.intent == "unknown":
+            # During combat the "unknown" path is already handled above;
+            # if we got here combat wasn't active or didn't consume it.
             self.log(t("feedback_no_intent",
                        fallback="Nie rozumiem, co chcesz zrobić. Spróbuj inaczej."), LOG_WARN)
             return
@@ -554,6 +581,21 @@ class Game:
         if intent.intent == "break":
             self._attempt_break(intent); return
 
+        # Prompt 16: mass-action commands. Deterministic, no LLM. Each
+        # handler iterates the room's visible entities and applies the
+        # action to every valid target — accumulating time, noise,
+        # materials, and consequences.
+        if intent.intent == "mass_salvage":
+            self._attempt_mass_salvage(intent); return
+        if intent.intent == "mass_search":
+            self._attempt_mass_search(intent); return
+        if intent.intent == "mass_loot_take":
+            self._attempt_mass_loot(intent, mode="take"); return
+        if intent.intent == "mass_loot_loose":
+            self._attempt_mass_loot(intent, mode="loot"); return
+        if intent.intent == "mass_break":
+            self._attempt_mass_break(intent); return
+
         # Prompt 14: "zaatakuj X" where X is a non-creature object should
         # route to break, not to a missing-affordance refusal. Peek at the
         # current room's visible entities — if the named target is an
@@ -604,6 +646,22 @@ class Game:
         lines = apply(r.effects, self.world, time_system=time_system)
         for ln in lines:
             self.log(ln, LOG_NORMAL)
+
+        # Prompt 17: if the player just attacked an alive hostile and
+        # combat is NOT already active, kick it off and run the enemy
+        # turn so the player feels the room react. Skip for already-dead
+        # targets (post-mortem `zaatakuj X` on a corpse is harmless).
+        if intent.intent == "attack" and v.matched_entities:
+            target = v.matched_entities[0]
+            if target.entity_type in ("monster","crawler","npc") and target.is_alive():
+                from . import combat as _cmb
+                room_after = self.world.current_floor.current_room() if self.world.current_floor else None
+                if room_after is not None and _cmb.get_combat(room_after) is None:
+                    cs2 = _cmb.start_combat(room_after, self.world,
+                                            triggered_by="player_attack")
+                    self.log(t("feedback_combat_start",
+                               fallback="Walka się zaczyna."), LOG_WARN)
+                    self._run_enemy_turn(cs2)
 
         # Hooks: class offer trigger
         self._maybe_offer_class()
@@ -1340,6 +1398,818 @@ class Game:
         # Affinity nudge for environment plays.
         ch.affinity["environment"] = ch.affinity.get("environment", 0) + 1
 
+    # ── Prompt 16: mass-action handlers ─────────────────────────────────────
+
+    def _attempt_mass_salvage(self, intent):
+        """Dismantle every salvageable visible entity in the room.
+
+        Skips: safehouse-owned (with note), structural, locked exits,
+        already-stripped/depleted/destroyed entities, terminals (require
+        tool), and creatures.  Accumulates time, noise, materials, and
+        social risk via the existing salvage path."""
+        from . import time_system as ts
+        from ..content import materials as _mat
+        room = self.world.current_floor.current_room() if self.world.current_floor else None
+        if room is None:
+            self.log(t("feedback_no_room", fallback="Nie jesteś nigdzie."), LOG_WARN)
+            return
+        self.log(t("feedback_mass_salvage_intro",
+                   fallback="Zaczynasz metodyczną rozbiórkę pomieszczenia."),
+                 LOG_SYSTEM)
+
+        salvaged: list[str] = []
+        skipped: list[str] = []
+        warned_safehouse = False
+        total_minutes = 0
+        # Snapshot the candidates BEFORE iteration so we don't loop on
+        # newly-revealed entities (e.g. a synthesized door we create).
+        candidates = [e for e in list(room.visible_entities())
+                      if e.entity_type not in ("monster", "crawler", "npc")
+                      and e.entity_type != "door"]
+        for ent in candidates:
+            name = ent.display_name()
+            tags = set(ent.tags or [])
+            st = ent.state or {}
+            if st.get("stripped") or st.get("depleted") or st.get("destroyed"):
+                skipped.append(f"{name}: już rozebrane")
+                continue
+            if "structural" in tags:
+                skipped.append(f"{name}: to część konstrukcji")
+                continue
+            if ent.entity_type == "terminal" and "salvageable" not in tags:
+                skipped.append(f"{name}: wymaga narzędzi")
+                continue
+            owned_safehouse = (st.get("owned_by") == "safehouse"
+                               or st.get("theft_sensitive") is True)
+            if owned_safehouse and not warned_safehouse:
+                # Surface the social cost once, then continue — the player
+                # explicitly chose mass salvage.
+                self.log(t("feedback_mass_salvage_safehouse_warn",
+                           fallback="Część tych rzeczy należy do safehouse — będą konsekwencje."),
+                         LOG_WARN)
+                warned_safehouse = True
+            table_key = _pick_salvage_table_key(ent)
+            if not table_key and "salvageable" not in tags:
+                skipped.append(f"{name}: nie ma z czego ciągnąć surowców")
+                continue
+            # Reuse the existing salvage path so social/audience/risk
+            # consequences flow through the canonical handler.
+            self._do_single_salvage(ent, mute_narrator=True)
+            mark = ", ".join(self._last_salvage_row) if self._last_salvage_row else ""
+            if mark:
+                salvaged.append(f"{name}: {mark}")
+            else:
+                skipped.append(f"{name}: nic użytecznego")
+            total_minutes += int(self._last_salvage_minutes or 8)
+
+        # Summary.
+        if salvaged:
+            self.log(t("feedback_mass_salvage_results_h",
+                       fallback="Rozebrano:"), LOG_SUCCESS)
+            for row in salvaged:
+                self.log(f"  • {row}", LOG_NORMAL)
+        if skipped:
+            self.log(t("feedback_mass_salvage_skipped_h",
+                       fallback="Pominięto:"), LOG_WARN)
+            for row in skipped:
+                self.log(f"  · {row}", LOG_NORMAL)
+        if not salvaged and not skipped:
+            self.log(t("feedback_mass_salvage_nothing",
+                       fallback="Nie widzisz tu niczego, co da się sensownie rozebrać."),
+                     LOG_WARN)
+            return
+        # Big noise + time on top of per-entity bumps already applied.
+        room.noise_level += min(5, len(salvaged))
+        self.log(t("feedback_mass_salvage_summary",
+                   fallback=f"Czas: ok. {total_minutes} min. Hałas: wysoki."),
+                 LOG_SYSTEM)
+        # Prompt 18: mass-salvage is the recycling-cult headline move and
+        # also drives audience. Emit the tags + audience bump once per
+        # batch (per-item single-salvage already books smaller bumps).
+        from . import audience as _aud
+        from . import sponsors as _sp
+        _aud.change_audience(self.world, 2, source="mass_salvage")
+        _sp.note_player_tag(self.world, "mass_salvage", weight=2)
+        _sp.note_player_tag(self.world, "salvage", weight=1)
+        _sp.maybe_intervene(self.world)
+
+    def _do_single_salvage(self, target, mute_narrator: bool = False):
+        """Salvage one target deterministically (no parser dance). Used by
+        mass-salvage. Stashes result on self._last_salvage_row +
+        self._last_salvage_minutes for the caller's summary."""
+        from . import time_system as ts
+        from ..content import materials as _mat
+        from ..content.data.salvage_tables import SALVAGE_TABLES
+        from ..systems import risk_reward
+        from .consequences import apply
+        import random as _r
+        self._last_salvage_row = []
+        self._last_salvage_minutes = 0
+        table_key = _pick_salvage_table_key(target)
+        if not table_key:
+            return
+        table = SALVAGE_TABLES.get(table_key, {})
+        ch = self.world.character
+        # Auto-success-with-partial: mass salvage is methodical, not a
+        # d20 roll per item. Use partial-success drops (floor qty/2).
+        drops = {}
+        for matkey, span in (table.get("drops") or {}).items():
+            lo, hi = (span if isinstance(span, list) else [span, span])
+            qty = max(0, _r.randint(int(lo), int(hi)) // 2)
+            if qty <= 0 and hi > 0:
+                qty = 1
+            if qty > 0:
+                drops[matkey] = qty
+        if drops:
+            _mat.add_materials(ch, drops)
+            self._last_salvage_row = [
+                f"{q}x {(_mat.get(k).name() if _mat.get(k) else k)}"
+                for k, q in drops.items()
+            ]
+        target.state = target.state or {}
+        target.state["stripped"] = True
+        target.state["depleted"] = True
+        # Time: from table or default 8.
+        mins = int(table.get("time_minutes", 8)) // 2  # methodical batch
+        self._last_salvage_minutes = max(2, mins)
+        ts.advance(self.world, self._last_salvage_minutes)
+        # Risks roll once per item — keep it light.
+        risks = list(table.get("risks", []))
+        if risks:
+            effs = risk_reward.risk_effects(risks[:1])
+            if effs:
+                apply(effs, self.world, time_system=ts)
+        # Safehouse social cost: per-item, light.
+        if (target.state.get("owned_by") == "safehouse"
+                or target.state.get("theft_sensitive")):
+            ch.flags["safehouse_theft_warnings"] = int(
+                ch.flags.get("safehouse_theft_warnings", 0)) + 1
+
+    def _attempt_mass_search(self, intent):
+        """Search every visible container/corpse/drawer/shelf in the room."""
+        from . import time_system as ts
+        room = self.world.current_floor.current_room() if self.world.current_floor else None
+        if room is None:
+            self.log(t("feedback_no_room", fallback="Nie jesteś nigdzie."), LOG_WARN)
+            return
+        self.log(t("feedback_mass_search_intro",
+                   fallback="Przeszukujesz wszystko, co wygląda na warte uwagi."),
+                 LOG_SYSTEM)
+        searched: list[str] = []
+        skipped: list[str] = []
+        for ent in list(room.visible_entities()):
+            tags = set(ent.tags or [])
+            st = ent.state or {}
+            if st.get("searched") or st.get("looted"):
+                skipped.append(f"{ent.display_name()}: już przeszukane")
+                continue
+            if not (("container" in tags) or ("corpse" in tags)
+                    or ("drawer" in tags) or ("shelf" in tags)
+                    or ent.entity_type == "corpse"):
+                continue
+            st["searched"] = True
+            ent.state = st
+            # Surface entity name as discovered. Containers without explicit
+            # loot tables still count as searched (player learned: nothing).
+            searched.append(ent.display_name())
+        ts.advance(self.world, max(4, 2 * len(searched)))
+        if searched:
+            self.log(t("feedback_mass_search_results_h",
+                       fallback="Przeszukano:"), LOG_SUCCESS)
+            for row in searched:
+                self.log(f"  • {row}", LOG_NORMAL)
+        if skipped:
+            self.log(t("feedback_mass_search_skipped_h",
+                       fallback="Pominięto:"), LOG_NORMAL)
+            for row in skipped:
+                self.log(f"  · {row}", LOG_DIM if hasattr(self, "LOG_DIM") else LOG_NORMAL)
+        if not searched and not skipped:
+            self.log(t("feedback_mass_search_nothing",
+                       fallback="Nie widzisz tu nic, co dałoby się sensownie przeszukać."),
+                     LOG_WARN)
+
+    def _attempt_mass_loot(self, intent, mode: str = "take"):
+        """Take every portable visible item that isn't owned. `mode`:
+            "take"  — generic 'weź wszystko' over loose visible items
+            "loot"  — 'ograb wszystko' — same plus container/corpse loot,
+                      and warns about safehouse property explicitly."""
+        from . import time_system as ts
+        ch = self.world.character
+        room = self.world.current_floor.current_room() if self.world.current_floor else None
+        if room is None:
+            self.log(t("feedback_no_room", fallback="Nie jesteś nigdzie."), LOG_WARN)
+            return
+        self.log(t("feedback_mass_loot_intro",
+                   fallback="Bierzesz wszystko, co da się unieść."),
+                 LOG_SYSTEM)
+        taken: list[str] = []
+        skipped: list[str] = []
+        warned_safehouse = False
+        for ent in list(room.visible_entities()):
+            tags = set(ent.tags or [])
+            st = ent.state or {}
+            if not ent.portable:
+                if mode == "loot" and ent.entity_type == "corpse" and not st.get("looted"):
+                    st["looted"] = True; ent.state = st
+                    taken.append(f"{ent.display_name()} (przeszukane)")
+                else:
+                    if "fixture" in tags or "structural" in tags or \
+                       ent.entity_type in ("door","terminal"):
+                        skipped.append(f"{ent.display_name()}: nie jest przenośne")
+                continue
+            owned = (st.get("owned_by") == "safehouse"
+                     or st.get("theft_sensitive") is True)
+            if owned and not warned_safehouse:
+                self.log(t("feedback_mass_loot_safehouse_warn",
+                           fallback="Niektóre z tych rzeczy należą do safehouse — ktoś patrzy."),
+                         LOG_WARN)
+                warned_safehouse = True
+            # Move into inventory.
+            try:
+                room.remove_entity(ent)
+            except Exception:
+                pass
+            ent.location_id = "inventory:player"
+            ch.inventory_ids.append(ent.entity_id)
+            taken.append(ent.display_name())
+            if owned:
+                ch.flags["safehouse_theft_warnings"] = int(
+                    ch.flags.get("safehouse_theft_warnings", 0)) + 1
+        ts.advance(self.world, max(2, len(taken)))
+        if taken:
+            self.log(t("feedback_mass_loot_results_h",
+                       fallback="Zabrane:"), LOG_SUCCESS)
+            for row in taken:
+                self.log(f"  • {row}", LOG_NORMAL)
+        if skipped:
+            self.log(t("feedback_mass_loot_skipped_h",
+                       fallback="Pominięto:"), LOG_WARN)
+            for row in skipped:
+                self.log(f"  · {row}", LOG_NORMAL)
+        if not taken and not skipped:
+            self.log(t("feedback_mass_loot_nothing",
+                       fallback="Nic tu się nie nadaje do zabrania."),
+                     LOG_WARN)
+
+    def _attempt_mass_break(self, intent):
+        """Smash every visibly fragile / clearly-breakable thing. Safe
+        minimal version: only targets entities tagged fragile / glass /
+        ceramic / destructible that are NOT structural and NOT owned by
+        safehouse / sponsor — owned items get a warning + are skipped to
+        keep this safe-minimal."""
+        from . import time_system as ts
+        from ..content import materials as _mat
+        from ..content.data.salvage_tables import SALVAGE_TABLES
+        import random as _r
+        room = self.world.current_floor.current_room() if self.world.current_floor else None
+        if room is None:
+            self.log(t("feedback_no_room", fallback="Nie jesteś nigdzie."), LOG_WARN)
+            return
+        self.log(t("feedback_mass_break_intro",
+                   fallback="Rozglądasz się, biorąc głęboki oddech. To narobi hałasu."),
+                 LOG_SYSTEM)
+        ch = self.world.character
+        broken: list[str] = []
+        skipped: list[str] = []
+        for ent in list(room.visible_entities()):
+            tags = set(ent.tags or [])
+            st = ent.state or {}
+            if ent.entity_type in ("monster", "crawler", "npc"):
+                continue
+            if "structural" in tags:
+                skipped.append(f"{ent.display_name()}: część konstrukcji")
+                continue
+            if st.get("broken") or st.get("destroyed"):
+                continue
+            if (st.get("owned_by") == "safehouse" or st.get("theft_sensitive")):
+                skipped.append(f"{ent.display_name()}: ktoś patrzy")
+                continue
+            destructive_tags = {"fragile","glass","ceramic","destructible","thin"}
+            if not (tags & destructive_tags):
+                continue
+            st["broken"] = True; st["destroyed"] = True
+            ent.state = st
+            # Brutal break — partial salvage if a table exists.
+            table_key = _pick_salvage_table_key(ent)
+            row = []
+            if table_key:
+                table = SALVAGE_TABLES.get(table_key, {})
+                drops = {}
+                for matkey, span in (table.get("drops") or {}).items():
+                    lo, hi = (span if isinstance(span, list) else [span, span])
+                    qty = max(0, _r.randint(int(lo), int(hi)) // 3)
+                    if qty > 0:
+                        drops[matkey] = qty
+                if drops:
+                    _mat.add_materials(ch, drops)
+                    row = [f"{q}x {(_mat.get(k).name() if _mat.get(k) else k)}"
+                           for k, q in drops.items()]
+                st["stripped"] = True; st["depleted"] = True
+            broken.append(ent.display_name() + (f" ({', '.join(row)})" if row else ""))
+        ts.advance(self.world, max(3, 2 * len(broken)))
+        room.noise_level += min(8, 2 * len(broken))
+        if broken:
+            self.log(t("feedback_mass_break_results_h",
+                       fallback="Roztrzaskane:"), LOG_SUCCESS)
+            for row in broken:
+                self.log(f"  • {row}", LOG_NORMAL)
+        if skipped:
+            self.log(t("feedback_mass_break_skipped_h",
+                       fallback="Pominięto:"), LOG_WARN)
+            for row in skipped:
+                self.log(f"  · {row}", LOG_NORMAL)
+        if not broken and not skipped:
+            self.log(t("feedback_mass_break_nothing",
+                       fallback="Nie widzisz tu niczego sensownego do rozbicia."),
+                     LOG_WARN)
+        else:
+            self.log(t("feedback_mass_break_summary",
+                       fallback="Hałas niesie się dalej, niż zamierzałeś."),
+                     LOG_WARN)
+
+    # ── Prompt 17: combat v1 ────────────────────────────────────────────────
+
+    def _combat_route(self, intent, cs) -> bool:
+        """Combat-state dispatch. Returns True iff this intent was consumed
+        by the combat layer (don't fall through to the standard pipeline).
+        Returns False for intents combat doesn't own — those run normally
+        and still consume the player's turn, after which enemies react."""
+        from . import combat as _cmb
+        room = self.world.current_floor.current_room()
+        # Combat-flavored verbs we own outright:
+        if intent.intent == "flee":
+            self._combat_flee(intent, cs); return True
+        if intent.intent in ("attack",):
+            self._combat_attack(intent, cs, mode="normal"); return True
+        # Synthetic verbs from new parser cues.
+        first_token = (intent.verb or intent.normalized_text or "").lower()
+        if "ostroz" in first_token or "ostroż" in first_token:
+            self._combat_attack(intent, cs, mode="careful"); return True
+        if any(w in (intent.normalized_text or "").lower()
+               for w in ("ryzykow","mocno ataku","mocny atak","heavy","wściekle","wsciekle")):
+            self._combat_attack(intent, cs, mode="heavy"); return True
+        if intent.intent in ("hide",) or "broń" in first_token or "bron" in first_token:
+            self._combat_defend(intent, cs); return True
+        if any(w in (intent.normalized_text or "").lower()
+               for w in ("unik","uniknij","robie unik","robię unik","dodge","evade")):
+            self._combat_dodge(intent, cs); return True
+        if any(w in (intent.normalized_text or "").lower()
+               for w in ("oceń","ocen sytuac","oceń sytuac","oceniam","assess")):
+            self._combat_assess(intent, cs); return True
+        if any(w in (intent.normalized_text or "").lower()
+               for w in ("zwab","zwabiam","lure","wciągam","wciagam")):
+            self._combat_lure(intent, cs); return True
+        if any(w in (intent.normalized_text or "").lower()
+               for w in ("zbliż","zblizam","podchodz","approach")):
+            self._combat_reposition(intent, cs, toward=True); return True
+        if any(w in (intent.normalized_text or "").lower()
+               for w in ("oddal","cofam","cofnij","wycofuj","back off","retreat"))\
+                 and intent.intent != "flee":
+            self._combat_reposition(intent, cs, toward=False); return True
+        # Use-environment: break/throw/push during combat trigger an
+        # environmental hook in addition to the normal effect.
+        if intent.intent in ("break","push_into","throw_at"):
+            consumed = self._combat_use_environment(intent, cs)
+            if consumed:
+                return True
+            # Fall through to normal handling, but still take an enemy turn.
+            return False
+        # Everything else (search, use item, journal commands) runs normally
+        # and then enemies get a free turn unless the command is a no-time
+        # info action (journal etc). We approximate that by ALWAYS letting
+        # combat-relevant intents in the table above own the turn, and
+        # everything else fall back to the standard pipeline. The enemy
+        # turn fires from `_combat_after_player_action`.
+        return False
+
+    def _combat_after_player_action(self, cs) -> None:
+        """Called at the end of every combat-aware player action. Ends
+        combat if all hostiles are gone; otherwise runs the enemy turn."""
+        from . import combat as _cmb
+        room = self.world.current_floor.current_room()
+        if room is None:
+            return
+        hostiles = _cmb.alive_hostiles_in(room)
+        if not hostiles:
+            _cmb.end_combat(room, self.world, outcome="all_down")
+            self.log(t("feedback_combat_won",
+                       fallback="Wszyscy wrogowie pokonani."), LOG_SUCCESS)
+            return
+        self._run_enemy_turn(cs)
+
+    def _run_enemy_turn(self, cs) -> None:
+        from . import combat as _cmb
+        from . import time_system as ts
+        room = self.world.current_floor.current_room()
+        ch = self.world.character
+        if room is None:
+            return
+        cs.side = "enemies"
+        for eid in list(cs.participants):
+            ent = self.world.get(eid)
+            if ent is None or not ent.is_alive():
+                continue
+            action = _cmb.choose_enemy_action(self.world, cs, ent)
+            self._apply_enemy_action(cs, ent, action)
+            if not ch.is_alive():
+                break
+        # Tick statuses on all participants (including player via clocks on character)
+        for eid in cs.participants:
+            ent = self.world.get(eid)
+            _cmb.tick_statuses(ent)
+        _cmb.tick_statuses(ch)
+        # Reset per-round player buffs.
+        cs.player_defend = 0
+        cs.player_dodge = False
+        cs.round += 1
+        cs.side = "player"
+        ts.advance(self.world, 1)
+        if not ch.is_alive():
+            self.state = STATE_DEFEAT
+            return
+        # Re-check end: if all hostiles dead/fled/disabled, end combat.
+        hostiles = _cmb.alive_hostiles_in(room)
+        if not hostiles:
+            _cmb.end_combat(room, self.world, outcome="all_down")
+            self.log(t("feedback_combat_won",
+                       fallback="Wszyscy wrogowie pokonani."), LOG_SUCCESS)
+
+    def _apply_enemy_action(self, cs, ent, action) -> None:
+        from . import combat as _cmb
+        ch = self.world.character
+        room = self.world.current_floor.current_room()
+        name = ent.display_name()
+        if action.kind == "wait":
+            self.log(f"{name}: {action.note or 'czeka'}.", LOG_NORMAL)
+            return
+        if action.kind == "approach":
+            cs.bands[ent.entity_id] = _cmb.BAND_ENGAGED
+            self.log(f"{name} zbliża się ({action.note or 'naciera'}).", LOG_WARN)
+            return
+        if action.kind == "back_off":
+            cs.bands[ent.entity_id] = _cmb.BAND_AT_RANGE
+            self.log(f"{name} cofa się, próbując utrzymać dystans.", LOG_NORMAL)
+            return
+        if action.kind == "flee":
+            self.log(f"{name} ucieka z pola walki.", LOG_SUCCESS)
+            ent.state = ent.state or {}
+            ent.state["fled"] = True
+            ent.hp = 0     # treated as no-longer-in-fight
+            return
+        if action.kind in ("attack",):
+            # Player dodge / defense consume here.
+            dmg = int(action.damage or 1)
+            if _cmb.has_status(ch, _cmb.STATUS_BEHIND_COVER) and \
+                    cs.bands.get(ent.entity_id) == _cmb.BAND_AT_RANGE:
+                dmg = max(0, dmg - 2)
+            if cs.player_dodge:
+                # Dodge consumes; halve damage on success roll.
+                import random as _r
+                if _r.randint(1,20) + ch.stat_mod("DEX") >= 12:
+                    dmg = max(0, dmg // 2)
+                    self.log(f"Unikasz większej części ataku od {name}.", LOG_NORMAL)
+            dmg = max(0, dmg - cs.player_defend)
+            if dmg <= 0:
+                self.log(f"{name} atakuje, ale nie robi krzywdy.", LOG_NORMAL)
+                return
+            ch.take_damage(dmg)
+            self.log(f"{name} trafia cię na {dmg} HP "
+                     f"(zostało {ch.hp}/{ch.max_hp}).", LOG_DANGER)
+            # Heavy hits cause bleeding sometimes.
+            if dmg >= 5:
+                _cmb.add_status(ch, _cmb.STATUS_WOUNDED, 4)
+
+    # ── Player combat actions ──────────────────────────────────────────────
+
+    def _combat_attack(self, intent, cs, mode: str = "normal"):
+        from . import combat as _cmb
+        from .utils_compat import roll_d20
+        import random as _r
+        room = self.world.current_floor.current_room()
+        ch = self.world.character
+        # Pick the first engaged enemy. Player can specify a name target via
+        # intent.targets; we honor that if it resolves to a participant.
+        target = None
+        if intent.targets:
+            from .validation import _resolve_entities
+            candidates = _resolve_entities(room, intent.targets[0])
+            if candidates and candidates[0].entity_id in cs.participants:
+                target = candidates[0]
+        if target is None:
+            engaged = [self.world.get(eid) for eid in cs.participants
+                       if cs.bands.get(eid) == _cmb.BAND_ENGAGED]
+            engaged = [e for e in engaged if e and e.is_alive()]
+            target = engaged[0] if engaged else \
+                next((self.world.get(eid) for eid in cs.participants
+                      if self.world.get(eid) and self.world.get(eid).is_alive()),
+                     None)
+        if target is None:
+            self.log(t("feedback_combat_no_target",
+                       fallback="Nie widzisz w kim uderzyć."), LOG_WARN)
+            return
+        band = cs.bands.get(target.entity_id, _cmb.BAND_ENGAGED)
+        if band == _cmb.BAND_AT_RANGE:
+            self.log(t("feedback_combat_out_of_range",
+                       fallback=f"„{target.display_name()}” jest poza zasięgiem zwarcia. "
+                                f"Zbliż się albo użyj czegoś z dystansu.",
+                       name=target.display_name()), LOG_WARN)
+            self._combat_after_player_action(cs)
+            return
+        raw = roll_d20()
+        mod = ch.stat_mod("STR")
+        to_hit_bonus = 0
+        damage_bonus = 0
+        defense_change = 0
+        noise = 3
+        if mode == "careful":
+            to_hit_bonus = 2
+            damage_bonus = -1
+            defense_change = 1
+            noise = 2
+        elif mode == "heavy":
+            to_hit_bonus = -2
+            damage_bonus = _r.randint(1,4)
+            defense_change = -2
+            noise = 5
+        dc = max(6, getattr(target, "ac", 10))
+        total = raw + mod + to_hit_bonus
+        # Status modifiers
+        if _cmb.has_status(target, _cmb.STATUS_PRONE):     total += 2
+        if _cmb.has_status(target, _cmb.STATUS_BLINDED):   total += 3
+        if _cmb.has_status(target, _cmb.STATUS_STUNNED):   total += 3
+        if _cmb.has_status(ch, _cmb.STATUS_BLINDED):       total -= 3
+        crit = (raw == 20)
+        fumble = (raw == 1)
+        hit = (not fumble) and (crit or total >= dc)
+        mode_label = {"normal":"atak","careful":"ostrożny atak","heavy":"ryzykowny atak"}[mode]
+        self.log(f"  [{mode_label}] d20({raw}) + STR({mod:+d})"
+                 f"{(' + bonus' + format(to_hit_bonus, '+d')) if to_hit_bonus else ''} "
+                 f"= {total} vs AC {dc} → "
+                 f"{'KRYT' if crit else ('hit' if hit else 'miss')}", LOG_SYSTEM)
+        if hit:
+            dmg = _r.randint(3, 8) + mod + damage_bonus
+            if crit: dmg *= 2
+            dmg = max(1, dmg)
+            target.hp = max(0, target.hp - dmg)
+            self.log(f"„{target.display_name()}”: -{dmg} HP "
+                     f"(zostało {target.hp}/{target.max_hp}).",
+                     LOG_SUCCESS if crit else LOG_NORMAL)
+            if target.hp <= 0:
+                self.log(f"„{target.display_name()}” pada.", LOG_SUCCESS)
+            if mode == "heavy" and not crit:
+                # Heavy attack exposes the player.
+                _cmb.add_status(ch, _cmb.STATUS_WOUNDED, 2)
+        else:
+            if fumble:
+                self.log(f"Twój atak idzie w bok i odsłaniasz się.", LOG_WARN)
+                _cmb.add_status(ch, _cmb.STATUS_PRONE, 1)
+            else:
+                self.log(f"Chybiasz.", LOG_NORMAL)
+        # Defense window for the enemy's reply.
+        if defense_change != 0:
+            cs.player_defend = max(0, cs.player_defend + max(0, defense_change))
+        room.noise_level += noise
+        cs.noise_added += noise
+        cs.last_action = f"attack:{mode}"
+        ch.affinity["melee"] = ch.affinity.get("melee", 0) + 1
+        self._combat_after_player_action(cs)
+
+    def _combat_defend(self, intent, cs):
+        from . import combat as _cmb
+        cs.player_defend = max(cs.player_defend, 3)
+        self.log(t("feedback_combat_defend",
+                   fallback="Bronisz się. Kolejny cios zaboli mniej."), LOG_SUCCESS)
+        cs.last_action = "defend"
+        self._combat_after_player_action(cs)
+
+    def _combat_dodge(self, intent, cs):
+        cs.player_dodge = True
+        self.log(t("feedback_combat_dodge",
+                   fallback="Przygotowujesz się do uniku."), LOG_SUCCESS)
+        cs.last_action = "dodge"
+        self._combat_after_player_action(cs)
+
+    def _combat_assess(self, intent, cs):
+        from . import combat as _cmb
+        if cs.assessed:
+            self.log(t("feedback_combat_assessed_already",
+                       fallback="Wiesz już wszystko, co da się ocenić bez bliższego oka."),
+                     LOG_NORMAL)
+            return
+        cs.assessed = True
+        self.log(t("feedback_combat_assess_h",
+                   fallback="Oceniasz sytuację:"), LOG_SYSTEM)
+        for eid in cs.participants:
+            e = self.world.get(eid)
+            if e is None or not e.is_alive():
+                continue
+            band = _cmb.describe_band(cs, e)
+            threat = _cmb.describe_threat(e)
+            behavior = _cmb.default_behavior(e)
+            status = _cmb.list_status_pl(e)
+            self.log(f"  • „{e.display_name()}” — {band}, {threat}. "
+                     f"Styl: {behavior}. Status: {status}.", LOG_NORMAL)
+        # Mention environment cues.
+        room = self.world.current_floor.current_room()
+        cues = []
+        for e in (room.entities if room else []):
+            tags = set(e.tags or [])
+            if (e.state or {}).get("broken") or (e.state or {}).get("destroyed"):
+                continue
+            if "fragile" in tags or "glass" in tags:
+                cues.append(f"{e.display_name()} — można rozbić")
+            if "furniture" in tags and "salvageable" in tags:
+                cues.append(f"{e.display_name()} — można przewrócić")
+            if (room.state or {}).get("player_traps"):
+                cues.append("masz w pokoju rozstawioną pułapkę — można w nią zwabić")
+                break
+        if cues:
+            self.log("  Otoczenie: " + "; ".join(cues[:4]) + ".", LOG_NORMAL)
+        cs.last_action = "assess"
+        # Assess is free — DOES NOT trigger an enemy turn.
+
+    def _combat_flee(self, intent, cs):
+        """Try to escape through a known unlocked exit."""
+        from . import combat as _cmb
+        from .utils_compat import roll_d20
+        room = self.world.current_floor.current_room()
+        ch = self.world.character
+        # Pick a destination: explicit if the player said one, else first
+        # non-locked non-hidden exit.
+        target_label = None
+        if intent.destination:
+            from .validation import fold
+            tgt_f = fold(intent.destination)
+            for label, ed in (room.exits or {}).items():
+                if ed.get("hidden") or ed.get("locked"):
+                    continue
+                if fold(label) == tgt_f or tgt_f in fold(label):
+                    target_label = label; break
+        if target_label is None:
+            for label, ed in (room.exits or {}).items():
+                if not ed.get("hidden") and not ed.get("locked"):
+                    target_label = label; break
+        if target_label is None:
+            self.log(t("feedback_combat_no_exit",
+                       fallback="Nie widzisz, którędy uciekać."), LOG_WARN)
+            self._combat_after_player_action(cs); return
+        # DC scales with number of engaged hostiles and presence of guards.
+        engaged = [self.world.get(eid) for eid in cs.participants
+                   if cs.bands.get(eid) == _cmb.BAND_ENGAGED]
+        engaged = [e for e in engaged if e and e.is_alive()]
+        guards = sum(1 for e in engaged
+                     if _cmb.default_behavior(e) == _cmb.BEHAVIOR_GUARD)
+        dc = 10 + 2 * len(engaged) + 3 * guards
+        raw = roll_d20()
+        mod = ch.stat_mod("DEX")
+        total = raw + mod
+        self.log(f"  [ucieczka] d20({raw}) + DEX({mod:+d}) = {total} vs DC {dc}",
+                 LOG_SYSTEM)
+        if total >= dc or raw == 20:
+            self.log(t("feedback_combat_flee_ok",
+                       fallback=f"Wycofujesz się przez „{target_label}”.",
+                       exit=target_label), LOG_SUCCESS)
+            _cmb.end_combat(room, self.world, outcome="player_flee")
+            # Move through the exit by submitting a normal move command.
+            self.submit_generated_command(f"idź {target_label}")
+            return
+        else:
+            self.log(t("feedback_combat_flee_fail",
+                       fallback="Nie udaje ci się zerwać. Wrogowie wykorzystują moment."),
+                     LOG_WARN)
+            cs.last_action = "flee_fail"
+            self._combat_after_player_action(cs)
+
+    def _combat_reposition(self, intent, cs, toward: bool):
+        from . import combat as _cmb
+        # Move ALL enemies' bands in the chosen direction relative to player.
+        # Approach (toward=True) sets engaged; back away sets at_range.
+        new_band = _cmb.BAND_ENGAGED if toward else _cmb.BAND_AT_RANGE
+        for eid in cs.participants:
+            cs.bands[eid] = new_band
+        if toward:
+            self.log(t("feedback_combat_close_in",
+                       fallback="Zbliżasz się do wrogów."), LOG_NORMAL)
+        else:
+            self.log(t("feedback_combat_back_off",
+                       fallback="Cofasz się na dystans."), LOG_NORMAL)
+        cs.last_action = "reposition"
+        self._combat_after_player_action(cs)
+
+    def _combat_use_environment(self, intent, cs) -> bool:
+        """Break/throw/push in combat: in addition to the normal effect,
+        apply a situational status to an engaged enemy if tags match.
+        Returns True if a combat-environment hook fired (and an enemy turn
+        followed); False if the action should just run normally."""
+        from . import combat as _cmb
+        room = self.world.current_floor.current_room()
+        if room is None:
+            return False
+        from .validation import _resolve_entities
+        if not intent.targets:
+            return False
+        candidates = _resolve_entities(room, intent.targets[0])
+        if not candidates:
+            return False
+        target = candidates[0]
+        tags = set(target.tags or [])
+        engaged = [self.world.get(eid) for eid in cs.participants
+                   if cs.bands.get(eid) == _cmb.BAND_ENGAGED and
+                   self.world.get(eid) and self.world.get(eid).is_alive()]
+        if not engaged:
+            return False
+        victim = engaged[0]
+        applied = None
+        # Order matters: electrical+machine victim FIRST (so a panel
+        # with both `electrical` and `fragile` tags shocks a machine
+        # instead of just blinding it), then furniture push, then
+        # generic fragile/glass break, then throw.
+        if intent.intent == "break" and ("electrical" in tags or "wire" in tags) \
+                and _cmb.default_behavior(victim) == _cmb.BEHAVIOR_MACHINE:
+            _cmb.add_status(victim, _cmb.STATUS_SHOCKED, 2)
+            applied = "shocked"
+        elif intent.intent == "push_into" and "furniture" in tags:
+            _cmb.add_status(victim, _cmb.STATUS_PRONE, 2)
+            applied = "prone"
+        elif intent.intent == "break" and ("glass" in tags or "fragile" in tags):
+            _cmb.add_status(victim, _cmb.STATUS_BLINDED, 2)
+            applied = "blinded"
+        elif intent.intent == "throw_at" and "fragile" in tags:
+            _cmb.add_status(victim, _cmb.STATUS_BLINDED, 1)
+            applied = "blinded"
+        if applied:
+            self.log(t(f"feedback_combat_env_{applied}",
+                       fallback=f"Otoczenie zwraca się przeciw „{victim.display_name()}” "
+                                f"— status: {_cmb.status_label(applied)}.",
+                       name=victim.display_name()), LOG_SUCCESS)
+            # Don't double-process: run the underlying intent to actually
+            # break/push/throw, then take an enemy turn.
+            self._fallback_to_standard_pipeline(intent)
+            cs.last_action = f"env:{applied}"
+            self._combat_after_player_action(cs)
+            return True
+        return False
+
+    def _combat_lure(self, intent, cs) -> None:
+        from . import combat as _cmb
+        room = self.world.current_floor.current_room()
+        traps = (room.state or {}).get("player_traps") or []
+        untriggered = [tr for tr in traps if not tr.get("triggered")]
+        if not untriggered:
+            self.log(t("feedback_combat_no_trap",
+                       fallback="Nie masz w pokoju gotowej pułapki, do której można kogoś zwabić."),
+                     LOG_WARN)
+            return
+        # Pick the first engaged hostile as the victim.
+        engaged = [self.world.get(eid) for eid in cs.participants
+                   if cs.bands.get(eid) == _cmb.BAND_ENGAGED and
+                   self.world.get(eid) and self.world.get(eid).is_alive()]
+        if not engaged:
+            engaged = [self.world.get(eid) for eid in cs.participants
+                       if self.world.get(eid) and self.world.get(eid).is_alive()]
+        if not engaged:
+            self.log(t("feedback_combat_no_target",
+                       fallback="Nie widzisz w kogo wciągnąć w pułapkę."), LOG_WARN)
+            return
+        victim = engaged[0]
+        # CHA check.
+        from .utils_compat import roll_d20
+        ch = self.world.character
+        raw = roll_d20()
+        mod = ch.stat_mod("CHA")
+        if raw + mod >= 11:
+            tr = untriggered[0]
+            tr["triggered"] = True
+            payload = tr.get("effect") or {}
+            dmg = int(payload.get("amount", 3))
+            victim.hp = max(0, victim.hp - dmg)
+            self.log(t("feedback_combat_lure_ok",
+                       fallback=f"„{victim.display_name()}” wpada w pułapkę — -{dmg} HP.",
+                       name=victim.display_name(), amount=dmg), LOG_SUCCESS)
+            if payload.get("type") == "damage_and_stun":
+                _cmb.add_status(victim, _cmb.STATUS_STUNNED, 2)
+            elif payload.get("type") == "knockdown":
+                _cmb.add_status(victim, _cmb.STATUS_PRONE, 2)
+        else:
+            self.log(t("feedback_combat_lure_fail",
+                       fallback="Próbujesz go zwabić, ale nie chwyta."),
+                     LOG_WARN)
+        cs.last_action = "lure"
+        self._combat_after_player_action(cs)
+
+    def _fallback_to_standard_pipeline(self, intent):
+        """Run an intent through validate→resolve→apply as the standard
+        play path would. Used by combat-environment hooks so we don't
+        duplicate the break/salvage logic."""
+        v = validate(intent, self.world)
+        if not v.valid:
+            self.log(v.message() or "—", LOG_WARN)
+            return
+        r = resolve(v, self.world)
+        lines = apply(r.effects, self.world, time_system=time_system)
+        for ln in lines:
+            self.log(ln, LOG_NORMAL)
+
     def _attempt_deploy(self, intent):
         """Place a deployable item from inventory into the current room.
         The item must be in the player's inventory and carry the 'trap',
@@ -1742,8 +2612,14 @@ class Game:
             # Modest reward effects through the same mapper
             immediate.extend(risk_reward.reward_effects(
                 tmpl.get("possible_rewards", []) or []))
+            # Prompt 18: belief-seed planting is the Ministerstwo headline.
+            immediate.append({"type": "add_audience", "amount": 1,
+                              "source": "belief_seed", "tag": "memetic_seed"})
+            immediate.append({"type": "sponsor_tag",
+                              "tag": "belief_invocation", "weight": 1})
             if level == "critical_success":
-                immediate.append({"type": "add_audience", "amount": 1})
+                immediate.append({"type": "add_audience", "amount": 1,
+                                  "source": "belief_seed_crit"})
 
         # Persist seed.
         register_seed(self.world, seed)
@@ -2319,40 +3195,51 @@ class Game:
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.move_selection(self.nav_state, -1)
+                    self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
             if key in (pygame.K_DOWN, pygame.K_s):
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.move_selection(self.nav_state, +1)
+                    self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
             if key in (pygame.K_LEFT,):
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.cycle_group(self.nav_state, -1)
+                    self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
             if key in (pygame.K_RIGHT,):
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.cycle_group(self.nav_state, +1)
+                    self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
             if key == pygame.K_TAB:
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.cycle_group(self.nav_state, -1 if shift_held else +1)
+                    self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
             if key == pygame.K_RETURN:
-                # Empty input + Enter = activate currently-selected nav
-                # option. Submitting an empty command would be a no-op
-                # anyway, so this can never steal a real command.
-                self._ensure_nav_state()
-                opt = ui_nav.current_option(self.nav_state)
-                if opt and opt.enabled and opt.command:
-                    self.submit_generated_command(opt.command)
+                # Prompt 18: Enter on empty input fires the nav option
+                # ONLY when the player explicitly armed the selection by
+                # pressing arrow / Tab first. Cold Enter on empty (e.g.
+                # an extra tap after a failed typed command, or
+                # autorepeat) is a no-op. This prevents the spam where
+                # 'rozejrzyj się' replays itself N times after the
+                # actual command fails.
+                if self._nav_selection_armed:
+                    self._ensure_nav_state()
+                    opt = ui_nav.current_option(self.nav_state)
+                    self._nav_selection_armed = False
+                    if opt and opt.enabled and opt.command:
+                        self.submit_generated_command(opt.command)
                     self._suppress_textinput = True
                     return
 
@@ -2388,9 +3275,17 @@ class Game:
 
     def _ensure_nav_state(self):
         """Build (or rebuild) the nav state on demand. Called both from
-        handle_keydown and from draw."""
+        handle_keydown and from draw.
+
+        Prompt 18: pass the previous nav_state so the rebuild preserves
+        the currently-selected tab (group) and per-group cursor index.
+        Otherwise every keystroke would snap selection back to Akcje,
+        making Left/Right tab navigation between Akcje / Wyjścia /
+        Ekwipunek / Crafting feel broken even though cycle_group fires.
+        """
         from ..ui import ui_nav
-        self.nav_state = ui_nav.build_play_options(self.world)
+        prev = getattr(self, "nav_state", None)
+        self.nav_state = ui_nav.build_play_options(self.world, prev_state=prev)
 
     def handle_textinput(self, ev):
         if self._suppress_textinput:
@@ -2405,6 +3300,9 @@ class Game:
             if self.journal_state.open:
                 return
             self.input_text += ev.text
+            # Prompt 18: typing immediately disarms the nav-selection
+            # latch — the player is in text mode now.
+            self._nav_selection_armed = False
         elif self.state == STATE_CREATE and self.cc.get("step") == "name":
             self.cc["name_input"] = self.cc.get("name_input","") + ev.text
 

@@ -37,6 +37,17 @@ class WorldState:
     known_passwords: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     unlocked_paths: List[str] = field(default_factory=list)
 
+    # Prompt 18: sponsor / audience v1.
+    # `sponsor_interventions_used` is a list of InterventionRecord — set
+    # by `engine.sponsors`. Old saves load as []. Pending queues are
+    # transient hints to safehouse / encounter code; they save so a
+    # mid-floor reload doesn't lose a promised gift or hunter.
+    sponsor_interventions_used: List[Any] = field(default_factory=list)
+    pending_sponsor_gifts:   List[Dict[str, Any]] = field(default_factory=list)
+    pending_sponsor_hunters: List[Dict[str, Any]] = field(default_factory=list)
+    # Internal: minutes since last audience event, for idle decay.
+    _audience_idle_minutes: int = 0
+
     # ── Entity registry ──────────────────────────────────────────────────────
 
     def register(self, ent: Entity) -> Entity:
@@ -82,6 +93,13 @@ class WorldState:
             "known_routes": dict(self.known_routes or {}),
             "known_passwords": dict(self.known_passwords or {}),
             "unlocked_paths": list(self.unlocked_paths or []),
+            # Prompt 18 — sponsor/audience state. Lazy import to avoid a
+            # circular dependency at module load.
+            "sponsor_interventions_used": _serialize_interventions(self),
+            "pending_sponsor_gifts":   list(self.pending_sponsor_gifts or []),
+            "pending_sponsor_hunters": list(self.pending_sponsor_hunters or []),
+            "_audience_idle_minutes":  int(getattr(self,
+                                                   "_audience_idle_minutes", 0) or 0),
         }
 
     @classmethod
@@ -107,7 +125,38 @@ class WorldState:
         w.known_routes    = dict(d.get("known_routes") or {})
         w.known_passwords = dict(d.get("known_passwords") or {})
         w.unlocked_paths  = list(d.get("unlocked_paths") or [])
+        # Prompt 18 — sponsor/audience. Old saves predate these fields;
+        # default-empty values are safe. Lazy import keeps the engine
+        # importable when the sponsor module is being unit-tested in
+        # isolation.
+        _deserialize_interventions(w, d.get("sponsor_interventions_used") or [])
+        w.pending_sponsor_gifts   = list(d.get("pending_sponsor_gifts") or [])
+        w.pending_sponsor_hunters = list(d.get("pending_sponsor_hunters") or [])
+        w._audience_idle_minutes  = int(d.get("_audience_idle_minutes") or 0)
+        # Migrate legacy bool sponsor_attention -> dict by touching the
+        # accessor (does the conversion if needed).
+        try:
+            from .sponsors import _attention_dict as _attn
+            _attn(w)
+        except Exception:
+            pass
         # Old saves predate these stores; bootstrap will fill defaults too.
         from ..systems import knowledge as _kn
         _kn.bootstrap(w)
         return w
+
+
+def _serialize_interventions(world):
+    try:
+        from .sponsors import serialize_interventions
+        return serialize_interventions(world)
+    except Exception:
+        return []
+
+
+def _deserialize_interventions(world, raw):
+    try:
+        from .sponsors import deserialize_interventions
+        deserialize_interventions(world, raw)
+    except Exception:
+        world.sponsor_interventions_used = []
