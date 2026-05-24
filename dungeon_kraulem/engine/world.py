@@ -48,6 +48,12 @@ class WorldState:
     # Internal: minutes since last audience event, for idle decay.
     _audience_idle_minutes: int = 0
 
+    # Prompt 19 — companion registry. Keyed by companion_id. Owned
+    # companions are tracked via `character.companion_ids`. Old saves
+    # load with an empty dict; the pet-owner background isn't picked
+    # there, so nothing references it.
+    companions: Dict[int, Any] = field(default_factory=dict)
+
     # ── Entity registry ──────────────────────────────────────────────────────
 
     def register(self, ent: Entity) -> Entity:
@@ -100,6 +106,8 @@ class WorldState:
             "pending_sponsor_hunters": list(self.pending_sponsor_hunters or []),
             "_audience_idle_minutes":  int(getattr(self,
                                                    "_audience_idle_minutes", 0) or 0),
+            # Prompt 19 — companions.
+            "companions": _serialize_companions(self),
         }
 
     @classmethod
@@ -140,6 +148,8 @@ class WorldState:
             _attn(w)
         except Exception:
             pass
+        # Prompt 19 — companions. Old saves predate this; default empty.
+        _deserialize_companions(w, d.get("companions") or {})
         # Old saves predate these stores; bootstrap will fill defaults too.
         from ..systems import knowledge as _kn
         _kn.bootstrap(w)
@@ -160,3 +170,19 @@ def _deserialize_interventions(world, raw):
         deserialize_interventions(world, raw)
     except Exception:
         world.sponsor_interventions_used = []
+
+
+def _serialize_companions(world):
+    try:
+        from .companion import serialize_companions
+        return serialize_companions(world)
+    except Exception:
+        return {}
+
+
+def _deserialize_companions(world, raw):
+    try:
+        from .companion import deserialize_companions
+        deserialize_companions(world, raw)
+    except Exception:
+        world.companions = {}

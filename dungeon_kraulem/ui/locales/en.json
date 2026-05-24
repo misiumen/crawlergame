@@ -417,5 +417,27 @@
   "sponsor_kanal7_tagline": "Stay tuned past the ads.",
   "sponsor_kanal7_heckle_1": "Channel 7: 'And folks — one hit point left… WE WILL SEE THIS AFTER THE ADS.'",
   "sponsor_kanal7_heckle_2": "Channel 7: 'We have a hero of the week. Or a corpse of the week. We will find out.'",
-  "sponsor_kanal7_heckle_3": "Channel 7: 'This is the Edge. This is where it HAPPENS. This is where we MAKE MONEY.'"
+  "sponsor_kanal7_heckle_3": "Channel 7: 'This is the Edge. This is where it HAPPENS. This is where we MAKE MONEY.'",
+
+  "bg_opiekun_zwierzaka_n": "Pet handler",
+  "bg_opiekun_zwierzaka_d": "You get along with animals better than with people. You start with one random pet.",
+
+  "journal_tab_companions": "Companions",
+
+  "nav_pet_inspect": "Check pet",
+  "nav_pet_lure":    "Pet decoy",
+
+  "companion_feedback_none_owned": "You don't have a companion with you right now.",
+  "companion_inspect_header": "— Your companion —",
+  "companion_feed_no_food": "You have nothing to feed the pet. Find a snack bar or rations.",
+  "companion_feed_ok": "You feed the pet. (bond +1, stress -2)",
+  "companion_calm_success": "You speak softly. The pet breathes slower. (stress -3, bond +1)",
+  "companion_calm_partial": "The pet isn't fully convinced but stops thrashing. (stress -1)",
+  "companion_scout_implausible": "This pet isn't built for scouting. It looks at you with reproach.",
+  "companion_scout_lost": "Your pet vanishes around a corner. It doesn't come back.",
+  "companion_scout_success": "Your pet comes back with something. It can sense things.",
+  "companion_scout_fail": "Your pet comes back with nothing useful.",
+  "companion_lure_combat": "Your companion makes a scene. Your next attack has advantage. (stress +3)",
+  "companion_lure_exploration": "Your pet puts on a show — nobody's looking at you for a beat. (stress +3)",
+  "companion_advantage_consumed": "(Companion distracts: +2 to hit.)"
 }

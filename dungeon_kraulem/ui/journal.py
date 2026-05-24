@@ -44,10 +44,11 @@ TAB_MATERIALS    = "materials"
 TAB_CRAFTING     = "crafting"
 TAB_ACHIEVEMENTS = "achievements"
 TAB_SPONSORS     = "sponsors"   # Prompt 18 — sponsor / audience overview
+TAB_COMPANIONS   = "companions" # Prompt 19 — Towarzysze (pets + crawler allies)
 
 TABS = (TAB_LOG, TAB_MAP, TAB_OBJECTIVES, TAB_KNOWLEDGE, TAB_RUMORS,
-        TAB_BELIEFS, TAB_CRAWLERS, TAB_SPONSORS, TAB_INVENTORY, TAB_MATERIALS,
-        TAB_CRAFTING, TAB_ACHIEVEMENTS)
+        TAB_BELIEFS, TAB_CRAWLERS, TAB_COMPANIONS, TAB_SPONSORS,
+        TAB_INVENTORY, TAB_MATERIALS, TAB_CRAFTING, TAB_ACHIEVEMENTS)
 
 _TAB_LABEL_KEYS = {
     TAB_LOG:          ("journal_tab_log",          "Log"),
@@ -58,6 +59,7 @@ _TAB_LABEL_KEYS = {
     TAB_BELIEFS:      ("journal_tab_beliefs",      "Mity"),
     TAB_CRAWLERS:     ("journal_tab_crawlers",     "Crawlerzy"),
     TAB_SPONSORS:     ("journal_tab_sponsors",     "Sponsorzy"),
+    TAB_COMPANIONS:   ("journal_tab_companions",   "Towarzysze"),
     TAB_INVENTORY:    ("journal_tab_inventory",    "Ekwipunek"),
     TAB_MATERIALS:    ("journal_tab_materials",    "Materiały"),
     TAB_CRAFTING:     ("journal_tab_crafting",     "Crafting"),
@@ -757,6 +759,66 @@ def _collect_sponsors(world) -> List[JournalEntry]:
     return out
 
 
+def _collect_companions(world) -> List[JournalEntry]:
+    """Prompt 19 — Towarzysze tab. Lists every Companion in
+    `character.companion_ids` with state, role, abilities, and recent
+    notes. Crawler-ally entries also surface here so a single tab
+    covers everyone who's "with" the player."""
+    out: List[JournalEntry] = []
+    try:
+        from ..engine import companion as _comp
+        from ..content.data.pets import get_pet_template
+    except Exception:
+        return out
+    comps = _comp.player_companions(world)
+    for c in comps:
+        tmpl = get_pet_template(c.species_key) if c.kind == _comp.KIND_PET else {}
+        title = c.display_name_pl or c.species_key
+        subtitle_parts = [
+            {"pet": "Zwierzak", "crawler": "Sojusznik",
+             "drone": "Dron", "summon": "Przyzwany",
+             "temp_npc": "Czasowy"}.get(c.kind, c.kind),
+            f"więź {c.bond}/10",
+            f"stres {c.stress}/10",
+        ]
+        if c.status != _comp.STATUS_ACTIVE:
+            subtitle_parts.append(c.status.upper())
+        subtitle = "  •  ".join(subtitle_parts)
+
+        body_lines = []
+        if tmpl.get("description_pl"):
+            body_lines.append(tmpl["description_pl"])
+        for label, val in (
+            ("Temperament", tmpl.get("temperament", "")),
+            ("Rola", tmpl.get("role", "")),
+            ("Potrzebuje", tmpl.get("need", "")),
+            ("Ryzyko", tmpl.get("risk", "")),
+        ):
+            if val:
+                body_lines.append(f"{label}: {val}")
+        if c.abilities:
+            body_lines.append("Umiejętności: " + ", ".join(c.abilities))
+        if c.sponsor_likes_tags:
+            body_lines.append(
+                "Tagi sponsora: " + ", ".join(c.sponsor_likes_tags))
+        body_lines.append("")
+        body_lines.append("Polecenia: sprawdź zwierzę, nakarm zwierzę, "
+                          "uspokój zwierzę, wyślij zwierzę na zwiad, "
+                          "użyj zwierzęcia jako wabika.")
+
+        out.append(JournalEntry(
+            title=title,
+            subtitle=subtitle,
+            body=tmpl.get("description_pl", ""),
+            detail="\n".join(body_lines),
+            tags=["companion", c.kind],
+            sort_key=(0 if c.status == _comp.STATUS_ACTIVE else 1, title),
+            raw_ref=c.companion_id,
+        ))
+    out.sort(key=lambda e: e.sort_key)
+    return out
+
+
 _COLLECTORS = {
     TAB_LOG:          _collect_log,
     TAB_MAP:          _collect_map,
@@ -765,6 +827,7 @@ _COLLECTORS = {
     TAB_RUMORS:       _collect_rumors,
     TAB_BELIEFS:      _collect_beliefs,
     TAB_CRAWLERS:     _collect_crawlers,
+    TAB_COMPANIONS:   _collect_companions,
     TAB_SPONSORS:     _collect_sponsors,
     TAB_INVENTORY:    _collect_inventory,
     TAB_MATERIALS:    _collect_materials,
@@ -788,6 +851,7 @@ EMPTY_STATES = {
     TAB_CRAFTING:     "Brak przepisów. Spróbuj 'pomoc craftingu'.",
     TAB_ACHIEVEMENTS: "Nie odblokowano jeszcze osiągnięć.",
     TAB_SPONSORS:     "Żaden sponsor jeszcze cię nie zauważył.",
+    TAB_COMPANIONS:   "Nie masz ze sobą żadnego towarzysza.",
 }
 
 

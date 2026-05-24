@@ -181,6 +181,23 @@ def _basic_actions(world, room=None) -> List[SelectableOption]:
                                     t("nav_rest", fallback="Odpocznij"),
                                     "odpocznij", GROUP_ACTIONS,
                                     hotkey="r"))
+    # Prompt 19 — companion actions surface here when the player has an
+    # active pet. Two slots only to keep the panel small: inspect (always)
+    # + lure (always; the engine decides combat vs exploration path).
+    try:
+        from ..engine import companion as _comp
+        pet = _comp.active_pet(world)
+        if pet is not None:
+            out.append(SelectableOption(
+                "act_pet_inspect",
+                t("nav_pet_inspect", fallback="Sprawdź zwierzę"),
+                "sprawdź zwierzę", GROUP_ACTIONS))
+            out.append(SelectableOption(
+                "act_pet_lure",
+                t("nav_pet_lure", fallback="Wabik (zwierzę)"),
+                "użyj zwierzęcia jako wabika", GROUP_ACTIONS))
+    except Exception:
+        pass
     # Always-available info panels — short row.
     out.extend([
         SelectableOption("act_inventory",

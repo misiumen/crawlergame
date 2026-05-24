@@ -25,6 +25,7 @@ T_ITEM    = "item"
 T_FEATURE = "environmental_feature"
 T_SERVICE = "safehouse_service"
 T_EXIT    = "exit"
+T_COMPANION = "companion"   # Prompt 19 — pets / crawler allies / drones
 
 
 @dataclass

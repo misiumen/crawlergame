@@ -242,6 +242,47 @@ register(Affordance("deploy",
     risk_tags=["noise"]))
 
 
+# ── Prompt 19 — pet / companion affordances ────────────────────────────────
+# Routed by parser_core to engine.companion_actions rather than the
+# normal entity-targeting resolver — `accepted_target_types` left empty.
+
+register(Affordance("companion_inspect",
+    verbs_pl=["sprawdź zwierzę","sprawdz zwierze","sprawdź pupila",
+              "obejrzyj zwierzę","obejrzyj pupila","zobacz zwierzę",
+              "status zwierzęcia"],
+    verbs_en=["check pet","inspect pet","look at pet"],
+    time_cost=1))
+
+register(Affordance("companion_feed",
+    verbs_pl=["nakarm zwierzę","nakarm zwierze","nakarm pupila",
+              "podaj jedzenie zwierzęciu","daj jeść zwierzęciu","nakarm chowańca"],
+    verbs_en=["feed pet","feed companion"],
+    time_cost=3))
+
+register(Affordance("companion_calm",
+    verbs_pl=["uspokój zwierzę","uspokoj zwierze","głaszcz zwierzę",
+              "głaszcz pupila","pogłaszcz zwierzę","ukoj zwierzę",
+              "uspokój pupila"],
+    verbs_en=["calm pet","soothe pet","pet companion"],
+    stat="CHA", base_dc=10, time_cost=5))
+
+register(Affordance("companion_scout",
+    verbs_pl=["wyślij zwierzę na zwiad","wyslij zwierze na zwiad",
+              "wyślij na zwiad","poślij zwierzę na zwiad",
+              "wyślij pupila","każ zwierzęciu szukać","wyślij zwierzę"],
+    verbs_en=["send pet to scout","scout with pet","send pet"],
+    stat="WIS", base_dc=11, time_cost=15,
+    risk_tags=["noise","pet_risk"]))
+
+register(Affordance("companion_lure",
+    verbs_pl=["użyj zwierzęcia jako wabika","uzyj zwierzecia jako wabika",
+              "wabik ze zwierzęcia","użyj pupila jako wabika",
+              "użyj zwierzęcia jako odwrócenia uwagi"],
+    verbs_en=["use pet as lure","use pet as distraction","pet decoy"],
+    stat="CHA", base_dc=12, time_cost=5,
+    risk_tags=["noise","pet_risk"], audience_effect=2))
+
+
 def find_affordance_by_verb(verb: str, lang: str = "pl") -> Optional[Affordance]:
     """Match a verb root against any affordance's verb list. Polish-stem aware."""
     if not verb:

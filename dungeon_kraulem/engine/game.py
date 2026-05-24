@@ -111,6 +111,10 @@ class Game:
             "unemployed_hustler":{"CHA":+1,"DEX":+1},
             "janitor":       {"CON":+1,"INT":+1},
             "paramedic":     {"WIS":+1,"INT":+1},
+            # Prompt 19 — pet-owner background. Modest WIS/CHA bump
+            # (you talk to an animal all day) and a random pet handed
+            # out further down by `_assign_starter_pet`.
+            "opiekun_zwierzaka": {"WIS":+1,"CHA":+1},
         }.get(background, {})
         for s, b in adj.items():
             self.world.character.stats[s] = self.world.character.stats.get(s, 10) + b
@@ -130,15 +134,31 @@ class Game:
             "unemployed_hustler":["improvised_lockpick","cracked_mug"],
             "janitor":       ["duct_tape","flashlight"],
             "paramedic":     ["dirty_bandage","battery"],
+            # Prompt 19 — opiekun_zwierzaka starts with food for the pet
+            # and a battered carrier; the pet itself is assigned below.
+            "opiekun_zwierzaka": ["snack_bar","duct_tape"],
         }.get(background, ["cracked_mug"])
         for k in starters:
             it = make_item(k, location_id="inventory:player")
             self.world.register(it)
             self.world.character.inventory_ids.append(it.entity_id)
 
+        # Prompt 19 — pet-owner background gets a random companion. The
+        # pet is registered BEFORE Floor 1 is built so its location_room_id
+        # gets set to the start room (which doesn't exist yet); we patch
+        # location_room_id after build below.
+        if background == "opiekun_zwierzaka":
+            self._assign_starter_pet()
+
         # Build Floor 1
         self.world.current_floor = build_floor_1(self.world)
         self.world.floor_number = 1
+        # Place the pet in the player's starting room.
+        if background == "opiekun_zwierzaka":
+            from . import companion as _comp
+            pet = _comp.active_pet(self.world)
+            if pet is not None:
+                pet.location_room_id = self.world.current_floor.current_room_id
         self.log(t("log_floor_open",
                    fallback=f"Witaj na Piętrze 1, {self.world.character.name}.",
                    name=self.world.character.name),
@@ -155,6 +175,35 @@ class Game:
                             "potem 'zrób' przedmiot. Spróbuj 'pomoc'.)"),
                  LOG_SYSTEM)
         self.state = STATE_PLAY
+
+    def _assign_starter_pet(self):
+        """Prompt 19 — roll one random pet from the v1 catalog and
+        register it as the player's first companion. Logs the intro line
+        so the player sees the assignment in the opening narration."""
+        from ..content.data import pets as _pets
+        from . import companion as _comp
+        import random as _r
+        # Use the world's random seed if present so save/replay is
+        # deterministic; fall back to module random otherwise.
+        seed = getattr(self.world, "random_seed", None)
+        rng = _r.Random(seed) if seed is not None else _r.Random()
+        tmpl = _pets.roll_random_pet(rng)
+        pet = _comp.Companion(
+            kind=_comp.KIND_PET,
+            species_key=tmpl["species_key"],
+            display_name_pl=tmpl["display_name_pl"],
+            bond=5,
+            stress=0,
+            status=_comp.STATUS_ACTIVE,
+            temporary=False,
+            tags=list(tmpl.get("risk_tags") or []),
+            abilities=list(tmpl.get("abilities") or []),
+            sponsor_likes_tags=list(tmpl.get("sponsor_likes") or []),
+        )
+        _comp.register_companion(self.world, pet)
+        intro = tmpl.get("intro_line_pl") or \
+            f"Twój towarzysz: {tmpl['display_name_pl']}."
+        self.log(intro, LOG_SYNDIC)
 
     def submit_input(self):
         text_val = self.input_text.strip()
@@ -538,6 +587,15 @@ class Game:
             self._open_journal(_journal.TAB_CRAFTING); return
         if intent.intent == "journal_achievements":
             self._open_journal(_journal.TAB_ACHIEVEMENTS); return
+        # Prompt 19 — pet/companion intents and the companions journal tab.
+        if intent.intent == "journal_companions":
+            self._open_journal(_journal.TAB_COMPANIONS); return
+        if intent.intent in ("companion_inspect", "companion_feed",
+                             "companion_calm", "companion_scout",
+                             "companion_lure"):
+            from . import companion_actions as _ca
+            _ca.handle(self, intent.intent, intent)
+            return
 
         # Prompt 09 — display settings
         if intent.intent == "show_resolutions":
@@ -1938,6 +1996,15 @@ class Game:
         if _cmb.has_status(target, _cmb.STATUS_BLINDED):   total += 3
         if _cmb.has_status(target, _cmb.STATUS_STUNNED):   total += 3
         if _cmb.has_status(ch, _cmb.STATUS_BLINDED):       total -= 3
+        # Prompt 19 — companion advantage: +2 to-hit on the next player
+        # attack after `użyj zwierzęcia jako wabika` fires in combat.
+        # Consumed on use; one bonus per encounter.
+        if getattr(cs, "companion_advantage_pending", False):
+            total += 2
+            cs.companion_advantage_pending = False
+            self.log(t("companion_advantage_consumed",
+                       fallback="(Towarzysz odwraca uwagę: +2 do trafienia.)"),
+                     LOG_SYSTEM)
         crit = (raw == 20)
         fumble = (raw == 1)
         hit = (not fumble) and (crit or total >= dc)
@@ -2992,7 +3059,7 @@ class Game:
             elif step == "background":
                 bgs = ["office_worker","mechanic","nurse","cook","security_guard",
                        "courier","student","streamer","soldier","unemployed_hustler",
-                       "janitor","paramedic"]
+                       "janitor","paramedic","opiekun_zwierzaka"]
                 # Arrow navigation for the background list.
                 if key in (pygame.K_UP, pygame.K_w):
                     self.cc["selected_bg"] = (self.cc.get("selected_bg",0) - 1) % len(bgs)

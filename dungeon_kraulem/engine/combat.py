@@ -108,6 +108,10 @@ class CombatState:
     player_dodge: bool = False      # consumed on next incoming attack
     last_action: str = ""
     noise_added: int = 0
+    # Prompt 19 — companion advantage. Set by `companion_lure` during
+    # combat; consumed by the next player attack roll (+2 to-hit). One
+    # bonus per encounter; clears when combat ends.
+    companion_advantage_pending: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -118,6 +122,8 @@ class CombatState:
             "player_dodge": self.player_dodge,
             "last_action": self.last_action,
             "noise_added": self.noise_added,
+            "companion_advantage_pending":
+                bool(self.companion_advantage_pending),
         }
 
     @classmethod
@@ -126,7 +132,8 @@ class CombatState:
             return None
         cs = cls()
         for k in ("active","round","side","assessed","player_defend",
-                  "player_dodge","last_action","noise_added"):
+                  "player_dodge","last_action","noise_added",
+                  "companion_advantage_pending"):
             if k in d:
                 setattr(cs, k, d[k])
         cs.participants = list(d.get("participants", []))

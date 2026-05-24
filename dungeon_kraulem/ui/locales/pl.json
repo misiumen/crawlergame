@@ -455,5 +455,27 @@
   "sponsor_kanal7_tagline": "Pozostań po reklamach.",
   "sponsor_kanal7_heckle_1": "Kanał 7: 'I cieeeeniami — został mu jeden punkt życia… ZOBACZYMY TO PO REKLAMACH.'",
   "sponsor_kanal7_heckle_2": "Kanał 7: 'Mamy bohatera tygodnia. Albo trupa tygodnia. Sprawdzimy.'",
-  "sponsor_kanal7_heckle_3": "Kanał 7: 'Tu Krawędź. Tu się dzieje. Tu się ZARABIA.'"
+  "sponsor_kanal7_heckle_3": "Kanał 7: 'Tu Krawędź. Tu się dzieje. Tu się ZARABIA.'",
+
+  "bg_opiekun_zwierzaka_n": "Opiekun zwierzaka",
+  "bg_opiekun_zwierzaka_d": "Lepiej dogadujesz się ze zwierzętami niż z ludźmi. Zaczynasz z jednym przypadkowym pupilem.",
+
+  "journal_tab_companions": "Towarzysze",
+
+  "nav_pet_inspect": "Sprawdź zwierzę",
+  "nav_pet_lure":    "Wabik (zwierzę)",
+
+  "companion_feedback_none_owned": "Nie masz teraz przy sobie żadnego zwierzęcia.",
+  "companion_inspect_header": "— Twój towarzysz —",
+  "companion_feed_no_food": "Nie masz nic, czym mógłbyś nakarmić zwierzę. Spróbuj znaleźć batonik albo racje.",
+  "companion_feed_ok": "Karmisz zwierzę. (więź +1, stres −2)",
+  "companion_calm_success": "Mówisz spokojnym głosem. Zwierzę oddycha wolniej. (stres −3, więź +1)",
+  "companion_calm_partial": "Zwierzę nie do końca ci wierzy, ale przestaje się rzucać. (stres −1)",
+  "companion_scout_implausible": "To zwierzę nie nadaje się na zwiad. Patrzy na ciebie z pretensją.",
+  "companion_scout_lost": "Twoje zwierzę znika za rogiem. Nie wraca.",
+  "companion_scout_success": "Twoje zwierzę wraca z czymś. Coś tam czuje.",
+  "companion_scout_fail": "Twoje zwierzę wraca bez niczego użytecznego.",
+  "companion_lure_combat": "Twój towarzysz robi scenę. Następny atak ma przewagę. (stres +3)",
+  "companion_lure_exploration": "Twoje zwierzę robi taki spektakl, że nikt nie patrzy w twoją stronę przez chwilę. (stres +3)",
+  "companion_advantage_consumed": "(Towarzysz odwraca uwagę: +2 do trafienia.)"
 }

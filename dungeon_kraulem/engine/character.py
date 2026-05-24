@@ -33,6 +33,11 @@ class Character:
     inventory_ids: List[int] = field(default_factory=list)
     credits: int = 25
 
+    # Prompt 19 — companion ids the player currently owns. Companions
+    # themselves live on world.companions; this list just references
+    # them by id so save/load can rehydrate the relationship.
+    companion_ids: List[int] = field(default_factory=list)
+
     # Materials inventory (Prompt 06): qty-only, dict[material_key] -> int.
     # Items crafted FROM materials become Entities in inventory_ids above.
     materials: Dict[str, int] = field(default_factory=dict)
@@ -83,6 +88,7 @@ class Character:
             "species_picked_at_floor": self.species_picked_at_floor,
             "affinity": dict(self.affinity),
             "inventory_ids": list(self.inventory_ids),
+            "companion_ids": list(self.companion_ids),
             "materials": dict(self.materials),
             "credits": self.credits, "audience_rating": self.audience_rating,
             "unlocked_achievements": list(self.unlocked_achievements),
@@ -102,6 +108,7 @@ class Character:
         c.conditions = list(d.get("conditions", []))
         c.affinity = {**c.affinity, **d.get("affinity", {})}
         c.inventory_ids = list(d.get("inventory_ids", []))
+        c.companion_ids = list(d.get("companion_ids", []))   # Prompt 19
         c.materials = dict(d.get("materials", {}))
         c.unlocked_achievements = list(d.get("unlocked_achievements", []))
         c.journal = {k: list(v) for k, v in d.get("journal", {}).items()}

@@ -135,7 +135,8 @@ def test_char_creation_page_keys():
     g.handle_keydown(FakeEv(_pg.K_PAGEUP))
     assert g.cc["selected_bg"] == 4
     g.handle_keydown(FakeEv(_pg.K_END))
-    assert g.cc["selected_bg"] == 11   # 12 backgrounds, index 11
+    # Prompt 19: opiekun_zwierzaka added -> 13 backgrounds, index 12.
+    assert g.cc["selected_bg"] == 12
     g.handle_keydown(FakeEv(_pg.K_HOME))
     assert g.cc["selected_bg"] == 0
     print("  char-creation PageUp/Down/Home/End: OK")

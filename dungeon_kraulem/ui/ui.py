@@ -155,7 +155,7 @@ def draw_creation(surf, state):
              60, 100, NORMAL_TEXT, body_size + 2)
         bgs = ["office_worker","mechanic","nurse","cook","security_guard",
                "courier","student","streamer","soldier","unemployed_hustler",
-               "janitor","paramedic"]
+               "janitor","paramedic","opiekun_zwierzaka"]
         sel = state.get("selected_bg", 0)
         cy = 140
         for i, key in enumerate(bgs):

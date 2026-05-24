@@ -99,6 +99,30 @@ _QUICK_INTENTS = {
     "journal_crawlers":   ["crawlerzy","crawlers","znajomi"],
     "journal_crafting":   ["crafting","przepisy","recipes"],
     "journal_achievements":["osiągnięcia","osiagniecia","achievements","sukcesy"],
+
+    # Prompt 19 — pet / companion intents. The verbs themselves live on
+    # the affordance catalog (engine.affordances) for richer matching;
+    # here we just list quick phrasings so the parser picks up the
+    # intent class. game.py routes these to engine.companion_actions
+    # rather than the normal entity-validation pipeline.
+    "companion_inspect": ["sprawdź zwierzę","sprawdz zwierze","sprawdź pupila",
+                          "obejrzyj zwierzę","status zwierzęcia",
+                          "check pet","inspect pet"],
+    "companion_feed":    ["nakarm zwierzę","nakarm zwierze","nakarm pupila",
+                          "nakarm chowańca","podaj jedzenie zwierzęciu",
+                          "feed pet","feed companion"],
+    "companion_calm":    ["uspokój zwierzę","uspokoj zwierze","głaszcz zwierzę",
+                          "pogłaszcz zwierzę","ukoj zwierzę","calm pet"],
+    "companion_scout":   ["wyślij zwierzę na zwiad","wyslij zwierze na zwiad",
+                          "wyślij na zwiad","wyślij pupila","wyślij zwierzę",
+                          "każ zwierzęciu szukać","send pet to scout"],
+    "companion_lure":    ["użyj zwierzęcia jako wabika",
+                          "uzyj zwierzecia jako wabika",
+                          "wabik ze zwierzęcia","użyj pupila jako wabika",
+                          "use pet as lure","use pet as distraction"],
+
+    # Quick journal tab nav.
+    "journal_companions": ["towarzysze","chowańce","chowance","pupile","companions"],
 }
 
 
