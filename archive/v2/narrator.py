@@ -179,11 +179,20 @@ _LINES = {
 
 class Narrator:
     def get(self, category, **kwargs):
-        lines = _LINES.get(category, ["..."])
-        line = random.choice(lines)
+        # Prefer localized variants: narrator_<category>_1 .. _6
+        from lang import tr, has_key
+        candidates = []
+        for i in range(1, 7):
+            key = f"narrator_{category}_{i}"
+            if has_key(key):
+                candidates.append(tr(key))
+        if not candidates:
+            # Fall back to inline English/PL pool
+            candidates = _LINES.get(category, ["..."])
+        line = random.choice(candidates) if candidates else "..."
         try:
             return line.format(**kwargs)
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, IndexError):
             return line
 
     def say(self, category, **kwargs):
