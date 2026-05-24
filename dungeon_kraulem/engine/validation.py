@@ -19,6 +19,10 @@ class ValidationResult:
     matched_tool: Optional[Entity] = None
     matched_affordance_key: str = ""
     possible_interpretations: List[str] = field(default_factory=list)
+    # Prompt 20: parallel list of entity_ids for the same candidates,
+    # so the game layer can stash them on `pending_disambiguation` and
+    # let the next typed command refer to them ("oba", "1", "brudny").
+    possible_entity_ids: List[int] = field(default_factory=list)
     required_checks: List = field(default_factory=list)
     time_cost: int = 5
     risks: List[str] = field(default_factory=list)
@@ -144,9 +148,10 @@ def validate(intent, world) -> ValidationResult:
             result.fallback_message = (
                 f"„{intent.targets[0]}” — może chodzi o jedno z: "
                 + ", ".join(c.display_name() for c in candidates[:5])
-                + ". Doprecyzuj."
+                + ". Doprecyzuj (możesz też powiedzieć „oba” / „wszystko” / numer)."
             )
             result.possible_interpretations = [c.display_name() for c in candidates[:5]]
+            result.possible_entity_ids = [c.entity_id for c in candidates[:5]]
             return result
         matched = candidates[0] if candidates else None
     elif intent.intent in ("inspect","attack","talk","intimidate","bribe","loot",
@@ -163,8 +168,10 @@ def validate(intent, world) -> ValidationResult:
             result.fallback_message = (
                 "Co dokładnie? "
                 + ", ".join(c.display_name() for c in candidates[:5])
+                + " (możesz też powiedzieć „oba” / „wszystko” / numer)."
             )
             result.possible_interpretations = [c.display_name() for c in candidates[:5]]
+            result.possible_entity_ids = [c.entity_id for c in candidates[:5]]
             return result
 
     if matched is None and intent.intent in ("inspect","attack","talk","intimidate","bribe",

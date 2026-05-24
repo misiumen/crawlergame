@@ -463,21 +463,33 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
 
 # ── Prompt 08/09: Navigation panel (option groups) ─────────────────────────
 
-def draw_nav_panel(surf, nav_state, input_mode="text", layout=None):
+def draw_nav_panel(surf, nav_state, input_mode="text", layout=None,
+                   *, armed: bool = False):
     """Render the current group's option list. The nav rect comes from
     the Layout (anchored above the log), so it no longer overlays the
-    sidebar regardless of resolution."""
+    sidebar regardless of resolution.
+
+    Prompt 20: `armed` means the player has used arrow keys / Tab from
+    text-empty mode to drive the panel (the Prompt-18 arming latch) but
+    `input_mode` is still "text". Treat that visually the same as full
+    nav-mode — show the cursor marker + bright selection. Otherwise the
+    cursor would move silently and the player would see no feedback,
+    which is exactly the bug the playtester hit on Obiekty tab."""
     if nav_state is None or not getattr(nav_state, "groups", None):
         return
     L = _resolve_layout(layout)
     x, y, w, h = L.nav_rect
     panel(surf, (x, y, w, h))
 
+    # Prompt 20: treat "armed" as effectively the same as nav mode
+    # for rendering purposes (cursor marker + bright selection color).
+    nav_active = (input_mode == "nav") or bool(armed)
+
     groups = list(nav_state.groups)
     cur = nav_state.current_group()
     header = t("ui_nav_header", fallback="Akcje i wybór")
     text(surf, header, x + 12, y + 6,
-         ACCENT2 if input_mode == "nav" else DIM_TEXT,
+         ACCENT2 if nav_active else DIM_TEXT,
          L.font_small, True)
 
     # Group tabs in a horizontal row at the top of the panel.
@@ -486,7 +498,7 @@ def draw_nav_panel(surf, nav_state, input_mode="text", layout=None):
     from .ui_nav import group_label
     for g in groups:
         lbl = "[" + group_label(g) + "]"
-        col = ACCENT if g == cur and input_mode == "nav" else \
+        col = ACCENT if g == cur and nav_active else \
               ACCENT2 if g == cur else DIM_TEXT
         img = font(L.font_small - 1, bold=g == cur).render(lbl, True, col)
         if cx + img.get_width() > x + w - 12:
@@ -525,8 +537,8 @@ def draw_nav_panel(surf, nav_state, input_mode="text", layout=None):
         row_idx = i % per_col
         ox = x + 12 + col_idx * col_w
         oy = start_cy + row_idx * line_h
-        marker = "▶ " if (i == sel_idx and input_mode == "nav") else "  "
-        col = (BRIGHT_TEXT if input_mode == "nav" and i == sel_idx
+        marker = "▶ " if (i == sel_idx and nav_active) else "  "
+        col = (BRIGHT_TEXT if nav_active and i == sel_idx
                else NORMAL_TEXT if opt.enabled else DIM_TEXT)
         line = marker + opt.label
         max_w = col_w - 12

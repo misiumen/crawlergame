@@ -86,6 +86,13 @@ class Game:
         # Class / species offers
         self.offer_candidates = []
 
+        # Prompt 20: pending disambiguation from the last ambiguous_target
+        # validation. Holds the original intent + candidate entity ids so
+        # follow-up commands like "oba" / "1" / "brudny" can resolve.
+        # None means no pending disambiguation. Cleared on any command
+        # that doesn't match a disambiguation follow-up.
+        self.pending_disambiguation = None  # dict | None
+
     # ── Helpers ──────────────────────────────────────────────────────────────
 
     def log(self, msg, cat=LOG_NORMAL):
@@ -175,6 +182,108 @@ class Game:
                             "potem 'zrób' przedmiot. Spróbuj 'pomoc'.)"),
                  LOG_SYSTEM)
         self.state = STATE_PLAY
+
+    def _resolve_disambiguation(self, text_val: str) -> bool:
+        """Prompt 20: handle a short reply that picks among the candidates
+        from a previous ambiguous_target. Returns True iff the reply was
+        consumed (and the original action got re-issued, possibly several
+        times). Returns False if the reply doesn't look like a follow-up
+        and should be parsed as a fresh command.
+
+        Supported follow-up forms:
+          - "oba" / "obu" / "obydwa" / "wszystko" / "wszystkie" /
+            "both" / "all"               -> pick ALL candidates
+          - "1" / "2" / "pierwszy" / "drugi" / "trzeci" -> by index
+          - any partial-name match against candidate display names
+        """
+        pending = self.pending_disambiguation
+        if not pending or not pending.get("entity_ids"):
+            return False
+        entity_ids = list(pending["entity_ids"])
+        names      = list(pending.get("names") or [])
+        orig       = pending["intent"]
+        verb       = (getattr(orig, "verb", "") or
+                      getattr(orig, "normalized_text", "").split()[0] or
+                      "podnieś")
+        from .polish_text import fold as _fold
+        t_f = _fold(text_val)
+        if not t_f:
+            return False
+
+        # 1. "all" / "both" forms.
+        ALL_TOKENS = {"oba","obu","obydwa","obydwu","obydwoje","wszystko",
+                      "wszystkie","wszystkim","both","all","everything"}
+        # Token-level match: any token in the input matches the set.
+        in_tokens = set(t_f.replace(",", " ").split())
+        if in_tokens & ALL_TOKENS:
+            # Clear BEFORE re-issuing so the synthesized commands don't
+            # recursively hit the disambiguation path.
+            self.pending_disambiguation = None
+            self._reissue_for_entities(verb, entity_ids, label="oba")
+            return True
+
+        # 2. Numeric pick. "1" / "2" or "pierwszy" / "drugi" / etc.
+        ORDINAL_MAP = {"pierwszy":1,"drugi":2,"trzeci":3,"czwarty":4,"piaty":5,
+                       "piąty":5,"first":1,"second":2,"third":3,"fourth":4,
+                       "fifth":5}
+        picked_idx = None
+        if t_f.isdigit():
+            picked_idx = int(t_f)
+        else:
+            for tok in in_tokens:
+                if tok in ORDINAL_MAP:
+                    picked_idx = ORDINAL_MAP[tok]; break
+        if picked_idx is not None and 1 <= picked_idx <= len(entity_ids):
+            self.pending_disambiguation = None
+            self._reissue_for_entities(verb, [entity_ids[picked_idx - 1]],
+                                       label=str(picked_idx))
+            return True
+
+        # 3. Partial name match against candidate display names.
+        # Use polish_match (5-char stem) so "brudny" matches "brudny
+        # bandaż" without needing the full phrase.
+        from .polish_text import polish_match
+        matched_ids = []
+        for ent_id, name in zip(entity_ids, names):
+            if polish_match(t_f, _fold(name)):
+                matched_ids.append(ent_id)
+        if matched_ids:
+            self.pending_disambiguation = None
+            self._reissue_for_entities(verb, matched_ids,
+                                       label=text_val[:40])
+            return True
+
+        # No match — caller will clear pending and parse fresh.
+        return False
+
+    def _reissue_for_entities(self, verb: str, entity_ids,
+                              *, label: str = "") -> None:
+        """Re-execute the disambiguated action for each picked entity.
+        We synthesize a command `<verb> <display_name>` per entity and
+        feed it back through the normal handler — that way every hook
+        (combat, audience, sponsors) fires correctly per-entity."""
+        if not entity_ids:
+            return
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            return
+        if len(entity_ids) > 1:
+            self.log(f"  → {label or 'wszystkie'} "
+                     f"({len(entity_ids)} obiekt(ów))", LOG_SYSTEM)
+        # Re-emit per-entity. Use exact display name so the parser
+        # resolves unambiguously this time.
+        for eid in entity_ids:
+            ent = self.world.get(int(eid))
+            if ent is None or ent.location_id != room.room_id:
+                continue
+            name = ent.display_name() if hasattr(ent, "display_name") else \
+                   getattr(ent, "fallback_name", "")
+            cmd = f"{verb} {name}".strip()
+            # NOTE: re-enter via _handle_play_input (not submit_input) so
+            # the command is treated as a player action but not re-echoed
+            # in the log (the "→ oba (2)" line already documents intent).
+            self._handle_play_input(cmd)
 
     def _assign_starter_pet(self):
         """Prompt 19 — roll one random pet from the v1 catalog and
@@ -524,6 +633,18 @@ class Game:
             self._suppress_textinput = True
 
     def _handle_play_input(self, text_val):
+        # Prompt 20: disambiguation follow-up. If the previous command
+        # left an ambiguous_target pending, intercept short replies like
+        # "oba" / "obu" / "wszystko" / "1" / "brudny" before the normal
+        # parser runs. On match, synthesize new commands targeting the
+        # picked entities and re-enter this handler for each. On
+        # non-match, clear the pending state and fall through normally.
+        if self.pending_disambiguation is not None:
+            if self._resolve_disambiguation(text_val):
+                return
+            # Non-match — clear the pending state and let parser handle.
+            self.pending_disambiguation = None
+
         intent = parse_with_optional_llm(text_val, self.world)
         # Prompt 17: when combat is active, the combat router runs BEFORE
         # the generic intent dispatch. Combat-flavored commands (attack /
@@ -707,6 +828,17 @@ class Game:
             self.log(v.message() or "—", LOG_WARN)
             if v.possible_interpretations:
                 self.log("  ? " + " | ".join(v.possible_interpretations), LOG_NORMAL)
+            # Prompt 20: when validation reports ambiguous_target, stash
+            # the candidates so the next command ("oba" / "1" / "brudny")
+            # can refer back to them. Cleared otherwise.
+            if v.reason == "ambiguous_target" and v.possible_entity_ids:
+                self.pending_disambiguation = {
+                    "intent": intent,
+                    "entity_ids": list(v.possible_entity_ids),
+                    "names": list(v.possible_interpretations or []),
+                }
+            else:
+                self.pending_disambiguation = None
             return
 
         r = resolve(v, self.world)
@@ -3425,7 +3557,10 @@ class Game:
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
                                   input_mode=self.input_mode, layout=L)
             self._ensure_nav_state()
-            ui.draw_nav_panel(s, self.nav_state, self.input_mode, layout=L)
+            # Prompt 20: pass the arming latch so cursor marker shows
+            # when text-mode arrow keys drive the panel.
+            ui.draw_nav_panel(s, self.nav_state, self.input_mode, layout=L,
+                              armed=getattr(self, "_nav_selection_armed", False))
             # Prompt 10: journal overlay sits on top.
             if self.journal_state.open:
                 ui.draw_journal(s, self.world, self.journal_state, layout=L)
