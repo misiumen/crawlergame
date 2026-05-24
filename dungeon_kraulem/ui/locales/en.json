@@ -503,6 +503,10 @@
   "ui_monitor_out_of_range":"No such monitor. Available: 0..{max}.",
 
   "ui_group_personel":      "Personnel",
+  "ui_group_pet":           "Pet",
+  "nav_pet_feed":           "Feed pet",
+  "nav_pet_calm":           "Calm pet",
+  "nav_pet_scout":          "Send pet to scout",
 
   "feedback_inspect_empty": "You look at: {name}. Nothing more."
 }

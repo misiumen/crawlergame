@@ -324,14 +324,24 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
         elif kind == "loot":
             eid = eff.get("entity_id")
             ent = _resolve_entity(world, room, eid)
-            if ent is not None and ent.portable:
-                if room is not None:
-                    room.remove_entity(ent)
-                ent.location_id = f"inventory:player"
-                world.character.inventory_ids.append(ent.entity_id)
-                lines.append(t("feedback_looted",
-                               fallback=f"Zabierasz: {ent.display_name()}.",
-                               name=ent.display_name()))
+            if ent is not None:
+                if ent.portable:
+                    # Path A: portable entity (a card, a flask) → pick up
+                    if room is not None:
+                        room.remove_entity(ent)
+                    ent.location_id = f"inventory:player"
+                    world.character.inventory_ids.append(ent.entity_id)
+                    lines.append(t("feedback_looted",
+                                   fallback=f"Zabierasz: {ent.display_name()}.",
+                                   name=ent.display_name()))
+                else:
+                    # Prompt 22 bug fix — Path B: container (skrzynia,
+                    # szafa, kupa gruzu). `przeszukaj` yields contents.
+                    # Either spawn from `state.loot` if the entity was
+                    # authored with one, or roll random scraps based on
+                    # tags. Once searched the container is marked
+                    # `depleted` so re-searching is a no-op.
+                    _loot_container(world, room, ent, lines)
             if time_system:
                 time_system.advance(world, eff.get("time_cost", 2))
 
@@ -559,6 +569,86 @@ def _resolve_entity(world, room, entity_id):
             if e.entity_id == entity_id:
                 return e
     return world.entities.get(entity_id)
+
+
+# ── Prompt 22 bug fix: container search yields contents ──────────────────
+
+def _loot_container(world, room, container, lines) -> None:
+    """Search a non-portable container. Produces:
+      - authored items from `container.state['loot']` (list of item_keys)
+      - failing that, 1-3 randomly-rolled scraps/materials based on tags
+    Marks the container `depleted` after to avoid re-search. Empty
+    containers print a deadpan "nothing useful" line so the player at
+    least knows the search resolved."""
+    state = container.state or {}
+    if state.get("depleted") or state.get("stripped"):
+        lines.append(t("feedback_container_already_searched",
+                       fallback=f"„{container.display_name()}” już jest "
+                                f"przeszukane — nic więcej.",
+                       name=container.display_name()))
+        return
+
+    import random as _r
+    yielded = False
+
+    # Authored loot first.
+    authored = state.get("loot") or []
+    if authored:
+        try:
+            from ..content.items import make_item
+            for item_key in list(authored)[:5]:
+                ent = make_item(item_key, location_id=f"inventory:player")
+                world.register(ent)
+                world.character.inventory_ids.append(ent.entity_id)
+                lines.append(t("feedback_container_yielded",
+                               fallback=f"W środku: {ent.display_name()}.",
+                               name=ent.display_name()))
+                yielded = True
+            container.state["loot"] = []
+        except Exception:
+            pass
+
+    # Random scrap drops based on tags (covers procgen containers).
+    if not yielded:
+        tags = set(container.tags or [])
+        drops = {}
+        # Pick from material catalog; small quantities.
+        candidates = []
+        if "supply" in tags or "crate" in tags or "container" in tags:
+            candidates = ["scrap_metal", "wire_bundle", "tape", "screws"]
+        elif "medical" in tags or "clinic" in tags:
+            candidates = ["cloth_strips", "tape"]
+        elif "chemical" in tags or "lab" in tags:
+            candidates = ["glass_shards", "wire_bundle"]
+        else:
+            candidates = ["scrap_metal", "cloth_strips"]
+        # 1-2 stacks, 1-2 qty each.
+        n_kinds = _r.randint(1, 2)
+        try:
+            from ..content import materials as _mat
+            for _ in range(n_kinds):
+                if not candidates: break
+                k = _r.choice(candidates)
+                candidates.remove(k)
+                if _mat.get(k) is None: continue
+                drops[k] = drops.get(k, 0) + _r.randint(1, 2)
+            if drops:
+                _mat.add_materials(world.character, drops)
+                row = ", ".join(
+                    f"{q}x {(_mat.get(k).name() if _mat.get(k) else k)}"
+                    for k, q in drops.items())
+                lines.append(t("feedback_container_scraps",
+                               fallback=f"W środku: {row}.",
+                               row=row))
+                yielded = True
+        except Exception:
+            pass
+
+    if not yielded:
+        lines.append(t("feedback_container_empty",
+                       fallback=f"„{container.display_name()}” — pusto.",
+                       name=container.display_name()))
+    container.state["depleted"] = True
 
 
 # ── Prompt 19 audit fix S1: sponsor gift consumer ─────────────────────────

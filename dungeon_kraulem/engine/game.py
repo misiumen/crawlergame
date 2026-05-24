@@ -1734,6 +1734,28 @@ class Game:
                        name=target.display_name()), LOG_SUCCESS)
             if room:
                 room.noise_level += 2 if level == "critical_success" else 3
+            # Prompt 22 bug fix: break needs CONSEQUENCES — audience
+            # reacts (it's a spectacle), and breaking sponsor property
+            # emits the right tags so the sponsor system notices. The
+            # tag bus already plumbs these to all 6 sponsors.
+            from . import audience as _aud
+            from . import sponsors as _sp
+            _aud.change_audience(self.world,
+                                 2 if level == "critical_success" else 1,
+                                 source="break")
+            _sp.note_player_tag(self.world, "spectacle", weight=1)
+            # Was it sponsor property? Look at tags / state.
+            is_sponsor_property = (
+                "sponsor" in tags or "sponsor_property" in tags or
+                (target.state or {}).get("sponsor_owned")
+            )
+            if is_sponsor_property:
+                _sp.note_player_tag(self.world, "sponsor_property_damage",
+                                    weight=2)
+                line = narrate("sponsor_files_complaint") or \
+                       narrate("sponsor_property_salvage")
+                if line:
+                    self.log(line, LOG_SYNDIC)
             # Prompt 14: if we broke a synthetic door, unlock the exit it
             # represented so the player can now walk through.
             if target.key == "_synth_door":
@@ -1768,6 +1790,38 @@ class Game:
                                  LOG_NORMAL)
                     target.state["stripped"] = True
                     target.state["depleted"] = True
+            else:
+                # Prompt 22 bug fix: even non-salvageable objects yield
+                # debris when broken — at least 1-2 generic scraps based
+                # on dominant material tag. Otherwise the player gets
+                # zero feedback that anything happened (other than the
+                # break-success line).
+                from ..content import materials as _mat
+                import random as _r
+                debris_key = None
+                if "glass" in tags or "fragile" in tags:
+                    debris_key = "glass_shards"
+                elif "plastic" in tags or "synthetic" in tags:
+                    debris_key = "plastic_shards"
+                elif "wood" in tags:
+                    debris_key = "wood_fragments"
+                elif "electronic" in tags or "electrical" in tags or \
+                     "sponsor" in tags:
+                    debris_key = "circuit_board"
+                elif "metal" in tags:
+                    debris_key = "scrap_metal"
+                else:
+                    debris_key = "scrap_metal"   # neutral default
+                qty = 1 if level == "success" else _r.randint(1, 2)
+                if _mat.get(debris_key):
+                    _mat.add_materials(ch, {debris_key: qty})
+                    mname = _mat.get(debris_key).name()
+                    self.log(t("feedback_break_debris",
+                               fallback=f"Z odłamków zbierasz: {qty}x {mname}.",
+                               qty=qty, name=mname),
+                             LOG_NORMAL)
+                target.state["stripped"] = True
+                target.state["depleted"] = True
         elif level == "partial_success":
             target.state = {**(target.state or {}), "damaged": True}
             self.log(t("feedback_break_partial",
@@ -3650,28 +3704,33 @@ class Game:
         input_empty = not self.input_text
         if input_empty:
             from ..ui import ui_nav
-            if key in (pygame.K_UP, pygame.K_w):
+            # Prompt 22 bug fix: WASD MUST NOT arm the nav latch in text
+            # mode — the player typing `wschód` / `arszenik` / `daj` from
+            # empty input expects W/A/S/D to land as letters. Only
+            # arrow keys arm here. Nav mode (input_mode == "nav") keeps
+            # WASD as nav shortcuts; that path is untouched.
+            if key == pygame.K_UP:
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.move_selection(self.nav_state, -1)
                     self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
-            if key in (pygame.K_DOWN, pygame.K_s):
+            if key == pygame.K_DOWN:
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.move_selection(self.nav_state, +1)
                     self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
-            if key in (pygame.K_LEFT,):
+            if key == pygame.K_LEFT:
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.cycle_group(self.nav_state, -1)
                     self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
-            if key in (pygame.K_RIGHT,):
+            if key == pygame.K_RIGHT:
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.cycle_group(self.nav_state, +1)

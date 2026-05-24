@@ -510,6 +510,42 @@ def test_monitor_bare_lists_displays():
     print("  bare 'monitor' -> set_monitor (list mode): OK")
 
 
+def test_wasd_does_not_arm_in_text_mode():
+    """Prompt 22 bug fix: pressing W with empty input must NOT
+    arm the nav latch — that broke typing words starting with W/A/S/D
+    (`wschód` was eaten letter-by-letter)."""
+    from ..engine.game import Game
+    import pygame as _pg
+    from ..engine.world import WorldState
+    from ..engine.character import Character
+    from ..engine.floor import FloorState
+    from ..engine.room import RoomState
+    class FakeEv:
+        def __init__(self, k): self.key = k
+    w = WorldState()
+    w.character = Character(name="N", background="janitor")
+    f = FloorState(floor_id="f", floor_number=1)
+    r = RoomState(room_id="r0", fallback_short_title="Studio")
+    f.add_room(r); f.start_room_id="r0"; f.current_room_id="r0"
+    w.current_floor = f
+    g = Game(screen=None); g.world = w; g.state = "play"
+    g.input_text = ""
+    g._nav_selection_armed = False
+    g._suppress_textinput = False
+    # Press W from text mode with empty input.
+    g.handle_keydown(FakeEv(_pg.K_w))
+    # Nav latch must NOT be armed, and textinput must NOT be suppressed.
+    assert g._nav_selection_armed is False, \
+        "W in text-empty mode must not arm nav latch"
+    assert g._suppress_textinput is False, \
+        "W in text-empty mode must not suppress textinput"
+    # But arrow keys still arm.
+    g.handle_keydown(FakeEv(_pg.K_UP))
+    assert g._nav_selection_armed is True, \
+        "Arrow up must still arm nav latch"
+    print("  WASD passes through in text-empty mode; arrows still arm: OK")
+
+
 def test_safehouse_service_entities_hidden_from_objects():
     """Prompt 22: entities tagged 'service' (safehouse vendors like
     `clinic_counter`) should NOT appear in Obiekty — they were noise
@@ -625,6 +661,7 @@ def main():
     test_podnies_wszystko_routes_to_mass_loot()
     test_portable_item_labeled_podnies_in_navpanel()
     test_stripped_object_hidden_from_navpanel()
+    test_wasd_does_not_arm_in_text_mode()
     test_safehouse_service_entities_hidden_from_objects()
     test_monitor_mid_phrase_does_not_route_to_settings()
     test_monitor_bare_lists_displays()

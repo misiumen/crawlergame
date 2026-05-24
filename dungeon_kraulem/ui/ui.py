@@ -444,19 +444,54 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
          lx + 10, ly + 4, ACCENT, L.font_small, True)
     f = font(L.font_small)
     line_h = f.get_height() + 2
-    max_lines = (lh - 22) // line_h
-    visible = log[-(max_lines + scroll): len(log) - scroll if scroll else None]
-    if not visible: visible = log[-max_lines:]
-    cy = ly + 22
-    for s, cat in visible[-max_lines:]:
+    max_w = lw - 24
+
+    # Prompt 22 bug fix: previously the log render picked the LAST N
+    # entries (where N = lh/line_h) and walked forward, top-down.
+    # When entries wrapped to multiple visual lines (audience bumps +
+    # alarm + narrator hits in a burst), the first entries filled the
+    # panel and the NEWEST entries got clipped — exactly opposite of
+    # what the player wants. Now we render bottom-up: start at the
+    # last entry, push it onto a stack of (line, color) rows, walk
+    # backwards through history until we have enough rows to fill the
+    # visible area + the `scroll` offset, then blit from the top of
+    # that final window.
+    #
+    # `scroll` here is how many full entries to skip from the bottom
+    # — for future PageUp/PageDown support. 0 means "newest pinned".
+    visible_rows: list = []   # list of (line_text, color)
+    # Walk entries newest-first.
+    if scroll < 0:
+        scroll = 0
+    available_rows = max(1, (lh - 22) // line_h)
+    skipped_entries = 0
+    for entry in reversed(log):
+        if skipped_entries < scroll:
+            skipped_entries += 1
+            continue
+        s, cat = entry
         col = LOG_COLORS.get(cat, NORMAL_TEXT)
-        max_w = lw - 24
-        for line in _soft_wrap(s, max_w, L.font_small):
-            img = f.render(line, True, col)
-            surf.blit(img, (lx + 12, cy))
-            cy += line_h
-            if cy > ly + lh - 4: break
-        if cy > ly + lh - 4: break
+        # _soft_wrap returns lines in display order (top-first); since
+        # we're building bottom-up, prepend reversed.
+        wrapped = list(_soft_wrap(s, max_w, L.font_small))
+        # Prepend wrapped lines as a block at the front of visible_rows.
+        block = [(ln, col) for ln in wrapped]
+        visible_rows = block + visible_rows
+        if len(visible_rows) >= available_rows:
+            # Trim from the top — anything past available_rows is
+            # older than what we want to show.
+            visible_rows = visible_rows[-available_rows:]
+            break
+
+    # Render top-down within the panel bounds.
+    cy = ly + 22
+    bottom_limit = ly + lh - 4
+    for line_text, col in visible_rows:
+        if cy + line_h > bottom_limit:
+            break
+        img = f.render(line_text, True, col)
+        surf.blit(img, (lx + 12, cy))
+        cy += line_h
 
     # Input
     ix, iy, iw, ih = L.input_rect

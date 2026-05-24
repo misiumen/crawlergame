@@ -541,6 +541,10 @@
   "ui_monitor_out_of_range":"Nie ma takiego monitora. Dostępne: 0..{max}.",
 
   "ui_group_personel":      "Personel",
+  "ui_group_pet":           "Zwierzę",
+  "nav_pet_feed":           "Nakarm zwierzę",
+  "nav_pet_calm":           "Uspokój zwierzę",
+  "nav_pet_scout":          "Wyślij zwierzę na zwiad",
 
   "feedback_inspect_empty": "Patrzysz na: {name}. Nic ponad to."
 }

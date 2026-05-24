@@ -32,9 +32,13 @@ GROUP_CRAFTING  = "crafting"
 # a discoverable surface for "talk to the receptionist / buy coffee /
 # rest" instead of typing a number from memory.
 GROUP_PERSONEL  = "personel"
+# Prompt 22 — pet actions get their own tab. Surfaces all 5 pet verbs
+# instead of just the 2 that fit cleanly in Akcje. Only appears when
+# the player has an active pet.
+GROUP_PET       = "pet"
 
 ALL_GROUPS = (GROUP_ACTIONS, GROUP_EXITS, GROUP_OBJECTS, GROUP_ENTITIES,
-              GROUP_PERSONEL, GROUP_INVENTORY, GROUP_CRAFTING)
+              GROUP_PERSONEL, GROUP_PET, GROUP_INVENTORY, GROUP_CRAFTING)
 
 
 @dataclass
@@ -85,6 +89,7 @@ _GROUP_LABEL_KEYS = {
     GROUP_OBJECTS:   ("ui_group_objects",   "Obiekty"),
     GROUP_ENTITIES:  ("ui_group_entities",  "Postacie"),
     GROUP_PERSONEL:  ("ui_group_personel",  "Personel"),
+    GROUP_PET:       ("ui_group_pet",       "Zwierzę"),
     GROUP_INVENTORY: ("ui_group_inventory", "Ekwipunek"),
     GROUP_CRAFTING:  ("ui_group_crafting",  "Crafting"),
 }
@@ -127,6 +132,7 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
     objects   = _object_options(world, room)
     entities  = _entity_options(world, room)
     personel  = _personel_options(world, room)
+    pet       = _pet_options(world)
     inv       = _inventory_options(world)
     crafting  = _crafting_options(world)
 
@@ -137,6 +143,7 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
         (GROUP_OBJECTS,   objects),
         (GROUP_ENTITIES,  entities),
         (GROUP_PERSONEL,  personel),
+        (GROUP_PET,       pet),
         (GROUP_INVENTORY, inv),
         (GROUP_CRAFTING,  crafting),
     ):
@@ -188,23 +195,8 @@ def _basic_actions(world, room=None) -> List[SelectableOption]:
                                     t("nav_rest", fallback="Odpocznij"),
                                     "odpocznij", GROUP_ACTIONS,
                                     hotkey="r"))
-    # Prompt 19 — companion actions surface here when the player has an
-    # active pet. Two slots only to keep the panel small: inspect (always)
-    # + lure (always; the engine decides combat vs exploration path).
-    try:
-        from ..engine import companion as _comp
-        pet = _comp.active_pet(world)
-        if pet is not None:
-            out.append(SelectableOption(
-                "act_pet_inspect",
-                t("nav_pet_inspect", fallback="Sprawdź zwierzę"),
-                "sprawdź zwierzę", GROUP_ACTIONS))
-            out.append(SelectableOption(
-                "act_pet_lure",
-                t("nav_pet_lure", fallback="Wabik (zwierzę)"),
-                "użyj zwierzęcia jako wabika", GROUP_ACTIONS))
-    except Exception:
-        pass
+    # Prompt 22 — pet actions moved out of Akcje into their own Zwierzę
+    # tab so generic actions stay uncluttered. See _pet_options below.
     # Always-available info panels — short row.
     out.extend([
         SelectableOption("act_inventory",
@@ -318,8 +310,13 @@ def _object_options(world, room) -> List[SelectableOption]:
                 group=GROUP_OBJECTS, target_id=e.entity_id,
                 action_type="salvage",
             ))
-        # Use / open / hack pass-throughs when affordance is declared.
-        if "use" in affs:
+        # Prompt 22 bug fix 8: Użyj is only meaningful for entities with
+        # both `use` in affordances AND at least one "actually-usable"
+        # tag. Bare terminals + safehouse counters previously offered
+        # Użyj that produced zero feedback — pure noise.
+        USE_TAGS = {"consumable","wearable","wield","interface","tool",
+                    "powered","button","switch","controllable"}
+        if "use" in affs and (set(tags) & USE_TAGS):
             out.append(SelectableOption(
                 option_id=f"use_{e.entity_id}",
                 label=f"Użyj: {name}",
@@ -327,7 +324,14 @@ def _object_options(world, room) -> List[SelectableOption]:
                 group=GROUP_OBJECTS, target_id=e.entity_id,
                 action_type="use",
             ))
-        if "hack" in affs:
+        # Prompt 22 bug fix 9: Zhakuj requires both `hack` affordance
+        # AND an actual interface tag. A sealed crate has no interface
+        # to hack. Electronic / digital / networked entities qualify.
+        HACK_TAGS = {"electrical","electronic","digital","interface",
+                     "terminal","computer","network","camera","sensor",
+                     "robot","drone","machine","ai","construct",
+                     "door_electronic"}
+        if "hack" in affs and (set(tags) & HACK_TAGS):
             out.append(SelectableOption(
                 option_id=f"hack_{e.entity_id}",
                 label=f"Zhakuj: {name}",
@@ -373,6 +377,66 @@ def _entity_options(world, room) -> List[SelectableOption]:
                 group=GROUP_ENTITIES, target_id=e.entity_id,
                 action_type="attack",
             ))
+        # Prompt 22 bug fix 9: machine/robot/drone enemies can be hacked.
+        # Per the user, this is a real and asked-for path: hack a robot
+        # to disable it / turn it / read intel. Affordance is auto-added
+        # below if the entity has a robot-class tag, in case the
+        # content templates forgot it.
+        ROBOT_TAGS = {"robot","drone","machine","ai","construct"}
+        if (set(e.tags or []) & ROBOT_TAGS) and "hack" not in affs:
+            # Soft-add hack: don't mutate the entity, just offer the
+            # action. The hack handler validates the target's tags
+            # again at resolve time.
+            out.append(SelectableOption(
+                option_id=f"hack_{e.entity_id}",
+                label=f"Zhakuj: {name}",
+                command=f"zhakuj {name}",
+                group=GROUP_ENTITIES, target_id=e.entity_id,
+                action_type="hack",
+            ))
+        elif "hack" in affs:
+            out.append(SelectableOption(
+                option_id=f"hack_{e.entity_id}",
+                label=f"Zhakuj: {name}",
+                command=f"zhakuj {name}",
+                group=GROUP_ENTITIES, target_id=e.entity_id,
+                action_type="hack",
+            ))
+    return out
+
+
+def _pet_options(world) -> List[SelectableOption]:
+    """Prompt 22 — Zwierzę tab. All 5 pet verbs surface here when the
+    player has an active pet; tab disappears entirely otherwise."""
+    out: List[SelectableOption] = []
+    try:
+        from ..engine import companion as _comp
+        pet = _comp.active_pet(world)
+    except Exception:
+        return out
+    if pet is None:
+        return out
+    name = pet.display_name_pl or "zwierzę"
+    out.append(SelectableOption(
+        "pet_inspect",
+        t("nav_pet_inspect", fallback=f"Sprawdź {name}"),
+        f"sprawdź zwierzę", GROUP_PET))
+    out.append(SelectableOption(
+        "pet_feed",
+        t("nav_pet_feed", fallback=f"Nakarm {name}"),
+        f"nakarm zwierzę", GROUP_PET))
+    out.append(SelectableOption(
+        "pet_calm",
+        t("nav_pet_calm", fallback=f"Uspokój {name}"),
+        f"uspokój zwierzę", GROUP_PET))
+    out.append(SelectableOption(
+        "pet_scout",
+        t("nav_pet_scout", fallback=f"Wyślij {name} na zwiad"),
+        f"wyślij zwierzę na zwiad", GROUP_PET))
+    out.append(SelectableOption(
+        "pet_lure",
+        t("nav_pet_lure", fallback=f"Wabik ({name})"),
+        f"użyj zwierzęcia jako wabika", GROUP_PET))
     return out
 
 

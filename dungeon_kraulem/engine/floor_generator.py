@@ -353,16 +353,34 @@ def _plan_roles(graph: Dict, arch: Dict, rng: random.Random) -> Dict[str, str]:
     safe_count = arch.get("safehouse_count", 1)
     secret_count = arch.get("secret_room_count", 1 if arch.get("secret_chance",0) >= 0.5 else 0)
 
-    # Pick safehouse positions: prefer middle layers
+    # Prompt 22 bug fix: previously safehouse picked uniformly from
+    # `middle`. Layer-1 (directly adjacent to start) makes up 25-50%
+    # of middle, so the safehouse landed there often enough that
+    # 5 consecutive playthroughs hit room 2 every time. Now we EXCLUDE
+    # start-neighbors from the candidate pool: safehouse must be at
+    # least 2 rooms deep. Falls back to the full middle if there's no
+    # deeper room available (tiny floors).
+    start_neighbors = set(graph["adjacency"].get(graph["start"], []))
+    deeper_middle = [n for n in middle if n not in start_neighbors]
+
+    # Pick safehouse positions: prefer depth over proximity-to-start.
     picked = set()
     while sum(1 for r in plan.values() if r == "safe") < safe_count and middle:
-        chosen = rng.choice([n for n in middle if n not in picked]) if middle else None
-        if chosen is None: break
+        candidates_pool = (deeper_middle if deeper_middle
+                           else middle)
+        candidates = [n for n in candidates_pool if n not in picked]
+        if not candidates:
+            # Fall through to anything left in middle.
+            candidates = [n for n in middle if n not in picked]
+        if not candidates:
+            break
+        chosen = rng.choice(candidates)
         plan[chosen] = "safe"
         picked.add(chosen)
-        # Avoid clustering
         if chosen in middle:
             middle = [m for m in middle if m != chosen]
+        if chosen in deeper_middle:
+            deeper_middle = [m for m in deeper_middle if m != chosen]
 
     # Secrets: usually deeper / off the main path
     for _ in range(secret_count):
@@ -427,7 +445,20 @@ def _instantiate_rooms(f: FloorState, world, graph: Dict,
         for nb in neighbours:
             if nb in r.exits.values() or any(ed.get("target") == nb for ed in r.exits.values()):
                 continue
-            label = labels_pool.pop(0) if labels_pool else f"przejście do {nb}"
+            # Prompt 22 bug fix: previous fallback used `f"przejście do {nb}"`
+            # which leaked the procgen room_id (`gen_r2`) into the player-
+            # facing exit label. Use the destination's display title
+            # instead — falls back to a generic noun if neither is
+            # set, never to an internal ID.
+            if labels_pool:
+                label = labels_pool.pop(0)
+            else:
+                tgt = f.rooms.get(nb)
+                tgt_name = (tgt.display_short_title()
+                            if tgt is not None else "")
+                if not tgt_name or tgt_name == nb:
+                    tgt_name = "korytarz"
+                label = f"przejście do {tgt_name}"
             r.exits[label] = {
                 "target": nb,
                 "locked": False, "hidden": False,

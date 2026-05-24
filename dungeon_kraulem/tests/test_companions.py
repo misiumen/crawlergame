@@ -296,10 +296,21 @@ def test_combat_advantage_survives_save_round_trip():
 
 def test_lure_emits_spectacle_tag_to_sponsors():
     """Calling `companion_lure` in exploration must bump audience AND
-    emit the `spectacle` tag (which several sponsors care about)."""
+    emit the `spectacle` tag (which several sponsors care about).
+    Prompt 22 fix: requires at least one visible NPC/enemy in the room
+    to fire — empty rooms now refuse gracefully. We add a hostile so
+    the test exercises the success path."""
     from ..engine import companion_actions as _ca
     from ..engine import sponsors as _sp
+    from ..engine.entity import Entity, T_MONSTER
     w = _mk_world()
+    # Add a hostile so lure has someone to fool.
+    mob = Entity(key="bot", entity_type=T_MONSTER,
+                 fallback_name="szczurek", hp=4, max_hp=4,
+                 tags=["monster"], affordances=["attack"],
+                 location_id="r0")
+    w.current_floor.current_room().entities.append(mob)
+    w.register(mob)
     # Set floor sponsor to Kanał 7 — they like `spectacle`.
     w.current_floor.sponsor_key = "kanal_7_krawedz"
     pet = _give_pet(w, "gees")   # also has 'spectacle' in sponsor_likes
@@ -313,6 +324,30 @@ def test_lure_emits_spectacle_tag_to_sponsors():
     assert post > pre, \
         f"Kanał 7 attention should rise, was {pre} now {post}"
     print(f"  lure emits spectacle: OK (Kanał 7 attention {pre}->{post})")
+
+
+def test_lure_in_empty_room_refuses_gracefully():
+    """Prompt 22 bug fix: pet lure with no NPC/enemy present should
+    refuse — no stress cost, no audience bump, no sponsor tag."""
+    from ..engine import companion_actions as _ca
+    from ..engine import sponsors as _sp
+    w = _mk_world()
+    w.current_floor.sponsor_key = "kanal_7_krawedz"
+    pet = _give_pet(w, "gees")
+    pre_stress = pet.stress
+    pre_aud = w.character.audience_rating
+    pre_attn = _sp.get_attention(w, "kanal_7_krawedz")
+    game = _FakeGame(w)
+    _ca.handle(game, "companion_lure", type("I", (), {})())
+    assert pet.stress == pre_stress, "no stress cost in empty room"
+    assert w.character.audience_rating == pre_aud, \
+        "no audience bump in empty room"
+    assert _sp.get_attention(w, "kanal_7_krawedz") == pre_attn, \
+        "no sponsor tag in empty room"
+    msgs = " ".join(m for m, _ in game.lines)
+    assert "głupio" in msgs or "kogo" in msgs, \
+        f"expected refusal line; got {msgs!r}"
+    print("  lure in empty room refuses gracefully: OK")
 
 
 # ── Journal ──────────────────────────────────────────────────────────────
@@ -348,6 +383,7 @@ def main():
     test_combat_advantage_flag_set_and_consumed()
     test_combat_advantage_survives_save_round_trip()
     test_lure_emits_spectacle_tag_to_sponsors()
+    test_lure_in_empty_room_refuses_gracefully()
     test_companion_appears_in_journal_companions_tab()
     print("Prompt 19 companion smoke: OK")
 

@@ -125,9 +125,12 @@ def change_audience(world, delta: int, source: str = "",
 
     if emit_log and hasattr(world, "log"):
         sign = "+" if delta > 0 else ""
-        tag = f" ({source})" if source else ""
+        # Prompt 22 bug fix: NEVER print the internal `source` tag in
+        # the player log — those are English snake_case identifiers
+        # ("heavy_hit", "alarm:default") and the game is Polish-only.
+        # `source` is still tracked internally for analytics / debug.
         # Cat "system" keeps these out of the narrative flow.
-        world.log.append((f"Widownia {sign}{delta}{tag}", "system"))
+        world.log.append((f"Widownia {sign}{delta}", "system"))
 
     if after == before:
         return None

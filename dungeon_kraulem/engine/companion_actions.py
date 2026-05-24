@@ -287,7 +287,27 @@ def _h_lure(game, intent, pet) -> None:
             except Exception as exc:
                 game.log(f"(combat tick failed: {exc})", LOG_WARN)
         return
-    # Exploration path
+    # Exploration path — Prompt 22 bug fix: only succeeds when there's
+    # SOMEONE to lure. An empty room means there's no audience for the
+    # spectacle, no NPC to distract. Refuse gracefully — no stress
+    # cost, no audience bump, no sponsor tag.
+    if room is None:
+        game.log(t("companion_lure_no_room",
+                   fallback="Nie widzisz, gdzie miałby zacząć."),
+                 LOG_WARN)
+        return
+    targets_present = any(
+        e.entity_type in ("monster", "crawler", "npc") and e.is_alive()
+        for e in (room.visible_entities() if hasattr(room, "visible_entities")
+                  else room.entities)
+    )
+    if not targets_present:
+        game.log(t("companion_lure_empty_room",
+                   fallback=(f"Nie ma kogo zwabić. "
+                             f"{pet.display_name_pl} patrzy na ciebie "
+                             f"głupio.")),
+                 LOG_WARN)
+        return
     pet.adjust_stress(+3)
     game.log(t("companion_lure_exploration",
                fallback=f"{pet.display_name_pl} biegnie przed siebie "
