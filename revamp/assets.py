@@ -14,13 +14,23 @@ from .config import IMAGE_DIR
 _cache: Dict[Tuple[str,int,int], "pygame.Surface"] = {}
 
 
+def _candidate_dirs():
+    """Yield possible IMAGE_DIR locations (handles PyInstaller bundling)."""
+    import sys as _sys
+    base = getattr(_sys, "_MEIPASS", None)
+    if base:
+        yield os.path.join(base, IMAGE_DIR)
+    yield IMAGE_DIR
+
+
 def _resolve(key: str):
-    if not os.path.isdir(IMAGE_DIR):
-        return None
-    for ext in (".png",".jpg",".bmp",".gif"):
-        cand = os.path.join(IMAGE_DIR, f"{key}{ext}")
-        if os.path.isfile(cand):
-            return cand
+    for d in _candidate_dirs():
+        if not os.path.isdir(d):
+            continue
+        for ext in (".png",".jpg",".bmp",".gif"):
+            cand = os.path.join(d, f"{key}{ext}")
+            if os.path.isfile(cand):
+                return cand
     return None
 
 

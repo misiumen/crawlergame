@@ -28,8 +28,28 @@ class _Safe(dict):
         return "{" + k + "}"
 
 
+def _resource_root() -> str:
+    """Return base directory for bundled resources.
+
+    PyInstaller --onefile unpacks data files to sys._MEIPASS at runtime.
+    In normal dev runs we fall back to the project root.
+    """
+    base = getattr(sys, "_MEIPASS", None)
+    if base:
+        return base
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+
+
 def _path(code: str) -> str:
-    return os.path.join(LOCALES_DIR, f"{code}.json")
+    # First try the configured LOCALES_DIR relative to CWD / resource root
+    candidates = [
+        os.path.join(_resource_root(), LOCALES_DIR, f"{code}.json"),
+        os.path.join(LOCALES_DIR, f"{code}.json"),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return candidates[0]   # let the open() below fail in a controlled way
 
 
 def _load(code: str) -> Dict[str, str]:

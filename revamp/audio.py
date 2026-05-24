@@ -42,13 +42,22 @@ def init():
 def is_ready() -> bool: return _initialized
 
 
+def _candidate_dirs(directory: str):
+    """Yield possible base dirs (handles PyInstaller bundling)."""
+    base = getattr(__import__("sys"), "_MEIPASS", None)
+    if base:
+        yield os.path.join(base, directory)
+    yield directory
+
+
 def _find(directory: str, key: str, exts):
-    if not os.path.isdir(directory):
-        return None
-    for ext in exts:
-        cand = os.path.join(directory, f"{key}{ext}")
-        if os.path.isfile(cand):
-            return cand
+    for d in _candidate_dirs(directory):
+        if not os.path.isdir(d):
+            continue
+        for ext in exts:
+            cand = os.path.join(d, f"{key}{ext}")
+            if os.path.isfile(cand):
+                return cand
     return None
 
 
