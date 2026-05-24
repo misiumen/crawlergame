@@ -64,6 +64,9 @@ class RoomState:
     encounter_key: str = ""                    # key into ENCOUNTER_TEMPLATES
     encounter_intro_fallback: str = ""         # intro line for the encounter
 
+    # Gap 4: deployable player traps and other room-bound dynamic state.
+    state: Dict[str, Any] = field(default_factory=dict)
+
     def is_safe(self) -> bool:
         return self.safehouse_subtype is not None or self.actual_type == "safehouse"
 
@@ -111,6 +114,7 @@ class RoomState:
             "light_level": self.light_level,
             "encounter_key": self.encounter_key,
             "encounter_intro_fallback": self.encounter_intro_fallback,
+            "state": dict(self.state),
         }
 
     @classmethod
@@ -135,6 +139,8 @@ class RoomState:
         r.noise_level = d.get("noise_level", 0)
         r.encounter_key = d.get("encounter_key", "")
         r.encounter_intro_fallback = d.get("encounter_intro_fallback", "")
+        # Gap 8: tolerate older saves that pre-date room.state.
+        r.state = dict(d.get("state", {}))
         return r
 
     # ── Display ──────────────────────────────────────────────────────────────

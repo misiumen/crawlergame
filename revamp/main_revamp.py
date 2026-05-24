@@ -15,16 +15,24 @@ def main():
         print("pygame is required. Run: pip install pygame-ce")
         sys.exit(1)
 
-    from . import lang, audio
-    from .config import (SCREEN_W, SCREEN_H, FPS, TITLE,
-                         LANGUAGE, LANG_DEBUG_MISSING)
+    from . import lang, audio, settings as _settings
+    from .config import (FPS, TITLE, LANGUAGE, LANG_DEBUG_MISSING)
 
     lang.set_debug_missing(LANG_DEBUG_MISSING)
     lang.set_language(LANGUAGE)
 
     pygame.init()
     pygame.display.set_caption(TITLE)
-    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+    # Prompt 09: pull resolution + fullscreen from persisted settings, with
+    # graceful fallback to DEFAULT_RESOLUTION on missing/corrupt file.
+    s = _settings.load_settings()
+    w, h = s["resolution_width"], s["resolution_height"]
+    flags = pygame.FULLSCREEN if s.get("fullscreen") else 0
+    try:
+        screen = pygame.display.set_mode((w, h), flags)
+    except pygame.error:
+        from .config import DEFAULT_RESOLUTION
+        screen = pygame.display.set_mode(DEFAULT_RESOLUTION)
     pygame.key.set_repeat(400, 50)
 
     audio.init()

@@ -10,11 +10,37 @@ def advance(world, minutes: int):
     f = world.current_floor
     prev_day = f.day_number()
     prev_remaining = f.deadline_remaining_minutes()
+    # Snapshot for memetic propagation tick (every ~2h of game time).
+    prev_2h_bucket = f.current_minute // 120
     f.current_minute += minutes
 
     # Day-change event
     if f.day_number() != prev_day:
         world.log_msg(_day_change_line(f), "syndicate")
+
+    # Prompt 07: ambient belief-seed propagation tick.
+    new_2h_bucket = f.current_minute // 120
+    if new_2h_bucket != prev_2h_bucket:
+        try:
+            from . import memetics
+            events = memetics.process_belief_seeds(world, minutes, trigger="tick")
+            for ev in events:
+                kind = ev.get("kind")
+                if kind == "rumor":
+                    world.log_msg(t("feedback_belief_spreads",
+                                    fallback="Plotka, którą zasiałeś, znajduje nowe usta."),
+                                  "syndicate")
+                elif kind == "backlash":
+                    world.log_msg(t("feedback_belief_distorts",
+                                    fallback="Twój pomysł zmienił właściciela — i sens."),
+                                  "warn")
+                elif kind == "burned_out":
+                    world.log_msg(t("feedback_belief_burned",
+                                    fallback="Jeden z twoich pomysłów wypalił się i zostawił po sobie ciszę."),
+                                  "normal")
+        except Exception:
+            # Memetics is auxiliary; never break time advancement.
+            pass
 
     # Deadline warnings
     remaining = f.deadline_remaining_minutes()

@@ -294,3 +294,40 @@ def random_clue(source: Optional[str] = None) -> Optional[Tuple[str, Dict]]:
     if not pool:
         return None
     return random.choice(pool)
+
+
+# ── Clue delivery with false-variant rolling (post-07b follow-up) ───────────
+
+def roll_clue_delivery(clue: Dict, rng=None) -> Dict[str, Any]:
+    """Decide how a clue lands on delivery.
+
+    Reads `false_variant_chance` (0..1) and optional `false_variant` /
+    `false_variant_pl` text. Returns a dict with:
+        text           — Polish text to show (true or distorted)
+        reliability    — float, lowered if false variant fired
+        contaminated   — bool, True iff the false variant fired
+        used_false     — bool (alias of contaminated)
+
+    Falls back safely if `false_variant_chance` is 0 or no false_variant
+    text is defined. The caller decides whether to mark the stored clue
+    `contaminated`. Returned reliability is the new effective value to
+    store on `known_clues`.
+    """
+    if not isinstance(clue, dict):
+        return {"text": "", "reliability": 1.0, "contaminated": False,
+                "used_false": False}
+    chance = float(clue.get("false_variant_chance") or 0.0)
+    true_text = (clue.get("text_pl") or clue.get("text") or
+                 clue.get("description") or "")
+    false_text = (clue.get("false_variant_pl") or clue.get("false_variant")
+                  or "")
+    rel = float(clue.get("reliability", clue.get("truth", 1.0)))
+    R = rng or random
+    if chance > 0.0 and false_text and R.random() < chance:
+        # Distortion landed. Lower reliability to half of declared truth, or
+        # 0.3 floor — whichever is lower.
+        new_rel = min(0.3, rel * 0.5)
+        return {"text": false_text, "reliability": new_rel,
+                "contaminated": True, "used_false": True}
+    return {"text": true_text, "reliability": rel,
+            "contaminated": False, "used_false": False}

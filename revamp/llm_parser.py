@@ -90,8 +90,19 @@ _SYSTEM_INSTRUCTION = (
     '  "desired_outcome": "string or null",\n'
     '  "suggested_stat": "STR|DEX|CON|INT|WIS|CHA|null",\n'
     '  "risk_level": "low|medium|high|null",\n'
-    '  "confidence": 0.0\n'
+    '  "confidence": 0.0,\n'
+    '  "method": "string or null (memetic only: rumor|lie|mythic_comparison|false_order|religious_framing|logic_exploit|identity_attack|propaganda|taboo_creation|sponsor_disinformation|social_proof|performance|forged_evidence)",\n'
+    '  "core_claim": "string or null (memetic only: the proposition)",\n'
+    '  "target_tags": ["string"],\n'
+    '  "spread_channel": "string or null (e.g. crawler_gossip, machine_radio, sponsor_replay, safehouse_rumor, graffiti, terminal_logs, audience_memes)",\n'
+    '  "emotional_hook": "string or null",\n'
+    '  "logic_hook": "string or null"\n'
     "}\n"
+    "Memetic intents Ollama may produce: seed_belief, spread_rumor,\n"
+    "create_taboo, issue_false_order, logic_exploit, identity_attack,\n"
+    "sow_distrust, incite_panic, religious_framing,\n"
+    "sponsor_disinformation, propaganda, forge_social_proof.\n"
+    "Ollama may interpret the idea but never decides whether it spreads.\n"
 )
 
 
@@ -255,6 +266,22 @@ def _normalize(raw) -> dict | None:
     elif conf_v > 1.0:
         conf_v = 1.0
 
+    # Prompt 07: memetic extras. Optional; pass through as strings/lists.
+    def _str(name):
+        v = raw.get(name)
+        return v.strip() if isinstance(v, str) and v.strip() else None
+    method_v = _str("method")
+    core_claim_v = _str("core_claim")
+    spread_channel_v = _str("spread_channel")
+    emotional_hook_v = _str("emotional_hook")
+    logic_hook_v = _str("logic_hook")
+    target_tags_v = raw.get("target_tags")
+    if isinstance(target_tags_v, str):
+        target_tags_v = [target_tags_v]
+    if not isinstance(target_tags_v, list):
+        target_tags_v = []
+    target_tags_v = [str(t).strip() for t in target_tags_v if str(t).strip()]
+
     return {
         "intent": intent_v,
         "verb": verb_v,
@@ -265,6 +292,12 @@ def _normalize(raw) -> dict | None:
         "suggested_stat": stat_v,
         "risk_level": risk_v,
         "confidence": conf_v,
+        "method": method_v,
+        "core_claim": core_claim_v,
+        "spread_channel": spread_channel_v,
+        "emotional_hook": emotional_hook_v,
+        "logic_hook": logic_hook_v,
+        "target_tags": target_tags_v,
     }
 
 

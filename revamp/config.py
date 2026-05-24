@@ -1,8 +1,23 @@
 """Revamp configuration."""
 
-# Window
-SCREEN_W = 1280
-SCREEN_H = 800
+# ── Window / display ──────────────────────────────────────────────────────
+SUPPORTED_RESOLUTIONS = [
+    (1280, 720),
+    (1366, 768),
+    (1600, 900),
+    (1920, 1080),
+    (2560, 1440),
+    (3440, 1440),
+]
+DEFAULT_RESOLUTION = (1280, 720)
+FULLSCREEN_ENABLED = False
+UI_SCALE = "auto"       # "auto" or float multiplier applied to font_scale
+
+# Legacy constants — kept as defaults for back-compat. Anything that needs
+# the live size should read `pygame.display.get_surface().get_size()` or
+# call `revamp.layout.calculate_layout(w, h)`.
+SCREEN_W = DEFAULT_RESOLUTION[0]
+SCREEN_H = DEFAULT_RESOLUTION[1]
 FPS = 60
 TITLE = "CRAWL PROTOCOL — Revamp"
 

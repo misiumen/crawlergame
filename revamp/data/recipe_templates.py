@@ -16,6 +16,8 @@ RECIPES = {
         "time_minutes": 10,
         "result": {"item_key": "improvised_bandage", "quantity": 1},
         "failure_risks": ["waste_materials"],
+        "aliases_pl": ["opatrunek","bandaż","bandaz","prowizoryczny opatrunek"],
+        "aliases_en": ["bandage","makeshift bandage","field dressing"],
     },
     "shiv": {
         "category": "weapon",
@@ -29,6 +31,8 @@ RECIPES = {
         "time_minutes": 20,
         "result": {"item_key": "crafted_shiv", "quantity": 1},
         "failure_risks": ["cut_self", "flawed_item"],
+        "aliases_pl": ["nóż","noz","ostrze","sztylet","kosa","kosa do walki","shiv"],
+        "aliases_en": ["shiv","knife","blade","shank"],
     },
     "tripwire": {
         "category": "trap",
@@ -42,6 +46,8 @@ RECIPES = {
         "time_minutes": 25,
         "result": {"item_key": "tripwire_trap", "quantity": 1},
         "failure_risks": ["noise", "flawed_item"],
+        "aliases_pl": ["linka","linka potykająca","potykacz","pułapka linkowa","pulapka linkowa"],
+        "aliases_en": ["tripwire","trip wire","wire trap"],
     },
     "shock_trap": {
         "category": "trap",
@@ -55,6 +61,10 @@ RECIPES = {
         "time_minutes": 40,
         "result": {"item_key": "shock_trap", "quantity": 1},
         "failure_risks": ["shock", "noise", "unstable_item"],
+        "aliases_pl": ["pułapka elektryczna","pulapka elektryczna","pułapka z prądem",
+                       "pulapka z pradem","pułapka zwarciowa","pulapka zwarciowa",
+                       "pułapka prądowa","pulapka pradowa"],
+        "aliases_en": ["shock trap","electric trap","stun trap","taser trap"],
     },
     "smoke_bottle": {
         "category": "distraction",
@@ -68,6 +78,9 @@ RECIPES = {
         "time_minutes": 30,
         "result": {"item_key": "smoke_bottle", "quantity": 1},
         "failure_risks": ["chemical_splash", "bad_smell"],
+        "aliases_pl": ["dymówka","dymowka","butelka dymna","bomba dymna","świeca dymna",
+                       "swieca dymna"],
+        "aliases_en": ["smoke bottle","smoke bomb","smoke grenade"],
     },
     "armor_patch": {
         "category": "armor",
@@ -81,6 +94,9 @@ RECIPES = {
         "time_minutes": 30,
         "result": {"item_key": "armor_patch", "quantity": 1},
         "failure_risks": ["waste_materials", "flawed_item"],
+        "aliases_pl": ["łatka","latka","łatka pancerza","latka pancerza","płyta","plyta",
+                       "wzmocnienie","pancerz prowizoryczny"],
+        "aliases_en": ["armor patch","armour patch","plating","makeshift armor"],
     },
     "bait_bundle": {
         "category": "bait",
@@ -94,6 +110,9 @@ RECIPES = {
         "time_minutes": 10,
         "result": {"item_key": "bait_bundle", "quantity": 1},
         "failure_risks": ["stench"],
+        "aliases_pl": ["przynęta","przyneta","pakunek przynęty","pakunek przynety",
+                       "mięsna przynęta","miesna przyneta","wabik"],
+        "aliases_en": ["bait","bait bundle","decoy meat","lure"],
     },
 }
 

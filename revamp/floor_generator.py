@@ -204,7 +204,8 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
     _place_clue_chain(f, rng)
 
     # Step 9: place encounters in combat rooms, weighted by objective tags
-    _place_encounters(f, rng)
+    # (and, when belief seeds exist on the world, by their target_tags too).
+    _place_encounters(f, rng, world=world)
 
     # Step 10: ensure objective.required_tags are present somewhere on the floor
     _ensure_required_tags(f, rng)
@@ -460,6 +461,17 @@ def _build_room_from_template(node_id: str, role: str, tmpl: Dict,
                 r.entities.append(ent)
                 world.register(ent)
 
+    # Gap 3: safehouse ownership. Anything that spawns inside a safehouse-role
+    # room (cafe / bathroom / clinic / armory / lounge / merchant) belongs to
+    # the safehouse. Salvage validator will use these flags to apply social
+    # consequences instead of treating it as free loot.
+    if role == "safe":
+        for e in r.entities:
+            if e.state is None:
+                e.state = {}
+            e.state.setdefault("owned_by", "safehouse")
+            e.state.setdefault("theft_sensitive", True)
+
     # Stash exit_hints for later wiring
     r._exit_hints = list(tmpl.get("exit_hints", []))
 
@@ -649,22 +661,73 @@ def _place_clue_chain(f: FloorState, rng: random.Random):
 
 
 def _seed_initial_rumors(f: FloorState, rng: random.Random):
-    """Pre-seed 1-2 rumor keys on the floor so cafe chat has something."""
+    """Pre-seed 1-3 rumor keys on the floor so cafe chat has something.
+
+    Prompt 07b: bias toward objective tags. Distribution target:
+      ~50 percent relevant or partially relevant
+      ~25 percent atmospheric / noisy
+      ~15 percent misleading / biased
+      ~10 percent rare / very useful (truth >= 0.9 AND objective overlap)
+    Exact mix is approximate — we pick from weighted buckets per slot.
+    """
     table = cl.all_rumor_categories()
-    if not table: return
-    # Pick a 1.0-truth or high-truth rumor + 1 lower-truth
-    high_pool = []
-    low_pool  = []
+    if not table:
+        return
+
+    # Pull objective tag set for biasing.
+    obj_meta = cl.all_floor_objectives().get(f.objective_key, {}) if f.objective_key else {}
+    obj_tags = set(obj_meta.get("tags", []) + obj_meta.get("required_tags", []))
+
+    def _rumor_tag_pool(r):
+        return set(r.get("tags") or []) | set(r.get("reveals_tags") or []) \
+             | set(r.get("objective_tags") or [])
+
+    relevant: list = []
+    atmospheric: list = []
+    misleading: list = []
+    rare: list = []
     for cat, items in table.items():
         for r in items:
-            if r.get("truth", 0.5) >= 0.7:
-                high_pool.append(r)
+            truth = float(r.get("truth", 0.5))
+            tags = _rumor_tag_pool(r)
+            overlaps = bool(obj_tags & tags) if obj_tags else False
+            if truth >= 0.9 and overlaps:
+                rare.append(r)
+            elif overlaps and truth >= 0.5:
+                relevant.append(r)
+            elif truth < 0.4:
+                misleading.append(r)
             else:
-                low_pool.append(r)
-    if high_pool:
-        f.rumors.append(rng.choice(high_pool)["key"])
-    if low_pool and rng.random() < 0.5:
-        f.rumors.append(rng.choice(low_pool)["key"])
+                atmospheric.append(r)
+
+    # Slot 1 (always): try rare → relevant → atmospheric
+    def _pick(bucket):
+        return rng.choice(bucket)["key"] if bucket else None
+
+    picks = []
+    for bucket in (rare, relevant, atmospheric):
+        k = _pick(bucket)
+        if k:
+            picks.append(k); break
+
+    # Slot 2: 60% another relevant, 25% atmospheric, 15% misleading
+    r2 = rng.random()
+    bucket2 = (relevant if r2 < 0.60 else
+               atmospheric if r2 < 0.85 else
+               misleading)
+    k2 = _pick(bucket2)
+    if k2 and k2 not in picks:
+        picks.append(k2)
+
+    # Optional slot 3 with low probability — extra noise.
+    if rng.random() < 0.30:
+        k3 = _pick(atmospheric or misleading or relevant)
+        if k3 and k3 not in picks:
+            picks.append(k3)
+
+    for k in picks:
+        if k not in f.rumors:
+            f.rumors.append(k)
 
 
 # ── Graph utilities ──────────────────────────────────────────────────────────
@@ -712,8 +775,16 @@ def _generic_exit_labels():
 
 # ── Encounter placement (Prompt 06a, gap #3) ─────────────────────────────────
 
-def _place_encounters(f: FloorState, rng: random.Random):
-    """Pick one encounter per combat room, weighting by objective tags."""
+def _place_encounters(f: FloorState, rng: random.Random, world=None):
+    """Pick one encounter per combat room.
+
+    Tag scoring sources:
+      - objective.tags + objective.required_tags
+      - room.sensory_tags + actual_type
+      - belief-seed target_tags returned by
+        `memetics.encounter_modifiers_for(world, room)` if `world` is given
+        (post-07b follow-up; small weight, never dominant).
+    """
     obj = cl.all_floor_objectives().get(f.objective_key, {}) if f.objective_key else {}
     obj_tags = set(obj.get("tags", []) + obj.get("required_tags", []))
 
@@ -726,18 +797,41 @@ def _place_encounters(f: FloorState, rng: random.Random):
     if not pool:
         return
 
+    # Optional belief overlay — collected per-room because seeds may target
+    # only a subset of rooms.
+    _memetics = None
+    if world is not None and getattr(world, "belief_seeds", None):
+        try:
+            from . import memetics as _memetics  # type: ignore
+        except Exception:
+            _memetics = None
+
     for room in combat_rooms:
         room_tags = set(room.sensory_tags or []) | {room.actual_type}
-        # Score each encounter: tag overlap with (objective + room) wins
+
+        belief_tags = set()
+        if _memetics is not None:
+            try:
+                mods = _memetics.encounter_modifiers_for(world, room)
+            except Exception:
+                mods = []
+            for m in mods or []:
+                for tg in (m.get("target_tags") or []):
+                    belief_tags.add(tg)
+
         scored = []
         for key, etmpl in pool.items():
             if etmpl.get("floor_min", 1) > f.floor_number:
                 continue
             etags = set(etmpl.get("tags", []))
-            overlap_obj  = len(etags & obj_tags)
-            overlap_room = len(etags & room_tags)
+            overlap_obj    = len(etags & obj_tags)
+            overlap_room   = len(etags & room_tags)
+            overlap_belief = len(etags & belief_tags)
             base_w = max(1, int(etmpl.get("weight", 1)))
-            scored.append((key, etmpl, base_w + overlap_obj * 3 + overlap_room * 2))
+            # belief weight is intentionally small (×1) so memetics never
+            # outrun objective weight (×3) or room weight (×2).
+            score = base_w + overlap_obj * 3 + overlap_room * 2 + overlap_belief
+            scored.append((key, etmpl, score))
         if not scored:
             continue
         keys = [(k, t) for k, t, _ in scored]
@@ -747,6 +841,17 @@ def _place_encounters(f: FloorState, rng: random.Random):
         room.encounter_key = ekey
         if intro:
             room.encounter_intro_fallback = intro
+        # Record on room.state which belief tags nudged the pick — useful
+        # for debugging and for resolution-time hooks. Empty unless beliefs
+        # actually overlapped this template.
+        if belief_tags:
+            actual_overlap = list(set(etmpl.get("tags", [])) & belief_tags)
+            if actual_overlap:
+                room.state = room.state or {}
+                room.state.setdefault("encounter_belief_tags", [])
+                for tg in actual_overlap:
+                    if tg not in room.state["encounter_belief_tags"]:
+                        room.state["encounter_belief_tags"].append(tg)
 
 
 # ── Required-tag guarantee (Prompt 06a, gap #4) ──────────────────────────────

@@ -217,6 +217,15 @@ register(Affordance("perform",
     verbs_en=["perform","pose"],
     stat="CHA", base_dc=11, time_cost=5, class_affinity="showmanship", audience_effect=10))
 
+# Gap 4: deploy a crafted/portable trap or device into the current room
+register(Affordance("deploy",
+    verbs_pl=["rozstaw","ustaw","podłóż","podloz","zamontuj","rozłóż","rozloz",
+              "rozłożę","rozloze","stawiam","kładę pułapkę","kladę pułapkę",
+              "kladk","podstaw"],
+    verbs_en=["deploy","place","set","plant","rig","arm"],
+    stat="DEX", base_dc=11, time_cost=5, class_affinity="trap",
+    risk_tags=["noise"]))
+
 
 def find_affordance_by_verb(verb: str, lang: str = "pl") -> Optional[Affordance]:
     """Match a verb root against any affordance's verb list. Polish-stem aware."""

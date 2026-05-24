@@ -71,7 +71,8 @@ ROOM_POOL = [
         "sensory_tags": ["bright", "warm", "coffee", "sponsor_ads"],
         "entity_seed_pools": {
             "svc":  ["coffee_counter"],
-            "env":  ["sponsor_screen"],
+            "env":  ["sponsor_screen","coffee_machine","furniture_wood","loose_chair",
+                     "vending_machine","trash_bin"],
             "npc":  [("paranoid_mapper", "friendly"), ("loot_goblin_crawler", "neutral")],
             "item": ["cracked_mug", "snack_bar"],
         },
@@ -111,7 +112,8 @@ ROOM_POOL = [
         "sensory_tags": ["damp", "cold", "echo", "graffiti"],
         "entity_seed_pools": {
             "svc":  ["mirror"],
-            "env":  ["loose_grate"],
+            "env":  ["loose_grate","bathroom_fixture","sink","toilet_stall",
+                     "pipe_cluster","cleaning_cabinet","mirror"],
             "item": ["dirty_bandage"],
         },
         "exit_hints": ["północ", "sufit"],
@@ -181,6 +183,8 @@ ROOM_POOL = [
         "entity_seed_pools": {
             "svc":  ["clinic_counter"],
             "item": ["dirty_bandage"],
+            "env":  ["medical_cabinet","biohazard_bin","bandage_box",
+                     "disinfectant_shelf","broken_monitor"],
         },
         "exit_hints": ["korytarz"],
         "guaranteed_min_exits": 1,
@@ -216,7 +220,8 @@ ROOM_POOL = [
         "sensory_tags": ["dim", "humming", "mossy_smell"],
         "entity_seed_pools": {
             "mon": ["tunnel_runt"],
-            "env": ["exposed_wiring", "water_pool"],
+            "env": ["exposed_wiring","water_pool","broken_table","debris_pile",
+                    "sponsor_camera","loose_shelf"],
         },
         "exit_hints": ["wschód", "zachód", "południe"],
         "guaranteed_min_exits": 2,
@@ -314,6 +319,7 @@ ROOM_POOL = [
         "entity_seed_pools": {
             "item": ["battery", "duct_tape"],
             "term": ["storage_terminal"],
+            "env":  ["supply_crate","locker","metal_shelf","sealed_box","machine_scrap"],
         },
         "exit_hints": ["z powrotem"],
         "guaranteed_min_exits": 1,
@@ -344,7 +350,8 @@ ROOM_POOL = [
         "sensory_tags": ["dim", "dusty", "crowded"],
         "entity_seed_pools": {
             "item": ["suspicious_keycard", "duct_tape"],
-            "env":  ["loose_cables"],
+            "env":  ["loose_cables","electrical_panel","wire_bundle_source",
+                     "machine_scrap","vent_grate","pressure_valve","broken_terminal"],
         },
         "exit_hints": ["z powrotem", "kratka (sufit)"],
         "guaranteed_min_exits": 1,

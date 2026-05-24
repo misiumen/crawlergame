@@ -237,3 +237,40 @@ puli "daj mi pokój z tagiem X" i dobiera ważoną losowość.
 Wszystkie szablony używają stabilnych angielskich kluczy oraz polskich
 `fallback_*` tekstów. UI woła `t(key, fallback=fallback_*)`. Pula nie
 zawiera lokalizowanych nazw — lokalizacja jest robiona przez `lang.tr()`.
+
+## Crafting and salvage
+
+Szczegóły w `docs/CRAFTING_BIBLE.md`. Najważniejsze założenia:
+
+- Crafting jest filarem przetrwania i lore, nie osobnym menu ekonomicznym.
+- Gracz może lootować, rozbierać, odzyskiwać, pozyskiwać, demontować, wytwarzać,
+  improwizować, naprawiać, wzmacniać i rozstawiać. Każde z tych słów ma własny
+  parser-friendly czasownik PL i EN.
+- Materiały noszą tagi (`sharp`, `wire`, `binding`, `electrical`, `organic`,
+  `chemical`, `metal`, `cloth`, `glass`, `wood`, ...). Receptury i improwizacja
+  patrzą na tagi, nie tylko na klucz materiału.
+- Improwizowany crafting musi się walidować przeciw aktualnym materiałom gracza,
+  kontekstowi pokoju (safehouse, walka, niebezpieczeństwo) i ryzyku.
+- Encje rozbierane zostawiają stan (`stripped`, `depleted`, `damaged`,
+  `destroyed`, `harvested`) — nie ma niekończącego się farmienia.
+- Kradzież w safehouse, pozyskiwanie organów z ciał, niszczenie własności
+  sponsora, wandalizm armatury — każde uruchamia społeczną reakcję
+  (`safehouse_consequence`, `social_suspicion`, `sponsor_attention`).
+- Narrator i osiągnięcia są obowiązkową informacją zwrotną dla istotnych
+  akcji salvage/craft. Nie ma być przy każdym podniesieniu jednej śrubki.
+
+## Memetic actions
+
+Szczegóły w `docs/MEMETICS_BIBLE.md`. Tu wystarczy zaznaczyć kontrakt:
+
+- Memetyka to ziarna przekonań, plotki, fałszywe rozkazy, manipulacja społeczna,
+  exploity logiczne i symboliczne ataki na NPC i frakcje. To nie to samo co
+  tworzenie frakcji od zera.
+- Parser (deterministyczny + opcjonalnie Ollama) interpretuje intencję; model
+  świata waliduje kontekst — czy NPC w ogóle reaguje na takie zdanie, czy
+  ma odpowiednie afordancje i podatność.
+- Udane memetyczne akcje zostają zapisane w `world.flags` / `floor.active_events`
+  i mogą wracać przez plotki, encountery, linijki narratora, clue chains i
+  reroll rozwiązań celu piętra.
+- Memetyka jest implementowana po tym, jak crafting jest stabilny. Wcześniejsze
+  wzmianki w kodzie zostają jako TODO, nie jako działający system.

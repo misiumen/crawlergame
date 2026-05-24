@@ -46,6 +46,9 @@ class FloorState:
     # Each entry: {"minute": int, "kind": str, "args": {...}}
     active_events: List[Dict] = field(default_factory=list)
 
+    # Prompt 07: belief seeds active on this floor (subset of world.belief_seeds).
+    active_belief_seed_ids: List[str] = field(default_factory=list)
+
     # ── Helpers ──────────────────────────────────────────────────────────────
 
     def current_room(self) -> Optional[RoomState]:
@@ -113,6 +116,7 @@ class FloorState:
             "objective_title_fallback": self.objective_title_fallback,
             "objective_description_fallback": self.objective_description_fallback,
             "objective_solution_paths": list(self.objective_solution_paths),
+            "active_belief_seed_ids": list(self.active_belief_seed_ids),
         }
 
     @classmethod
@@ -135,4 +139,5 @@ class FloorState:
         f.objective_title_fallback = d.get("objective_title_fallback", "")
         f.objective_description_fallback = d.get("objective_description_fallback", "")
         f.objective_solution_paths = list(d.get("objective_solution_paths", []))
+        f.active_belief_seed_ids = list(d.get("active_belief_seed_ids", []))
         return f

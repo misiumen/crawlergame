@@ -40,9 +40,65 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                     # Prompt 1: encounter-template intro (combat rooms)
                     if r.encounter_intro_fallback:
                         lines.append(r.encounter_intro_fallback)
+                    # Prompt-07b follow-up: consume belief-seed encounter
+                    # modifiers for this room. Mods are advisory: at most
+                    # one Polish flavor line per entry, and we stash the
+                    # mod types onto room.state["belief_mods"] so
+                    # validation/resolution can read them later.
+                    try:
+                        from . import memetics, narrator as _narr
+                        mods = memetics.encounter_modifiers_for(world, r)
+                        if mods:
+                            r.state = r.state or {}
+                            r.state.setdefault("belief_mods", [])
+                            for m in mods:
+                                mt = m.get("type")
+                                if mt and mt not in r.state["belief_mods"]:
+                                    r.state["belief_mods"].append(mt)
+                                # Pick a narrator line that matches the
+                                # nature of the mod (machine/crawler/sponsor).
+                                tags = set(m.get("target_tags") or [])
+                                if tags & {"machine","drone","ai","construct"}:
+                                    nline = _narr.say("machine_talks_back") or \
+                                            _narr.say("machine_confusion")
+                                elif tags & {"crawler","npc","cult","civilian"}:
+                                    nline = _narr.say("rumor_echo") or \
+                                            _narr.say("crawler_gossip_shift")
+                                elif tags & {"sponsor","audience"}:
+                                    nline = _narr.say("sponsor_mocks_belief") or \
+                                            _narr.say("sponsor_notices_propaganda")
+                                else:
+                                    nline = _narr.say("rumor_echo")
+                                fb = m.get("fallback_line")
+                                if nline:
+                                    lines.append(nline)
+                                elif fb:
+                                    lines.append(fb)
+                            # If we have a high-distortion mod, also flag
+                            # the room as a place where the belief may
+                            # backfire — useful for resolution logic.
+                            for sid in (mods[0].get("seed_id"),):
+                                seed = (world.belief_seeds or {}).get(sid)
+                                if seed is not None and seed.distortion >= 70:
+                                    r.state.setdefault("belief_backfire_seeds", [])
+                                    if sid not in r.state["belief_backfire_seeds"]:
+                                        r.state["belief_backfire_seeds"].append(sid)
+                                    nline = _narr.say("belief_backfires")
+                                    if nline:
+                                        lines.append(nline)
+                    except Exception:
+                        pass
                 else:
                     # Return visit — short look line
                     lines.append(r.display_look())
+                # Prompt 07: safehouse entry — strong propagation trigger.
+                if r.safehouse_subtype:
+                    try:
+                        from . import memetics
+                        memetics.process_belief_seeds(world, 0,
+                                                      trigger="safehouse_entry")
+                    except Exception:
+                        pass
 
         elif kind == "look":
             if room:
@@ -98,6 +154,31 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
             eid = eff.get("entity_id"); amount = int(eff.get("amount", 0))
             ent = _resolve_entity(world, room, eid)
             if ent is not None:
+                # Gap 4: pre-fire any armed player traps in the room against this
+                # hostile before the main damage lands. One trap per damage hit.
+                if room is not None and ent.entity_type in ("monster","crawler","npc") \
+                        and ent.is_alive():
+                    traps = (room.state or {}).get("player_traps") or []
+                    untriggered = [tr for tr in traps if not tr.get("triggered")]
+                    if untriggered:
+                        tr = untriggered[0]
+                        tr["triggered"] = True
+                        eff_payload = tr.get("effect") or {}
+                        bonus = int(eff_payload.get("amount", 2))
+                        ent.hp = max(0, ent.hp - bonus)
+                        cond = None
+                        if eff_payload.get("type") == "damage_and_stun":
+                            cond = "stunned"
+                        elif eff_payload.get("type") == "knockdown":
+                            cond = "prone"
+                        elif eff_payload.get("type") == "obscure":
+                            cond = "blinded"
+                        if cond and cond not in ent.conditions:
+                            ent.conditions.append(cond)
+                        lines.append(t("feedback_trap_fires",
+                                       fallback=f"Pułapka „{tr.get('display_name','?')}” odpala: "
+                                                f"-{bonus} HP{(' + '+cond) if cond else ''}.",
+                                       name=tr.get("display_name","?"), amount=bonus))
                 ent.hp = max(0, ent.hp - amount)
                 if ent.hp <= 0 and ent.max_hp > 0:
                     lines.append(t("feedback_entity_down", fallback=f"{ent.display_name()} pada.",
@@ -320,12 +401,43 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                     room.fragments.append(ckey)
                 if ckey not in ch.flags["known_clues"]:
                     ch.flags["known_clues"].append(ckey)
+                # Prompt 07b follow-up: roll `false_variant_chance` to maybe
+                # deliver a distorted version. The store keeps the original
+                # key + new effective reliability + a `contaminated` flag so
+                # save/load preserves the uncertain state.
+                from . import content_loader as _cl
+                delivery = _cl.roll_clue_delivery(clue)
+                used_text = delivery["text"]
+                # Reveal_tags follow the canonical clue, regardless of which
+                # variant fired — false rumors still teach the tag-shape;
+                # they just teach it wrong. The reliability counter records
+                # how much to trust it.
                 for tag in clue.get("reveals", []) or []:
                     if tag not in ch.flags["known_facts"]:
                         ch.flags["known_facts"].append(tag)
-                line = clue.get("text", "")
-                if line:
-                    lines.append(line)
+                try:
+                    from . import knowledge as _kn
+                    entry = dict(clue)
+                    entry.setdefault("key", ckey)
+                    entry["reliability"] = delivery["reliability"]
+                    if delivery["contaminated"]:
+                        # Tag for journal display + downstream gating.
+                        entry["tags"] = list(entry.get("tags") or []) + ["contaminated"]
+                    newly = _kn.add_known_clue(world, entry)
+                    if newly:
+                        for path in (clue.get("enables_paths") or []):
+                            lines.append(t("feedback_path_unlocked",
+                                           fallback=f"Odblokowano możliwość: {path}.",
+                                           path=path))
+                except Exception:
+                    pass
+                if used_text:
+                    lines.append(used_text)
+                # If contaminated, hint AT THE FRINGE that the source feels
+                # off — never expose the false_variant_chance mechanic.
+                if delivery["contaminated"]:
+                    lines.append(t("feedback_clue_feels_off",
+                                   fallback="Brzmi spójnie, ale coś tu nie pasuje. Lepiej traktować ostrożnie."))
 
         elif kind == "class_affinity_shift":
             kind_id = eff.get("kind")

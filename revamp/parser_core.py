@@ -40,6 +40,16 @@ class ActionIntent:
     needs_clarification: bool = False
     clarification_options: List[str] = field(default_factory=list)
     parser_source: str = "deterministic"
+    # Audit gap 1: Polish "X z Y" / English "X from Y" extraction
+    desired_material: Optional[str] = None   # the X token (what player wants)
+    desired_part: Optional[str] = None       # alias for human-readable parts
+    source_text: Optional[str] = None        # the Y token (source entity)
+    raw_target_text: Optional[str] = None    # the original target fragment
+
+    # Prompt 07: memetic action payload.
+    memetic_method: Optional[str] = None     # rumor / lie / false_order / ...
+    core_claim: Optional[str] = None         # the proposition the player asserts
+    spread_channel: Optional[str] = None     # narrative channel for the claim
 
     def to_dict(self):
         return self.__dict__.copy()
@@ -55,13 +65,34 @@ _QUICK_INTENTS = {
     "check_inventory": ["ekwipunek","plecak","inventory"],
     "check_character": ["postać","postac","karta","character"],
     "check_map":     ["mapa","map"],
-    "ask_rumor":     ["plotki","rumors"],
+    # ask_rumor is reserved for an NPC-side action; the journal tab cues
+    # (plotki/rumors) now live in `check_beliefs` and route to the rumors
+    # tab through phrasing detection in game.py.
+    "ask_rumor":     ["zapytaj o plotki","ask about rumors"],
     "save":          ["zapisz","save"],
+    # Multi-word "pomoc X" matches MUST come before bare "help" so they win.
+    "craft_help":      ["pomoc craftingu","craft help"],
+    "salvage_help":    ["pomoc odzyskiwania","salvage help"],
+    "trap_help":       ["pomoc pułapek","pomoc pulapek","trap help","pomoc rozstawiania"],
     "help":          ["pomoc","help","?"],
     "flee":          ["uciekaj","spierdalaj","run","flee","wycofaj"],
     "check_materials": ["materiały","materialy","materials","surowce"],
-    "craft_help":      ["pomoc craftingu","craft help"],
-    "salvage_help":    ["pomoc odzyskiwania","salvage help"],
+    "check_beliefs":   ["idee","plotki","wpływy","wplywy","beliefs","rumors",
+                        "memy","mem","mity","przekonania"],
+    # Prompt 07b: knowledge journal (clues + facts + passwords + routes).
+    "check_knowledge": ["wiedza","informacje","wskazówki","wskazowki",
+                        "clues","facts","notes"],
+    # Prompt 09: resolution / display settings
+    "show_resolutions":   ["rozdzielczość","rozdzielczosc","resolution","resolutions"],
+    "set_fullscreen":     ["fullscreen","pełny ekran","pelny ekran","ekran"],
+    "set_windowed":       ["windowed","tryb okna","okno","tryb okien"],
+    # Prompt 10: journal overlay
+    "journal_open":       ["dziennik","journal","notatki","notes"],
+    "journal_close":      ["zamknij","close","wyjdź","wyjdz","zamknij dziennik"],
+    "journal_objectives": ["cele","objectives","zadania","cel"],
+    "journal_crawlers":   ["crawlerzy","crawlers","znajomi"],
+    "journal_crafting":   ["crafting","przepisy","recipes"],
+    "journal_achievements":["osiągnięcia","osiagniecia","achievements","sukcesy"],
 }
 
 
@@ -127,6 +158,38 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.9
         return intent
 
+    # ── Prompt 09: "ustaw rozdzielczość 1600x900" / "set resolution 1600x900" ──
+    res_re = re.compile(
+        r"^(?:ustaw|set)\s+(?:rozdzielczosc|rozdzielczość|resolution)\s+"
+        r"(?P<w>\d{3,5})\s*[x×]\s*(?P<h>\d{3,5})$"
+    )
+    rm2 = res_re.match(folded)
+    if rm2:
+        intent.intent = "set_resolution"
+        intent.verb = "set_resolution"
+        try:
+            intent.modifiers.append(f"w:{int(rm2.group('w'))}")
+            intent.modifiers.append(f"h:{int(rm2.group('h'))}")
+        except (ValueError, TypeError):
+            pass
+        intent.confidence = 0.95
+        return intent
+
+    # ── Prompt 07b: "użyj hasła [do X]" must beat the generic "use" regex ────
+    pwd_re_early = re.compile(
+        r"^(?:uzyj|użyj|use|wprowadz|wprowadź|enter|wpisz)\s+"
+        r"(?:hasla|hasła|password|kodu|code)"
+        r"(?:\s+(?:do|na|on|to|for)\s+(?P<who>.+))?$"
+    )
+    pme = pwd_re_early.match(folded)
+    if pme:
+        intent.intent = "use_password"
+        intent.verb = pme.group(0).split()[0]
+        if pme.group("who"):
+            intent.targets.append(_strip_articles(pme.group("who")))
+        intent.confidence = 0.9
+        return intent
+
     # ── Use: "użyj X na Y" / "use X on Y" ────────────────────────────────────
     use_re = re.compile(r"^(?:uzyj|użyj|use)\s+(.+?)(?:\s+(?:na|on|at|aby|do)\s+(.+))?$")
     um = use_re.match(folded)
@@ -137,6 +200,211 @@ def parse(text: str, world=None) -> ActionIntent:
         if um.group(2):
             intent.targets.append(_strip_articles(um.group(2)))
         intent.confidence = 0.85
+        return intent
+
+    # ── Salvage / harvest / loot "X z Y" (Polish) and "X from Y" (English) ────
+    # Patterns: pozyskaj X z Y / wyciągnij X z Y / odzyskaj X z Y / zbierz X z Y
+    #           weź X z Y / wymontuj X z Y / zdemontuj X z Y / wyjmij X z Y
+    # English:   harvest/take/recover/pull X from/out of Y
+    extract_re = re.compile(
+        r"^(?P<verb>"
+        r"pozyskaj\w*|wyciagnij\w*|wyciągnij\w*|odzyskaj\w*|zbierz\w*|wez\w*|weź\w*|"
+        r"wymontuj\w*|zdemontuj\w*|wyjmij\w*|wyjm\w*|wyrwij\w*|wypruj\w*|"
+        r"harvest|take|recover|pull|grab|salvage|extract"
+        r")\s+"
+        r"(?P<obj>.+?)"
+        r"\s+(?:z\s+tego\s+|z\s+|ze\s+|from\s+|out\s+of\s+)"
+        r"(?P<src>.+)$"
+    )
+    em = extract_re.match(folded)
+    if em:
+        verb = em.group("verb")
+        aff = find_affordance_by_verb(verb, intent.language_guess)
+        # Verb -> intent override: 'wez/take' is loot, 'pozyskaj/harvest' is harvest,
+        # everything else defaults to salvage. Override if affordance lookup says
+        # something different (loot, harvest, salvage).
+        intent_key = aff.key if aff else "salvage"
+        if any(verb.startswith(p) for p in ("wez","weź","take","grab","wyjmij","wyjm")):
+            intent_key = "loot"
+        elif any(verb.startswith(p) for p in ("pozyskaj","harvest","wypruj","wyrwij")):
+            intent_key = "harvest"
+        elif any(verb.startswith(p) for p in (
+                "wyciagnij","wyciągnij","odzyskaj","zbierz","wymontuj","zdemontuj",
+                "salvage","recover","pull","extract")):
+            intent_key = "salvage"
+        intent.intent = intent_key
+        intent.verb = verb
+        obj_text = _strip_articles(em.group("obj"))
+        src_text = _strip_articles(em.group("src"))
+        intent.targets.append(src_text)        # source is the main target
+        intent.source_text = src_text
+        intent.desired_material = obj_text
+        intent.desired_part = obj_text
+        intent.raw_target_text = f"{obj_text} z {src_text}"
+        intent.confidence = 0.9
+        return intent
+
+    # ── Prompt 07b: clue-gated resolution phrasings ───────────────────────────
+    # "użyj hasła / use password [on X]"
+    pwd_re = re.compile(
+        r"^(?:uzyj|użyj|use|wprowadz|wprowadź|enter|wpisz)\s+"
+        r"(?:hasla|hasła|password|kodu|code)"
+        r"(?:\s+(?:do|na|on|to|for)\s+(?P<who>.+))?$"
+    )
+    pm2 = pwd_re.match(folded)
+    if pm2:
+        intent.intent = "use_password"
+        intent.verb = pm2.group(0).split()[0]
+        if pm2.group("who"):
+            intent.targets.append(_strip_articles(pm2.group("who")))
+        intent.confidence = 0.9
+        return intent
+
+    # "wykorzystaj słabość [X] / exploit weakness [of X]"
+    weak_re = re.compile(
+        r"^(?:wykorzystaj|exploit|target)\s+(?:slabosc|słabość|weakness)"
+        r"(?:\s+(?:of\s+|na\s+|of\s+the\s+)?(?P<who>.+))?$"
+    )
+    wm = weak_re.match(folded)
+    if wm:
+        intent.intent = "exploit_weakness"
+        if wm.group("who"):
+            intent.targets.append(_strip_articles(wm.group("who")))
+        intent.confidence = 0.9
+        return intent
+
+    # "przypominam / invoke belief / use myth"
+    invoke_re = re.compile(
+        r"^(?:przypominam|przypomnij|przyzywam|invoke|remind|cite)\s+"
+        r"(?P<who>.+?)(?:\s+(?:o|of|about|że|that)\s+(?P<claim>.+))?$"
+    )
+    im = invoke_re.match(folded)
+    if im and ("serca" in folded or "heart" in folded or "myth" in folded
+               or "wierze" in folded or "wierzą" in folded
+               or "tabu" in folded or "prawd" in folded):
+        intent.intent = "invoke_belief"
+        intent.verb = "invoke"
+        intent.targets.append(_strip_articles(im.group("who")))
+        intent.core_claim = (im.group("claim") or "").strip()
+        intent.confidence = 0.82
+        return intent
+
+    # ── Prompt 07: memetic / belief-seed phrasing ─────────────────────────────
+    # Patterns the player typically types when planting an idea, lie, rumor,
+    # or false order. Each branch fills intent.memetic_method, .core_claim,
+    # and .targets where possible. Validation/resolution lives in game.py
+    # (`_attempt_memetic`) so we don't pollute the standard validate pipeline.
+
+    # 1) "wmów / wmów im / convince <target>, że <claim>"
+    #    → identity_attack OR seed_belief depending on phrasing
+    seed_re = re.compile(
+        r"^(?P<verb>wmow\w*|wmaw\w*|przekonaj\w*|przekonuj\w*|powiedz\w*|"
+        r"convince|tell|persuade|make)\s+"
+        r"(?P<who>[^,]+?)"
+        r"[, ]+(?:ze|że|that)\s+"
+        r"(?P<claim>.+)$"
+    )
+    sm = seed_re.match(folded)
+    if sm:
+        intent.intent = "seed_belief"
+        intent.verb = sm.group("verb")
+        who = _strip_articles(sm.group("who"))
+        intent.targets.append(who)
+        intent.core_claim = sm.group("claim").strip()
+        intent.memetic_method = "identity_attack" if "wmow" in intent.verb else "lie"
+        intent.confidence = 0.85
+        return intent
+
+    # 2) "rozpuszczam plotkę, że X" / "spread rumor that X"
+    rumor_re = re.compile(
+        r"^(?P<verb>rozpuszczam|rozpu[sś]c\w*|rozglos\w*|rozg[lł]os\w*|plotkuj\w*|"
+        r"powtarzam|spread|circulate|start)\s+"
+        r"(?:plotk\w*|rumor\w*|gossip)\s*"
+        r"(?:[, ]+(?:ze|że|that)\s+)?"
+        r"(?P<claim>.+)$"
+    )
+    rm = rumor_re.match(folded)
+    if rm:
+        intent.intent = "spread_rumor"
+        intent.verb = rm.group("verb")
+        intent.core_claim = rm.group("claim").strip()
+        intent.memetic_method = "rumor"
+        intent.spread_channel = "crawler_gossip"
+        intent.confidence = 0.85
+        return intent
+
+    # 3) "podaj fałszywy rozkaz / issue false order to <target>: <claim>"
+    order_re = re.compile(
+        r"^(?P<verb>podaj|wydaj|issue|fake)\s+(?:falszywy|fa[lł]szywy|fake|false)\s+"
+        r"(?:rozkaz|order)\s+"
+        r"(?:(?:dla|do|to)\s+)?(?P<who>[^:,]+?)"
+        r"(?:\s*[:,]\s*(?P<claim>.+))?$"
+    )
+    om = order_re.match(folded)
+    if om:
+        intent.intent = "issue_false_order"
+        intent.verb = om.group("verb")
+        intent.targets.append(_strip_articles(om.group("who")))
+        intent.core_claim = (om.group("claim") or "").strip()
+        intent.memetic_method = "false_order"
+        intent.spread_channel = "machine_radio"
+        intent.confidence = 0.85
+        return intent
+
+    # 4) "ogłaszam / broadcast / propaganda" — broadcast-mode framing
+    propaganda_re = re.compile(
+        r"^(?P<verb>ogla\w*|og[lł]a\w*|nadaj\w*|broadcast|announce|propagand\w*)"
+        r"(?:\s+(?:przez|via|through)\s+(?P<chan>kamer\w*|terminal\w*|radio|camera))?"
+        r"[, ]+"
+        r"(?:(?:ze|że|that)\s+)?(?P<claim>.+)$"
+    )
+    pm = propaganda_re.match(folded)
+    if pm:
+        intent.intent = "propaganda"
+        intent.verb = pm.group("verb")
+        chan = (pm.group("chan") or "").strip()
+        intent.spread_channel = ("sponsor_replay" if "kamer" in chan or "camera" in chan
+                                 else "terminal_logs" if "terminal" in chan
+                                 else "audience_memes")
+        intent.core_claim = pm.group("claim").strip()
+        intent.memetic_method = "propaganda"
+        intent.confidence = 0.82
+        return intent
+
+    # 5) "stwórz tabu / create taboo about X"
+    taboo_re = re.compile(
+        r"^(?P<verb>stworz|stw[oó]rz|nada\w*|ustanow\w*|create|declare)\s+"
+        r"(?:tabu|taboo|przeklen\w*|cursed)\s+"
+        r"(?:(?:o|on|about|wok[oó][lł]|wokol)\s+)?(?P<claim>.+)$"
+    )
+    tm2 = taboo_re.match(folded)
+    if tm2:
+        intent.intent = "create_taboo"
+        intent.verb = tm2.group("verb")
+        intent.core_claim = tm2.group("claim").strip()
+        intent.memetic_method = "taboo_creation"
+        intent.spread_channel = "graffiti"
+        intent.confidence = 0.8
+        return intent
+
+    # 6) "rozsiej / sow distrust / divide them" — sow_distrust
+    distrust_re = re.compile(
+        r"^(?P<verb>skloc\w*|sk[lł]oc\w*|podziel\w*|zasiej\w*|sow|divide|"
+        r"turn against)\s+"
+        r"(?P<who>.+?)"
+        r"(?:\s+(?:przeciw|against|na|with)\s+(?P<who2>.+))?$"
+    )
+    dm = distrust_re.match(folded)
+    if dm and "nieufnos" in folded or (dm and ("sow" in folded or "divide" in folded)):
+        intent.intent = "sow_distrust"
+        intent.verb = dm.group("verb")
+        who = _strip_articles(dm.group("who"))
+        if dm.group("who2"):
+            intent.targets.extend([who, _strip_articles(dm.group("who2"))])
+        else:
+            intent.targets.append(who)
+        intent.memetic_method = "social_proof"
+        intent.confidence = 0.78
         return intent
 
     # ── Push/throw/lure into/at/onto X — environment chains ──────────────────
@@ -179,6 +447,34 @@ def parse(text: str, world=None) -> ActionIntent:
     return intent
 
 
+_WEAK_FIELD_PLACEHOLDERS = {
+    # Single-word generic stubs commonly returned by the deterministic
+    # parser when player phrasing was bare ("plotka", "belief", etc.).
+    "", "?", "??", "...", "x", "y",
+    "belief", "rumor", "lie", "myth", "mit", "plotka", "plotki",
+    "machine", "maszyna", "maszyny", "drono", "dron", "drony", "robot", "roboty",
+    "crawler", "crawlerzy", "sponsor", "sponsorzy",
+}
+
+
+def is_weak_memetic_field(value) -> bool:
+    """Return True when `value` is so generic that an LLM expansion would
+    plausibly improve it. Used by the Ollama enrichment path."""
+    if value is None:
+        return True
+    if not isinstance(value, str):
+        return False
+    s = value.strip()
+    if len(s) < 8:
+        return True
+    if s.lower() in _WEAK_FIELD_PLACEHOLDERS:
+        return True
+    # Single token or two-token short phrase is also weak.
+    if s.count(" ") < 1:
+        return True
+    return False
+
+
 def _strip_articles(s: str) -> str:
     """Remove leading filler tokens from a target phrase."""
     parts = [t for t in re.split(r"\s+", s.strip()) if t and t not in _STOP]
@@ -188,21 +484,80 @@ def _strip_articles(s: str) -> str:
 def parse_with_optional_llm(text: str, world=None) -> ActionIntent:
     """Pipeline: deterministic first; if confidence is low and Ollama is
     enabled, call the LLM to produce a fallback intent. Either way, return
-    an ActionIntent for the validator to interpret. Never raise."""
+    an ActionIntent for the validator to interpret. Never raise.
+
+    Prompt-07b follow-up: for memetic / social intents we *also* try
+    Ollama enrichment at high deterministic confidence — but only to fill
+    in optional fields (core_claim, method, target_tags, hooks). The
+    deterministic intent label, verb, and targets stay authoritative.
+    """
     from .config import USE_OLLAMA
 
-    # Always run the deterministic parser first.
     deterministic = parse(text, world)
-    if deterministic.confidence >= 0.7 or deterministic.intent == "numeric":
+
+    # Intents where an LLM can usefully enrich even when the deterministic
+    # parser was confident. Keep this list narrow — these are all already
+    # social/memetic flavored.
+    _ENRICH_MEMETIC = {
+        "seed_belief", "spread_rumor", "create_taboo", "issue_false_order",
+        "logic_exploit", "identity_attack", "sow_distrust", "incite_panic",
+        "religious_framing", "sponsor_disinformation", "propaganda",
+        "forge_social_proof", "invoke_belief", "talk",
+    }
+
+    if deterministic.intent == "numeric":
         return deterministic
 
+    # Path 1: deterministic was confident enough; enrich memetic intents
+    # for optional fields. Post-07b follow-up: also allow Ollama to UPGRADE
+    # weak deterministic memetic fields (placeholders, single tokens, etc.)
+    # but never override explicit objects, destinations, or the intent label.
+    if deterministic.confidence >= 0.7:
+        if (not USE_OLLAMA) or (deterministic.intent not in _ENRICH_MEMETIC):
+            return deterministic
+        try:
+            from . import llm_parser
+            ctx = _build_compact_context(world)
+            llm_dict = llm_parser.parse_with_ollama(text, ctx)
+        except Exception:
+            llm_dict = None
+        if not llm_dict:
+            return deterministic
+
+        def _upgrade(field_name, llm_key, allow_upgrade=True):
+            cur = getattr(deterministic, field_name, None)
+            new = llm_dict.get(llm_key)
+            if not new:
+                return
+            if not cur:
+                setattr(deterministic, field_name, new)
+                return
+            if allow_upgrade and is_weak_memetic_field(cur) and not is_weak_memetic_field(new):
+                setattr(deterministic, field_name, new)
+
+        _upgrade("core_claim",      "core_claim",      allow_upgrade=True)
+        _upgrade("memetic_method",  "method",          allow_upgrade=True)
+        _upgrade("spread_channel",  "spread_channel",  allow_upgrade=False)
+        _upgrade("desired_outcome", "desired_outcome", allow_upgrade=True)
+        # Stash target_tags onto modifiers so downstream sees them. We never
+        # remove deterministic tags — only add LLM-discovered ones.
+        for tg in (llm_dict.get("target_tags") or []):
+            mod = f"target_tag:{tg}"
+            if mod not in deterministic.modifiers:
+                deterministic.modifiers.append(mod)
+        # Stash LLM's suggested_stat too; select_memetic_stat will read it.
+        st = llm_dict.get("suggested_stat")
+        if isinstance(st, str) and st.upper() in {"STR","DEX","CON","INT","WIS","CHA"}:
+            stat_mod = f"stat:{st.upper()}"
+            if stat_mod not in deterministic.modifiers:
+                deterministic.modifiers.append(stat_mod)
+        return deterministic
+
+    # Path 2: deterministic low-confidence fallback — original behavior.
     if not USE_OLLAMA:
         return deterministic
 
-    # Build a compact context the LLM can actually use without paying tokens
-    # for the entire world.
     context = _build_compact_context(world)
-
     try:
         from . import llm_parser
         llm_dict = llm_parser.parse_with_ollama(text, context)
@@ -213,7 +568,6 @@ def parse_with_optional_llm(text: str, world=None) -> ActionIntent:
         return deterministic
 
     llm_intent = _intent_from_llm_dict(llm_dict, raw_text=text)
-    # Prefer the LLM's interpretation only if it's at least as confident.
     if llm_intent.confidence >= deterministic.confidence:
         return llm_intent
     return deterministic
@@ -307,6 +661,14 @@ def _intent_from_llm_dict(d: dict, raw_text: str) -> ActionIntent:
         intent.confidence = float(d.get("confidence", 0.5))
     except (TypeError, ValueError):
         intent.confidence = 0.5
+    # Prompt 07: pass through memetic extras if present.
+    intent.memetic_method = d.get("method")
+    intent.core_claim = d.get("core_claim")
+    intent.spread_channel = d.get("spread_channel")
+    if d.get("target_tags"):
+        # Stash on modifiers so downstream can pick them up.
+        for tg in d.get("target_tags") or []:
+            intent.modifiers.append(f"target_tag:{tg}")
     return intent
 
 
@@ -316,5 +678,14 @@ _LLM_INTENT_PASSTHROUGH = {
     "attack","defend","use","talk","intimidate","bribe","sneak","hide","flee",
     "craft","loot","open","close","hack","force","lockpick","throw_at",
     "push_into","lure","perform","ask_rumor","check_inventory","check_character",
-    "check_map","save","help",
+    "check_map","save","help","deploy","salvage","strip","harvest",
+    # Prompt 07: memetic intent labels.
+    "seed_belief","spread_rumor","create_taboo","issue_false_order",
+    "logic_exploit","identity_attack","sow_distrust","incite_panic",
+    "religious_framing","sponsor_disinformation","propaganda",
+    "forge_social_proof","check_beliefs","check_knowledge",
+    "use_password","exploit_weakness","invoke_belief",
+    "show_resolutions","set_fullscreen","set_windowed","set_resolution",
+    "journal_open","journal_close","journal_objectives","journal_crawlers",
+    "journal_crafting","journal_achievements",
 }
