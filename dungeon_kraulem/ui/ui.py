@@ -545,11 +545,16 @@ def draw_nav_panel(surf, nav_state, input_mode="text", layout=None,
         col_count = 2; col_w = (w - 36) // 2
     if w >= 2200:
         col_count = 3; col_w = (w - 48) // 3
-    per_col = max(1, (n + col_count - 1) // col_count)
 
     line_h = font(L.font_small).get_height() + 2
     max_lines_per_col = max(1, (h - (cy - y) - 12) // line_h)
-    visible_total = min(n, col_count * max_lines_per_col)
+    # Prompt 22 fix: previously `per_col` was ceil(n / col_count) and the
+    # row index iterated by `i % per_col`. If ceil exceeded
+    # `max_lines_per_col`, rows rendered past the panel and bled into
+    # the log below. Now cap `per_col` first so layout never overflows.
+    ideal_per_col = (n + col_count - 1) // col_count
+    per_col = max(1, min(max_lines_per_col, ideal_per_col))
+    visible_total = min(n, col_count * per_col)
     visible = opts[:visible_total]
 
     f_opt = font(L.font_small)

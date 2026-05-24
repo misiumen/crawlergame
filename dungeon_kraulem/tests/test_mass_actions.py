@@ -446,6 +446,76 @@ def test_disambiguation_partial_name_picks_one():
     print("  disambiguation partial-name picks one: OK")
 
 
+def test_podnies_wszystko_routes_to_mass_loot():
+    """Prompt 22 bug fix: "podnieś wszystko" should route to
+    mass_loot_take, not fail with "no target". Previously `podnieś`
+    wasn't in the mass-loot verb set."""
+    i = parse("podnieś wszystko", world=None)
+    assert i.intent == "mass_loot_take", \
+        f"expected mass_loot_take, got {i.intent}"
+    assert i.mass_target is True
+    print("  'podnieś wszystko' -> mass_loot_take: OK")
+
+
+def test_portable_item_labeled_podnies_in_navpanel():
+    """Prompt 22 bug fix: portable items should show "Podnieś:" in
+    the action panel (not "Przeszukaj:"), and the bound command
+    should be `podnieś <name>` not `przeszukaj <name>`."""
+    from ..ui import ui_nav
+    from ..engine.world import WorldState
+    from ..engine.character import Character
+    from ..engine.floor import FloorState
+    from ..engine.room import RoomState
+    from ..engine.entity import Entity, T_OBJECT
+    w = WorldState()
+    w.character = Character(name="N", background="janitor")
+    f = FloorState(floor_id="f1", floor_number=1)
+    r = RoomState(room_id="r0", fallback_short_title="Studio")
+    f.add_room(r); f.start_room_id="r0"; f.current_room_id="r0"
+    w.current_floor = f
+    card = Entity(key="access_card", entity_type=T_OBJECT,
+                  fallback_name="podejrzana karta", portable=True,
+                  affordances=["inspect","loot"], location_id="r0")
+    r.entities.append(card); w.register(card)
+    state = ui_nav.build_play_options(w)
+    obj_opts = state.options_in("objects")
+    loot_opts = [o for o in obj_opts if o.action_type == "loot"]
+    assert loot_opts, "portable item must have a loot option"
+    assert loot_opts[0].label.startswith("Podnieś"), \
+        f"portable item label should start with 'Podnieś', got: {loot_opts[0].label!r}"
+    assert loot_opts[0].command.startswith("podnieś"), \
+        f"portable item command should start with 'podnieś', got: {loot_opts[0].command!r}"
+    print("  portable item labeled Podnieś: OK")
+
+
+def test_stripped_object_hidden_from_navpanel():
+    """Prompt 22 bug fix: an entity with state.stripped=True is fully
+    dismantled and should disappear from the Obiekty action bar."""
+    from ..ui import ui_nav
+    from ..engine.world import WorldState
+    from ..engine.character import Character
+    from ..engine.floor import FloorState
+    from ..engine.room import RoomState
+    from ..engine.entity import Entity, T_OBJECT
+    w = WorldState()
+    w.character = Character(name="N", background="janitor")
+    f = FloorState(floor_id="f1", floor_number=1)
+    r = RoomState(room_id="r0", fallback_short_title="Studio")
+    f.add_room(r); f.start_room_id="r0"; f.current_room_id="r0"
+    w.current_floor = f
+    box = Entity(key="junction_box", entity_type=T_OBJECT,
+                 fallback_name="rozdzielnia",
+                 tags=["salvageable"], affordances=["inspect","salvage"],
+                 location_id="r0")
+    box.state = {"stripped": True}
+    r.entities.append(box); w.register(box)
+    state = ui_nav.build_play_options(w)
+    obj_opts = state.options_in("objects")
+    assert not any("rozdzielnia" in o.label for o in obj_opts), \
+        f"stripped entity should NOT appear in nav; got {[o.label for o in obj_opts]}"
+    print("  stripped object hidden from nav: OK")
+
+
 def test_nav_panel_armed_renders_marker():
     """Prompt 20 bug fix: when player presses arrow from text-empty
     input (Prompt-18 arming latch), input_mode stays 'text' but the
@@ -486,6 +556,9 @@ def main():
     test_no_exit_message_has_no_placeholder_leak()
     test_disambiguation_oba_picks_both()
     test_disambiguation_partial_name_picks_one()
+    test_podnies_wszystko_routes_to_mass_loot()
+    test_portable_item_labeled_podnies_in_navpanel()
+    test_stripped_object_hidden_from_navpanel()
     test_nav_panel_armed_renders_marker()
     print("Prompt 16 mass-action smoke: OK")
 

@@ -248,6 +248,17 @@ def _object_options(world, room) -> List[SelectableOption]:
     for e in room.visible_entities():
         if e.entity_type in ("monster", "crawler", "npc"):
             continue
+        state = e.state or {}
+        # Prompt 22 fix: hide fully-dismantled / depleted objects so
+        # the action bar doesn't keep showing "rozdzielnia" after it's
+        # been reduced to parts. We still surface them if they're a
+        # container (loot remnants may still be inside).
+        fully_consumed = (state.get("stripped") or state.get("depleted")) and \
+                         not (("container" in (e.tags or [])) or
+                              ("corpse" in (e.tags or [])) or
+                              e.entity_type == "corpse")
+        if fully_consumed:
+            continue
         name = e.display_name()
         tags = e.tags or []
         affs = e.affordances or []
@@ -259,8 +270,21 @@ def _object_options(world, room) -> List[SelectableOption]:
             group=GROUP_OBJECTS, target_id=e.entity_id,
             action_type="inspect",
         ))
-        # Loot if portable or container.
-        if e.portable or "container" in tags or "corpse" in tags or e.entity_type == "corpse":
+        # Prompt 22 fix: distinguish PORTABLE items (player picks them
+        # up with "podnieś") from CONTAINERS / CORPSES (player searches
+        # them with "przeszukaj"). Previously both rendered as
+        # "Przeszukaj" which is wrong for cards / cables / scrap.
+        is_container = "container" in tags or "corpse" in tags or \
+                       e.entity_type == "corpse"
+        if e.portable and not is_container:
+            out.append(SelectableOption(
+                option_id=f"loot_{e.entity_id}",
+                label=f"Podnieś: {name}",
+                command=f"podnieś {name}",
+                group=GROUP_OBJECTS, target_id=e.entity_id,
+                action_type="loot",
+            ))
+        elif is_container:
             out.append(SelectableOption(
                 option_id=f"loot_{e.entity_id}",
                 label=f"Przeszukaj: {name}",
@@ -268,8 +292,9 @@ def _object_options(world, room) -> List[SelectableOption]:
                 group=GROUP_OBJECTS, target_id=e.entity_id,
                 action_type="loot",
             ))
-        # Salvage if tagged or affordance lists it.
-        if "salvageable" in tags or "salvage" in affs:
+        # Salvage if tagged or affordance lists it AND not already stripped.
+        if ("salvageable" in tags or "salvage" in affs) and \
+           not state.get("stripped"):
             out.append(SelectableOption(
                 option_id=f"salvage_{e.entity_id}",
                 label=f"Zdemontuj: {name}",
