@@ -52,7 +52,7 @@ SAFEHOUSE_TEMPLATES = {
         "possible_clue_sources": ["npc_dialogue","terminal"],
         "name_pool": ["Klinika Bez Pytań", "Punkt Sanitarny 7", "NovaChem Triage"],
         "entry_descriptions": [
-            "Zapach środków dezynfekujących walczy z czymś gorszym i wygrywa tylko techniczne. Lampy halogenowe odbijają się od białych płytek z mściwą czystością.",
+            "Zapach środków dezynfekujących walczy z czymś gorszym i wygrywa tylko technicznie. Lampy halogenowe odbijają się od białych płytek z mściwą czystością.",
             "Cennik wisi obok defibrylatora, jakby były tej samej kategorii produktów.",
         ],
         "services": ["heal", "cure", "full", "rumor", "rest_short"],

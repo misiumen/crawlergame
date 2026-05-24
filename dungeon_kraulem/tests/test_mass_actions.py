@@ -488,6 +488,36 @@ def test_portable_item_labeled_podnies_in_navpanel():
     print("  portable item labeled Podnieś: OK")
 
 
+def test_monitor_mid_phrase_does_not_route_to_settings():
+    """Prompt 22 bug fix: typing `sprawdź rozbity monitor` (where
+    monitor is an in-game object) must NOT route to the set_monitor
+    settings command. Previously `_QUICK_INTENTS` had 'monitor' as a
+    cue, and the fast-path matched on `endswith(" monitor")` —
+    settings bled into gameplay."""
+    intent = parse("sprawdź rozbity monitor", world=None)
+    assert intent.intent != "set_monitor", \
+        f"in-game 'monitor' object should not route to settings; got {intent.intent}"
+    print("  'sprawdź rozbity monitor' does NOT hit set_monitor: OK")
+
+
+def test_monitor_bare_lists_displays():
+    """`monitor` alone still works to list displays (anchored regex)."""
+    intent = parse("monitor", world=None)
+    assert intent.intent == "set_monitor", f"got {intent.intent}"
+    # No index modifier -> list mode
+    assert not any(m.startswith("index:") for m in (intent.modifiers or [])), \
+        "bare `monitor` should not have an index modifier"
+    print("  bare 'monitor' -> set_monitor (list mode): OK")
+
+
+def test_monitor_with_index_switches():
+    """`monitor 1` switches to monitor index 1."""
+    intent = parse("monitor 1", world=None)
+    assert intent.intent == "set_monitor"
+    assert "index:1" in (intent.modifiers or [])
+    print("  'monitor 1' -> set_monitor with index:1: OK")
+
+
 def test_stripped_object_hidden_from_navpanel():
     """Prompt 22 bug fix: an entity with state.stripped=True is fully
     dismantled and should disappear from the Obiekty action bar."""
@@ -559,6 +589,9 @@ def main():
     test_podnies_wszystko_routes_to_mass_loot()
     test_portable_item_labeled_podnies_in_navpanel()
     test_stripped_object_hidden_from_navpanel()
+    test_monitor_mid_phrase_does_not_route_to_settings()
+    test_monitor_bare_lists_displays()
+    test_monitor_with_index_switches()
     test_nav_panel_armed_renders_marker()
     print("Prompt 16 mass-action smoke: OK")
 

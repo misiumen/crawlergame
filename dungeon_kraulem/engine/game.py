@@ -727,8 +727,12 @@ class Game:
 
         # List displays.
         if idx is None:
+            # Prompt 22 bug fix: pass `idx` so the locale's {idx}
+            # placeholder gets substituted (the player was seeing the
+            # literal "{idx}" in the log).
             self.log(t("ui_monitor_header",
-                       fallback=f"Dostępne ekrany (aktywny: {cur}):"),
+                       fallback=f"Dostępne ekrany (aktywny: {cur}):",
+                       idx=cur),
                      LOG_SYSTEM)
             for i in range(num):
                 try:
@@ -746,7 +750,8 @@ class Game:
         # Switch.
         if idx < 0 or idx >= num:
             self.log(t("ui_monitor_out_of_range",
-                       fallback=f"Nie ma monitora {idx}. Dostępne: 0..{num-1}."),
+                       fallback=f"Nie ma monitora {idx}. Dostępne: 0..{num-1}.",
+                       idx=idx, max=num-1),
                      LOG_WARN)
             return
         # Persist via the settings helper. If `set_monitor_index` doesn't
@@ -758,7 +763,8 @@ class Game:
             s["monitor_index"] = int(idx)
             _settings.save_settings(s)
         self.log(t("ui_monitor_set",
-                   fallback=f"Monitor: {idx}. Zacznie działać po restarcie gry."),
+                   fallback=f"Monitor: {idx}. Zacznie działać po restarcie gry.",
+                   idx=idx),
                  LOG_SUCCESS)
 
     def submit_generated_command(self, command: str):
@@ -3336,6 +3342,14 @@ class Game:
         mods = pygame.key.get_mods()
         shift_held = bool(mods & pygame.KMOD_SHIFT)
         ctrl_held  = bool(mods & pygame.KMOD_CTRL)
+        # Prompt 22 bug fix: `_suppress_textinput` was sticky — a key that
+        # didn't produce a TEXTINPUT (Enter, arrows, Backspace, Esc) would
+        # leave the flag set, then steal the NEXT typed character. This
+        # is why the first letter of a character name (and the first
+        # letter typed in the command box after pressing any nav key) got
+        # eaten. Clearing here means each keydown gets exactly one shot
+        # to suppress its own corresponding textinput; nothing leaks past.
+        self._suppress_textinput = False
 
         if self.state == STATE_TITLE:
             # Arrow-key navigation mirroring the four visible items.

@@ -92,9 +92,12 @@ _QUICK_INTENTS = {
     "show_resolutions":   ["rozdzielczość","rozdzielczosc","resolution","resolutions"],
     "set_fullscreen":     ["fullscreen","pełny ekran","pelny ekran","ekran"],
     "set_windowed":       ["windowed","tryb okna","okno","tryb okien"],
-    # Prompt 22: monitor / display picker. `monitor` alone lists displays;
-    # `monitor 0` / `monitor 1` switches and requires a restart to apply.
-    "set_monitor":        ["monitor","ekran nr","display","wyświetlacz","wyswietlacz"],
+    # Prompt 22 — set_monitor previously had quick-intent cues, but
+    # "monitor" matched via endswith(" monitor"), so typing
+    # `sprawdź rozbity monitor` (in-game object) routed to display
+    # settings. Removed entirely; the dedicated regex `mon_re` below
+    # is anchored at `^` and handles both bare `monitor` and
+    # `monitor N` forms.
     # Prompt 10: journal overlay
     "journal_open":       ["dziennik","journal","notatki","notes"],
     "journal_close":      ["zamknij","close","wyjdź","wyjdz","zamknij dziennik"],
@@ -308,19 +311,24 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.9
         return intent
 
-    # ── Prompt 22: "monitor 1" / "ekran nr 2" / "display 0" — switch monitor.
+    # ── Prompt 22: monitor switcher. Anchored at `^` to avoid matching
+    # in-game objects with "monitor" in their name (e.g. "rozbity monitor").
+    # Both bare `monitor` (lists displays) and `monitor N` (switches)
+    # are handled here.
     mon_re = re.compile(
         r"^(?:monitor|ekran(?:\s+nr)?|display|wyświetlacz|wyswietlacz)"
-        r"\s+(?P<idx>\d{1,2})$"
+        r"(?:\s+(?P<idx>\d{1,2}))?$"
     )
     mm = mon_re.match(folded)
     if mm:
         intent.intent = "set_monitor"
         intent.verb = "set_monitor"
-        try:
-            intent.modifiers.append(f"index:{int(mm.group('idx'))}")
-        except (ValueError, TypeError):
-            pass
+        idx_str = mm.group("idx")
+        if idx_str is not None:
+            try:
+                intent.modifiers.append(f"index:{int(idx_str)}")
+            except (ValueError, TypeError):
+                pass
         intent.confidence = 0.95
         return intent
 
