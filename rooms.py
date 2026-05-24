@@ -88,6 +88,22 @@ class Room:
         return ROOM_COLORS.get(self.room_type, "NORMAL_TEXT")
 
     def description(self):
+        from lang import tr
+        key_map = {
+            ROOM_COMBAT:     "v2_room_combat_desc",
+            ROOM_TRAP:       "v2_room_trap_desc",
+            ROOM_TREASURE:   "v2_room_treasure_desc",
+            ROOM_REST:       "v2_room_rest_desc",
+            ROOM_MERCHANT:   "v2_room_merchant_desc",
+            ROOM_LORE:       "v2_room_lore_desc",
+            ROOM_MUTATION:   "v2_room_mutation_desc",
+            ROOM_CHECKPOINT: "v2_room_checkpoint_desc",
+            ROOM_BOSS:       "v2_room_boss_desc",
+            ROOM_START:      "v2_room_start_desc",
+        }
+        k = key_map.get(self.room_type)
+        if k:
+            return tr(k, fallback="Unknown room.")
         base = {
             ROOM_COMBAT:     "Hostiles detected. Engage or be eliminated.",
             ROOM_TRAP:       "Environmental hazard. Proceed with caution.",

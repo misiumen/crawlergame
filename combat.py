@@ -2,6 +2,7 @@
 import random
 from utils import d20, parse_dice, clamp
 from narrator import get_narrator
+from lang import tr
 
 
 # ── Condition helpers ──────────────────────────────────────────────────────────
@@ -156,7 +157,7 @@ class CombatState:
         self.round += 1
         self.defend_active = False
         self.dodge_active = False
-        self.log(f"-- Round {self.round} --", "system")
+        self.log(tr("v2_combat_round", n=self.round), "system")
         # Tick conditions on enemies
         for e in self.active_enemies():
             _tick_conditions(e, lambda t: self.log(t, "combat"))
@@ -217,7 +218,7 @@ def process_player_action(state: CombatState, action_dict: dict):
             if result["fumble"]:
                 state.log(f"  {n.say('critical_miss')}", "warn")
             else:
-                state.log("  Miss.", "combat")
+                state.log("  " + tr("v2_combat_miss"), "combat")
         else:
             # Weapon attack
             raw, roll = player.attack_roll()
@@ -229,22 +230,22 @@ def process_player_action(state: CombatState, action_dict: dict):
                 multiplier = effect.get("damage_multiplier", 1)
                 dmg *= multiplier
                 target.take_damage(dmg)
-                state.log(f"  Hit! {dmg} damage to {target.name}.", "combat")
+                state.log("  " + tr("v2_combat_hit", dmg=dmg, target=target.name), "combat")
                 if target.condition_on_hit:
                     _apply_condition(target, target.condition_on_hit)
-                    state.log(f"  {target.name} is now {target.condition_on_hit}.", "warn")
+                    state.log("  " + tr("v2_combat_target_cond", target=target.name, cond=target.condition_on_hit), "warn")
                 # Affinity: melee/ranged based on weapon stat
                 kind = "ranged" if (player.weapon and player.weapon.stat == "DEX") else "melee"
                 _record_kill_method(player, target, kind)
             else:
-                state.log(f"  Missed {target.name} (roll {roll} vs AC {target.effective_ac()}).", "combat")
+                state.log("  " + tr("v2_combat_miss_target", target=target.name, roll=roll, ac=target.effective_ac()), "combat")
 
     elif effect["type"] == "condition":
         _apply_condition(target, effect["condition"])
-        state.log(f"  {target.name} is now {effect['condition']}.", "combat")
+        state.log("  " + tr("v2_combat_target_cond", target=target.name, cond=effect['condition']), "combat")
 
     elif effect["type"] == "disarm":
-        state.log(f"  {target.name} is disarmed (attack penalty for 2 rounds).", "combat")
+        state.log("  " + tr("v2_combat_disarmed", target=target.name), "combat")
         _apply_condition(target, "disarmed")
 
     elif effect["type"] == "self_buff":
@@ -265,8 +266,8 @@ def process_player_action(state: CombatState, action_dict: dict):
 
     elif effect["type"] == "inspect":
         state.inspect_target = target
-        state.log(f"  {target.name}: HP {target.hp}/{target.max_hp} | AC {target.effective_ac()}", "system")
-        state.log(f"  Tags: {', '.join(target.tags) if target.tags else 'none'}", "system")
+        state.log("  " + tr("v2_combat_inspect", target=target.name, hp=target.hp, max=target.max_hp, ac=target.effective_ac()), "system")
+        state.log("  " + tr("v2_combat_inspect_tags", tags=", ".join(target.tags) if target.tags else "—"), "system")
         # Player used their action on inspect, enemy still attacks
         _run_enemy_turn(state)
         state.waiting_for_input = True
@@ -279,7 +280,7 @@ def process_player_action(state: CombatState, action_dict: dict):
         if feat:
             resolve_feature(feat, player, target, lambda t: state.log(t, "combat"))
         else:
-            state.log(f"  No ability found matching '{aname}'.", "warn")
+            state.log("  " + tr("v2_combat_no_match_ability", name=aname or ""), "warn")
 
     elif effect["type"] == "item":
         iname = action_dict.get("item_name", "")
@@ -287,14 +288,14 @@ def process_player_action(state: CombatState, action_dict: dict):
         if item:
             result_str = player.use_consumable(item)
             player.remove_from_inventory(item)
-            state.log(f"  Used {item.name}: {result_str}", "loot")
+            state.log("  " + tr("v2_combat_used_item", name=item.name, result=result_str), "loot")
         else:
-            state.log(f"  No usable item matching '{iname}'.", "warn")
+            state.log("  " + tr("v2_combat_no_match_item", name=iname or ""), "warn")
 
     elif effect["type"] == "environment":
         dmg = effect.get("damage", 4)
         target.take_damage(dmg)
-        state.log(f"  Environmental damage: {dmg} to {target.name}.", "combat")
+        state.log("  " + tr("v2_combat_env_dmg", dmg=dmg, target=target.name), "combat")
         state.log(f"  {get_narrator().say('audience_up')}", "syndicate")
         player.add_audience(5)
 
@@ -433,7 +434,7 @@ def _run_enemy_turn(state: CombatState):
             break
         # Skip if enemy is stunned/dominated/fleeing
         if any(c in enemy.conditions for c in ("stunned", "dominated", "fleeing")):
-            state.log(f"  {enemy.name} is {enemy.conditions[0]} and cannot act.", "combat")
+            state.log("  " + tr("v2_combat_condition_skip", name=enemy.name, cond=enemy.conditions[0]), "combat")
             continue
 
         raw, roll = enemy.attack_roll()
@@ -448,15 +449,15 @@ def _run_enemy_turn(state: CombatState):
             dmg = enemy.damage_roll()
             if raw == 20:
                 dmg *= 2
-                state.log(f"  {enemy.name} crits! {dmg} damage!", "warn")
+                state.log("  " + tr("v2_combat_enemy_crits", enemy=enemy.name, dmg=dmg), "warn")
             else:
-                state.log(f"  {enemy.name} hits for {dmg}.", "combat")
+                state.log("  " + tr("v2_combat_enemy_hits", enemy=enemy.name, dmg=dmg), "combat")
             if state.defend_active:
                 dmg = max(1, dmg // 2)
-                state.log(f"  Defending: damage reduced to {dmg}.", "system")
+                state.log("  " + tr("v2_combat_defend_reduce", dmg=dmg), "system")
             player.take_damage(dmg)
         else:
-            state.log(f"  {enemy.name} misses (roll {roll} vs AC {player_ac}).", "combat")
+            state.log("  " + tr("v2_combat_enemy_misses", enemy=enemy.name, roll=roll, ac=player_ac), "combat")
 
         # Tick player conditions
         _tick_conditions(player, lambda t: state.log(t, "warn"))
