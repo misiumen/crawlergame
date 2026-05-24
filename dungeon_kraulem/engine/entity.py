@@ -51,8 +51,16 @@ class Entity:
     max_hp: int = 0
     ac: int = 10
     damage_dice: str = "1d4"
+    damage_type: str = "physical"   # Prompt 21: what kind of damage this entity deals on attack
     attack_bonus: int = 0
     conditions: List[str] = field(default_factory=list)
+    # Prompt 21: resistance / vulnerability / immunity to typed damage.
+    # Each is a list of damage_type keys (see engine.damage.DAMAGE_TYPES).
+    # `resists` halves incoming damage; `vulnerable_to` doubles it;
+    # `immune_to` reduces to zero.
+    resists: List[str] = field(default_factory=list)
+    vulnerable_to: List[str] = field(default_factory=list)
+    immune_to: List[str] = field(default_factory=list)
 
     def is_alive(self) -> bool:
         return self.hp > 0 if self.max_hp > 0 else True
@@ -71,8 +79,13 @@ class Entity:
             "interactable": self.interactable, "portable": self.portable,
             "state": dict(self.state), "affordances": list(self.affordances),
             "hp": self.hp, "max_hp": self.max_hp, "ac": self.ac,
-            "damage_dice": self.damage_dice, "attack_bonus": self.attack_bonus,
+            "damage_dice": self.damage_dice,
+            "damage_type": self.damage_type,
+            "attack_bonus": self.attack_bonus,
             "conditions": list(self.conditions),
+            "resists": list(self.resists),
+            "vulnerable_to": list(self.vulnerable_to),
+            "immune_to": list(self.immune_to),
         }
 
     @classmethod
@@ -97,8 +110,12 @@ class Entity:
         e.max_hp = d.get("max_hp", 0)
         e.ac = d.get("ac", 10)
         e.damage_dice = d.get("damage_dice", "1d4")
+        e.damage_type = d.get("damage_type", "physical")
         e.attack_bonus = d.get("attack_bonus", 0)
         e.conditions = list(d.get("conditions", []))
+        e.resists       = list(d.get("resists", []))
+        e.vulnerable_to = list(d.get("vulnerable_to", []))
+        e.immune_to     = list(d.get("immune_to", []))
         return e
 
     def display_name(self):

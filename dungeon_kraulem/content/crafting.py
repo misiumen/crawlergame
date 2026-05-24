@@ -248,6 +248,17 @@ _CATEGORY_ITEM_FALLBACKS = {
                               "Organiczny argument za tym, żeby potwór poszedł gdzie indziej."),
     "improvised_bandage":    ("prowizoryczny opatrunek",
                               "Brudna, ale lepsza niż nic próba zatrzymania krwawienia."),
+    # Prompt 21 — elemental trap variants. They share `trap` tag so the
+    # crafted_entity wiring picks them up; the actual damage_type is
+    # read from the item.tags by game._attempt_deploy at deploy time.
+    "fire_trap":             ("pułapka zapalająca",
+                              "Fosfor + ciasna butelka. Coś tu się zapali, i to nie ty."),
+    "acid_flask":            ("fiolka żrąca",
+                              "Wykorzystany odpad chemiczny w pękniętej fiolce. Nie wąchać."),
+    "poison_dart":           ("zatruta strzałka",
+                              "Cienki kolec na sprężynie. Powolne, ale precyzyjne."),
+    "frost_charge":          ("ładunek mrożący",
+                              "Sprężona puszka z chłodziwem i bardzo wąską klapką."),
 }
 
 
@@ -262,6 +273,21 @@ def make_crafted_entity(result_key: str, room_id: str = "",
     affordances = ["inspect", "use", "loot"]
     if result_key.endswith("trap"):
         tags.append("trap"); affordances.append("deploy")
+    # Prompt 21 — elemental trap subtypes inherit `trap` + add their
+    # element tag so game._attempt_deploy picks the right damage_type.
+    if result_key == "fire_trap":
+        tags.extend(["trap","fire","incendiary","flammable"])
+        if "deploy" not in affordances: affordances.append("deploy")
+    if result_key == "acid_flask":
+        tags.extend(["trap","acid","throwable"])
+        if "deploy" not in affordances: affordances.append("deploy")
+        affordances.append("throw_at")
+    if result_key == "poison_dart":
+        tags.extend(["trap","poison"])
+        if "deploy" not in affordances: affordances.append("deploy")
+    if result_key == "frost_charge":
+        tags.extend(["trap","cold"])
+        if "deploy" not in affordances: affordances.append("deploy")
     if result_key.endswith("weapon") or result_key == "crafted_shiv":
         tags.extend(["weapon","sharp","melee"])
         affordances.append("attack")

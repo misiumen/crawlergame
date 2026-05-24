@@ -30,6 +30,15 @@ def advance(world, minutes: int):
     except Exception:
         pass
 
+    # Prompt 21: slow-decay status clocks out of combat. Burning /
+    # poisoned / bleeding / corroded keep ticking at half rate during
+    # exploration. Combat's own tick_statuses handles in-combat pace.
+    try:
+        from . import damage as _dmg
+        _dmg.slow_decay_tick(world, minutes)
+    except Exception:
+        pass
+
     # Day-change event
     if f.day_number() != prev_day:
         world.log_msg(_day_change_line(f), "syndicate")

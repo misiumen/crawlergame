@@ -500,5 +500,38 @@
   "encounter_prep_armed_traps":   "Już rozstawione: {items}",
   "encounter_prep_exits":         "Wyjścia: {items}",
   "encounter_prep_empty":         "Pusto. Naprawdę pusto.",
-  "ui_topbar_encounter_close":    "⚠ TUŻ-TUŻ"
+  "ui_topbar_encounter_close":    "⚠ TUŻ-TUŻ",
+
+  "damage_type_physical":   "fizyczne",
+  "damage_type_fire":       "ogień",
+  "damage_type_electric":   "elektryczne",
+  "damage_type_acid":       "żrące",
+  "damage_type_poison":     "toksyczne",
+  "damage_type_cold":       "zimno",
+  "damage_type_psychic":    "psychiczne",
+
+  "status_burning":         "płonący",
+  "status_corroded":        "skorodowany",
+  "status_poisoned":        "zatruty",
+  "status_chilled":         "wyziębiony",
+
+  "dmg_resisted":           "(osłabione)",
+  "dmg_vulnerable":         "(podatny!)",
+  "dmg_immune":             "(odporny)",
+
+  "dot_burning_tick":       "Palisz się. {amount} HP w popiele.",
+  "dot_bleeding_tick":      "Krwawisz. {amount} HP się znajdzie poza ciałem.",
+  "dot_poisoned_tick":      "Trucizna szarpie. {amount} HP w toksynach.",
+  "status_burning_extinguished": "{name} dymi, ale gaśnie — był(a) mokry/mokra.",
+  "status_chilled_burned_off":   "Lód spotyka ogień. Para. Status zniesiony obu stronom.",
+
+  "ent_patrol_security_n":       "Ochroniarz patrolu",
+  "ent_silent_response_n":       "Agent ds. wycieków",
+  "ent_biotech_inspector_n":     "Inspektor NovaChem",
+  "ent_qc_agent_n":              "Agent Kontroli Jakości",
+  "ent_league_executor_n":       "Egzekutor Ligi",
+  "ent_collector_n":             "Windykator",
+  "ent_chief_editor_n":          "Redaktor Naczelny",
+  "ent_recycler_pilgrim_n":      "Pielgrzym Recyklera",
+  "ent_antihost_n":              "Anty-gospodarz"
 }

@@ -279,7 +279,15 @@ def _effects_for_level(level, aff_key, validation, world):
                                 "source":"heavy_hit","tag":"heavy_attack_hit"})
         elif aff_key in ("push_into","throw_at","lure") and destination is not None:
             dmg = random.randint(6, 12)
-            effects.append({"type":"damage_entity","entity_id":primary.entity_id,"amount":dmg})
+            # Prompt 21: env-kill carries the destination's damage_type
+            # (e.g. acid_pool -> acid + corroded; future env types just
+            # set their damage_type field to plug in).
+            env_dmg_type = getattr(destination, "damage_type",
+                                   None) or "physical"
+            effects.append({"type":"damage_entity",
+                            "entity_id":primary.entity_id,
+                            "amount":dmg,
+                            "damage_type":env_dmg_type})
             effects.append({"type":"add_affinity","kind":"environment","amount":2})
             # Prompt 18: environment kills are the marquee sponsor moment.
             # Bump audience AND emit env_kill tag for Sport/Kanał 7.

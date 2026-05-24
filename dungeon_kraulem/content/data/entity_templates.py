@@ -269,6 +269,8 @@ HAZ = {
         fallback_desc="Zielonkawy płyn, który zjada metal cicho i z apetytem.",
         tags=["acid","liquid","hazardous"],
         affordances=["inspect","push_into","throw_at"],
+        # Prompt 21: push someone in → acid damage + corroded.
+        damage_type="acid",
     ),
 }
 
@@ -333,9 +335,11 @@ MON = {
         name_key="ent_tunnel_runt_n", fallback_name="Tunelowy Szczurek",
         desc_key="ent_tunnel_runt_d",
         fallback_desc="Niski, mokry, bardzo zły. Chrupie dłoń jeśli mu pozwolisz.",
-        tags=["monster","small","biting"],
+        tags=["monster","small","biting","flammable"],
         affordances=["inspect","attack","intimidate","lure","sneak"],
         hp=8, max_hp=8, ac=11, attack_bonus=3, damage_dice="1d4+1",
+        # Prompt 21: small + furry = vulnerable to fire AND cold.
+        vulnerable_to=["fire","cold"],
     ),
     "freezer_carver": dict(
         name_key="ent_freezer_carver_n", fallback_name="Rzeźnik z Zamrażarki",
@@ -344,6 +348,9 @@ MON = {
         tags=["monster","humanoid","sharp"],
         affordances=["inspect","attack","talk","intimidate","lure","sneak"],
         hp=18, max_hp=18, ac=12, attack_bonus=4, damage_dice="1d8+1",
+        # Lives at sub-zero — vulnerable to fire, resistant to cold.
+        vulnerable_to=["fire"],
+        resists=["cold"],
     ),
     "relay_warden": dict(
         name_key="ent_relay_warden_n", fallback_name="Strażnik Przekaźnika",
@@ -352,6 +359,10 @@ MON = {
         tags=["monster","humanoid","armored","floor_boss"],
         affordances=["inspect","attack","intimidate","bribe","talk","sneak"],
         hp=32, max_hp=32, ac=14, attack_bonus=6, damage_dice="2d6+1",
+        damage_type="electric",
+        # Armored + grounded = resistant to electric, vulnerable to acid.
+        resists=["electric","physical"],
+        vulnerable_to=["acid"],
     ),
 
     # ── Prompt 20 — alarm responders ────────────────────────────────────────
@@ -362,6 +373,9 @@ MON = {
         tags=["monster","humanoid","corporate","responder"],
         affordances=["inspect","attack","intimidate","bribe","talk"],
         hp=14, max_hp=14, ac=12, attack_bonus=3, damage_dice="1d6+1",
+        # Kevlar vest = mild physical resist, no chem protection.
+        resists=["physical"],
+        vulnerable_to=["electric"],
     ),
     "silent_response": dict(
         name_key="ent_silent_response_n", fallback_name="Agent ds. wycieków",
@@ -370,6 +384,8 @@ MON = {
         tags=["monster","humanoid","corporate","stealth","responder"],
         affordances=["inspect","attack","sneak"],
         hp=12, max_hp=12, ac=13, attack_bonus=4, damage_dice="1d8",
+        # No special armor — light and fast.
+        vulnerable_to=["fire"],
     ),
     "biotech_inspector": dict(
         name_key="ent_biotech_inspector_n", fallback_name="Inspektor NovaChem",
@@ -378,6 +394,10 @@ MON = {
         tags=["monster","humanoid","corporate","novachem","responder"],
         affordances=["inspect","attack","intimidate","talk"],
         hp=18, max_hp=18, ac=13, attack_bonus=4, damage_dice="1d6+2",
+        # HazMat suit — chem-proof but a battery makes it crackle.
+        immune_to=["poison"],
+        resists=["acid","fire"],
+        vulnerable_to=["electric"],
     ),
 
     # ── Prompt 18 (deferred) — sponsor hunters ──────────────────────────────
@@ -393,6 +413,9 @@ MON = {
         tags=["monster","humanoid","corporate","novachem","sponsor_hunter"],
         affordances=["inspect","attack","intimidate","talk"],
         hp=16, max_hp=16, ac=12, attack_bonus=4, damage_dice="1d8",
+        damage_type="poison",
+        resists=["poison","acid"],
+        vulnerable_to=["fire"],
     ),
     "egzekutor_ligi": dict(
         name_key="ent_league_executor_n", fallback_name="Egzekutor Ligi",
@@ -402,6 +425,8 @@ MON = {
         tags=["monster","humanoid","armored","sport","sponsor_hunter"],
         affordances=["inspect","attack","intimidate"],
         hp=22, max_hp=22, ac=14, attack_bonus=5, damage_dice="1d10+1",
+        resists=["physical"],
+        vulnerable_to=["electric","cold"],
     ),
     "windykator": dict(
         name_key="ent_collector_n", fallback_name="Windykator",
@@ -411,6 +436,7 @@ MON = {
         tags=["monster","humanoid","cunning","czarny_rynek","sponsor_hunter"],
         affordances=["inspect","attack","talk","intimidate","bribe"],
         hp=18, max_hp=18, ac=12, attack_bonus=4, damage_dice="1d6+2",
+        vulnerable_to=["psychic"],
     ),
     "redaktor_naczelny": dict(
         name_key="ent_chief_editor_n", fallback_name="Redaktor Naczelny",
@@ -420,15 +446,19 @@ MON = {
         tags=["monster","humanoid","memetic","ministerstwo","sponsor_hunter"],
         affordances=["inspect","attack","talk","intimidate"],
         hp=15, max_hp=15, ac=11, attack_bonus=3, damage_dice="1d6+1",
+        damage_type="psychic",
+        resists=["psychic"],
+        vulnerable_to=["fire","acid"],
     ),
     "pielgrzym_recyklera": dict(
         name_key="ent_recycler_pilgrim_n", fallback_name="Pielgrzym Recyklera",
         desc_key="ent_recycler_pilgrim_d",
         fallback_desc=("Patchworkowa szata z odzysku, święte koła "
                        "łańcuchowe, oczy zbyt jasne."),
-        tags=["monster","humanoid","cult","recykling","sponsor_hunter"],
+        tags=["monster","humanoid","cult","recykling","sponsor_hunter","flammable"],
         affordances=["inspect","attack","intimidate","talk"],
-        hp=14, max_hp=14, ac=11, attack_bonus=3, damage_dice="1d8"
+        hp=14, max_hp=14, ac=11, attack_bonus=3, damage_dice="1d8",
+        vulnerable_to=["fire","psychic"],
     ),
     "anty_gospodarz": dict(
         name_key="ent_antihost_n", fallback_name="Anty-gospodarz",
@@ -438,5 +468,6 @@ MON = {
         tags=["monster","humanoid","spectacle","kanal_7","sponsor_hunter"],
         affordances=["inspect","attack","talk","intimidate"],
         hp=12, max_hp=12, ac=11, attack_bonus=3, damage_dice="1d6+2",
+        vulnerable_to=["acid","psychic"],
     ),
 }

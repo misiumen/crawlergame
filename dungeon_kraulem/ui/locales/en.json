@@ -462,5 +462,38 @@
   "encounter_prep_armed_traps":   "Already set: {items}",
   "encounter_prep_exits":         "Exits: {items}",
   "encounter_prep_empty":         "Empty. Really empty.",
-  "ui_topbar_encounter_close":    "⚠ INCOMING"
+  "ui_topbar_encounter_close":    "⚠ INCOMING",
+
+  "damage_type_physical":   "physical",
+  "damage_type_fire":       "fire",
+  "damage_type_electric":   "electric",
+  "damage_type_acid":       "acid",
+  "damage_type_poison":     "poison",
+  "damage_type_cold":       "cold",
+  "damage_type_psychic":    "psychic",
+
+  "status_burning":         "burning",
+  "status_corroded":        "corroded",
+  "status_poisoned":        "poisoned",
+  "status_chilled":         "chilled",
+
+  "dmg_resisted":           "(resisted)",
+  "dmg_vulnerable":         "(vulnerable!)",
+  "dmg_immune":             "(immune)",
+
+  "dot_burning_tick":       "You're on fire. {amount} HP to ashes.",
+  "dot_bleeding_tick":      "You bleed. {amount} HP outside the body.",
+  "dot_poisoned_tick":      "Poison tugs. {amount} HP to toxins.",
+  "status_burning_extinguished": "{name} smolders but goes out — they were wet.",
+  "status_chilled_burned_off":   "Ice meets fire. Steam. Both statuses cleared.",
+
+  "ent_patrol_security_n":       "Patrol Officer",
+  "ent_silent_response_n":       "Leak Response Agent",
+  "ent_biotech_inspector_n":     "NovaChem Inspector",
+  "ent_qc_agent_n":              "Quality Control Agent",
+  "ent_league_executor_n":       "League Executioner",
+  "ent_collector_n":             "Debt Collector",
+  "ent_chief_editor_n":          "Chief Editor",
+  "ent_recycler_pilgrim_n":      "Recycler Pilgrim",
+  "ent_antihost_n":              "Anti-Host"
 }

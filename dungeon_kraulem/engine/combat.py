@@ -43,6 +43,11 @@ STATUS_BEHIND_COVER = "behind_cover"
 STATUS_AFRAID       = "afraid"
 STATUS_SHOCKED      = "shocked"
 STATUS_WOUNDED      = "wounded"
+# Prompt 21 — new statuses from the elemental system.
+STATUS_BURNING      = "burning"     # DOT, can spread to flammables
+STATUS_CORRODED     = "corroded"    # AC reduction, persists past combat
+STATUS_POISONED     = "poisoned"    # DOT, cured by antidote
+STATUS_CHILLED      = "chilled"     # halves DEX-derived stats
 
 _STATUS_PL = {
     STATUS_PRONE:        "przewrócony",
@@ -53,6 +58,10 @@ _STATUS_PL = {
     STATUS_AFRAID:       "spanikowany",
     STATUS_SHOCKED:      "porażony",
     STATUS_WOUNDED:      "ranny",
+    STATUS_BURNING:      "płonący",
+    STATUS_CORRODED:     "skorodowany",
+    STATUS_POISONED:     "zatruty",
+    STATUS_CHILLED:      "wyziębiony",
 }
 
 
@@ -296,16 +305,37 @@ def has_status(entity, key: str) -> bool:
 
 def tick_statuses(entity) -> None:
     """Decrement status clocks; remove statuses whose clock hits 0.
-    Bleeding deals small damage as the clock ticks."""
+    Applies DOT damage for DOT statuses (bleeding/burning/poisoned).
+
+    Prompt 21: also handles status interactions:
+      - burning + chilled present → both clear (steam interaction)
+    """
     if entity is None:
         return
     clocks = _clocks_for(entity) or {}
     if not clocks:
         return
+
+    # Status interaction: burning + chilled cancels both.
+    if STATUS_BURNING in clocks and STATUS_CHILLED in clocks:
+        clocks.pop(STATUS_BURNING, None)
+        clocks.pop(STATUS_CHILLED, None)
+        if entity.conditions:
+            for k in (STATUS_BURNING, STATUS_CHILLED):
+                if k in entity.conditions:
+                    entity.conditions.remove(k)
+
+    # DOT damage table — keep in sync with damage.STATUS_DOT_PER_TURN.
+    _dot = {
+        STATUS_BLEEDING: 1,
+        STATUS_BURNING:  2,
+        STATUS_POISONED: 1,
+    }
     drop = []
     for k, v in list(clocks.items()):
-        if k == STATUS_BLEEDING and getattr(entity, "is_alive", lambda: True)():
-            entity.hp = max(0, entity.hp - 1)
+        dot = _dot.get(k, 0)
+        if dot > 0 and getattr(entity, "is_alive", lambda: True)():
+            entity.hp = max(0, entity.hp - dot)
         clocks[k] = v - 1
         if clocks[k] <= 0:
             drop.append(k)

@@ -164,6 +164,10 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
 
         elif kind == "damage_entity":
             eid = eff.get("entity_id"); amount = int(eff.get("amount", 0))
+            # Prompt 21: damage_type defaults to physical; routed through
+            # engine.damage.apply_damage so resistances + status-on-hit
+            # work uniformly with traps and environmental kills.
+            damage_type = str(eff.get("damage_type") or "physical")
             ent = _resolve_entity(world, room, eid)
             if ent is not None:
                 # Gap 4: pre-fire any armed player traps in the room against this
@@ -177,28 +181,49 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                         tr["triggered"] = True
                         eff_payload = tr.get("effect") or {}
                         bonus = int(eff_payload.get("amount", 2))
-                        ent.hp = max(0, ent.hp - bonus)
-                        cond = None
-                        if eff_payload.get("type") == "damage_and_stun":
-                            cond = "stunned"
-                        elif eff_payload.get("type") == "knockdown":
-                            cond = "prone"
-                        elif eff_payload.get("type") == "obscure":
-                            cond = "blinded"
-                        if cond and cond not in ent.conditions:
-                            ent.conditions.append(cond)
+                        trap_dtype = str(eff_payload.get("damage_type")
+                                         or "physical")
+                        from . import damage as _dmg
+                        tr_res = _dmg.apply_damage(world, ent, bonus,
+                                                   damage_type=trap_dtype,
+                                                   source="trap_pre_combat")
+                        # Status-only effects still apply (smoke/trip).
+                        if eff_payload.get("type") == "knockdown" and \
+                           "prone" not in ent.conditions:
+                            ent.conditions.append("prone")
+                        elif eff_payload.get("type") == "obscure" and \
+                             "blinded" not in ent.conditions:
+                            ent.conditions.append("blinded")
                         lines.append(t("feedback_trap_fires",
-                                       fallback=f"Pułapka „{tr.get('display_name','?')}” odpala: "
-                                                f"-{bonus} HP{(' + '+cond) if cond else ''}.",
-                                       name=tr.get("display_name","?"), amount=bonus))
-                ent.hp = max(0, ent.hp - amount)
+                                       fallback=(f"Pułapka „{tr.get('display_name','?')}” "
+                                                 f"odpala: -{tr_res['amount_dealt']} HP "
+                                                 f"({_dmg.damage_type_label(trap_dtype)})"),
+                                       name=tr.get("display_name","?"),
+                                       amount=tr_res["amount_dealt"]))
+                # Main damage hit — route through engine.damage so
+                # resistance + elemental status apply uniformly.
+                from . import damage as _dmg
+                res = _dmg.apply_damage(world, ent, amount,
+                                        damage_type=damage_type,
+                                        source="combat")
                 if ent.hp <= 0 and ent.max_hp > 0:
                     lines.append(t("feedback_entity_down", fallback=f"{ent.display_name()} pada.",
                                    name=ent.display_name()))
                 else:
+                    tag = ""
+                    if res.get("immune"):
+                        tag = " (odporny)"
+                    elif res.get("resisted"):
+                        tag = " (osłabione)"
+                    elif res.get("vulnerable"):
+                        tag = " (podatny!)"
                     lines.append(t("feedback_entity_hit",
-                                   fallback=f"{ent.display_name()}: -{amount} HP.",
-                                   name=ent.display_name(), amount=amount))
+                                   fallback=(f"{ent.display_name()}: "
+                                             f"-{res['amount_dealt']} HP"
+                                             f" ({_dmg.damage_type_label(damage_type)})"
+                                             + tag),
+                                   name=ent.display_name(),
+                                   amount=res["amount_dealt"]))
 
         elif kind == "damage_self":
             world.character.take_damage(int(eff.get("amount", 0)))

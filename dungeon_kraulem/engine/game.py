@@ -2229,6 +2229,14 @@ class Game:
         if _cmb.has_status(target, _cmb.STATUS_BLINDED):   total += 3
         if _cmb.has_status(target, _cmb.STATUS_STUNNED):   total += 3
         if _cmb.has_status(ch, _cmb.STATUS_BLINDED):       total -= 3
+        # Prompt 21: status interactions get real teeth.
+        if _cmb.has_status(target, _cmb.STATUS_CHILLED):   total += 2  # slow
+        if _cmb.has_status(target, _cmb.STATUS_CORRODED):  total += 1  # AC -1
+        if _cmb.has_status(ch, _cmb.STATUS_AFRAID):        total -= 2
+        # Prompt 21: prone+stunned compound auto-hit (was: just +5).
+        if (_cmb.has_status(target, _cmb.STATUS_PRONE) and
+                _cmb.has_status(target, _cmb.STATUS_STUNNED)):
+            total += 5
         # Prompt 19 — companion advantage: +2 to-hit on the next player
         # attack after `użyj zwierzęcia jako wabika` fires in combat.
         # Consumed on use; one bonus per encounter.
@@ -2239,7 +2247,9 @@ class Game:
                        fallback="(Towarzysz odwraca uwagę: +2 do trafienia.)"),
                      LOG_SYSTEM)
         crit = (raw == 20)
-        fumble = (raw == 1)
+        # Prompt 21: shocked players fumble on 1-2 instead of just 1.
+        shocked_fumble_floor = 2 if _cmb.has_status(ch, _cmb.STATUS_SHOCKED) else 1
+        fumble = (raw <= shocked_fumble_floor)
         hit = (not fumble) and (crit or total >= dc)
         mode_label = {"normal":"atak","careful":"ostrożny atak","heavy":"ryzykowny atak"}[mode]
         self.log(f"  [{mode_label}] d20({raw}) + STR({mod:+d})"
@@ -2631,15 +2641,53 @@ class Game:
             "level":        level,                # crit_success > harder hit
             "triggered":    False,
         }
-        # Pre-compute damage payload (used when something walks in)
+        # Pre-compute damage payload (used when something walks in).
+        # Prompt 21: each trap also carries a `damage_type` so the
+        # encounter resolver can route it through engine.damage and
+        # apply the matching elemental status (burning / shocked /
+        # corroded / poisoned).
         if "shock" in item.key or "shock" in item.tags:
-            trap_record["effect"] = {"type": "damage_and_stun", "amount": 4 if level == "critical_success" else 3}
+            trap_record["effect"] = {
+                "type": "damage", "amount": 4 if level == "critical_success" else 3,
+                "damage_type": "electric",
+            }
+        elif "fire" in item.key or "fire" in item.tags or \
+             "incendiary" in item.tags:
+            trap_record["effect"] = {
+                "type": "damage", "amount": 3 if level == "critical_success" else 2,
+                "damage_type": "fire",
+            }
+        elif "acid" in item.key or "acid" in item.tags:
+            trap_record["effect"] = {
+                "type": "damage", "amount": 3 if level == "critical_success" else 2,
+                "damage_type": "acid",
+            }
+        elif "poison" in item.key or "poison" in item.tags:
+            trap_record["effect"] = {
+                "type": "damage", "amount": 2 if level == "critical_success" else 1,
+                "damage_type": "poison",
+            }
+        elif "cold" in item.tags or "frost" in item.key:
+            trap_record["effect"] = {
+                "type": "damage", "amount": 2 if level == "critical_success" else 1,
+                "damage_type": "cold",
+            }
         elif "smoke" in item.key:
-            trap_record["effect"] = {"type": "obscure", "amount": 2}
+            trap_record["effect"] = {
+                "type": "obscure", "amount": 2,
+                "damage_type": "physical",   # smoke doesn't damage
+            }
         elif "trip" in item.key or "tripwire" in item.tags:
-            trap_record["effect"] = {"type": "knockdown", "amount": 1}
+            trap_record["effect"] = {
+                "type": "knockdown", "amount": 1,
+                "damage_type": "physical",
+            }
         else:
-            trap_record["effect"] = {"type": "damage", "amount": 2 if level != "critical_success" else 4}
+            trap_record["effect"] = {
+                "type": "damage",
+                "amount": 2 if level != "critical_success" else 4,
+                "damage_type": "physical",
+            }
         traps.append(trap_record)
 
         self.log(t("feedback_deploy_ok",

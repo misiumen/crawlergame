@@ -402,27 +402,48 @@ def _resolve_pre_combat_traps(world, room, arrivers) -> None:
         effect = trap.get("effect") or {}
         trap_name = trap.get("display_name", "pułapka")
         if hit:
-            dmg = int(effect.get("amount", 0)) if effect.get("type") in (
-                "damage", "damage_and_stun") else 0
-            if dmg > 0:
-                target.hp = max(0, target.hp - dmg)
-            # Conditions per effect type.
-            condition = None
-            if effect.get("type") == "damage_and_stun":
-                condition = "stunned"
-            elif effect.get("type") == "knockdown":
-                condition = "prone"
-            elif effect.get("type") == "obscure":
-                condition = "blinded"
-            if condition and condition not in target.conditions:
-                target.conditions.append(condition)
+            # Prompt 21: route through engine.damage so elemental traps
+            # apply burning / shocked / corroded / poisoned automatically
+            # AND honor target resistances. Knockdown / obscure are still
+            # status-only (no damage) — handle them inline.
+            from . import damage as _dmg
+            kind = effect.get("type", "damage")
+            damage_type = effect.get("damage_type", "physical")
+            damage_amount = int(effect.get("amount", 0)) \
+                            if kind == "damage" else 0
+            status_extra = None
+            if kind == "knockdown":
+                status_extra = "prone"
+            elif kind == "obscure":
+                status_extra = "blinded"
+
+            result = {"amount_dealt": 0, "status_applied": None,
+                      "resisted": False, "vulnerable": False,
+                      "immune": False}
+            if damage_amount > 0:
+                result = _dmg.apply_damage(world, target, damage_amount,
+                                           damage_type=damage_type,
+                                           source=f"trap:{trap_name}")
+            if status_extra and status_extra not in target.conditions:
+                target.conditions.append(status_extra)
             trap["triggered"] = True
-            # Compose feedback line.
+            # Compose feedback line including elemental flavor.
             parts = []
-            if dmg > 0:
-                parts.append(f"{dmg} obrażeń")
-            if condition:
-                parts.append(condition)
+            if result["amount_dealt"] > 0:
+                tag = ""
+                if result.get("immune"):
+                    tag = " (odporny)"
+                elif result.get("resisted"):
+                    tag = " (osłabione)"
+                elif result.get("vulnerable"):
+                    tag = " (podatny!)"
+                parts.append(f"{result['amount_dealt']} obrażeń"
+                             f" ({_dmg.damage_type_label(damage_type)})"
+                             + tag)
+            if result.get("status_applied"):
+                parts.append(result["status_applied"])
+            if status_extra:
+                parts.append(status_extra)
             payload = ", ".join(parts) or "trafia"
             line = t("encounter_trap_fired",
                      fallback=(f"Pułapka „{trap_name}” trafia "
