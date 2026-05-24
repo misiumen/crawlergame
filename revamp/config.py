@@ -15,6 +15,10 @@ LOCALES_DIR = "revamp/locales"
 MINUTES_PER_DAY = 24 * 60
 FLOOR1_DEADLINE_DAYS = 14
 
+# Floor generation
+USE_HANDMADE_FLOOR_1 = False    # if True, load the 15-room vertical slice instead
+FLOOR_GEN_MAX_RETRIES = 8        # retries when validation fails
+
 # Parser
 USE_OLLAMA = True
 OLLAMA_URL = "http://localhost:11434"

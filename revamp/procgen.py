@@ -25,6 +25,21 @@ _TYPE_FOR_SEED = {
 
 
 def build_floor_1(world) -> FloorState:
+    """Entry point for Floor 1 construction.
+
+    Default path: procedural generator (revamp.floor_generator.generate_floor).
+    Debug fallback (config.USE_HANDMADE_FLOOR_1 = True): the hand-built
+    15-room vertical slice defined below.
+    """
+    from .config import USE_HANDMADE_FLOOR_1
+    if not USE_HANDMADE_FLOOR_1:
+        from .floor_generator import generate_floor
+        return generate_floor(world, floor_number=1)
+    return _build_handmade_floor_1(world)
+
+
+def _build_handmade_floor_1(world) -> FloorState:
+    """The original hand-authored Floor 1 — kept as opt-in debug harness."""
     f = FloorState(floor_id="floor_1", floor_number=1)
     f.title_key = FLOOR_1_TITLE_KEY; f.title_fallback = FLOOR_1_TITLE_FALLBACK
     f.theme_key = FLOOR_1_THEME_KEY; f.theme_fallback = FLOOR_1_THEME_FALLBACK
