@@ -16,9 +16,9 @@ MINUTES_PER_DAY = 24 * 60
 FLOOR1_DEADLINE_DAYS = 14
 
 # Parser
-USE_OLLAMA = False
+USE_OLLAMA = True
 OLLAMA_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.1:8b"
+OLLAMA_MODEL = "qwen2.5:3b"
 OLLAMA_TIMEOUT_SECONDS = 4
 
 # Audio

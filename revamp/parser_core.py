@@ -183,14 +183,135 @@ def _strip_articles(s: str) -> str:
 
 
 def parse_with_optional_llm(text: str, world=None) -> ActionIntent:
-    """Try the LLM parser first if enabled; fall back to deterministic."""
+    """Pipeline: deterministic first; if confidence is low and Ollama is
+    enabled, call the LLM to produce a fallback intent. Either way, return
+    an ActionIntent for the validator to interpret. Never raise."""
     from .config import USE_OLLAMA
-    if USE_OLLAMA:
-        try:
-            from . import llm_parser
-            result = llm_parser.parse(text, world)
-            if result and result.confidence >= 0.6:
-                return result
-        except Exception:
-            pass
-    return parse(text, world)
+
+    # Always run the deterministic parser first.
+    deterministic = parse(text, world)
+    if deterministic.confidence >= 0.7 or deterministic.intent == "numeric":
+        return deterministic
+
+    if not USE_OLLAMA:
+        return deterministic
+
+    # Build a compact context the LLM can actually use without paying tokens
+    # for the entire world.
+    context = _build_compact_context(world)
+
+    try:
+        from . import llm_parser
+        llm_dict = llm_parser.parse_with_ollama(text, context)
+    except Exception:
+        llm_dict = None
+
+    if not llm_dict:
+        return deterministic
+
+    llm_intent = _intent_from_llm_dict(llm_dict, raw_text=text)
+    # Prefer the LLM's interpretation only if it's at least as confident.
+    if llm_intent.confidence >= deterministic.confidence:
+        return llm_intent
+    return deterministic
+
+
+def _build_compact_context(world) -> dict:
+    """Compact context for the LLM. No save dumps, no long logs."""
+    ctx = {"mode": "exploration"}
+    if world is None or world.current_floor is None:
+        return ctx
+    room = world.current_floor.current_room()
+    if room is None:
+        return ctx
+
+    desc = room.display_first_enter() or room.display_look() or ""
+    # Single short paragraph
+    ctx["room_short_description"] = desc.strip()[:240]
+
+    visible_objects = []
+    visible_entities = []
+    for e in room.visible_entities():
+        name = e.display_name()
+        if e.entity_type in ("object", "hazard", "environmental_feature",
+                             "container", "door", "terminal", "service",
+                             "safehouse_service", "exit", "corpse"):
+            visible_objects.append(name)
+        elif e.entity_type in ("crawler", "monster", "npc", "player"):
+            visible_entities.append(name)
+        else:
+            visible_objects.append(name)
+    ctx["visible_objects"] = visible_objects
+    ctx["visible_entities"] = visible_entities
+    ctx["exits"] = list(room.exits.keys())
+
+    inv = []
+    for eid in world.character.inventory_ids:
+        ent = world.entities.get(eid)
+        if ent is not None:
+            inv.append(ent.display_name())
+    ctx["inventory"] = inv
+
+    # Mode hint — used by the prompt to influence intent space
+    if room.safehouse_subtype:
+        ctx["mode"] = "safehouse"
+    elif any(e.entity_type == "monster" and e.is_alive() for e in room.entities):
+        ctx["mode"] = "combat"
+    return ctx
+
+
+def _intent_from_llm_dict(d: dict, raw_text: str) -> ActionIntent:
+    """Convert an LLM-returned dict into an ActionIntent.
+
+    The result still must pass through the deterministic validator —
+    we are not granting the LLM authority over success/failure or any
+    world-state mutation.
+    """
+    intent = ActionIntent(raw_text=raw_text, parser_source="ollama")
+
+    # Map any model verb-y intent back onto our affordance vocabulary if
+    # possible, while keeping the original string as a hint.
+    raw_intent = (d.get("intent") or "").strip().lower()
+    raw_verb   = (d.get("verb") or "").strip().lower()
+
+    # Try our verb resolver — it's more reliable than the LLM's intent label
+    aff_match = None
+    for candidate in (raw_intent, raw_verb):
+        if candidate:
+            aff = find_affordance_by_verb(candidate, "pl") or find_affordance_by_verb(candidate, "en")
+            if aff is not None:
+                aff_match = aff
+                break
+
+    if aff_match is not None:
+        intent.intent = aff_match.key
+    elif raw_intent in _LLM_INTENT_PASSTHROUGH:
+        intent.intent = raw_intent
+    else:
+        # Last resort: keep the raw label so the validator can refuse it
+        intent.intent = raw_intent or "unknown"
+
+    intent.verb = raw_verb or raw_intent or ""
+    intent.targets = list(d.get("targets") or [])
+    intent.tool = d.get("tool")
+    intent.destination = d.get("destination")
+    intent.desired_outcome = d.get("desired_outcome")
+    if d.get("suggested_stat"):
+        intent.modifiers.append(f"stat:{d['suggested_stat']}")
+    if d.get("risk_level"):
+        intent.modifiers.append(f"risk:{d['risk_level']}")
+    try:
+        intent.confidence = float(d.get("confidence", 0.5))
+    except (TypeError, ValueError):
+        intent.confidence = 0.5
+    return intent
+
+
+# Whitelist of intent strings the LLM may produce that we accept verbatim.
+_LLM_INTENT_PASSTHROUGH = {
+    "look","inspect","search","move","listen","wait","rest_short","rest_long",
+    "attack","defend","use","talk","intimidate","bribe","sneak","hide","flee",
+    "craft","loot","open","close","hack","force","lockpick","throw_at",
+    "push_into","lure","perform","ask_rumor","check_inventory","check_character",
+    "check_map","save","help",
+}
