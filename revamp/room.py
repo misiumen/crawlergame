@@ -60,6 +60,10 @@ class RoomState:
     noise_level: int = 0                       # rises with combat; bleeds across rooms
     light_level: str = "dim"                   # "bright" | "dim" | "dark"
 
+    # Content-template hooks (Prompt 1)
+    encounter_key: str = ""                    # key into ENCOUNTER_TEMPLATES
+    encounter_intro_fallback: str = ""         # intro line for the encounter
+
     def is_safe(self) -> bool:
         return self.safehouse_subtype is not None or self.actual_type == "safehouse"
 
@@ -105,6 +109,8 @@ class RoomState:
             "last_visited_minute": self.last_visited_minute,
             "noise_level": self.noise_level,
             "light_level": self.light_level,
+            "encounter_key": self.encounter_key,
+            "encounter_intro_fallback": self.encounter_intro_fallback,
         }
 
     @classmethod
@@ -127,6 +133,8 @@ class RoomState:
         r.secret = d.get("secret", False)
         r.last_visited_minute = d.get("last_visited_minute", -1)
         r.noise_level = d.get("noise_level", 0)
+        r.encounter_key = d.get("encounter_key", "")
+        r.encounter_intro_fallback = d.get("encounter_intro_fallback", "")
         return r
 
     # ── Display ──────────────────────────────────────────────────────────────

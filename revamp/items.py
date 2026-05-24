@@ -36,12 +36,37 @@ ITEM_TEMPLATES = {
 
 
 def make_item(key: str, location_id: str = "") -> Entity:
+    """Build an item Entity. Prefers content/data/item_templates.py for
+    richer fallback name/description/tags/affordances; falls back to the
+    legacy ITEM_TEMPLATES dict above if no content entry exists."""
     proto = ITEM_TEMPLATES.get(key, {})
+
+    # Pull richer fallback content if available (Prompt 1)
+    fb_name = key.replace("_", " ")
+    fb_desc = ""
+    tags = list(proto.get("tags", []))
+    aff  = list(proto.get("affordances", ["inspect", "loot"]))
+    try:
+        from . import content_loader
+        c_tmpl = content_loader.item_template(key)
+    except Exception:
+        c_tmpl = None
+    if c_tmpl:
+        fb_name = c_tmpl.get("fallback_name") or fb_name
+        fb_desc = c_tmpl.get("fallback_description") or fb_desc
+        # Merge tags / affordances from content layer without duplicates
+        for t in c_tmpl.get("tags", []):
+            if t not in tags:
+                tags.append(t)
+        for a in c_tmpl.get("affordances", []):
+            if a not in aff:
+                aff.append(a)
+
     return Entity(
         key=key, entity_type=T_ITEM,
-        name_key=f"item_{key}_n", fallback_name=key.replace("_"," "),
-        desc_key=f"item_{key}_d", fallback_desc="",
+        name_key=f"item_{key}_n", fallback_name=fb_name,
+        desc_key=f"item_{key}_d", fallback_desc=fb_desc,
         location_id=location_id, portable=True,
-        tags=list(proto.get("tags", [])),
-        affordances=list(proto.get("affordances", ["inspect","loot"])),
+        tags=tags,
+        affordances=aff,
     )

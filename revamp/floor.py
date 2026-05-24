@@ -37,6 +37,12 @@ class FloorState:
     exit_conditions: List[str] = field(default_factory=list)
     exits_unlocked: Set[str] = field(default_factory=set)
 
+    # Floor objective (Prompt 1 — pulled from floor_objective_templates)
+    objective_key: str = ""
+    objective_title_fallback: str = ""
+    objective_description_fallback: str = ""
+    objective_solution_paths: List[str] = field(default_factory=list)
+
     # Each entry: {"minute": int, "kind": str, "args": {...}}
     active_events: List[Dict] = field(default_factory=list)
 
@@ -103,6 +109,10 @@ class FloorState:
             "exit_conditions": list(self.exit_conditions),
             "exits_unlocked": list(self.exits_unlocked),
             "active_events": list(self.active_events),
+            "objective_key": self.objective_key,
+            "objective_title_fallback": self.objective_title_fallback,
+            "objective_description_fallback": self.objective_description_fallback,
+            "objective_solution_paths": list(self.objective_solution_paths),
         }
 
     @classmethod
@@ -121,4 +131,8 @@ class FloorState:
         f.exit_conditions = list(d.get("exit_conditions", []))
         f.exits_unlocked = set(d.get("exits_unlocked", []))
         f.active_events = list(d.get("active_events", []))
+        f.objective_key = d.get("objective_key", "")
+        f.objective_title_fallback = d.get("objective_title_fallback", "")
+        f.objective_description_fallback = d.get("objective_description_fallback", "")
+        f.objective_solution_paths = list(d.get("objective_solution_paths", []))
         return f

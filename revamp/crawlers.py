@@ -32,6 +32,13 @@ class Crawler(Entity):
     known_to_player: bool = False
     last_seen_room: str = ""
     last_seen_minute: int = -1
+    # Archetype-derived narrative depth (Prompt 1)
+    archetype_key: str = ""        # key into npc_templates.CRAWLER_ARCHETYPES
+    wants: list = field(default_factory=list)
+    fears: list = field(default_factory=list)
+    secret: list = field(default_factory=list)
+    survival_style: str = ""
+    opener: str = ""               # cached opening line for first interaction
 
     def to_dict(self):
         d = super().to_dict()
@@ -43,13 +50,18 @@ class Crawler(Entity):
             "known_to_player": self.known_to_player,
             "last_seen_room": self.last_seen_room,
             "last_seen_minute": self.last_seen_minute,
+            "archetype_key": self.archetype_key,
+            "wants": list(self.wants),
+            "fears": list(self.fears),
+            "secret": list(self.secret),
+            "survival_style": self.survival_style,
+            "opener": self.opener,
         })
         return d
 
     @classmethod
     def from_dict(cls, d):
         c = super().from_dict(d)
-        # Re-populate crawler-specific fields
         c.alias = d.get("alias", "")
         c.personality = d.get("personality", "professional")
         c.status = d.get("status", "healthy")
@@ -61,6 +73,12 @@ class Crawler(Entity):
         c.known_to_player = d.get("known_to_player", False)
         c.last_seen_room = d.get("last_seen_room", "")
         c.last_seen_minute = d.get("last_seen_minute", -1)
+        c.archetype_key = d.get("archetype_key", "")
+        c.wants = list(d.get("wants", []))
+        c.fears = list(d.get("fears", []))
+        c.secret = list(d.get("secret", []))
+        c.survival_style = d.get("survival_style", "")
+        c.opener = d.get("opener", "")
         return c
 
 
@@ -70,25 +88,57 @@ _LAST = ["Vance","Thresh","Cole","Maren","Tyde","Crane","Solis","Vex",
          "Harrow","Cross","Weld","Fenn","Kade","Morrow","Volke","Hess"]
 
 
-def make_random_crawler(floor_num: int, room_id: str, disposition: Optional[str] = None) -> Crawler:
-    name = f"{random.choice(_FIRST)} {random.choice(_LAST)}"
-    archetype = random.choice(["vet","scavenger","preacher","runner","medic"])
+def make_random_crawler(floor_num: int, room_id: str,
+                        disposition: Optional[str] = None,
+                        archetype_key: Optional[str] = None) -> Crawler:
+    """Build a crawler. Pulls personality/wants/fears/dialogue from
+    revamp/data/npc_templates.py when an archetype is provided or random."""
+    # Try the content-template archetype pool first
+    from . import content_loader
+    arch_data = None
+    arch_key = archetype_key or ""
+    if archetype_key:
+        arch_data = content_loader.crawler_archetype_data(archetype_key)
+    if arch_data is None:
+        picked = content_loader.random_crawler_archetype()
+        if picked is not None:
+            arch_key, arch_data = picked
+
+    # Name: prefer fallback_name_pool from archetype, else procgen
+    if arch_data:
+        nm = content_loader.crawler_name_from_archetype(arch_data)
+        name = nm or f"{random.choice(_FIRST)} {random.choice(_LAST)}"
+    else:
+        name = f"{random.choice(_FIRST)} {random.choice(_LAST)}"
+
+    # Legacy "alias" archetype tag (small set kept for combat sizing)
+    alias = random.choice(["vet","scavenger","preacher","runner","medic"])
     dispo = disposition or _pick_disposition(floor_num)
-    personality = random.choice(PERSONALITIES)
+
+    # Personality: from archetype if provided, else random
+    personality = (arch_data or {}).get("personality") or random.choice(PERSONALITIES)
+    survival = (arch_data or {}).get("survival_style") or ""
+
     hp = 10 + floor_num * 4 + random.randint(0, 4)
     c = Crawler(
-        key=f"crawler_{archetype}_{name.split()[0].lower()}",
+        key=f"crawler_{alias}_{name.split()[0].lower()}",
         entity_type=T_CRAWLER,
         name_key="", fallback_name=name,
-        desc_key="", fallback_desc=f"{archetype}, {personality}",
-        tags=[archetype, personality],
+        desc_key="", fallback_desc=f"{alias}, {personality}",
+        tags=[alias, personality] + ([arch_key] if arch_key else []),
         location_id=room_id,
         hp=hp, max_hp=hp, ac=11 + floor_num // 2,
         attack_bonus=2 + floor_num // 2, damage_dice="1d6",
         affordances=["inspect","talk","intimidate","bribe","attack","loot"],
-        alias=archetype, personality=personality,
+        alias=alias, personality=personality,
         disposition=dispo,
         last_seen_room=room_id,
+        archetype_key=arch_key,
+        wants=list((arch_data or {}).get("wants", [])),
+        fears=list((arch_data or {}).get("fears", [])),
+        secret=list((arch_data or {}).get("secret", [])),
+        survival_style=survival,
+        opener=content_loader.crawler_opener(arch_data) if arch_data else "",
     )
     if dispo == "hostile":
         c.status = "fighting_monster" if random.random() < 0.3 else "healthy"

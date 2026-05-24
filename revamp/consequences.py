@@ -15,17 +15,34 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
         if kind == "move_to_room":
             target = eff["room_id"]
             if floor and target in floor.rooms:
+                r = floor.rooms[target]
+                # Detect first-ever visit BEFORE we mutate state
+                first_visit = not r.visited
                 floor.current_room_id = target
-                floor.rooms[target].visited = True
+                r.visited = True
                 floor.discovered_room_ids.add(target)
                 floor.known_room_ids.add(target)
-                floor.rooms[target].last_visited_minute = floor.current_minute
                 if time_system:
                     time_system.advance(world, eff.get("time_cost", 10))
-                # First-enter line
-                r = floor.rooms[target]
-                if r.last_visited_minute == floor.current_minute:
+                r.last_visited_minute = floor.current_minute
+
+                if first_visit:
                     lines.append(r.display_first_enter())
+                    # Prompt 1: layer a safehouse template entry-description
+                    if r.safehouse_subtype:
+                        try:
+                            from . import content_loader
+                            extra = content_loader.safehouse_entry_description(r.safehouse_subtype)
+                            if extra:
+                                lines.append(extra)
+                        except Exception:
+                            pass
+                    # Prompt 1: encounter-template intro (combat rooms)
+                    if r.encounter_intro_fallback:
+                        lines.append(r.encounter_intro_fallback)
+                else:
+                    # Return visit — short look line
+                    lines.append(r.display_look())
 
         elif kind == "look":
             if room:

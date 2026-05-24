@@ -72,8 +72,28 @@ def resolve(validation_result, world) -> ResolutionResult:
     result.fallback_description = (
         f"[{aff_key}] d20({raw}) + {stat}({mod:+d}) + tła({bonus:+d}) = {total} vs DC {dc} → {level}"
     )
+    # Prompt 1: enrich partial / failure / critical_failure with a narrative
+    # line pulled from failure_templates. Never blocks if missing.
+    flavor = _content_flavor(level)
+    if flavor:
+        result.fallback_description += "\n  " + flavor
     result.effects = _effects_for_level(level, aff_key, validation_result, world)
     return result
+
+
+def _content_flavor(level: str) -> str:
+    """Return a narrative line from failure_templates matching the level, or ''."""
+    try:
+        from . import content_loader
+    except Exception:
+        return ""
+    if level == PARTIAL:
+        return content_loader.random_partial_success_line() or ""
+    if level == FAILURE:
+        return content_loader.random_failure_line() or ""
+    if level == CRIT_FAILURE:
+        return content_loader.random_critical_failure_line() or ""
+    return ""
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

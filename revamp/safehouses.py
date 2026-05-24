@@ -40,6 +40,22 @@ def perform(action_key: str, world):
         return t("safe_cafe_food_result", fallback="Jesz coś nazwanego 'posiłkiem'.")
     if action_key == "chat":
         ch.audience_rating += 2
+        # Prompt 1: pull a real rumor from the content layer when available
+        try:
+            from . import content_loader
+            rumor = content_loader.random_rumor() or {}
+        except Exception:
+            rumor = {}
+        text = rumor.get("text", "")
+        if text:
+            # Track the rumor key on the floor so later code can act on it
+            try:
+                key = rumor.get("key")
+                if key and world.current_floor and key not in world.current_floor.rumors:
+                    world.current_floor.rumors.append(key)
+            except Exception:
+                pass
+            return text
         return t("safe_cafe_chat_result", fallback="Plotki. Niektóre brzmią użytecznie.")
     if action_key == "wash":
         ch.heal(2); ch.conditions[:] = [c for c in ch.conditions if c != "dirty"]

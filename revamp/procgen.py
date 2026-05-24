@@ -54,7 +54,40 @@ def build_floor_1(world) -> FloorState:
     f.start_room_id = "r1_intake"
     f.current_room_id = f.start_room_id
     f.exit_room_ids = ["r1_exit"]
-    f.exit_conditions = ["defeat_boss_or_bribe"]
+
+    # Seed a content-template encounter into one Floor 1 combat room (Prompt 1)
+    from . import content_loader
+    combat_rooms = [rm for rm in f.rooms.values() if rm.actual_type == "combat"]
+    if combat_rooms:
+        picked_room = combat_rooms[0]
+        enc_pick = content_loader.random_encounter_template(floor_num=1,
+                                                            required_tags=["monster"])
+        if enc_pick is None:
+            enc_pick = content_loader.random_encounter_template(floor_num=1)
+        if enc_pick is not None:
+            ekey, etmpl = enc_pick
+            picked_room.encounter_key = ekey
+            intro = content_loader.encounter_intro_line(etmpl)
+            if intro:
+                picked_room.encounter_intro_fallback = intro
+
+    # Pick a Floor 1 exit objective from content templates (Prompt 1)
+    from . import content_loader
+    picked = content_loader.random_floor_objective()
+    if picked is not None:
+        key, obj = picked
+        f.exit_conditions = [key]
+        # Stash human-readable objective on the floor for UI/log
+        f.objective_key = key
+        f.objective_title_fallback = obj.get("fallback_title", "")
+        f.objective_description_fallback = obj.get("description", "")
+        f.objective_solution_paths = list(obj.get("solution_paths", []))
+    else:
+        f.exit_conditions = ["defeat_boss_or_bribe"]
+        f.objective_key = ""
+        f.objective_title_fallback = ""
+        f.objective_description_fallback = ""
+        f.objective_solution_paths = []
 
     # Mark start as visited/discovered
     start = f.rooms[f.start_room_id]
