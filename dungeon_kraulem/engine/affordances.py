@@ -283,6 +283,30 @@ register(Affordance("companion_lure",
     risk_tags=["noise","pet_risk"], audience_effect=2))
 
 
+# ── Prompt 23 — wield / sheathe ────────────────────────────────────────────
+# Routed by parser_core to a dedicated game.py handler, not the normal
+# entity-targeting resolver, because the "target" is an INVENTORY item
+# (not a room entity) and the outcome modifies character state.
+
+register(Affordance("wield",
+    verbs_pl=["dobądź","dobadz","weź do ręki","wez do reki",
+              "chwyć","chwyc","uzbrój się","uzbroj sie"],
+    verbs_en=["wield","equip"],
+    time_cost=1))
+
+register(Affordance("sheathe",
+    verbs_pl=["wycofaj broń","wycofaj bron","schowaj broń","schowaj bron",
+              "odłóż broń","odloz bron","zdejmij broń"],
+    verbs_en=["sheathe","stow","put away","unwield"],
+    time_cost=1))
+
+register(Affordance("coat_weapon",
+    verbs_pl=["nasącz","nasacz","posmaruj","pokryj","powlecz",
+              "namaść","namasc"],
+    verbs_en=["coat","imbue","slather","anoint"],
+    time_cost=3, stat="DEX", base_dc=10))
+
+
 # ── Prompt 20 — encounter prep ────────────────────────────────────────────
 
 register(Affordance("prep_room",

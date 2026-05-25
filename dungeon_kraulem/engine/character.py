@@ -46,6 +46,15 @@ class Character:
     # NOTE: BACKGROUNDS is the single source of truth for the
     # character-creation list. game.py and ui.py both import it.
 
+    # Prompt 23 — wield slots. Both fields hold the entity_id of an
+    # inventory item being held in that hand, or None for empty.
+    # `wielded_main_id` is the primary weapon used for attack damage.
+    # `wielded_offhand_id` is the off-hand: shield (+AC), torch
+    # (light), second knife (extra attack at -2), chembottle (ready),
+    # etc. Two-handed weapons lock the off-hand slot.
+    wielded_main_id: Optional[int] = None
+    wielded_offhand_id: Optional[int] = None
+
     # Prompt 19 — companion ids the player currently owns. Companions
     # themselves live on world.companions; this list just references
     # them by id so save/load can rehydrate the relationship.
@@ -77,7 +86,26 @@ class Character:
         return (v - 10) // 2
 
     def effective_ac(self) -> int:
-        return self.base_ac + self.stat_mod("DEX")
+        ac = self.base_ac + self.stat_mod("DEX")
+        # Prompt 23: offhand shield grants +2 AC. Looked up lazily at
+        # call time via the world entity registry — `self.world` isn't
+        # available here, so callers using full-AC math route through
+        # `engine.combat.player_ac(world)` instead. This default keeps
+        # the legacy path working when no world reference is handy.
+        return ac
+
+    def offhand_ac_bonus(self, world) -> int:
+        """Prompt 23: +2 if the offhand entity is a shield (has `shield`
+        tag). 0 otherwise. Lazy lookup avoids storing a world ref on
+        the character itself."""
+        if self.wielded_offhand_id is None or world is None:
+            return 0
+        ent = world.get(self.wielded_offhand_id)
+        if ent is None:
+            return 0
+        if "shield" in (ent.tags or []):
+            return 2
+        return 0
 
     def is_alive(self) -> bool:
         return self.hp > 0
@@ -102,6 +130,8 @@ class Character:
             "affinity": dict(self.affinity),
             "inventory_ids": list(self.inventory_ids),
             "companion_ids": list(self.companion_ids),
+            "wielded_main_id": self.wielded_main_id,
+            "wielded_offhand_id": self.wielded_offhand_id,
             "materials": dict(self.materials),
             "credits": self.credits, "audience_rating": self.audience_rating,
             "unlocked_achievements": list(self.unlocked_achievements),
@@ -122,6 +152,8 @@ class Character:
         c.affinity = {**c.affinity, **d.get("affinity", {})}
         c.inventory_ids = list(d.get("inventory_ids", []))
         c.companion_ids = list(d.get("companion_ids", []))   # Prompt 19
+        c.wielded_main_id    = d.get("wielded_main_id")       # Prompt 23
+        c.wielded_offhand_id = d.get("wielded_offhand_id")    # Prompt 23
         c.materials = dict(d.get("materials", {}))
         c.unlocked_achievements = list(d.get("unlocked_achievements", []))
         c.journal = {k: list(v) for k, v in d.get("journal", {}).items()}

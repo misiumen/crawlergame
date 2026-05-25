@@ -183,6 +183,224 @@ class Game:
                  LOG_SYSTEM)
         self.state = STATE_PLAY
 
+    # ── Prompt 23: wield / sheathe / coat handlers ───────────────────────
+
+    def _resolve_inventory_item(self, name: str):
+        """Match `name` to an item in inventory by display name, key, or
+        Polish-stem match. Returns the Entity or None."""
+        from .polish_text import polish_match, fold as _fold
+        ch = self.world.character
+        name_f = _fold(name.strip())
+        if not name_f:
+            return None
+        # Direct display-name match first.
+        for ent_id in (ch.inventory_ids or []):
+            ent = self.world.get(ent_id)
+            if ent is None: continue
+            if _fold(ent.display_name()) == name_f or _fold(ent.key) == name_f:
+                return ent
+        # Polish-stem fallback (handles inflections).
+        for ent_id in (ch.inventory_ids or []):
+            ent = self.world.get(ent_id)
+            if ent is None: continue
+            if polish_match(name_f, _fold(ent.display_name())) or \
+               polish_match(name_f, _fold(ent.key.replace("_", " "))):
+                return ent
+        return None
+
+    def _attempt_wield(self, intent):
+        """Equip an inventory item to main or offhand. Two-handed weapons
+        refuse if the offhand is occupied. Combat-mode switching costs
+        one action; out-of-combat switching is free.
+        """
+        if not intent.targets:
+            self.log(t("feedback_wield_no_target",
+                       fallback="Co chcesz dobyć?"), LOG_WARN)
+            return
+        ch = self.world.character
+        item = self._resolve_inventory_item(intent.targets[0])
+        if item is None:
+            self.log(t("feedback_wield_not_in_inventory",
+                       fallback=f"Nie masz „{intent.targets[0]}” w plecaku.",
+                       name=intent.targets[0]),
+                     LOG_WARN)
+            return
+        # Determine target hand.
+        hand = "main"
+        for m in (intent.modifiers or []):
+            if isinstance(m, str) and m.startswith("hand:"):
+                hand = m.split(":", 1)[1]
+        # Two-handed weapons (tagged `two_handed`) require both hands.
+        tags = set(item.tags or [])
+        two_handed = "two_handed" in tags
+        offhand_only = "offhand_only" in tags   # e.g. shield
+        if offhand_only and hand == "main":
+            hand = "offhand"   # silently promote
+        if two_handed and ch.wielded_offhand_id is not None and hand == "main":
+            offhand_ent = self.world.get(ch.wielded_offhand_id)
+            offhand_name = offhand_ent.display_name() if offhand_ent else "coś"
+            self.log(t("feedback_wield_twohand_refuse",
+                       fallback=f"„{item.display_name()}” wymaga obu rąk. "
+                                f"Najpierw wyłóż „{offhand_name}”.",
+                       weapon=item.display_name(), offhand=offhand_name),
+                     LOG_WARN)
+            return
+        # Check the slot isn't already holding this item.
+        cur_slot_id = (ch.wielded_main_id if hand == "main"
+                       else ch.wielded_offhand_id)
+        if cur_slot_id == item.entity_id:
+            self.log(t("feedback_wield_already",
+                       fallback=f"Już trzymasz „{item.display_name()}”.",
+                       name=item.display_name()),
+                     LOG_WARN)
+            return
+        # If item is currently in the OTHER hand, swap.
+        if hand == "main" and ch.wielded_offhand_id == item.entity_id:
+            ch.wielded_offhand_id = None
+        elif hand == "offhand" and ch.wielded_main_id == item.entity_id:
+            ch.wielded_main_id = None
+        # Set the slot.
+        if hand == "main":
+            ch.wielded_main_id = item.entity_id
+            # Two-handed auto-clears offhand.
+            if two_handed:
+                ch.wielded_offhand_id = None
+        else:
+            ch.wielded_offhand_id = item.entity_id
+        hand_label = "lewą rękę" if hand == "offhand" else "główną rękę"
+        self.log(t("feedback_wield_ok",
+                   fallback=f"Dobywasz „{item.display_name()}” w {hand_label}.",
+                   name=item.display_name(), hand=hand_label),
+                 LOG_SUCCESS)
+        # Combat: this consumes the player's action.
+        from . import combat as _cmb
+        floor = self.world.current_floor
+        room = floor.current_room() if floor else None
+        cs = _cmb.get_combat(room) if room else None
+        if cs is not None:
+            self._combat_after_player_action(cs)
+
+    def _attempt_sheathe(self, intent):
+        """Put away the currently-wielded main weapon."""
+        ch = self.world.character
+        # Without explicit target, sheathe main. With target, sheathe
+        # whichever hand holds it.
+        if intent.targets:
+            item = self._resolve_inventory_item(intent.targets[0])
+            if item is None:
+                self.log(t("feedback_sheathe_not_held",
+                           fallback="Nie trzymasz tego."),
+                         LOG_WARN)
+                return
+            if ch.wielded_main_id == item.entity_id:
+                ch.wielded_main_id = None
+            elif ch.wielded_offhand_id == item.entity_id:
+                ch.wielded_offhand_id = None
+            else:
+                self.log(t("feedback_sheathe_not_held",
+                           fallback="Nie trzymasz tego."),
+                         LOG_WARN)
+                return
+            self.log(t("feedback_sheathe_ok",
+                       fallback=f"Chowasz „{item.display_name()}”.",
+                       name=item.display_name()),
+                     LOG_SUCCESS)
+        else:
+            if ch.wielded_main_id is None:
+                self.log(t("feedback_sheathe_empty",
+                           fallback="Już nic nie trzymasz."),
+                         LOG_WARN)
+                return
+            ent = self.world.get(ch.wielded_main_id)
+            ch.wielded_main_id = None
+            if ent is not None:
+                self.log(t("feedback_sheathe_ok",
+                           fallback=f"Chowasz „{ent.display_name()}”.",
+                           name=ent.display_name()),
+                         LOG_SUCCESS)
+
+    def _attempt_coat_weapon(self, intent):
+        """Apply a substance material to a weapon, granting status-on-hit.
+
+        Substance compatibility table:
+            contaminated_blood / ichor_sample / chem_reagent → poison/acid
+            battery_cell                                    → electric (one hit)
+            tape + fungal_fiber                             → grip (no status)
+        """
+        if len(intent.targets) < 2:
+            self.log(t("feedback_coat_usage",
+                       fallback="Czym? Np. „nasącz nóż jadem”."),
+                     LOG_WARN)
+            return
+        ch = self.world.character
+        from ..content import materials as _mat
+        weapon = self._resolve_inventory_item(intent.targets[0])
+        if weapon is None:
+            self.log(t("feedback_coat_no_weapon",
+                       fallback=f"Nie masz „{intent.targets[0]}” pod ręką.",
+                       name=intent.targets[0]),
+                     LOG_WARN)
+            return
+        if "weapon" not in (weapon.tags or []):
+            self.log(t("feedback_coat_not_weapon",
+                       fallback=f"„{weapon.display_name()}” to nie broń.",
+                       name=weapon.display_name()),
+                     LOG_WARN)
+            return
+        # Resolve substance from materials inventory (player.materials dict).
+        sub_name = intent.targets[1].lower().strip()
+        from .polish_text import polish_match, fold as _fold
+        sub_name_f = _fold(sub_name)
+        matched_key = None
+        for mkey in (ch.materials or {}):
+            mat = _mat.get(mkey)
+            if mat is None: continue
+            if _fold(mat.name()) == sub_name_f or \
+               polish_match(sub_name_f, _fold(mat.name())) or \
+               polish_match(sub_name_f, _fold(mkey.replace("_", " "))):
+                matched_key = mkey
+                break
+        if matched_key is None or ch.materials.get(matched_key, 0) <= 0:
+            self.log(t("feedback_coat_no_material",
+                       fallback=f"Nie masz „{sub_name}” w materiałach.",
+                       name=sub_name),
+                     LOG_WARN)
+            return
+        # Resolve coating type from material → damage_type + hits.
+        COAT_TABLE = {
+            "contaminated_blood": ("poison", 3),
+            "ichor_sample":       ("acid",   2),
+            "chem_reagent":       ("acid",   2),
+            "strange_organ":      ("poison", 2),
+            "battery_cell":       ("electric", 1),
+            "tape":               ("physical", 5),   # grip aid (no status, +1 to-hit)
+            "fungal_fiber":       ("physical", 5),
+        }
+        if matched_key not in COAT_TABLE:
+            self.log(t("feedback_coat_incompatible",
+                       fallback=f"„{matched_key}” nie pasuje do broni."),
+                     LOG_WARN)
+            return
+        damage_type, hits = COAT_TABLE[matched_key]
+        # Consume one unit of material.
+        _mat.consume_materials(ch, {matched_key: 1})
+        # Apply coating to weapon state.
+        weapon.state = {**(weapon.state or {}),
+                        "coating": {
+                            "damage_type": damage_type,
+                            "hits_remaining": hits,
+                            "material": matched_key,
+                        }}
+        mat_name = _mat.get(matched_key).name() if _mat.get(matched_key) else matched_key
+        from . import time_system as _ts
+        _ts.advance(self.world, 3)
+        self.log(t("feedback_coat_ok",
+                   fallback=(f"Pokrywasz „{weapon.display_name()}” substancją "
+                             f"„{mat_name}”. {hits} trafień."),
+                   weapon=weapon.display_name(),
+                   material=mat_name, hits=hits),
+                 LOG_SUCCESS)
+
     def _show_prep_readout(self) -> None:
         """Prompt 20 — print a structured 'what can I do right now?'
         list focused on combat prep. Lists:
@@ -885,6 +1103,13 @@ class Game:
         # useful when an alarm has scheduled an arrival.
         if intent.intent == "prep_room":
             self._show_prep_readout(); return
+        # Prompt 23: wield slot management.
+        if intent.intent == "wield":
+            self._attempt_wield(intent); return
+        if intent.intent == "sheathe":
+            self._attempt_sheathe(intent); return
+        if intent.intent == "coat_weapon":
+            self._attempt_coat_weapon(intent); return
 
         # Prompt 09 — display settings
         if intent.intent == "show_resolutions":
@@ -2316,6 +2541,10 @@ class Game:
                 if _r.randint(1,20) + ch.stat_mod("DEX") >= 12:
                     dmg = max(0, dmg // 2)
                     self.log(f"Unikasz większej części ataku od {name}.", LOG_NORMAL)
+            # Prompt 23: shield in offhand reduces damage by AC bonus.
+            shield_bonus = ch.offhand_ac_bonus(self.world)
+            if shield_bonus > 0:
+                dmg = max(0, dmg - shield_bonus)
             dmg = max(0, dmg - cs.player_defend)
             if dmg <= 0:
                 self.log(f"{name} atakuje, ale nie robi krzywdy.", LOG_NORMAL)
@@ -2414,11 +2643,55 @@ class Game:
                  f"= {total} vs AC {dc} → "
                  f"{'KRYT' if crit else ('hit' if hit else 'miss')}", LOG_SYSTEM)
         if hit:
-            dmg = _r.randint(3, 8) + mod + damage_bonus
+            # Prompt 23: damage comes from the wielded main weapon
+            # (damage_dice + damage_type). Unarmed default 1d6+2.
+            # Coating, if present, overrides damage_type for this hit
+            # and decrements. Routes through damage.apply_damage so
+            # resistance/vulnerability/status-on-hit work uniformly.
+            from . import damage as _dmg
+            weapon = self.world.get(ch.wielded_main_id) if ch.wielded_main_id else None
+            if weapon is not None:
+                dmg_dice = weapon.damage_dice or "1d6+2"
+                dmg_type = weapon.damage_type or "physical"
+                weapon_name = weapon.display_name()
+            else:
+                dmg_dice = "1d6+2"
+                dmg_type = "physical"
+                weapon_name = "pięść"
+            # Coating override.
+            coating_status_applied = None
+            coating = (weapon.state or {}).get("coating") if weapon else None
+            if coating and coating.get("hits_remaining", 0) > 0:
+                dmg_type = coating.get("damage_type", dmg_type)
+            # Roll dice.
+            base = _roll_dice_spec(dmg_dice, _r)
+            dmg = base + mod + damage_bonus
             if crit: dmg *= 2
             dmg = max(1, dmg)
-            target.hp = max(0, target.hp - dmg)
-            self.log(f"„{target.display_name()}”: -{dmg} HP "
+            # Apply via damage module (resistance + status on hit).
+            res = _dmg.apply_damage(self.world, target, dmg,
+                                    damage_type=dmg_type,
+                                    source=f"weapon:{weapon_name}")
+            # Decrement coating on a landed hit.
+            if coating and coating.get("hits_remaining", 0) > 0:
+                coating["hits_remaining"] -= 1
+                if coating["hits_remaining"] <= 0:
+                    weapon.state["coating"] = None
+                    self.log(t("feedback_coating_worn",
+                               fallback=f"Powłoka „{weapon.display_name()}” się "
+                                        f"zużyła."),
+                             LOG_SYSTEM)
+            tag = ""
+            if res.get("immune"):
+                tag = " (odporny)"
+            elif res.get("resisted"):
+                tag = " (osłabione)"
+            elif res.get("vulnerable"):
+                tag = " (podatny!)"
+            type_label = _dmg.damage_type_label(dmg_type)
+            self.log(f"„{target.display_name()}”: "
+                     f"-{res['amount_dealt']} HP "
+                     f"({type_label}){tag} "
                      f"(zostało {target.hp}/{target.max_hp}).",
                      LOG_SUCCESS if crit else LOG_NORMAL)
             if target.hp <= 0:
@@ -3943,6 +4216,35 @@ _SALVAGE_TAG_RULES = [
     ({"metal","scrap","heavy"},                "furniture_metal"),
     ({"wood","handle"},                        "furniture_wood"),
 ]
+
+
+def _roll_dice_spec(spec: str, rng) -> int:
+    """Prompt 23: parse and roll '1d6+2' / '2d4' / '3'. Robust to
+    garbage — returns the additive part on parse failure. Used for
+    weapon damage dice."""
+    if not spec:
+        return 0
+    spec = str(spec).strip().lower().replace(" ", "")
+    if spec.isdigit():
+        return int(spec)
+    plus = 0
+    if "+" in spec:
+        spec, plus_s = spec.split("+", 1)
+        try:
+            plus = int(plus_s)
+        except ValueError:
+            plus = 0
+    if "d" not in spec:
+        return plus
+    try:
+        n, sides = spec.split("d", 1)
+        n = int(n or "1")
+        sides = int(sides)
+    except ValueError:
+        return plus
+    if n <= 0 or sides <= 0:
+        return plus
+    return sum(rng.randint(1, sides) for _ in range(n)) + plus
 
 
 def _pick_salvage_table_key(entity):

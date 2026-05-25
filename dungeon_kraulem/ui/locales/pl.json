@@ -546,5 +546,25 @@
   "nav_pet_calm":           "Uspokój zwierzę",
   "nav_pet_scout":          "Wyślij zwierzę na zwiad",
 
+  "ui_enemy_header":           "CEL",
+  "ui_enemy_statuses":         "Stan:",
+  "ui_enemy_advantage_flag":   "• Towarzysz odwraca uwagę",
+
+  "feedback_wield_no_target":      "Co chcesz dobyć?",
+  "feedback_wield_not_in_inventory":"Nie masz „{name}” w plecaku.",
+  "feedback_wield_twohand_refuse": "„{weapon}” wymaga obu rąk. Najpierw wyłóż „{offhand}”.",
+  "feedback_wield_already":        "Już trzymasz „{name}”.",
+  "feedback_wield_ok":             "Dobywasz „{name}” w {hand}.",
+  "feedback_sheathe_not_held":     "Nie trzymasz tego.",
+  "feedback_sheathe_empty":        "Już nic nie trzymasz.",
+  "feedback_sheathe_ok":           "Chowasz „{name}”.",
+  "feedback_coat_usage":           "Czym? Np. „nasącz nóż jadem”.",
+  "feedback_coat_no_weapon":       "Nie masz „{name}” pod ręką.",
+  "feedback_coat_not_weapon":      "„{name}” to nie broń.",
+  "feedback_coat_no_material":     "Nie masz „{name}” w materiałach.",
+  "feedback_coat_incompatible":    "To nie pasuje do broni.",
+  "feedback_coat_ok":              "Pokrywasz „{weapon}” substancją „{material}”. {hits} trafień.",
+  "feedback_coating_worn":         "Powłoka „{name}” się zużyła.",
+
   "feedback_inspect_empty": "Patrzysz na: {name}. Nic ponad to."
 }

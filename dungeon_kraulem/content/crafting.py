@@ -304,10 +304,38 @@ def make_crafted_entity(result_key: str, room_id: str = "",
         tags.extend(["tool"])
     state = {"quality": quality, "damaged": damaged, "unstable": unstable}
     if damaged: state["damage_count"] = 1
-    return Entity(
+
+    # Prompt 23 — weapon templates carry damage_dice + damage_type so
+    # the combat code reads them when wielded. Tags here also gate
+    # two-handed / offhand-only rules in the wield handler.
+    WEAPON_STATS = {
+        "crafted_shiv":          ("1d4+1", "physical", ["weapon","sharp","melee","one_handed"]),
+        "improvised_weapon":     ("1d6",   "physical", ["weapon","melee","one_handed"]),
+        "improvised_knife":      ("1d6",   "physical", ["weapon","sharp","melee","one_handed"]),
+        "improvised_spear":      ("1d8",   "physical", ["weapon","sharp","melee","two_handed","reach"]),
+        "improvised_club":       ("1d6+1", "physical", ["weapon","heavy","melee","one_handed"]),
+        "improvised_garrote":    ("1d4",   "physical", ["weapon","silent","melee","one_handed"]),
+        "improvised_taser":      ("1d4",   "electric", ["weapon","electrical","melee","one_handed"]),
+        "improvised_chembottle": ("1d6",   "acid",     ["weapon","chemical","throwable","one_handed"]),
+    }
+    damage_dice = "1d4"
+    damage_type = "physical"
+    if result_key in WEAPON_STATS:
+        damage_dice, damage_type, extra_tags = WEAPON_STATS[result_key]
+        for tg in extra_tags:
+            if tg not in tags:
+                tags.append(tg)
+
+    ent = Entity(
         key=result_key, entity_type=T_ITEM,
         name_key=f"item_{result_key}_n", fallback_name=name,
         desc_key=f"item_{result_key}_d", fallback_desc=desc,
         location_id=room_id or "inventory:player", portable=True,
         tags=tags, affordances=affordances, state=state,
     )
+    # Set weapon-specific combat fields (defaults left untouched for
+    # non-weapon results).
+    if result_key in WEAPON_STATS:
+        ent.damage_dice = damage_dice
+        ent.damage_type = damage_type
+    return ent

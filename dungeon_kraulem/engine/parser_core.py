@@ -81,7 +81,11 @@ _QUICK_INTENTS = {
     "salvage_help":    ["pomoc odzyskiwania","salvage help"],
     "trap_help":       ["pomoc pułapek","pomoc pulapek","trap help","pomoc rozstawiania"],
     "help":          ["pomoc","help","?"],
-    "flee":          ["uciekaj","spierdalaj","run","flee","wycofaj"],
+    # Prompt 23: removed bare "wycofaj" (collided with "wycofaj broń"
+    # for the sheathe verb). Flee now requires the reflexive form
+    # "wycofuj się" / "wycofaj się" which is the natural Polish anyway.
+    "flee":          ["uciekaj","spierdalaj","run","flee",
+                      "wycofuj się","wycofaj się","wycofaj sie","wycofuj sie"],
     "check_materials": ["materiały","materialy","materials","surowce"],
     "check_beliefs":   ["idee","plotki","wpływy","wplywy","beliefs","rumors",
                         "memy","mem","mity","przekonania"],
@@ -129,6 +133,14 @@ _QUICK_INTENTS = {
 
     # Quick journal tab nav.
     "journal_companions": ["towarzysze","chowańce","chowance","pupile","companions"],
+
+    # Prompt 23 — wield / sheathe / coat. The regex below extracts the
+    # target item name + optional hand modifier. Quick-intent cues
+    # below are only the BARE verbs (matched via the fast-path) —
+    # the regex handles the typed-with-target form.
+    "sheathe":       ["wycofaj broń","wycofaj bron","schowaj broń",
+                      "schowaj bron","odłóż broń","odloz bron",
+                      "sheathe","stow"],
 
     # Prompt 20 — encounter prep.
     "prep_room":  ["przygotuj się","przygotuj sie","oceń pokój","ocen pokoj",
@@ -308,6 +320,53 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.intent = "talk"
         intent.verb = "talk"
         intent.targets.append(_strip_articles(tm.group(1)))
+        intent.confidence = 0.9
+        return intent
+
+    # ── Prompt 23: "dobądź X" / "dobądź X w lewą rękę" / "wyciągnij X"
+    # — wield an inventory item. Hand modifier optional (defaults main).
+    # "wycofaj broń" (sheathe) is handled via the quick-intent table
+    # above because it has no target.
+    # Hand alternatives must match the FOLDED input (no diacritics).
+    # "lewą rękę" folds to "lewa reke" (NOT "reka"), "prawą rękę" → "prawa reke".
+    # Prompt 23: removed `wyciągnij` from the verb set — it collided with
+    # `wyciągnij X z Y` (extract for salvage). `dobądź` / `chwyć` /
+    # `uzbrój się` are the canonical Polish wield verbs.
+    wield_re = re.compile(
+        r"^(?:dobądź|dobadz|chwyć|chwyc|"
+        r"uzbrój się|uzbroj sie|wield|equip)"
+        r"\s+(?P<item>.+?)"
+        r"(?:\s+(?:w|do)\s+(?P<hand>lewą\s+rękę|lewa\s+reke|"
+        r"prawą\s+rękę|prawa\s+reke|główną\s+rękę|glowna\s+reke|"
+        r"off\s+hand|main\s+hand))?$"
+    )
+    wm = wield_re.match(folded)
+    if wm:
+        intent.intent = "wield"
+        intent.verb = "wield"
+        intent.targets.append(_strip_articles(wm.group("item")))
+        hand_str = (wm.group("hand") or "").lower()
+        if "lew" in hand_str or "off" in hand_str:
+            intent.modifiers.append("hand:offhand")
+        else:
+            intent.modifiers.append("hand:main")
+        intent.confidence = 0.92
+        return intent
+
+    # ── Prompt 23: "nasącz X Y" — coat weapon X with substance Y.
+    # Two-target form. Placed before generic verb routing so it doesn't
+    # collide with single-target verbs.
+    coat_re = re.compile(
+        r"^(?:nasącz|nasacz|posmaruj|pokryj|powlecz|namaść|namasc|"
+        r"coat|imbue|slather|anoint)"
+        r"\s+(?P<weapon>.+?)\s+(?P<substance>.+)$"
+    )
+    cm = coat_re.match(folded)
+    if cm:
+        intent.intent = "coat_weapon"
+        intent.verb = "coat_weapon"
+        intent.targets.append(_strip_articles(cm.group("weapon")))
+        intent.targets.append(_strip_articles(cm.group("substance")))
         intent.confidence = 0.9
         return intent
 

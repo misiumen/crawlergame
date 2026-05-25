@@ -306,13 +306,112 @@ def draw_room_panel(surf, world, layout=None):
             if cy > y + h - 30: break
 
 
+def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L):
+    """Prompt 23 — combat target info: name, HP bar, AC, statuses,
+    distance band. Replaces the bottom half of the right sidebar
+    when combat is active."""
+    from ..engine import combat as _cmb
+    cy = y + 8
+    text(surf, t("ui_enemy_header", fallback="CEL"),
+         x + 14, cy, DANGER, L.font_small, True); cy += 18
+    text(surf, target.display_name(), x + 14, cy, BRIGHT_TEXT,
+         L.font_small, True); cy += 18
+    hp_bar(surf, x + 14, cy, w - 28, 12, target.hp, target.max_hp); cy += 16
+    text(surf, f"HP {target.hp}/{target.max_hp}   AC {target.ac}",
+         x + 14, cy, NORMAL_TEXT, L.font_small - 1); cy += 16
+
+    # Distance band.
+    if cs and target.entity_id in cs.bands:
+        band = cs.bands[target.entity_id]
+        band_pl = {"engaged": "zwarcie", "at_range": "dystans"}.get(band, band)
+        text(surf, f"Dystans: {band_pl}", x + 14, cy, ACCENT2,
+             L.font_small - 1); cy += 14
+
+    # Statuses with PL labels.
+    if target.conditions:
+        cy += 4
+        text(surf, t("ui_enemy_statuses", fallback="Stan:"),
+             x + 14, cy, DANGER, L.font_small - 1, True); cy += 14
+        labels = [_cmb.status_label(s, "pl") for s in target.conditions]
+        # Wrap statuses across rows.
+        line_w = w - 28
+        f_small = font(L.font_small - 1)
+        line = ""
+        for lbl in labels:
+            test = (line + ", " + lbl) if line else lbl
+            if f_small.size(test)[0] > line_w:
+                text(surf, line, x + 14, cy, WARN, L.font_small - 1)
+                cy += 14
+                line = lbl
+            else:
+                line = test
+        if line:
+            text(surf, line, x + 14, cy, WARN, L.font_small - 1); cy += 14
+
+    # Resistances if known (always visible for now — could be gated by clues later).
+    if target.resists or target.vulnerable_to or target.immune_to:
+        cy += 4
+        if target.resists:
+            text(surf, "Odporny: " + ", ".join(target.resists),
+                 x + 14, cy, ACCENT2, L.font_small - 1); cy += 13
+        if target.vulnerable_to:
+            text(surf, "Podatny: " + ", ".join(target.vulnerable_to),
+                 x + 14, cy, ACCENT, L.font_small - 1); cy += 13
+        if target.immune_to:
+            text(surf, "Niewrażliwy: " + ", ".join(target.immune_to),
+                 x + 14, cy, DIM_TEXT, L.font_small - 1); cy += 13
+
+    # Companion advantage flag (Prompt 19).
+    if cs and getattr(cs, "companion_advantage_pending", False):
+        cy += 4
+        text(surf, t("ui_enemy_advantage_flag",
+                     fallback="• Towarzysz odwraca uwagę"),
+             x + 14, cy, ACCENT, L.font_small - 1); cy += 13
+
+
 def draw_sidebar(surf, world, layout=None):
     """Right column: character status + stats + conditions. The map / known
     rooms / clues list lives in the left sidebar on ultrawide, or stays
-    here on compact/wide."""
+    here on compact/wide.
+
+    Prompt 23: when combat is active in the current room, the sidebar
+    splits — upper half stays player, lower half shows the current
+    combat target's panel (HP bar, AC, statuses, distance band).
+    """
     L = _resolve_layout(layout)
     x, y, w, h = L.right_sidebar_rect
-    panel(surf, (x, y, w, h))
+
+    # Prompt 23 — detect combat and target.
+    target_ent = None
+    cs = None
+    try:
+        from ..engine import combat as _cmb
+        f = world.current_floor
+        room = f.current_room() if f else None
+        cs = _cmb.get_combat(room) if room else None
+        if cs is not None and cs.active and cs.participants:
+            for eid in cs.participants:
+                ent = world.get(eid)
+                if ent is not None and ent.is_alive():
+                    target_ent = ent
+                    break
+    except Exception:
+        target_ent = None
+        cs = None
+
+    # If we have a combat target, split the sidebar 55/45 (player top,
+    # enemy bottom). Otherwise full panel is player.
+    if target_ent is not None:
+        player_h = int(h * 0.55)
+        enemy_y = y + player_h
+        enemy_h = h - player_h
+        panel(surf, (x, y, w, player_h))
+        panel(surf, (x, enemy_y, w, enemy_h))
+        _draw_enemy_panel(surf, world, target_ent, cs,
+                          x, enemy_y, w, enemy_h, L)
+        h = player_h    # restrict the player drawing area
+    else:
+        panel(surf, (x, y, w, h))
     c = world.character
     cy = y + 12
     text(surf, c.name or "—", x + 14, cy, BRIGHT_TEXT, L.font_title - 4, True); cy += 24

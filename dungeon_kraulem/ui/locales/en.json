@@ -508,5 +508,25 @@
   "nav_pet_calm":           "Calm pet",
   "nav_pet_scout":          "Send pet to scout",
 
+  "ui_enemy_header":           "TARGET",
+  "ui_enemy_statuses":         "Status:",
+  "ui_enemy_advantage_flag":   "• Companion distracting",
+
+  "feedback_wield_no_target":      "What do you want to wield?",
+  "feedback_wield_not_in_inventory":"You don't have \"{name}\" in your pack.",
+  "feedback_wield_twohand_refuse": "\"{weapon}\" needs both hands. First put away \"{offhand}\".",
+  "feedback_wield_already":        "You're already holding \"{name}\".",
+  "feedback_wield_ok":             "You draw \"{name}\" in your {hand}.",
+  "feedback_sheathe_not_held":     "You're not holding that.",
+  "feedback_sheathe_empty":        "You're already holding nothing.",
+  "feedback_sheathe_ok":           "You put away \"{name}\".",
+  "feedback_coat_usage":           "With what? E.g. \"coat knife with venom\".",
+  "feedback_coat_no_weapon":       "You don't have \"{name}\" at hand.",
+  "feedback_coat_not_weapon":      "\"{name}\" isn't a weapon.",
+  "feedback_coat_no_material":     "You don't have \"{name}\" in materials.",
+  "feedback_coat_incompatible":    "That doesn't apply to weapons.",
+  "feedback_coat_ok":              "You coat \"{weapon}\" with \"{material}\". {hits} hits.",
+  "feedback_coating_worn":         "The coating on \"{name}\" wore off.",
+
   "feedback_inspect_empty": "You look at: {name}. Nothing more."
 }
