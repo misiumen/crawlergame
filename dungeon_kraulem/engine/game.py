@@ -5120,7 +5120,14 @@ class Game:
             collapsed = False
             f = getattr(self.world, "current_floor", None)
             if f is not None:
-                collapsed = bool((f.state or {}).get("collapsed"))
+                # Defensive getattr: pre-P26b FloorState objects (in
+                # older save files or in tests that stub the class)
+                # may not carry the `state` attribute. Treat absence
+                # as "not collapsed" — the only side-effect of being
+                # wrong is missing a deadline-cross from a stale save,
+                # which is recoverable.
+                fstate = getattr(f, "state", None) or {}
+                collapsed = bool(fstate.get("collapsed"))
             if collapsed:
                 self.state = STATE_DEFEAT
 

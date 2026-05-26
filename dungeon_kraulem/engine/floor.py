@@ -46,6 +46,11 @@ class FloorState:
     # Each entry: {"minute": int, "kind": str, "args": {...}}
     active_events: List[Dict] = field(default_factory=list)
 
+    # Prompt 26b — floor-level runtime state (e.g. "collapsed" flag set
+    # by time_system when deadline crosses 0). Free-form dict so future
+    # prompts can store extra ephemeral flags without schema migration.
+    state: Dict = field(default_factory=dict)
+
     # Prompt 07: belief seeds active on this floor (subset of world.belief_seeds).
     active_belief_seed_ids: List[str] = field(default_factory=list)
 
@@ -122,6 +127,7 @@ class FloorState:
             "objective_description_fallback": self.objective_description_fallback,
             "objective_solution_paths": list(self.objective_solution_paths),
             "active_belief_seed_ids": list(self.active_belief_seed_ids),
+            "state": dict(self.state),
         }
 
     @classmethod
@@ -145,4 +151,5 @@ class FloorState:
         f.objective_description_fallback = d.get("objective_description_fallback", "")
         f.objective_solution_paths = list(d.get("objective_solution_paths", []))
         f.active_belief_seed_ids = list(d.get("active_belief_seed_ids", []))
+        f.state = dict(d.get("state", {}))
         return f
