@@ -93,10 +93,48 @@ class Game:
         # that doesn't match a disambiguation follow-up.
         self.pending_disambiguation = None  # dict | None
 
+        # Prompt 23.5 (backlog #1): log scrollback. 0 = pinned to newest.
+        # PgUp / PgDn bump this in `_handle_play_keydown`; new log writes
+        # auto-reset to 0 so the player never misses the latest hit.
+        self.log_scroll = 0
+
+        # Prompt 23.5 (backlog #2): when an action-panel option commits a
+        # command, this carries the option's `target_id` through one
+        # dispatch cycle so the validator can bypass disambiguation for
+        # the already-resolved target. Cleared after each command.
+        self._preresolved_target_id = None
+
+        # P24.5: full-screen graphical map overlay (M key toggles).
+        self.full_map_open = False
+
+        # P25: paper-doll slot swap popover. When open, holds the slot
+        # being edited + the cursor index within the eligible list.
+        # Cleared on Esc / commit / clicking outside.
+        self.slot_popover_open: Optional[str] = None  # slot key
+        self.slot_popover_idx: int = 0
+
+        # P24.5: per-frame click registry. Draw functions populate it;
+        # mouse handlers query it. Cleared at the start of every draw.
+        from ..ui.click_registry import ClickRegistry
+        self.click_registry = ClickRegistry()
+        # Mouse hover state: last-known mouse position so the tooltip
+        # renderer knows where to draw. Updated on MOUSEMOTION.
+        self._mouse_xy = (-1, -1)
+        # P24.5: pending UI side-channels populated by clickable panels
+        # (paper-doll slot picked, quick-strip item used). Game polls
+        # them at top of update() and dispatches the right action.
+        # Avoids passing Game callbacks into pure UI code.
+        # (These are read by `_drain_ui_inputs()`.)
+        # Each pending value is read-once: cleared after dispatch.
+
     # ── Helpers ──────────────────────────────────────────────────────────────
 
     def log(self, msg, cat=LOG_NORMAL):
         if self.world: self.world.log_msg(msg, cat)
+        # Prompt 23.5 (backlog #1): any new log entry auto-pins the view
+        # back to the newest. Without this, a player scrolled into history
+        # would silently miss new entries (e.g. an enemy entering combat).
+        self.log_scroll = 0
 
     # ── State transitions ────────────────────────────────────────────────────
 
@@ -318,6 +356,131 @@ class Game:
                            fallback=f"Chowasz „{ent.display_name()}”.",
                            name=ent.display_name()),
                          LOG_SUCCESS)
+
+    def _attempt_wear(self, intent):
+        """Prompt 25 — equip a wearable from inventory into its slot.
+
+        Auto-detects the slot from the item's `slot:X` tag. Conflicts
+        (slot already occupied) automatically unequip the previous
+        occupant back to inventory + log the swap.
+        """
+        from . import equipment as _eq
+        if not intent.targets:
+            self.log(t("feedback_wear_what",
+                       fallback="Co chcesz założyć?"), LOG_WARN)
+            return
+        item = self._resolve_inventory_item(intent.targets[0])
+        # _resolve_inventory_item only searches inventory; for "wear" we
+        # also need to consider items already-worn (so "załóż" on
+        # something worn is a no-op refusal rather than a "not found").
+        if item is None:
+            # Worn-pool fallback so refusal message is correct.
+            for slot, eid in _eq.iter_worn(self.world.character):
+                ent = self.world.get(eid)
+                if ent is None:
+                    continue
+                from .polish_text import polish_match, fold as _fold
+                if polish_match(_fold(intent.targets[0]),
+                                _fold(ent.display_name())):
+                    self.log(t("feedback_already_worn",
+                               fallback=f"„{ent.display_name()}” już "
+                                        f"masz na sobie."),
+                             LOG_WARN)
+                    return
+            self.log(t("feedback_wear_not_found",
+                       fallback=f"Nie masz „{intent.targets[0]}” do założenia.",
+                       what=intent.targets[0]), LOG_WARN)
+            return
+        # Pick a slot from the entity's tags. For wieldable items the
+        # player should use `dobądź`; warn here so we don't hijack the
+        # wield path.
+        slot = _eq.slot_for_entity(item)
+        if slot is None:
+            self.log(t("feedback_wear_no_slot",
+                       fallback=f"„{item.display_name()}” nie jest "
+                                f"częścią ekwipunku do założenia.",
+                       name=item.display_name()), LOG_WARN)
+            return
+        sd_check = _eq.SLOT_DEFS.get(slot)
+        if sd_check is not None and sd_check.is_wield:
+            self.log(t("feedback_wear_use_wield",
+                       fallback=f"Do „{item.display_name()}” użyj "
+                                f"„dobądź”, nie „załóż”.",
+                       name=item.display_name()), LOG_WARN)
+            return
+        ok, prev_id, reason = _eq.equip(self.world, self.world.character,
+                                        item, slot)
+        if not ok:
+            self.log(reason or "Nie pasuje.", LOG_WARN)
+            return
+        sd = _eq.SLOT_DEFS[slot]
+        prev_name = ""
+        if prev_id is not None:
+            prev = self.world.get(prev_id)
+            if prev is not None:
+                prev_name = prev.display_name()
+        if prev_name:
+            self.log(t("feedback_wear_swapped",
+                       fallback=f"Zakładasz „{item.display_name()}” "
+                                f"(slot: {sd.label_pl}). Zdejmujesz: "
+                                f"„{prev_name}”.",
+                       new=item.display_name(), slot=sd.label_pl,
+                       old=prev_name), LOG_SUCCESS)
+        else:
+            self.log(t("feedback_wear_ok",
+                       fallback=f"Zakładasz „{item.display_name()}” "
+                                f"(slot: {sd.label_pl}).",
+                       name=item.display_name(), slot=sd.label_pl),
+                     LOG_SUCCESS)
+
+    def _attempt_take_off(self, intent):
+        """Prompt 25 — remove a worn item back to inventory. Accepts
+        either an item name OR a slot name (`zdejmij hełm`)."""
+        from . import equipment as _eq
+        from .polish_text import polish_match, fold as _fold
+        if not intent.targets:
+            # No target — if exactly one slot is occupied, take that off.
+            worn = list(_eq.iter_worn(self.world.character))
+            if len(worn) == 1:
+                slot, _eid = worn[0]
+            else:
+                self.log(t("feedback_take_off_which",
+                           fallback="Zdjąć co? Powiedz, co konkretnie."),
+                         LOG_WARN)
+                return
+        else:
+            slot = None
+            frag = _fold(intent.targets[0])
+            # 1) Match by entity display name.
+            for s, eid in _eq.iter_worn(self.world.character):
+                ent = self.world.get(eid)
+                if ent is None:
+                    continue
+                if polish_match(frag, _fold(ent.display_name())):
+                    slot = s
+                    break
+            # 2) Match by slot label or short glyph.
+            if slot is None:
+                for s_key, sd in _eq.SLOT_DEFS.items():
+                    if polish_match(frag, _fold(sd.label_pl)):
+                        slot = s_key
+                        break
+            if slot is None:
+                self.log(t("feedback_take_off_none",
+                           fallback=f"Nie masz nic takiego na sobie."),
+                         LOG_WARN)
+                return
+        ok, freed_id, reason = _eq.unequip(self.world, self.world.character,
+                                           slot)
+        if not ok:
+            self.log(reason or "Slot pusty.", LOG_WARN)
+            return
+        ent = self.world.get(freed_id) if freed_id is not None else None
+        nm = ent.display_name() if ent is not None else "?"
+        sd = _eq.SLOT_DEFS[slot]
+        self.log(t("feedback_take_off_ok",
+                   fallback=f"Zdejmujesz „{nm}” (slot: {sd.label_pl}).",
+                   name=nm, slot=sd.label_pl), LOG_SUCCESS)
 
     def _attempt_coat_weapon(self, intent):
         """Apply a substance material to a weapon, granting status-on-hit.
@@ -985,15 +1148,22 @@ class Game:
                    idx=idx),
                  LOG_SUCCESS)
 
-    def submit_generated_command(self, command: str):
+    def submit_generated_command(self, command: str, target_id=None):
         """Prompt 08: route a cursor/option-selected command through the
         same submit_input path used by typed text. The command is logged
         like a manual entry, then dispatched to the normal parser pipeline.
-        Never mutates game state directly."""
+        Never mutates game state directly.
+
+        Prompt 23.5 (backlog #2): when called from the action panel, the
+        `target_id` of the originating SelectableOption is carried through
+        so the validator can bypass disambiguation. The action panel
+        already knows which entity the player picked; making them answer
+        "który?" again is a UX bug."""
         cmd = (command or "").strip()
         if not cmd:
             return
         self.input_text = cmd
+        self._preresolved_target_id = target_id
         self.submit_input()
 
     def _handle_create_input(self, text_val):
@@ -1155,6 +1325,24 @@ class Game:
         if intent.intent in ("salvage", "strip", "harvest"):
             self._attempt_salvage(intent); return
 
+        # Prompt 24 — explicit butcher / eat verbs on corpses. The
+        # `salvage` path above also routes to butcher when the target is
+        # a corpse (so "rozbierz ciało" works), but these intent keys
+        # come from corpse-specific verbs (`wypatrosz`, `oprawiaj`,
+        # `zjedz` etc) and want their own handlers so the player gets
+        # appropriately-flavored feedback even when the target is e.g.
+        # a non-corpse (clean refusal: "to nie zwłoki").
+        if intent.intent == "butcher_corpse":
+            self._attempt_butcher_corpse(intent); return
+        if intent.intent == "eat_corpse":
+            self._attempt_eat_corpse(intent); return
+
+        # Prompt 25 — 7-slot equipment.
+        if intent.intent == "wear":
+            self._attempt_wear(intent); return
+        if intent.intent == "take_off":
+            self._attempt_take_off(intent); return
+
         # Gap 4: deploy a crafted/portable trap or device
         if intent.intent == "deploy":
             self._attempt_deploy(intent); return
@@ -1218,6 +1406,24 @@ class Game:
         # Standard pipeline: validate → resolve → apply
         v = validate(intent, self.world)
         if not v.valid:
+            # Prompt 23.5 (backlog #2): if the player committed this
+            # command via the action panel, `_preresolved_target_id` is
+            # set to the chosen entity. When validation reports ambiguous
+            # but our preresolved id is in the candidate list, re-issue
+            # the command for THAT specific entity instead of asking the
+            # player which one they meant — they already picked it.
+            if (v.reason == "ambiguous_target"
+                    and v.possible_entity_ids
+                    and self._preresolved_target_id is not None
+                    and self._preresolved_target_id in v.possible_entity_ids):
+                verb = (getattr(intent, "verb", "") or
+                        getattr(intent, "normalized_text", "").split()[0] or
+                        intent.intent)
+                tid = self._preresolved_target_id
+                self._preresolved_target_id = None
+                self.pending_disambiguation = None
+                self._reissue_for_entities(verb, [tid], label="")
+                return
             self.log(v.message() or "—", LOG_WARN)
             if v.possible_interpretations:
                 self.log("  ? " + " | ".join(v.possible_interpretations), LOG_NORMAL)
@@ -1232,7 +1438,10 @@ class Game:
                 }
             else:
                 self.pending_disambiguation = None
+            self._preresolved_target_id = None
             return
+        # Successful validation also consumes the preresolved hint.
+        self._preresolved_target_id = None
 
         # Prompt 22 bug fix: `sprawdź X` was silent — inspect had no
         # handler that printed the entity's description. Affordances
@@ -1257,6 +1466,13 @@ class Game:
                                     f"Nic ponad to.",
                            name=ent.display_name()),
                          LOG_NORMAL)
+
+        # P24.5: use-handler for map items. Reveals rooms via the
+        # floor's known/revealed sets so the minimap surfaces them.
+        if intent.intent == "use" and v.matched_entities:
+            ent = v.matched_entities[0]
+            if ent.key in ("map_fragment", "floor_map"):
+                self._consume_map_item(ent); return
 
         r = resolve(v, self.world)
         if r.fallback_description and (v.required_checks or r.level != "success"):
@@ -1366,12 +1582,14 @@ class Game:
     def _show_character(self):
         c = self.world.character
         self.log(f"{c.name} — {t(f'bg_{c.background}_n', fallback=c.background)}", LOG_SYSTEM)
+        from .dice_labels import stat_pl as _spl
         for s in BASE_STATS:
             mod = c.stat_mod(s); sign = "+" if mod >= 0 else ""
-            self.log(f"  {s}: {c.stats[s]:2d} ({sign}{mod})", LOG_NORMAL)
+            self.log(f"  {_spl(s)}: {c.stats[s]:2d} ({sign}{mod})", LOG_NORMAL)
         if c.class_key:
             self.log(f"  {t('ui_class', fallback='Klasa')}: {t(f'class_{c.class_key}_n', fallback=c.class_key)}", LOG_NORMAL)
-        self.log(f"  HP {c.hp}/{c.max_hp}   AC {c.effective_ac()}   {t('ui_credits', fallback='Kr')} {c.credits}", LOG_NORMAL)
+        self.log(f"  HP {c.hp}/{c.max_hp}   AC {c.effective_ac(self.world)}   "
+                 f"{t('ui_credits', fallback='Kr')} {c.credits}", LOG_NORMAL)
 
     def _show_map(self):
         f = self.world.current_floor
@@ -1483,6 +1701,14 @@ class Game:
                        fallback="Nie widzisz tu tego, czego szukasz."), LOG_WARN)
             return
 
+        # Prompt 24: salvaging a corpse routes to butcher under the
+        # hood — the materials economy is the same but the per-monster
+        # table + flavor + tag-bus events come from
+        # `content/data/monster_salvage.py`.
+        from .entity import T_CORPSE
+        if target.entity_type == T_CORPSE:
+            self._run_butcher(target); return
+
         # Gap 3: ownership / theft consequences. If the target was placed inside
         # a safehouse, salvaging it is theft. We don't BLOCK it — the player can
         # absolutely strip the cafe espresso machine — but we make it visible
@@ -1586,7 +1812,9 @@ class Game:
         elif total >= dc - 3:  level = "partial_success"
         else:                  level = "failure"
 
-        self.log(f"  [{intent.intent}] d20({raw}) + {stat}({mod:+d}) = {total} vs DC {dc} → {level}", LOG_SYSTEM)
+        from .dice_labels import format_check as _fc
+        self.log(_fc(intent.intent, stat, raw, mod, total, dc, level),
+                 LOG_SYSTEM)
 
         # Determine drops by level
         drops = {}
@@ -1690,6 +1918,168 @@ class Game:
         # Affinity nudge: salvage feeds survival
         ch.affinity["survival"] = ch.affinity.get("survival", 0) + 1
 
+    # ── Prompt 24 — corpse handlers ─────────────────────────────────────
+
+    def _resolve_corpse_target(self, intent):
+        """Pick a corpse from the current room that matches the intent.
+        Returns the Entity or None (and logs a clean refusal)."""
+        from .entity import T_CORPSE
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            self.log(t("feedback_no_target",
+                       fallback="Nie widzisz tu tego, czego szukasz."), LOG_WARN)
+            return None
+        target = None
+        if intent.targets:
+            from .validation import _resolve_entities
+            candidates = _resolve_entities(room, intent.targets[0])
+            target = candidates[0] if candidates else None
+        else:
+            # No explicit target: if exactly one corpse in the room, use it.
+            corpses = [e for e in room.visible_entities()
+                       if e.entity_type == T_CORPSE]
+            if len(corpses) == 1:
+                target = corpses[0]
+            elif len(corpses) > 1:
+                names = ", ".join(c.display_name() for c in corpses[:5])
+                self.log(t("feedback_corpse_which",
+                           fallback=f"Które ciało? {names}",
+                           names=names), LOG_WARN)
+                return None
+        if target is None:
+            self.log(t("feedback_corpse_none",
+                       fallback="Nie widzisz tu ciała."), LOG_WARN)
+            return None
+        if target.entity_type != T_CORPSE:
+            self.log(t("feedback_not_a_corpse",
+                       fallback=f"„{target.display_name()}” to nie zwłoki.",
+                       name=target.display_name()), LOG_WARN)
+            return None
+        return target
+
+    def _attempt_butcher_corpse(self, intent):
+        target = self._resolve_corpse_target(intent)
+        if target is None:
+            return
+        self._run_butcher(target)
+
+    def _run_butcher(self, corpse):
+        """Shared butcher path used by both explicit `wypatrosz` and the
+        salvage handler when salvaging a corpse. Mutates state, logs,
+        applies tag-bus events, advances time."""
+        from . import corpses as _cp
+        from . import time_system as ts
+        from ..content import materials as _mat
+        ch = self.world.character
+        result = _cp.butcher(self.world, corpse, ch)
+        if not result.ok:
+            self.log(result.message, LOG_WARN)
+            return
+
+        # Log yields with player-facing names.
+        if result.materials:
+            parts = []
+            for k, v in result.materials.items():
+                md = _mat.get(k)
+                nm = md.name() if md is not None else k.replace("_", " ")
+                parts.append(f"{v}× {nm}")
+            self.log(t("feedback_butcher_yield",
+                       fallback=f"Wypatroszono: {', '.join(parts)}.",
+                       yields=", ".join(parts)), LOG_SUCCESS)
+        else:
+            self.log(t("feedback_butcher_nothing",
+                       fallback="Wypatroszone — ale nic użytecznego."),
+                     LOG_NORMAL)
+
+        # Trophy goes to inventory as an entity. Falls back silently if
+        # the trophy item template doesn't exist yet — hook for P24-onward
+        # content drops.
+        if result.trophy_item_key:
+            try:
+                from ..content.items import make_item
+                it = make_item(result.trophy_item_key,
+                               location_id="inventory:player")
+                self.world.register(it)
+                ch.inventory_ids.append(it.entity_id)
+                self.log(t("feedback_trophy_drop",
+                           fallback=f"Znalezione: {it.display_name()}.",
+                           name=it.display_name()), LOG_SUCCESS)
+            except Exception:
+                pass
+
+        # Time + noise.
+        if result.time_min:
+            ts.advance(self.world, int(result.time_min))
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is not None and result.noise:
+            room.noise_level = int(getattr(room, "noise_level", 0)) + \
+                               int(result.noise)
+
+        # Tag bus events — sponsor reactions, P28 titles, P31 vendetta.
+        try:
+            from . import sponsors as _sp
+            _sp.note_player_tag(self.world, "butchered_corpse", weight=1)
+            if result.audience_tag:
+                _sp.note_player_tag(self.world, result.audience_tag, weight=2)
+            if result.desecration_tag:
+                _sp.note_player_tag(self.world, result.desecration_tag,
+                                    weight=2)
+        except Exception:
+            pass
+
+        # Title grants (P28 hook — for now just stash in character flags
+        # so titles system can drain them when it lands).
+        if result.title_grants:
+            pending = ch.flags.setdefault("pending_title_grants", [])
+            for tg in result.title_grants:
+                if tg not in pending:
+                    pending.append(tg)
+
+        ch.affinity["survival"] = ch.affinity.get("survival", 0) + 1
+
+    def _attempt_eat_corpse(self, intent):
+        from . import corpses as _cp
+        from . import time_system as ts
+        target = self._resolve_corpse_target(intent)
+        if target is None:
+            return
+        ch = self.world.character
+        result = _cp.eat(self.world, target, ch)
+        if not result.ok:
+            self.log(result.message, LOG_WARN)
+            return
+
+        # Flavor.
+        if result.hp_delta > 0:
+            self.log(t("feedback_eat_corpse_heal",
+                       fallback=f"Zjadasz. Trochę lepiej. (+{result.hp_delta} HP)",
+                       hp=result.hp_delta), LOG_SUCCESS)
+        elif result.hp_delta < 0:
+            self.log(t("feedback_eat_corpse_hurt",
+                       fallback=f"Zjadasz. Żołądek protestuje. ({result.hp_delta} HP)",
+                       hp=result.hp_delta), LOG_WARN)
+        else:
+            self.log(t("feedback_eat_corpse_neutral",
+                       fallback="Zjadasz. Smak ciężko opisać. Posila."),
+                     LOG_NORMAL)
+        if result.status_applied:
+            self.log(t("feedback_eat_status",
+                       fallback=f"Łapiesz: {result.status_applied}.",
+                       status=result.status_applied), LOG_WARN)
+
+        # Time + tag bus.
+        ts.advance(self.world, 5)
+        try:
+            from . import sponsors as _sp
+            if result.audience_tag:
+                _sp.note_player_tag(self.world, result.audience_tag, weight=2)
+            if result.cannibal_tag:
+                _sp.note_player_tag(self.world, result.cannibal_tag, weight=3)
+        except Exception:
+            pass
+
     def _attempt_craft(self, intent):
         """Try a known recipe by name, otherwise improvise by category from the player's text."""
         from ..content import crafting
@@ -1784,7 +2174,10 @@ class Game:
         elif total >= dc:      level = "success"
         elif total >= dc - 3:  level = "partial_success"
         else:                  level = "failure"
-        self.log(f"  [craft:{plan['category_label_pl']}] d20({raw}) + {stat}({mod:+d}) = {total} vs DC {dc} → {level}", LOG_SYSTEM)
+        from .dice_labels import (stat_pl as _spl, level_pl as _lpl)
+        self.log(f"  [rzemiosło:{plan['category_label_pl']}] d20({raw}) + "
+                 f"{_spl(stat)}({mod:+d}) = {total} vs TT {dc} → {_lpl(level)}",
+                 LOG_SYSTEM)
 
         # Materials: consume on success/partial; half-waste on failure; full loss on crit-fail
         if level in ("critical_success", "success", "partial_success"):
@@ -1946,7 +2339,8 @@ class Game:
         elif total >= dc:     level = "success"
         elif total >= dc - 3: level = "partial_success"
         else:                 level = "failure"
-        self.log(f"  [break] d20({raw}) + STR({mod:+d}) = {total} vs DC {dc} → {level}",
+        from .dice_labels import format_check as _fc
+        self.log(_fc("break", "STR", raw, mod, total, dc, level),
                  LOG_SYSTEM)
 
         ts.advance(self.world, 4)
@@ -2447,13 +2841,94 @@ class Game:
                 return True
             # Fall through to normal handling, but still take an enemy turn.
             return False
-        # Everything else (search, use item, journal commands) runs normally
-        # and then enemies get a free turn unless the command is a no-time
-        # info action (journal etc). We approximate that by ALWAYS letting
-        # combat-relevant intents in the table above own the turn, and
-        # everything else fall back to the standard pipeline. The enemy
-        # turn fires from `_combat_after_player_action`.
-        return False
+        # ── P26b: full combat lockdown whitelist ─────────────────────
+        # The minimal P24.6 version only blacklisted a few intents.
+        # Now we default-deny: every non-whitelisted intent gets a
+        # clean refusal. Three intent buckets:
+        #
+        #   1. Combat-action whitelist (consumes turn + enemy retaliates
+        #      via the handlers above; we return True after dispatch).
+        #      Already routed before this block — by the time we reach
+        #      here we know the intent is NOT a combat verb.
+        #
+        #   2. Info / free whitelist (no turn, no refusal — read-only).
+        #
+        #   3. Combat-compatible action whitelist — actions that
+        #      legitimately happen mid-fight (use item, swap weapon,
+        #      coat blade, push enemy into hazard, throw at enemy,
+        #      break/destroy interactive). These FALL THROUGH so their
+        #      normal handlers run, and the enemy then retaliates
+        #      because the player's turn is consumed.
+        #
+        # Anything not in (2) or (3) is refused with no turn cost (no
+        # double penalty for typos / muscle-memory).
+
+        # Movement during combat → forced flee with check.
+        if intent.intent == "move":
+            from .parser_core import ActionIntent
+            flee_intent = ActionIntent(
+                intent="flee",
+                verb="uciekaj",
+                targets=[intent.destination] if intent.destination else [],
+                modifiers=list(intent.modifiers or []),
+                normalized_text=f"uciekaj {intent.destination or ''}".strip(),
+            )
+            flee_intent.destination = intent.destination
+            self.log(t("feedback_combat_move_forced_flee",
+                       fallback="Nie wyjdziesz spokojnie — próbujesz się "
+                                "wycofać."), LOG_WARN)
+            self._combat_flee(flee_intent, cs)
+            return True
+
+        # Bucket 2: free / info-only.
+        FREE_IN_COMBAT = {
+            "check_inventory", "check_character", "check_map",
+            "check_materials", "check_beliefs", "check_knowledge",
+            "help", "journal_open", "journal_close",
+            "journal_objectives", "journal_crawlers", "save",
+            "set_monitor", "set_resolution",
+        }
+        if intent.intent in FREE_IN_COMBAT:
+            return False
+
+        # Bucket 3: combat-compatible actions that fall through to their
+        # normal handlers + count as a turn (enemy retaliates).
+        ALLOWED_FALLTHROUGH = {
+            "use",          # drink stim / throw grenade / activate item
+            "wield",        # swap weapon mid-fight (P23)
+            "sheathe",      # put weapon away (deliberate disengage)
+            "coat_weapon",  # apply poison (P23)
+            "inspect",      # look at something briefly — minor turn cost
+            "wear", "take_off",  # P25 — re-armor mid-fight (risky)
+            "intimidate", "bribe", "talk", "persuade",  # parley path
+            "hack",         # robot combat → hack-to-disable is a key tactic
+        }
+        if intent.intent in ALLOWED_FALLTHROUGH:
+            return False
+
+        # Everything else: clean refusal, no turn consumed.
+        REFUSAL_PL = {
+            "loot":           "Nie teraz — masz walkę na karku.",
+            "salvage":        "Nie zbierzesz złomu pod ostrzałem.",
+            "harvest":        "Nie zbierzesz tego, póki cię atakują.",
+            "search":         "Nie przeszukasz pokoju w środku walki.",
+            "mass_loot_take": "Nie podniesiesz wszystkiego — masz inne kłopoty.",
+            "mass_loot_loose": "Nie zgarniesz tego pod ostrzałem.",
+            "mass_salvage":   "Nie rozbierzesz pokoju w środku walki.",
+            "mass_search":    "Nie ma teraz na to czasu.",
+            "mass_break":     "Bicie wszystkiego naraz nie jest atakiem.",
+            "butcher_corpse": "Patroszenie poczeka — wróg żyje.",
+            "eat_corpse":     "Naprawdę chcesz teraz jeść?",
+            "rest":           "Nie odpoczniesz, póki cię biją.",
+            "sleep":          "Próba snu w trakcie walki kończy się jednoznacznie.",
+            "deploy":         "Pułapka wymaga spokoju — to nie ten moment.",
+            "craft":          "Nie posklejasz tego pod uderzeniami.",
+        }
+        msg = REFUSAL_PL.get(intent.intent,
+                             "Nie teraz — masz walkę na karku.")
+        self.log(t(f"feedback_combat_refused_{intent.intent}",
+                   fallback=msg), LOG_WARN)
+        return True
 
     def _combat_after_player_action(self, cs) -> None:
         """Called at the end of every combat-aware player action. Ends
@@ -2530,8 +3005,41 @@ class Game:
             ent.hp = 0     # treated as no-longer-in-fight
             return
         if action.kind in ("attack",):
-            # Player dodge / defense consume here.
             dmg = int(action.damage or 1)
+            # P26b: faction-aware retarget. If the AI picked a rival
+            # combat participant, damage that rival instead of the
+            # player. Crossfire is the audience-pleasing scenario the
+            # player can engineer by luring factions together.
+            rival_id = getattr(action, "target_id", None)
+            if rival_id is not None:
+                rival = self.world.get(rival_id)
+                if rival is not None and rival.is_alive():
+                    rival.hp = max(0, rival.hp - dmg)
+                    self.log(t("feedback_crossfire",
+                               fallback=f"{name} atakuje rywala "
+                                        f"„{rival.display_name()}” na {dmg} HP "
+                                        f"(zostało {rival.hp}/{rival.max_hp}).",
+                               attacker=name,
+                               rival=rival.display_name(),
+                               dmg=dmg,
+                               hp=rival.hp, max_hp=rival.max_hp),
+                             LOG_NORMAL)
+                    # Crossfire is good TV — audience bump.
+                    try:
+                        from . import sponsors as _sp
+                        _sp.note_player_tag(self.world, "crossfire", weight=2)
+                    except Exception:
+                        pass
+                    # If the rival died, transform to corpse.
+                    if rival.hp <= 0:
+                        self.log(f"„{rival.display_name()}” pada.", LOG_SUCCESS)
+                        try:
+                            from . import corpses as _cp
+                            _cp.transform_to_corpse(self.world, rival, killer=ent)
+                        except Exception:
+                            pass
+                    return
+            # Player target path (default / fallback).
             if _cmb.has_status(ch, _cmb.STATUS_BEHIND_COVER) and \
                     cs.bands.get(ent.entity_id) == _cmb.BAND_AT_RANGE:
                 dmg = max(0, dmg - 2)
@@ -2619,6 +3127,14 @@ class Game:
         if _cmb.has_status(target, _cmb.STATUS_CHILLED):   total += 2  # slow
         if _cmb.has_status(target, _cmb.STATUS_CORRODED):  total += 1  # AC -1
         if _cmb.has_status(ch, _cmb.STATUS_AFRAID):        total -= 2
+        # Prompt 26a — maim modifiers.
+        if _cmb.has_status(target, _cmb.STATUS_SLOWED):    total += 2  # easier to hit
+        if _cmb.has_status(target, _cmb.STATUS_DISARMED):  total += 1  # off-balance
+        if _cmb.has_status(ch, _cmb.STATUS_SLOWED):        total -= 2
+        if _cmb.has_status(ch, _cmb.STATUS_DISARMED):
+            # Player's arm is broken — main attacks are massively penalized.
+            total -= 3
+            damage_bonus -= 1
         # Prompt 21: prone+stunned compound auto-hit (was: just +5).
         if (_cmb.has_status(target, _cmb.STATUS_PRONE) and
                 _cmb.has_status(target, _cmb.STATUS_STUNNED)):
@@ -2632,16 +3148,45 @@ class Game:
             self.log(t("companion_advantage_consumed",
                        fallback="(Towarzysz odwraca uwagę: +2 do trafienia.)"),
                      LOG_SYSTEM)
+        # Prompt 26a — body-zone targeting. Reads the selected zone for
+        # this target (defaults to "torso"). Applies to-hit modifier and
+        # damage multiplier from the body plan. Already-broken zones get
+        # a +1 to-hit because the wound makes them easier to hit again.
+        from ..content.data import body_plans as _bp
+        _bp.init_body_parts(target)
+        plan = _bp.plan_for_entity(target)
+        zone_key = (cs.targeted_zone_by_eid or {}).get(target.entity_id)
+        if not zone_key or zone_key not in plan:
+            # Default to torso if available; else the first zone.
+            zone_key = "torso" if "torso" in plan else next(iter(plan.keys()))
+        zone_props = plan.get(zone_key, {})
+        zone_to_hit = int(zone_props.get("to_hit_mod", 0))
+        zone_dmg_mul = float(zone_props.get("damage_mul", 1.0))
+        total += zone_to_hit
+        zone_part = target.body_parts.get(zone_key) or {}
+        if zone_part.get("broken"):
+            total += 1   # weakened zone, easier follow-up
         crit = (raw == 20)
         # Prompt 21: shocked players fumble on 1-2 instead of just 1.
         shocked_fumble_floor = 2 if _cmb.has_status(ch, _cmb.STATUS_SHOCKED) else 1
         fumble = (raw <= shocked_fumble_floor)
         hit = (not fumble) and (crit or total >= dc)
         mode_label = {"normal":"atak","careful":"ostrożny atak","heavy":"ryzykowny atak"}[mode]
-        self.log(f"  [{mode_label}] d20({raw}) + STR({mod:+d})"
-                 f"{(' + bonus' + format(to_hit_bonus, '+d')) if to_hit_bonus else ''} "
-                 f"= {total} vs AC {dc} → "
-                 f"{'KRYT' if crit else ('hit' if hit else 'miss')}", LOG_SYSTEM)
+        outcome_pl = ("KRYT" if crit else
+                      ("trafienie" if hit else
+                       ("pudło" if not fumble else "fuks")))
+        from .dice_labels import stat_pl as _spl
+        bonus_str = f" + bonus({to_hit_bonus:+d})" if to_hit_bonus else ""
+        # Combat to-hit rolls vs AC (not TT) — AC is a target stat, not a
+        # difficulty check, so it keeps its name. P26a: append the zone
+        # label so the player sees WHICH part they swung at.
+        zone_label_pl = zone_props.get("label_pl", zone_key) if zone_props else ""
+        zone_str = f" → {zone_label_pl}" if zone_label_pl else ""
+        zone_mod_str = (f" zona({zone_to_hit:+d})" if zone_to_hit else "")
+        self.log(f"  [{mode_label}] d20({raw}) + {_spl('STR')}({mod:+d})"
+                 f"{bonus_str}{zone_mod_str} = {total} vs AC {dc} → "
+                 f"{outcome_pl}{zone_str}",
+                 LOG_SYSTEM)
         if hit:
             # Prompt 23: damage comes from the wielded main weapon
             # (damage_dice + damage_type). Unarmed default 1d6+2.
@@ -2667,11 +3212,32 @@ class Game:
             base = _roll_dice_spec(dmg_dice, _r)
             dmg = base + mod + damage_bonus
             if crit: dmg *= 2
-            dmg = max(1, dmg)
+            # Prompt 26a — scale damage by the zone's multiplier (head 1.5×,
+            # limbs 0.8×, etc.).
+            dmg = max(1, int(round(dmg * zone_dmg_mul)))
             # Apply via damage module (resistance + status on hit).
             res = _dmg.apply_damage(self.world, target, dmg,
                                     damage_type=dmg_type,
                                     source=f"weapon:{weapon_name}")
+            # Prompt 26a — also debit zone HP. Damage applied to zone is
+            # the actual amount dealt (post-resistance). Breaks trigger
+            # maim status on the victim.
+            actual = int(res.get("amount_dealt", dmg) or 0)
+            if actual > 0 and zone_key in target.body_parts:
+                zp = target.body_parts[zone_key]
+                zp["hp"] = max(0, int(zp.get("hp", 0)) - actual)
+                if zp["hp"] <= 0 and not zp.get("broken"):
+                    zp["broken"] = True
+                    maim = zone_props.get("maim_status")
+                    if maim:
+                        _cmb.add_status(target, maim, 3)
+                    zone_label_pl = zone_props.get("label_pl", zone_key)
+                    self.log(t("feedback_zone_broken",
+                               fallback=f"„{target.display_name()}”: "
+                                        f"{zone_label_pl} złamana!",
+                               name=target.display_name(),
+                               zone=zone_label_pl),
+                             LOG_DANGER)
             # Decrement coating on a landed hit.
             if coating and coating.get("hits_remaining", 0) > 0:
                 coating["hits_remaining"] -= 1
@@ -2696,6 +3262,25 @@ class Game:
                      LOG_SUCCESS if crit else LOG_NORMAL)
             if target.hp <= 0:
                 self.log(f"„{target.display_name()}” pada.", LOG_SUCCESS)
+                # Prompt 24 — corpse on death. Mutates target in place to
+                # entity_type=corpse so all existing references (combat
+                # state, sponsor tag bus, room.entities) stay valid. The
+                # action bar will pick up the new affordances on its
+                # next rebuild.
+                try:
+                    from . import corpses as _cp
+                    _cp.transform_to_corpse(self.world, target,
+                                            killer=self.world.character)
+                    # Tag-bus event: enemy_killed. Sponsor reactions, P28
+                    # title tracking, and P31 vendetta hook into this.
+                    try:
+                        from . import sponsors as _sp
+                        _sp.note_player_tag(self.world, "enemy_killed",
+                                            weight=1)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
             if mode == "heavy" and not crit:
                 # Heavy attack exposes the player.
                 _cmb.add_status(ch, _cmb.STATUS_WOUNDED, 2)
@@ -2803,8 +3388,9 @@ class Game:
         raw = roll_d20()
         mod = ch.stat_mod("DEX")
         total = raw + mod
-        self.log(f"  [ucieczka] d20({raw}) + DEX({mod:+d}) = {total} vs DC {dc}",
-                 LOG_SYSTEM)
+        from .dice_labels import stat_pl as _spl
+        self.log(f"  [ucieczka] d20({raw}) + {_spl('DEX')}({mod:+d}) = "
+                 f"{total} vs TT {dc}", LOG_SYSTEM)
         if total >= dc or raw == 20:
             self.log(t("feedback_combat_flee_ok",
                        fallback=f"Wycofujesz się przez „{target_label}”.",
@@ -3019,7 +3605,8 @@ class Game:
         elif total >= dc:     level = "success"
         elif total >= dc - 3: level = "partial_success"
         else:                 level = "failure"
-        self.log(f"  [deploy] d20({raw}) + {stat}({mod:+d}) = {total} vs DC {dc} → {level}",
+        from .dice_labels import format_check as _fc
+        self.log(_fc("deploy", stat, raw, mod, total, dc, level),
                  LOG_SYSTEM)
 
         ts.advance(self.world, aff.time_cost if aff else 5)
@@ -3296,8 +3883,9 @@ class Game:
         elif total >= dc:      level = "success"
         elif total >= dc - 3:  level = "partial_success"
         else:                  level = "failure"
-        self.log(f"  [memetic:{method}] d20({raw}) + {stat}({mod:+d}) = {total} vs DC {dc} → {level}",
-                 LOG_SYSTEM)
+        from .dice_labels import (stat_pl as _spl, level_pl as _lpl)
+        self.log(f"  [mem:{method}] d20({raw}) + {_spl(stat)}({mod:+d}) = "
+                 f"{total} vs TT {dc} → {_lpl(level)}", LOG_SYSTEM)
 
         # Narrator: attempt line first (always).
         line = narrate("belief_seed_attempt")
@@ -3626,7 +4214,9 @@ class Game:
         mod = ch.stat_mod(stat)
         total = raw + mod
         dc = 10 + seed.distortion // 10
-        self.log(f"  [invoke_belief] d20({raw}) + {stat}({mod:+d}) = {total} vs DC {dc}",
+        from .dice_labels import stat_pl as _spl
+        self.log(f"  [przywołanie] d20({raw}) + {_spl(stat)}({mod:+d}) = "
+                 f"{total} vs TT {dc}",
                  LOG_SYSTEM)
         if total >= dc:
             target_ent.conditions = target_ent.conditions or []
@@ -3863,11 +4453,90 @@ class Game:
         if key in (pygame.K_F2,):
             self._open_journal(self.journal_state.tab); self._suppress_textinput = True
             return
+
+        # P25: slot popover swallows keyboard input while open.
+        if self.slot_popover_open is not None:
+            n = self._popover_row_count()
+            if key == pygame.K_ESCAPE:
+                self._popover_close()
+                self._suppress_textinput = True
+                return
+            if key == pygame.K_UP:
+                self.slot_popover_idx = max(0, self.slot_popover_idx - 1)
+                self._suppress_textinput = True
+                return
+            if key == pygame.K_DOWN:
+                self.slot_popover_idx = min(max(0, n - 1),
+                                             self.slot_popover_idx + 1)
+                self._suppress_textinput = True
+                return
+            if key == pygame.K_RETURN:
+                self._popover_commit()
+                self._suppress_textinput = True
+                return
+            self._suppress_textinput = True
+            return
+
+        # P26a: in combat, number keys 1-9 pick the selected target's
+        # body zone (by display_order). Only fires when the input box is
+        # empty so typing numbers in commands still works.
+        if not self.input_text:
+            try:
+                from . import combat as _cmb
+                from ..content.data import body_plans as _bp
+                f = self.world.current_floor if self.world else None
+                room = f.current_room() if f else None
+                cs_zone = _cmb.get_combat(room) if room else None
+                if cs_zone is not None and cs_zone.active and digit is not None:
+                    tgt_id = getattr(cs_zone, "selected_target_id", None)
+                    tgt = self.world.get(tgt_id) if tgt_id is not None else None
+                    if tgt is not None and tgt.is_alive():
+                        plan = _bp.plan_for_entity(tgt)
+                        ordered = _bp.zones_in_display_order(plan)
+                        idx = int(digit) - 1
+                        if 0 <= idx < len(ordered):
+                            zone_key, _props = ordered[idx]
+                            cs_zone.targeted_zone_by_eid[tgt_id] = zone_key
+                            self._suppress_textinput = True
+                            return
+            except Exception:
+                pass
+
+        # P24.5: full-screen map. Esc closes if open. M toggles only
+        # when the input box is EMPTY (so 'M' as a typed letter still
+        # works mid-command).
+        if self.full_map_open:
+            if key == pygame.K_ESCAPE:
+                self.full_map_open = False
+                self._suppress_textinput = True
+                return
+            # Map overlay swallows other keys (except Esc above).
+            self._suppress_textinput = True
+            return
+        if key == pygame.K_m and not self.input_text:
+            self.full_map_open = True
+            self._suppress_textinput = True
+            return
         if key == pygame.K_j and self.input_mode == "nav":
             # In nav mode J already submits 'wiedza' command — keep that
             # behaviour. In text mode the textinput layer handles 'j' as a
             # typed character.
             pass
+
+        # Prompt 23.5 (backlog #1): PgUp / PgDn drive log scrollback in
+        # both text and nav modes. Works on empty AND non-empty input
+        # because they don't conflict with typing. Page step is 6 entries,
+        # which is roughly one screenful at default resolutions.
+        if key == pygame.K_PAGEUP and not self.journal_state.open:
+            self.log_scroll = min(self.log_scroll + 6,
+                                  max(0, len(self.world.log) - 1)
+                                  if self.world else 0)
+            self._suppress_textinput = True
+            return
+        if key == pygame.K_PAGEDOWN and not self.journal_state.open:
+            self.log_scroll = max(0, self.log_scroll - 6)
+            self._suppress_textinput = True
+            return
 
         # Global hotkeys that work in either mode — Ctrl+S save, F1/? help.
         if ctrl_held and key == pygame.K_s:
@@ -3911,15 +4580,24 @@ class Game:
                 self._suppress_textinput = True
                 return
             if key in (pygame.K_LEFT, pygame.K_a):
+                # P23.5b: L/R hops by COLUMN (grid-aware).
+                # P24.7: when a subject is focused AND cursor is on the
+                # back row (index 0), L-arrow backs out instead of
+                # column-hopping. Makes the back action discoverable.
                 from ..ui import ui_nav
                 self._ensure_nav_state()
-                ui_nav.cycle_group(self.nav_state, -1)
+                if self.nav_state.focused_subject() is not None \
+                        and self.nav_state.selected_index() == 0:
+                    self.nav_state.clear_focus()
+                    self._suppress_textinput = True
+                    return
+                ui_nav.move_selection_column(self.nav_state, -1)
                 self._suppress_textinput = True
                 return
             if key in (pygame.K_RIGHT, pygame.K_d):
                 from ..ui import ui_nav
                 self._ensure_nav_state()
-                ui_nav.cycle_group(self.nav_state, +1)
+                ui_nav.move_selection_column(self.nav_state, +1)
                 self._suppress_textinput = True
                 return
             if key == pygame.K_TAB:
@@ -3945,12 +4623,19 @@ class Game:
                 from ..ui import ui_nav
                 self._ensure_nav_state()
                 opt = ui_nav.current_option(self.nav_state)
-                if opt and opt.enabled and opt.command:
-                    self.submit_generated_command(opt.command)
+                self._commit_nav_option(opt)
                 self._suppress_textinput = True
                 return
             if key == pygame.K_ESCAPE:
-                # Return to text mode.
+                # P24.7: in nav mode, Esc backs out of a two-tier focus
+                # first; second Esc returns to text mode. Lets the player
+                # navigate verbs → picker → tabs → text without an
+                # explicit "← Powrót" click.
+                self._ensure_nav_state()
+                if self.nav_state.focused_subject() is not None:
+                    self.nav_state.clear_focus()
+                    self._suppress_textinput = True
+                    return
                 self.input_mode = "text"
                 self._suppress_textinput = True
                 return
@@ -3958,7 +4643,9 @@ class Game:
             if key == pygame.K_i:
                 self.submit_generated_command("plecak"); self._suppress_textinput = True; return
             if key == pygame.K_m:
-                self.submit_generated_command("mapa"); self._suppress_textinput = True; return
+                # P24.5: M-key now opens the full-screen graphical map.
+                self.full_map_open = not self.full_map_open
+                self._suppress_textinput = True; return
             if key == pygame.K_c:
                 self.submit_generated_command("postać"); self._suppress_textinput = True; return
             if key == pygame.K_j:
@@ -3997,16 +4684,25 @@ class Game:
                     self._suppress_textinput = True
                     return
             if key == pygame.K_LEFT:
+                # P23.5b column hop + P24.7 back-row shortcut: when in
+                # text mode with a focused subject AND the back row is
+                # already selected, treat L-arrow as back.
                 self._ensure_nav_state()
                 if self.nav_state.groups:
-                    ui_nav.cycle_group(self.nav_state, -1)
+                    if self.nav_state.focused_subject() is not None \
+                            and self.nav_state.selected_index() == 0:
+                        self.nav_state.clear_focus()
+                        self._nav_selection_armed = True
+                        self._suppress_textinput = True
+                        return
+                    ui_nav.move_selection_column(self.nav_state, -1)
                     self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
             if key == pygame.K_RIGHT:
                 self._ensure_nav_state()
                 if self.nav_state.groups:
-                    ui_nav.cycle_group(self.nav_state, +1)
+                    ui_nav.move_selection_column(self.nav_state, +1)
                     self._nav_selection_armed = True
                     self._suppress_textinput = True
                     return
@@ -4029,8 +4725,7 @@ class Game:
                     self._ensure_nav_state()
                     opt = ui_nav.current_option(self.nav_state)
                     self._nav_selection_armed = False
-                    if opt and opt.enabled and opt.command:
-                        self.submit_generated_command(opt.command)
+                    self._commit_nav_option(opt)
                     self._suppress_textinput = True
                     return
 
@@ -4078,6 +4773,316 @@ class Game:
         prev = getattr(self, "nav_state", None)
         self.nav_state = ui_nav.build_play_options(self.world, prev_state=prev)
 
+    # ── P24.5: Map item consumption ───────────────────────────────────
+
+    def _consume_map_item(self, item) -> None:
+        """A map fragment reveals 3-5 connected unexplored rooms from the
+        player's current room; a full floor map reveals everything on
+        the current floor. The revealed set lives on the floor as
+        `known_room_ids` so the minimap picks them up."""
+        floor = self.world.current_floor
+        ch = self.world.character
+        if floor is None:
+            return
+        import random as _r
+        rng = _r.Random(self.world.random_seed) if getattr(self.world, "random_seed", None) else _r.Random()
+        is_full = (item.key == "floor_map")
+        revealed = set(floor.known_room_ids or set())
+        if is_full:
+            new_ids = set(floor.rooms.keys()) - revealed
+            revealed |= new_ids
+            self.log(t("feedback_floor_map_used",
+                       fallback="Rozkładasz mapę całego piętra. "
+                                "Wszystkie pokoje są teraz oznaczone."),
+                     LOG_SUCCESS)
+        else:
+            # BFS from current room until we have N untracked rooms.
+            start = floor.current_room_id
+            queue = [start]
+            seen = {start}
+            collected = []
+            while queue and len(collected) < 5:
+                rid = queue.pop(0)
+                r = floor.rooms.get(rid)
+                if r is None:
+                    continue
+                for ed in (r.exits or {}).values():
+                    tgt = ed.get("target", "")
+                    if not tgt or tgt in seen:
+                        continue
+                    seen.add(tgt)
+                    queue.append(tgt)
+                    if tgt not in revealed:
+                        collected.append(tgt)
+            count = min(len(collected), rng.randint(3, 5))
+            picked = collected[:count]
+            revealed |= set(picked)
+            self.log(t("feedback_map_fragment_used",
+                       fallback=f"Strzęp mapy zdradza {len(picked)} "
+                                f"sąsiednich pokoi.",
+                       n=len(picked)), LOG_SUCCESS)
+        floor.known_room_ids = revealed
+        # Consume the item from inventory.
+        try:
+            ch.inventory_ids.remove(item.entity_id)
+        except ValueError:
+            pass
+
+    # ── P24.5: Mouse input ────────────────────────────────────────────
+
+    # ── P25 — slot popover handlers ──────────────────────────────────
+
+    def _popover_equip(self, entity_id: int) -> None:
+        from . import equipment as _eq
+        slot = self.slot_popover_open
+        if slot is None:
+            return
+        ent = self.world.get(entity_id)
+        if ent is None:
+            return
+        # Wield slots route through the existing P23 wield path so
+        # two-handed clears + Polish flavor lines stay consistent.
+        if _eq.SLOT_DEFS[slot].is_wield:
+            hand_mod = "hand:offhand" if slot == _eq.SLOT_OFF else "hand:main"
+            from .parser_core import ActionIntent
+            intent = ActionIntent(intent="wield", verb="dobądź",
+                                  targets=[ent.display_name()],
+                                  modifiers=[hand_mod])
+            self._attempt_wield(intent)
+        else:
+            ok, prev_id, reason = _eq.equip(self.world, self.world.character,
+                                            ent, slot)
+            if not ok:
+                self.log(reason or "Nie pasuje.", LOG_WARN)
+            else:
+                sd = _eq.SLOT_DEFS[slot]
+                self.log(t("feedback_popover_wear_ok",
+                           fallback=f"Zakładasz „{ent.display_name()}” "
+                                    f"(slot: {sd.label_pl}).",
+                           name=ent.display_name(), slot=sd.label_pl),
+                         LOG_SUCCESS)
+        self._popover_close()
+
+    def _popover_unequip(self) -> None:
+        from . import equipment as _eq
+        slot = self.slot_popover_open
+        if slot is None:
+            return
+        if _eq.SLOT_DEFS[slot].is_wield:
+            # Reuse the P23 sheathe path.
+            from .parser_core import ActionIntent
+            self._attempt_sheathe(ActionIntent(intent="sheathe",
+                                               verb="wycofaj broń"))
+        else:
+            ok, freed_id, reason = _eq.unequip(self.world,
+                                                self.world.character, slot)
+            if not ok:
+                self.log(reason or "Slot pusty.", LOG_WARN)
+            elif freed_id is not None:
+                ent = self.world.get(freed_id)
+                nm = ent.display_name() if ent is not None else "?"
+                sd = _eq.SLOT_DEFS[slot]
+                self.log(t("feedback_popover_unequip_ok",
+                           fallback=f"Zdejmujesz „{nm}” (slot: {sd.label_pl}).",
+                           name=nm, slot=sd.label_pl), LOG_SUCCESS)
+        self._popover_close()
+
+    def _popover_close(self) -> None:
+        self.slot_popover_open = None
+        self.slot_popover_idx = 0
+
+    def _popover_row_count(self) -> int:
+        """How many rows the popover currently shows (used by keyboard
+        cursor bounds-clamping)."""
+        from . import equipment as _eq
+        slot = self.slot_popover_open
+        if slot is None:
+            return 0
+        eligibles = _eq.eligible_inventory_for_slot(self.world,
+                                                    self.world.character, slot)
+        n = len(eligibles)
+        if _eq.equipped(self.world.character, slot) is not None:
+            n += 1   # Zdejmij row
+        n += 1       # Anuluj row
+        return n
+
+    def _popover_commit(self) -> None:
+        """Enter-pressed in the popover. Resolves the current cursor row
+        to one of: equip an eligible / unequip / cancel."""
+        from . import equipment as _eq
+        slot = self.slot_popover_open
+        if slot is None:
+            return
+        eligibles = _eq.eligible_inventory_for_slot(self.world,
+                                                    self.world.character, slot)
+        rows = []
+        for ent in eligibles:
+            rows.append(("equip", ent.entity_id))
+        if _eq.equipped(self.world.character, slot) is not None:
+            rows.append(("unequip", None))
+        rows.append(("cancel", None))
+        idx = max(0, min(self.slot_popover_idx, len(rows) - 1))
+        kind, eid = rows[idx]
+        if kind == "equip":
+            self._popover_equip(eid)
+        elif kind == "unequip":
+            self._popover_unequip()
+        else:
+            self._popover_close()
+
+    def _on_minimap_room_click(self, room_id: str) -> bool:
+        """Click handler for minimap room cells (P24.6 / P24.5-2).
+
+        Returns True if we acted on the click (moved or refused), so the
+        default mark-toggle skips. Returns False to fall through to the
+        mark-toggle behavior.
+
+        Move rules:
+          - Target must be an ADJACENT room (i.e. one of the current
+            room's exits points at it).
+          - Exit must be unlocked AND not hidden — locked doors require
+            keys/picks just like typed `idź <label>`.
+          - Click on the CURRENT room: no-op move; fall through to mark.
+          - Click on a non-adjacent room: fall through to mark (so the
+            player can still plan ahead).
+        """
+        floor = self.world.current_floor if self.world else None
+        if floor is None:
+            return False
+        cur_id = getattr(floor, "current_room_id", "")
+        if room_id == cur_id:
+            return False
+        cur_room = floor.rooms.get(cur_id)
+        if cur_room is None:
+            return False
+        # Find an exit pointing at `room_id`.
+        matched_label = None
+        matched_ed = None
+        for label, ed in (cur_room.exits or {}).items():
+            if ed.get("target") == room_id:
+                matched_label = label
+                matched_ed = ed
+                break
+        if matched_label is None:
+            # Non-adjacent: let mark-toggle handle it.
+            return False
+        if matched_ed.get("hidden"):
+            return False
+        if matched_ed.get("locked"):
+            self.log(t("feedback_minimap_locked",
+                       fallback=f"Wyjście „{matched_label}” jest zamknięte."),
+                     LOG_WARN)
+            return True
+        # Combat lockdown: in active combat the move resolver will
+        # refuse / convert to flee. Route through the standard command
+        # so the locking is consistent regardless of input source.
+        self.submit_generated_command(f"idź {matched_label}")
+        return True
+
+    def _on_nav_option_click(self, group_key: str, option_idx: int) -> None:
+        """Click callback for the action-bar option grid (P24.5 + P24.7).
+
+        Mouse/keyboard parity: a click on a subject focuses that subject
+        (and the next rebuild surfaces verbs); a click on a "back" row
+        clears focus; a click on a verb (or "plain" option) commits its
+        command. Keyboard cursor follows the click via the registry's
+        keyboard_sync hint.
+        """
+        self._ensure_nav_state()
+        if group_key not in self.nav_state.groups:
+            return
+        self.nav_state.current_group_index = self.nav_state.groups.index(group_key)
+        opts = self.nav_state.options_in(group_key)
+        if not (0 <= option_idx < len(opts)):
+            return
+        opt = opts[option_idx]
+        self.nav_state.set_selected_index(option_idx, group_key)
+        if not opt.enabled:
+            return
+        kind = getattr(opt, "option_kind", "plain")
+        if kind == "subject":
+            self.nav_state.set_focused_subject(group_key, opt.subject_id)
+            return
+        if kind == "back":
+            self.nav_state.clear_focus(group_key)
+            return
+        # verb / plain — run the command.
+        if opt.command:
+            self.submit_generated_command(opt.command,
+                                          target_id=opt.target_id)
+
+    def _commit_nav_option(self, opt) -> None:
+        """Shared Enter / armed-Enter logic for P24.7 — interprets the
+        option's `option_kind` and either focuses, backs, or runs."""
+        if opt is None or not opt.enabled:
+            return
+        kind = getattr(opt, "option_kind", "plain")
+        if kind == "subject":
+            group = self.nav_state.current_group()
+            self.nav_state.set_focused_subject(group, opt.subject_id)
+            return
+        if kind == "back":
+            self.nav_state.clear_focus()
+            return
+        if opt.command:
+            self.submit_generated_command(opt.command,
+                                          target_id=opt.target_id)
+
+    def handle_mousedown(self, ev):
+        """Left click → dispatch the topmost click zone under cursor.
+        Right click / middle click ignored for now."""
+        try:
+            if ev.button != 1:
+                return
+        except AttributeError:
+            return
+        mx, my = ev.pos
+        zone = self.click_registry.find(mx, my)
+        if zone is None:
+            return
+        # Sync keyboard cursor with click target if hinted.
+        if zone.keyboard_sync is not None:
+            grp, idx = zone.keyboard_sync
+            try:
+                self._ensure_nav_state()
+                if grp in self.nav_state.groups:
+                    self.nav_state.current_group_index = \
+                        self.nav_state.groups.index(grp)
+                self.nav_state.set_selected_index(idx, grp)
+            except Exception:
+                pass
+        # Fire the callback.
+        try:
+            zone.callback()
+        except Exception as exc:
+            # Don't let a UI handler bug crash the game; log + swallow.
+            self.log(f"(klik: {exc})", LOG_WARN)
+        # Drain side-channel intents the click may have written.
+        self._drain_ui_inputs()
+
+    def handle_mousemotion(self, ev):
+        try:
+            self._mouse_xy = ev.pos
+        except AttributeError:
+            self._mouse_xy = (-1, -1)
+
+    def _drain_ui_inputs(self):
+        """Pick up side-channel signals that UI click handlers wrote to
+        the world / game. Kept separate from the click callbacks so UI
+        code doesn't need to import the parser pipeline."""
+        # Paper-doll slot picked: open the P25 swap popover.
+        pending_slot = getattr(self.world, "_pending_slot_swap", None)
+        if pending_slot:
+            slot_key, _slot_label = pending_slot
+            self.world._pending_slot_swap = None
+            self.slot_popover_open = slot_key
+            self.slot_popover_idx = 0
+        # Quick-strip item used.
+        pending_use = getattr(self.world, "_pending_quick_use", None)
+        if pending_use:
+            self.world._pending_quick_use = None
+            self.submit_generated_command(pending_use)
+
     def handle_textinput(self, ev):
         if self._suppress_textinput:
             self._suppress_textinput = False
@@ -4107,6 +5112,17 @@ class Game:
             audio.play_music(self._music_key_for_state())
         except Exception:
             pass
+        # P26b: floor-collapse end-of-run trigger. Time_system sets a
+        # flag when the deadline crosses 0; Game flips to DEFEAT here
+        # so the player sees the run end. P31 will add escape-at-exit
+        # rescue + run-summary; today collapse == game over.
+        if self.state == STATE_PLAY and self.world is not None:
+            collapsed = False
+            f = getattr(self.world, "current_floor", None)
+            if f is not None:
+                collapsed = bool((f.state or {}).get("collapsed"))
+            if collapsed:
+                self.state = STATE_DEFEAT
 
     def _music_key_for_state(self):
         return {
@@ -4129,18 +5145,43 @@ class Game:
         elif self.state == STATE_PLAY:
             self._refresh_layout()
             L = self._layout
-            ui.draw_topbar(s, self.world, layout=L)
+            # P24.5: clear the click registry at frame start; draws
+            # below repopulate it.
+            self.click_registry.reset()
+            ui.draw_topbar(s, self.world, layout=L,
+                           click_registry=self.click_registry)
             if L.has_left_sidebar:
-                ui.draw_left_sidebar(s, self.world, layout=L)
-            ui.draw_room_panel(s, self.world, layout=L)
-            ui.draw_sidebar(s, self.world, layout=L)
+                ui.draw_left_sidebar(s, self.world, layout=L,
+                                     click_registry=self.click_registry,
+                                     on_room_click=self._on_minimap_room_click)
+            ui.draw_room_panel(s, self.world, layout=L,
+                               click_registry=self.click_registry)
+            ui.draw_sidebar(s, self.world, layout=L,
+                            click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
+                                  scroll=self.log_scroll,
                                   input_mode=self.input_mode, layout=L)
             self._ensure_nav_state()
-            # Prompt 20: pass the arming latch so cursor marker shows
-            # when text-mode arrow keys drive the panel.
             ui.draw_nav_panel(s, self.nav_state, self.input_mode, layout=L,
-                              armed=getattr(self, "_nav_selection_armed", False))
+                              armed=getattr(self, "_nav_selection_armed", False),
+                              click_registry=self.click_registry,
+                              on_option_click=self._on_nav_option_click)
+            # P24.5: full-screen map overlay (above all game UI, below tooltip).
+            if getattr(self, "full_map_open", False):
+                ui.draw_full_map_overlay(s, self.world, layout=L,
+                                         click_registry=self.click_registry)
+            # P25: slot-swap popover.
+            if self.slot_popover_open is not None:
+                ui.draw_slot_popover(
+                    s, self.world, self.slot_popover_open,
+                    self.slot_popover_idx, layout=L,
+                    click_registry=self.click_registry,
+                    on_pick=self._popover_equip,
+                    on_unequip=self._popover_unequip,
+                    on_close=self._popover_close,
+                )
+            # Hover tooltip overlay (drawn last so it floats above all).
+            ui.draw_hover_tooltip(s, self.click_registry, self._mouse_xy, L)
             # Prompt 10: journal overlay sits on top.
             if self.journal_state.open:
                 ui.draw_journal(s, self.world, self.journal_state, layout=L)
@@ -4153,6 +5194,7 @@ class Game:
             ui.draw_room_panel(s, self.world, layout=L)
             ui.draw_sidebar(s, self.world, layout=L)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
+                                  scroll=self.log_scroll,
                                   layout=L)
             # Overlay listing the suggested classes
             from ..ui.lang import t as tr

@@ -1,6 +1,17 @@
 {
   "_meta_language": "English",
 
+  "feedback_corpse_which":   "Which body? {names}",
+  "feedback_corpse_none":    "You don't see a body here.",
+  "feedback_not_a_corpse":   "\"{name}\" is not a corpse.",
+  "feedback_butcher_yield":  "Butchered: {yields}.",
+  "feedback_butcher_nothing":"Butchered — nothing useful.",
+  "feedback_trophy_drop":    "Found: {name}.",
+  "feedback_eat_corpse_heal":"You eat. A little better. (+{hp} HP)",
+  "feedback_eat_corpse_hurt":"You eat. Your stomach protests. ({hp} HP)",
+  "feedback_eat_corpse_neutral":"You eat. Hard to describe the taste. It sustains.",
+  "feedback_eat_status":     "You catch: {status}.",
+
   "title_tagline_1": "A tabletop-like sponsored-dungeon survival.",
   "title_tagline_2": "Every floor is many days.",
   "title_tagline_3": "Every choice costs time.",
@@ -502,7 +513,7 @@
   "ui_monitor_set":        "Monitor: {idx}. Takes effect on next launch.",
   "ui_monitor_out_of_range":"No such monitor. Available: 0..{max}.",
 
-  "ui_group_personel":      "Personnel",
+  "ui_group_personel":      "Services",
   "ui_group_pet":           "Pet",
   "nav_pet_feed":           "Feed pet",
   "nav_pet_calm":           "Calm pet",

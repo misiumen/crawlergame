@@ -32,6 +32,91 @@ ITEM_TEMPLATES = {
                             affordances=["inspect","loot","use"]),
     "improvised_lockpick": dict(tags=["lockpick","tool","junk"], portable=True,
                             affordances=["inspect","loot","use"]),
+    # P24.5 — map drops. Use-handler reveals adjacent unexplored rooms;
+    # floor map reveals every room on the current floor.
+    "map_fragment":    dict(tags=["map","paper","sponsor_loot"], portable=True,
+                            affordances=["inspect","use","loot"]),
+    "floor_map":       dict(tags=["map","paper","sponsor_loot","rare"], portable=True,
+                            affordances=["inspect","use","loot"]),
+    # Misc trophies referenced by monster_salvage tables (P24).
+    "warden_baton":     dict(tags=["weapon","melee","electric"], portable=True,
+                            affordances=["inspect","attack","loot"]),
+    "cleaver_handle":   dict(tags=["weapon","melee","sharp","junk"], portable=True,
+                            affordances=["inspect","attack","loot"]),
+    "planszetka_inspektora": dict(tags=["paper","sponsor_loot","data"], portable=True,
+                            affordances=["inspect","loot","use"]),
+    "notes_windykatora": dict(tags=["paper","sponsor_loot","data"], portable=True,
+                            affordances=["inspect","loot","use"]),
+
+    # ── P25 — wearables. Each tagged with exactly ONE `slot:X`. The
+    # `equip_state` field below is folded into `Entity.state` by
+    # `make_item` so equipment.slot_ac_bonus / aggregated_resists
+    # read the right values.
+    # HEAD (slot:head)
+    "helm_konstrukcyjny": dict(tags=["slot:head","armor"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"ac_bonus": 1}),
+    "czapka_uszanka":     dict(tags=["slot:head","cloth"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"equip_resists":["cold"]}),
+    "maska_filtrujaca":   dict(tags=["slot:head","filter"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"equip_resists":["poison"]}),
+    "sponsor_kepi":       dict(tags=["slot:head","sponsor","badge"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
+
+    # TORSO (slot:torso)
+    "kamizelka_taktyczna": dict(tags=["slot:torso","armor"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"ac_bonus": 2,
+                                         "equip_resists":["physical"]}),
+    "fartuch_laboratoryjny": dict(tags=["slot:torso","cloth","sponsor"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"equip_resists":["acid"]}),
+    "kurtka_skorzana":    dict(tags=["slot:torso","leather"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"ac_bonus": 1}),
+    "kombinezon_hazmat":  dict(tags=["slot:torso","hazmat"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"equip_resists":["acid","poison"],
+                                         "on_equip_status":["encumbered"]}),
+
+    # LEGS (slot:legs)
+    "spodnie_robocze":    dict(tags=["slot:legs","cloth"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
+    "buty_taktyczne":     dict(tags=["slot:legs","boots","armor"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"ac_bonus": 1}),
+    "kalosze":            dict(tags=["slot:legs","rubber","insulator"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={"equip_resists":["electric"]}),
+
+    # ACCESSORY (slot:accessory)
+    "odznaka_zawodnika":  dict(tags=["slot:accessory","sponsor","badge"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
+    "zegarek_sponsora":   dict(tags=["slot:accessory","sponsor","timepiece"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
+    "amulet_szczescia":   dict(tags=["slot:accessory","occult"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
+    "opaska_imienna":     dict(tags=["slot:accessory","cloth"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
+
+    # BACK (slot:back)
+    "plecak_taktyczny":   dict(tags=["slot:back","gear"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
+    "pas_narzedziowy":    dict(tags=["slot:back","gear","craft_material"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
+    "kabura_skorzana":    dict(tags=["slot:back","leather","gear"], portable=True,
+                            affordances=["inspect","loot","wear"],
+                            equip_state={}),
 }
 
 
@@ -62,7 +147,7 @@ def make_item(key: str, location_id: str = "") -> Entity:
             if a not in aff:
                 aff.append(a)
 
-    return Entity(
+    ent = Entity(
         key=key, entity_type=T_ITEM,
         name_key=f"item_{key}_n", fallback_name=fb_name,
         desc_key=f"item_{key}_d", fallback_desc=fb_desc,
@@ -70,3 +155,10 @@ def make_item(key: str, location_id: str = "") -> Entity:
         tags=tags,
         affordances=aff,
     )
+    # P25: fold the wearable's equip_state (ac_bonus, resists, hooks)
+    # into Entity.state so equipment.py reads it directly without
+    # needing a parallel template lookup.
+    equip_state = proto.get("equip_state")
+    if equip_state:
+        ent.state = dict(equip_state)
+    return ent

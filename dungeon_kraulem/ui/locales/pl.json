@@ -1,6 +1,17 @@
 {
   "_meta_language": "Polski",
 
+  "feedback_corpse_which":   "Które ciało? {names}",
+  "feedback_corpse_none":    "Nie widzisz tu ciała.",
+  "feedback_not_a_corpse":   "„{name}” to nie zwłoki.",
+  "feedback_butcher_yield":  "Wypatroszono: {yields}.",
+  "feedback_butcher_nothing":"Wypatroszone — ale nic użytecznego.",
+  "feedback_trophy_drop":    "Znalezione: {name}.",
+  "feedback_eat_corpse_heal":"Zjadasz. Trochę lepiej. (+{hp} HP)",
+  "feedback_eat_corpse_hurt":"Zjadasz. Żołądek protestuje. ({hp} HP)",
+  "feedback_eat_corpse_neutral":"Zjadasz. Smak ciężko opisać. Posila.",
+  "feedback_eat_status":     "Łapiesz: {status}.",
+
   "title_tagline_1": "Tabletopowe przeżycie w sponsorowanym lochu.",
   "title_tagline_2": "Każde piętro to wiele dni.",
   "title_tagline_3": "Każda decyzja kosztuje czas.",
@@ -540,7 +551,7 @@
   "ui_monitor_set":        "Monitor: {idx}. Zacznie działać po restarcie gry.",
   "ui_monitor_out_of_range":"Nie ma takiego monitora. Dostępne: 0..{max}.",
 
-  "ui_group_personel":      "Personel",
+  "ui_group_personel":      "Usługi",
   "ui_group_pet":           "Zwierzę",
   "nav_pet_feed":           "Nakarm zwierzę",
   "nav_pet_calm":           "Uspokój zwierzę",

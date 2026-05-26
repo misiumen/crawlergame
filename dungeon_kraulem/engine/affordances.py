@@ -306,6 +306,47 @@ register(Affordance("coat_weapon",
     verbs_en=["coat","imbue","slather","anoint"],
     time_cost=3, stat="DEX", base_dc=10))
 
+# ── Prompt 24 — corpses + salvage loop ────────────────────────────────
+# Butcher uses the existing `salvage` affordance code-path with a
+# corpse-specific branch in the handler. We register a NEW key
+# `butcher_corpse` whose verbs disambiguate butchering meat-and-bone
+# from environment salvage (you `oprawiasz` an animal but `demontujesz`
+# a vending machine; both work, but the parser surface is cleaner with
+# both routed).
+register(Affordance("butcher_corpse",
+    # Polish-only butchery verbs — `rozbierz` is intentionally OMITTED
+    # here because it already routes to `salvage` and we want plain
+    # "rozbierz ciało" → salvage handler, which auto-detects corpse
+    # targets and dispatches to butcher under the hood. Verbs below are
+    # corpse-specific and don't collide.
+    verbs_pl=["wypatrosz","wypatroszyć","oprawiaj","opraw","oprawić",
+              "patrosz","ćwiartuj","cwiartuj","ćwiartować",
+              "rzeź","rzez","oskóruj","oskoruj"],
+    verbs_en=["butcher","skin","gut","carve","dress"],
+    time_cost=5, stat="DEX", base_dc=8))
+
+register(Affordance("eat_corpse",
+    verbs_pl=["zjedz","jedz","pożryj","pozryj","spożyj","spozyj",
+              "skonsumuj","gryź","gryz","chłepc","chlepc"],
+    verbs_en=["eat","consume","devour","bite"],
+    time_cost=2, stat="CON", base_dc=8))
+
+# ── Prompt 25 — 7-slot equipment: wear / take off ────────────────────
+# `wear` is distinct from `wield` (hands) — wearables go on body slots
+# (head/torso/legs/acc/back). The handler auto-detects the slot from
+# the entity's `slot:X` tag, so the player doesn't need to specify.
+register(Affordance("wear",
+    verbs_pl=["załóż","zaloz","ubierz","włóż","wloz","nałóż","naloz",
+              "nakładaj","nakladaj"],
+    verbs_en=["wear","don","put on","equip"],
+    time_cost=1))
+
+register(Affordance("take_off",
+    verbs_pl=["zdejmij","ściągnij","sciagnij","zdejmę","zdejme",
+              "zsuń","zsun"],
+    verbs_en=["take off","remove","doff"],
+    time_cost=1))
+
 
 # ── Prompt 20 — encounter prep ────────────────────────────────────────────
 

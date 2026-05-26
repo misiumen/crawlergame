@@ -69,8 +69,11 @@ def resolve(validation_result, world) -> ResolutionResult:
         level = FAILURE
 
     result = ResolutionResult(level=level, raw_roll=raw, total=total, dc=dc)
-    result.fallback_description = (
-        f"[{aff_key}] d20({raw}) + {stat}({mod:+d}) + tła({bonus:+d}) = {total} vs DC {dc} → {level}"
+    from .dice_labels import format_check as _fc
+    result.fallback_description = _fc(
+        aff_key, stat, raw, mod, total, dc, level,
+        extras=[("tła", bonus)],
+        prefix="",
     )
     # Prompt 3: pick a context-aware fail-forward template; both narrative
     # line AND additional effects come from it.

@@ -90,6 +90,10 @@ def main():
                 g.handle_keydown(ev)
             elif ev.type == pygame.TEXTINPUT:
                 g.handle_textinput(ev)
+            elif ev.type == pygame.MOUSEBUTTONDOWN:
+                g.handle_mousedown(ev)
+            elif ev.type == pygame.MOUSEMOTION:
+                g.handle_mousemotion(ev)
         g.update(dt)
         g.draw()
 

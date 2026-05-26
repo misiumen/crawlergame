@@ -139,8 +139,21 @@ def validate(intent, world) -> ValidationResult:
 
     matched: Optional[Entity] = None
     if intent.targets:
-        # Prompt 03: ambiguous targets get a clarify response instead of a guess.
-        candidates = _resolve_entities(room, intent.targets[0])
+        # P24.6 (P24.5-10): inventory-first resolution for item-centric
+        # intents. Without this, `użyj plastikowa plakietka` (item in
+        # pocket) was failing with "you don't see it here" — technically
+        # accurate but a UX bug. For use/wyrzuć/daj/rzuć, search the
+        # player's inventory FIRST; only fall through to room entities
+        # if no inventory match.
+        inv_first = intent.intent in ("use", "wyrzuc", "wyrzuć", "daj",
+                                       "rzuc", "rzuć", "throw_at",
+                                       "drop", "give", "consume",
+                                       "wear", "take_off")
+        candidates = []
+        if inv_first:
+            candidates = _resolve_inventory_items(world, intent.targets[0])
+        if not candidates:
+            candidates = _resolve_entities(room, intent.targets[0])
         if len(candidates) > 1:
             result.valid = False
             result.reason = "ambiguous_target"
@@ -235,6 +248,51 @@ def _resolve_entity(room, fragment: str, world=None) -> Optional[Entity]:
     return matches[0] if matches else None
 
 
+def _resolve_inventory_items(world, fragment: str) -> list:
+    """P24.6: match an inventory item by player-facing name fragment.
+    Returns ALL matches so the standard ambiguity branch can re-use the
+    same disambiguation flow as room entities. Uses the same Polish
+    stem matching as `_resolve_entities`."""
+    if not fragment or world is None or world.character is None:
+        return []
+    inv_ids = list(getattr(world.character, "inventory_ids", []) or [])
+    if not inv_ids:
+        return []
+    f = fold(fragment)
+    tokens = [tt for tt in re.split(r"[^a-z0-9]+", f) if len(tt) >= 3]
+    matches = []
+    seen = set()
+    # Exact-name short-circuit.
+    for eid in inv_ids:
+        ent = world.entities.get(eid)
+        if ent is None:
+            continue
+        if fold(ent.display_name()) == f or fold(ent.key) == f:
+            return [ent]
+    # Stem-based token match.
+    for eid in inv_ids:
+        ent = world.entities.get(eid)
+        if ent is None:
+            continue
+        names = [fold(ent.key.replace("_", " ")), fold(ent.display_name())]
+        hit = False
+        for n in names:
+            if hit:
+                break
+            n_tokens = [tt for tt in re.split(r"[^a-z0-9]+", n)
+                        if len(tt) >= 3]
+            for tok in tokens:
+                if hit:
+                    break
+                stem = tok[:4]
+                for nt in n_tokens:
+                    if nt.startswith(stem) or tok.startswith(nt[:4]):
+                        hit = True; break
+        if hit and ent.entity_id not in seen:
+            matches.append(ent); seen.add(ent.entity_id)
+    return matches
+
+
 def _resolve_entities(room, fragment: str) -> list:
     """Return ALL visible entities matching the fragment (ambiguity-aware).
 
@@ -272,6 +330,29 @@ def _resolve_entities(room, fragment: str) -> list:
                         hit = True; break
         if hit and id(e) not in seen_ids:
             matches.append(e); seen_ids.add(id(e))
+
+    # Prompt 23.5 (backlog #6): when multiple candidates match, drop the
+    # spent / concealed ones BEFORE the player is asked to disambiguate.
+    # The action bar already hides them — the resolver shouldn't surface
+    # them either. If filtering would remove every match (i.e. the player
+    # typed something only a stripped entity matches), keep the original
+    # list so the per-action handler can still return its "already done"
+    # message instead of a confusing "you don't see that here".
+    if len(matches) > 1:
+        def _is_resolvable(e):
+            st = e.state or {}
+            tags = e.tags or []
+            is_container = ("container" in tags or "corpse" in tags or
+                            getattr(e, "entity_type", "") == "corpse")
+            if (st.get("stripped") or st.get("depleted") or
+                    st.get("destroyed")) and not is_container:
+                return False
+            if "concealed" in tags or "hidden_tag" in tags:
+                return False
+            return True
+        filtered = [e for e in matches if _is_resolvable(e)]
+        if filtered:
+            matches = filtered
 
     # Door fallback: target words pointing at exits.
     door_words = ("drzwi", "door", "doors", "wyjscie", "wyjście",

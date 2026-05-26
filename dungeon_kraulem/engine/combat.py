@@ -48,6 +48,9 @@ STATUS_BURNING      = "burning"     # DOT, can spread to flammables
 STATUS_CORRODED     = "corroded"    # AC reduction, persists past combat
 STATUS_POISONED     = "poisoned"    # DOT, cured by antidote
 STATUS_CHILLED      = "chilled"     # halves DEX-derived stats
+# Prompt 26a — maim statuses (body-part breakage).
+STATUS_DISARMED     = "disarmed"    # arm broken — main attack -3, drops weapon
+STATUS_SLOWED       = "slowed"      # leg broken — to-hit -2, can't approach
 
 _STATUS_PL = {
     STATUS_PRONE:        "przewrócony",
@@ -62,6 +65,8 @@ _STATUS_PL = {
     STATUS_CORRODED:     "skorodowany",
     STATUS_POISONED:     "zatruty",
     STATUS_CHILLED:      "wyziębiony",
+    STATUS_DISARMED:     "rozbrojony",
+    STATUS_SLOWED:       "okulały",
 }
 
 
@@ -122,6 +127,15 @@ class CombatState:
     # bonus per encounter; clears when combat ends.
     companion_advantage_pending: bool = False
 
+    # Prompt 24.5 — selected combat target (drives the right sidebar
+    # expanded panel + the arena cursor).
+    selected_target_id: Optional[int] = None
+
+    # Prompt 26a — per-target body-zone selection. dict eid → zone_key.
+    # When the player attacks, the resolver reads this for the current
+    # target. Empty means "torso" (default body shot).
+    targeted_zone_by_eid: Dict[int, str] = field(default_factory=dict)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "active": self.active, "round": self.round, "side": self.side,
@@ -133,6 +147,9 @@ class CombatState:
             "noise_added": self.noise_added,
             "companion_advantage_pending":
                 bool(self.companion_advantage_pending),
+            "selected_target_id": self.selected_target_id,
+            "targeted_zone_by_eid": {str(k): v for k, v
+                                     in (self.targeted_zone_by_eid or {}).items()},
         }
 
     @classmethod
@@ -147,6 +164,10 @@ class CombatState:
                 setattr(cs, k, d[k])
         cs.participants = list(d.get("participants", []))
         cs.bands = {int(k): str(v) for k, v in (d.get("bands") or {}).items()}
+        sti = d.get("selected_target_id")
+        cs.selected_target_id = int(sti) if sti is not None else None
+        tzb = d.get("targeted_zone_by_eid") or {}
+        cs.targeted_zone_by_eid = {int(k): str(v) for k, v in tzb.items()}
         return cs
 
 
@@ -355,6 +376,10 @@ class EnemyAction:
     damage: int = 0
     target_status: Optional[str] = None
     target_status_duration: int = 0
+    # P26b: faction-aware AI. When set, the attack targets another
+    # combat participant (a rival faction) instead of the player.
+    # None means "target player" (legacy default).
+    target_id: Optional[int] = None
 
 
 def choose_enemy_action(world, cs: CombatState, enemy) -> EnemyAction:
@@ -405,9 +430,65 @@ def choose_enemy_action(world, cs: CombatState, enemy) -> EnemyAction:
     # Berserker default.
     if band == BAND_AT_RANGE:
         return EnemyAction(actor_id=eid, kind="approach", note="berserker charges")
-    return EnemyAction(actor_id=eid, kind="attack",
+    action = EnemyAction(actor_id=eid, kind="attack",
                        damage=_enemy_attack_damage(enemy, heavy=True),
                        note="berserker hit")
+    # P26b: faction-aware retarget.
+    rival_id = _pick_rival_target(world, cs, enemy)
+    if rival_id is not None:
+        action.target_id = rival_id
+        action.note = action.note + " → rywal"
+    return action
+
+
+def _faction_tags(entity) -> set:
+    """Extract `faction:X` tags from an entity. Returns the set of
+    faction keys (without the prefix). Empty set means "no faction" —
+    these entities don't participate in cross-faction conflict (they
+    only ever target the player)."""
+    if entity is None:
+        return set()
+    out = set()
+    for t in (getattr(entity, "tags", []) or []):
+        if t.startswith("faction:"):
+            out.add(t.split(":", 1)[1])
+    return out
+
+
+def _pick_rival_target(world, cs: "CombatState", enemy) -> Optional[int]:
+    """If `enemy` belongs to a faction AND another live participant
+    belongs to a different faction, return that rival's entity_id.
+    Probability gating keeps the player as primary target most of the
+    time — rivalry kicks in ~30% of relevant turns, scaling with round
+    count so longer fights see more cross-fire (DCC-faithful drama).
+    """
+    if world is None or cs is None or enemy is None:
+        return None
+    my_factions = _faction_tags(enemy)
+    if not my_factions:
+        return None
+    # Scan participants for a rival.
+    rivals = []
+    for eid in cs.participants:
+        if eid == enemy.entity_id:
+            continue
+        other = world.get(eid)
+        if other is None or not getattr(other, "is_alive", lambda: True)():
+            continue
+        other_f = _faction_tags(other)
+        if not other_f:
+            continue
+        # Different faction sets and no overlap means rivals.
+        if my_factions.isdisjoint(other_f):
+            rivals.append(eid)
+    if not rivals:
+        return None
+    # 30% base chance to swap, scales up by 5% per round capped at 60%.
+    import random as _r
+    p = min(0.6, 0.30 + 0.05 * (cs.round - 1))
+    if _r.random() > p:
+        return None
+    return _r.choice(rivals)
 
 
 def _enemy_attack_damage(enemy, *, ranged: bool = False,

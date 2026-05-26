@@ -66,6 +66,36 @@ ALARM_ENCOUNTERS: Dict[str, Dict[str, Any]] = {
         "audience_bump":  3,
         "sponsor_tags":   ["chemical", "spectacle"],
     },
+
+    # P26b — noise-triggered patrols.
+    # Low-urgency: ambient ruckus reaches a passing routine patrol.
+    "patrol_routine": {
+        "delay_minutes": 15,
+        "hostile_keys": ["patrol_security"],
+        "warnings_at": [10, 3],
+        "log_intro_pl":
+            "Twój hałas niesie się dalej, niż chciałeś. Patrol kieruje "
+            "się w twoją stronę. ~15 minut.",
+        "log_intro_en":
+            "Your noise carries farther than you'd like. A patrol is "
+            "heading your way. ~15 minutes.",
+        "audience_bump":  1,
+        "sponsor_tags":   ["spectacle"],
+    },
+    # High-urgency: full-throttle combat noise summoned a responder.
+    "patrol_responder": {
+        "delay_minutes": 6,
+        "hostile_keys": ["patrol_security", "patrol_security"],
+        "warnings_at": [3, 1],
+        "log_intro_pl":
+            "Gdzieś brzęczy alarm. Walka się zaczyna. Patrol w drodze. "
+            "~6 minut.",
+        "log_intro_en":
+            "An alarm chimes somewhere. The fight has started. Patrol "
+            "incoming. ~6 minutes.",
+        "audience_bump":  2,
+        "sponsor_tags":   ["spectacle"],
+    },
 }
 
 

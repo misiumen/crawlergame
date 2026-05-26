@@ -53,6 +53,31 @@ class SelectableOption:
     target_id: Optional[int] = None
     action_type: str = ""
 
+    # P24.7 — two-tier picker. Each option declares its "kind":
+    #   "plain"   — single-tier: clicking/Entering runs `command`
+    #   "subject" — first-tier subject row; selecting it focuses
+    #               `subject_id` for that group so the next build
+    #               surfaces verbs for that subject
+    #   "verb"    — second-tier verb row; runs `command` against the
+    #               currently-focused subject
+    #   "back"    — virtual "← Powrót" row; clears the group's focus
+    option_kind: str = "plain"
+    subject_id: Optional[str] = None     # opaque key used by the
+                                         # builder to focus this row's
+                                         # subject (e.g. entity_id-as-str,
+                                         # exit label, item entity_id)
+
+
+# P24.7 — which groups participate in the two-tier subject→verb pattern.
+# Other groups (Akcje, Crafting, Usługi, Zwierzę) stay flat because their
+# rows are already verb-shape and don't share a common subject.
+TWO_TIER_GROUPS = frozenset({
+    GROUP_OBJECTS,
+    GROUP_ENTITIES,
+    GROUP_INVENTORY,
+    GROUP_EXITS,
+})
+
 
 @dataclass
 class UISelectionState:
@@ -60,6 +85,10 @@ class UISelectionState:
     current_group_index: int = 0
     selected_index_by_group: Dict[str, int] = field(default_factory=dict)
     options_by_group: Dict[str, List[SelectableOption]] = field(default_factory=dict)
+    # P24.7 — per-group focused subject. When set, that group renders
+    # the verb-list for the subject (with a ← Powrót row at index 0).
+    # When unset (default), the group renders the subject picker.
+    focused_subject_by_group: Dict[str, str] = field(default_factory=dict)
 
     def current_group(self) -> str:
         if not self.groups:
@@ -80,6 +109,24 @@ class UISelectionState:
             return
         self.selected_index_by_group[group] = max(0, min(idx, len(opts) - 1))
 
+    # P24.7 — focus helpers.
+    def focused_subject(self, group: Optional[str] = None) -> Optional[str]:
+        group = group or self.current_group()
+        return self.focused_subject_by_group.get(group)
+
+    def set_focused_subject(self, group: str, subject_id: Optional[str]) -> None:
+        if subject_id is None:
+            self.focused_subject_by_group.pop(group, None)
+        else:
+            self.focused_subject_by_group[group] = str(subject_id)
+        # Reset selection to 0 when focus changes so the cursor lands
+        # on the back row (or first verb / first subject).
+        self.selected_index_by_group[group] = 0
+
+    def clear_focus(self, group: Optional[str] = None) -> None:
+        group = group or self.current_group()
+        self.set_focused_subject(group, None)
+
 
 # ── Localized headers ──────────────────────────────────────────────────────
 
@@ -88,7 +135,7 @@ _GROUP_LABEL_KEYS = {
     GROUP_EXITS:     ("ui_group_exits",     "Wyjścia"),
     GROUP_OBJECTS:   ("ui_group_objects",   "Obiekty"),
     GROUP_ENTITIES:  ("ui_group_entities",  "Postacie"),
-    GROUP_PERSONEL:  ("ui_group_personel",  "Personel"),
+    GROUP_PERSONEL:  ("ui_group_personel",  "Usługi"),
     GROUP_PET:       ("ui_group_pet",       "Zwierzę"),
     GROUP_INVENTORY: ("ui_group_inventory", "Ekwipunek"),
     GROUP_CRAFTING:  ("ui_group_crafting",  "Crafting"),
@@ -107,14 +154,17 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
     visible/known things — never reveals hidden objects, hidden exits, or
     unidentified items.
 
-    Prompt 18: when `prev_state` is provided, the rebuilt state preserves
-    the previous group-tab selection (by group **key**, not raw index, since
-    visible groups can change) and per-group selected index. Without this,
-    every keystroke that calls `_ensure_nav_state` would yank the player
-    back to the Akcje tab — making Left/Right tab navigation feel broken
-    even though `cycle_group` was being called correctly.
+    P24.7: the four object-bearing tabs (Obiekty / Postacie / Ekwipunek /
+    Wyjścia) use a two-tier picker. The builder reads the focused subject
+    from `prev_state.focused_subject_by_group` BEFORE constructing
+    options, so subjects can be re-focused across rebuilds (every
+    keystroke). Auto-focus when there's exactly one subject available.
     """
     state = UISelectionState()
+    # Carry focus forward from prev_state so the rebuild reflects the
+    # player's two-tier choice.
+    if prev_state is not None:
+        state.focused_subject_by_group = dict(prev_state.focused_subject_by_group)
     if world is None or world.current_floor is None:
         state.groups = [GROUP_ACTIONS]
         state.options_by_group[GROUP_ACTIONS] = _basic_actions(world)
@@ -128,12 +178,16 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
         return state
 
     actions   = _basic_actions(world, room=room)
-    exits     = _exit_options(world, room)
-    objects   = _object_options(world, room)
-    entities  = _entity_options(world, room)
+    exits     = _exit_options(world, room,
+                              focused=state.focused_subject(GROUP_EXITS))
+    objects   = _object_options(world, room,
+                                focused=state.focused_subject(GROUP_OBJECTS))
+    entities  = _entity_options(world, room,
+                                focused=state.focused_subject(GROUP_ENTITIES))
     personel  = _personel_options(world, room)
     pet       = _pet_options(world)
-    inv       = _inventory_options(world)
+    inv       = _inventory_options(world,
+                                   focused=state.focused_subject(GROUP_INVENTORY))
     crafting  = _crafting_options(world)
 
     layout = []
@@ -174,6 +228,17 @@ def _restore_selection(state: "UISelectionState",
         opts = state.options_by_group.get(gk, [])
         if opts:
             state.selected_index_by_group[gk] = max(0, min(idx, len(opts) - 1))
+    # Prompt 23.5b: carry the grid shape (set by draw_nav_panel) across
+    # rebuilds so the very next keydown's L/R can hop columns correctly.
+    # Without this, every keystroke rebuilds the nav_state and wipes
+    # `_grid_per_col`, forcing L/R to fall back to flat ±1.
+    for attr in ("_grid_per_col", "_grid_col_count"):
+        v = getattr(prev, attr, None)
+        if v:
+            try:
+                setattr(state, attr, v)
+            except AttributeError:
+                pass
 
 
 # ── Group builders ─────────────────────────────────────────────────────────
@@ -218,31 +283,180 @@ def _basic_actions(world, room=None) -> List[SelectableOption]:
     return out
 
 
-def _exit_options(world, room) -> List[SelectableOption]:
-    out = []
+# ── P24.7 — generic two-tier helpers ─────────────────────────────────
+
+def _back_option(group: str) -> SelectableOption:
+    """The "← Powrót" virtual row that always sits at index 0 of a
+    verb-list. Selecting it clears the group's focus, returning to
+    the subject picker."""
+    return SelectableOption(
+        option_id=f"{group}_back",
+        label="← Powrót",
+        command="",
+        group=group,
+        option_kind="back",
+    )
+
+
+def _auto_focus_if_single(state_focus: Optional[str],
+                          subject_ids: List[str]) -> Optional[str]:
+    """If a tab's picker would have exactly one subject, auto-focus it
+    so the player lands on the verb list directly. Returns the focus
+    to use (existing focus wins; otherwise the lone subject)."""
+    if state_focus is not None:
+        return state_focus
+    if len(subject_ids) == 1:
+        return subject_ids[0]
+    return None
+
+
+def _exit_options(world, room, *,
+                  focused: Optional[str] = None) -> List[SelectableOption]:
+    """Two-tier (P24.7):
+      * Picker: one row per visible exit.
+      * Verbs (focused): Idź / Sprawdź drzwi / Wyłam (if locked) /
+        Zablokuj (if not locked) + ← Powrót.
+    """
     floor = world.current_floor
-    for label, ed in (room.exits or {}).items():
-        if ed.get("hidden"):
-            continue
-        target_id = ed.get("target", "")
-        target_room = floor.rooms.get(target_id) if floor else None
-        target_name = (target_room.display_short_title()
-                       if target_room and target_id in (floor.discovered_room_ids or set())
-                       else "?")
-        locked = " (zamkn.)" if ed.get("locked") else ""
+    visible = [(label, ed) for label, ed in (room.exits or {}).items()
+               if not ed.get("hidden")]
+    if not visible:
+        return []
+    subject_ids = [label for label, _ed in visible]
+    focused = _auto_focus_if_single(focused, subject_ids)
+
+    if focused is None:
+        # PICKER — one row per exit.
+        out: List[SelectableOption] = []
+        for label, ed in visible:
+            target_id = ed.get("target", "")
+            target_room = floor.rooms.get(target_id) if floor else None
+            target_name = (target_room.display_short_title()
+                           if target_room and target_id in (floor.discovered_room_ids or set())
+                           else "?")
+            locked = " (zamkn.)" if ed.get("locked") else ""
+            out.append(SelectableOption(
+                option_id=f"exit_pick_{target_id or label}",
+                label=f"{label}{locked}  →  {target_name}",
+                command="",
+                group=GROUP_EXITS,
+                option_kind="subject",
+                subject_id=label,
+                target_id=None,
+                action_type="exit_pick",
+            ))
+        return out
+
+    # VERBS for the focused exit.
+    ed = dict((room.exits or {}).get(focused, {}))
+    out = [_back_option(GROUP_EXITS)]
+    locked = bool(ed.get("locked"))
+    if not locked:
         out.append(SelectableOption(
-            option_id=f"exit_{target_id or label}",
-            label=f"Idź: {label}{locked}  →  {target_name}",
-            command=f"idź {label}",
-            group=GROUP_EXITS,
-            enabled=not ed.get("locked"),
-            target_id=None,
+            option_id=f"exit_go_{focused}",
+            label=f"Idź: {focused}",
+            command=f"idź {focused}",
+            group=GROUP_EXITS, option_kind="verb", subject_id=focused,
             action_type="move",
+        ))
+    out.append(SelectableOption(
+        option_id=f"exit_inspect_{focused}",
+        label=f"Sprawdź: {focused}",
+        command=f"sprawdź drzwi",
+        group=GROUP_EXITS, option_kind="verb", subject_id=focused,
+        action_type="inspect",
+    ))
+    if locked:
+        out.append(SelectableOption(
+            option_id=f"exit_force_{focused}",
+            label=f"Wyłam: {focused}",
+            command=f"wyłam drzwi",
+            group=GROUP_EXITS, option_kind="verb", subject_id=focused,
+            action_type="force",
         ))
     return out
 
 
-def _object_options(world, room) -> List[SelectableOption]:
+def _object_options(world, room, *,
+                    focused: Optional[str] = None) -> List[SelectableOption]:
+    """Two-tier (P24.7):
+      * Picker: one row per visible non-creature object the player could
+        meaningfully interact with.
+      * Verbs (focused): per-entity verb set for the focused subject.
+    """
+    out = _flat_object_verbs(world, room)
+    return _two_tier_route(out, focused, group=GROUP_OBJECTS,
+                           subject_label_fn=_object_subject_label,
+                           world=world)
+
+
+def _object_subject_label(world, eid_str: str) -> str:
+    """Resolve a subject_id (entity_id as string) to its display name."""
+    try:
+        ent = world.get(int(eid_str)) if world else None
+    except (TypeError, ValueError):
+        ent = None
+    return ent.display_name() if ent is not None else eid_str
+
+
+def _two_tier_route(flat_options: List[SelectableOption],
+                    focused: Optional[str],
+                    *, group: str,
+                    subject_label_fn=None,
+                    world=None) -> List[SelectableOption]:
+    """Convert a flat verb list (with `target_id` per option) into
+    either a subject picker or a focused-verb list.
+
+    Each option must carry `target_id` (entity_id) — that's the
+    subject the option acts upon. Options grouped by target_id become
+    one subject row in the picker.
+    """
+    if not flat_options:
+        return []
+    # Preserve subject order from the flat list.
+    subjects: List[str] = []
+    by_subject: Dict[str, List[SelectableOption]] = {}
+    for opt in flat_options:
+        sid = str(opt.target_id) if opt.target_id is not None else ""
+        if not sid:
+            continue
+        if sid not in by_subject:
+            subjects.append(sid)
+            by_subject[sid] = []
+        by_subject[sid].append(opt)
+
+    focused = _auto_focus_if_single(focused, subjects)
+
+    if focused is None:
+        # PICKER — one row per subject. Label = subject's display name.
+        picker: List[SelectableOption] = []
+        for sid in subjects:
+            label = subject_label_fn(world, sid) if subject_label_fn else sid
+            picker.append(SelectableOption(
+                option_id=f"{group}_pick_{sid}",
+                label=label,
+                command="",
+                group=group,
+                option_kind="subject",
+                subject_id=sid,
+                target_id=int(sid) if sid.isdigit() else None,
+                action_type=f"{group}_pick",
+            ))
+        return picker
+
+    # VERBS — back row + focused subject's verbs (tagged kind="verb").
+    out: List[SelectableOption] = [_back_option(group)]
+    for opt in by_subject.get(focused, []):
+        opt.option_kind = "verb"
+        opt.subject_id = focused
+        out.append(opt)
+    return out
+
+
+def _flat_object_verbs(world, room) -> List[SelectableOption]:
+    """Original per-entity object-verb generator (pre-P24.7 logic).
+    Now used by `_object_options` as the source for picker/verb routing.
+    """
     out = []
     for e in room.visible_entities():
         if e.entity_type in ("monster", "crawler", "npc"):
@@ -253,10 +467,53 @@ def _object_options(world, room) -> List[SelectableOption]:
         # the action bar doesn't keep showing "rozdzielnia" after it's
         # been reduced to parts. We still surface them if they're a
         # container (loot remnants may still be inside).
+        # Prompt 24 fix (backlog #5): for corpses, hide them once they've
+        # been BUTCHERED (state.butchered) — the corpse stays in the
+        # room for narrative continuity but the action options stop
+        # offering Wypatrosz / Zjedz.
+        is_corpse = (e.entity_type == "corpse" or "corpse" in tags)
         fully_consumed = (state.get("stripped") or state.get("depleted")) and \
-                         not (("container" in tags) or ("corpse" in tags) or
-                              e.entity_type == "corpse")
+                         not (("container" in tags) or is_corpse)
         if fully_consumed:
+            continue
+        # Corpses are surfaced through a dedicated block below.
+        if is_corpse:
+            butchered = bool(state.get("butchered"))
+            name = e.display_name()
+            # Inspect remains available even after butchering (lore is
+            # decoupled from material extraction).
+            if e.fallback_desc or e.desc_key:
+                out.append(SelectableOption(
+                    option_id=f"inspect_{e.entity_id}",
+                    label=f"Sprawdź: {name}",
+                    command=f"sprawdź {name}",
+                    group=GROUP_OBJECTS, target_id=e.entity_id,
+                    action_type="inspect",
+                ))
+            # Wypatrosz / Zjedz only when not yet butchered/eaten.
+            if not butchered:
+                if "salvage" in (e.affordances or []):
+                    out.append(SelectableOption(
+                        option_id=f"butcher_{e.entity_id}",
+                        label=f"Wypatrosz: {name}",
+                        command=f"wypatrosz {name}",
+                        group=GROUP_OBJECTS, target_id=e.entity_id,
+                        action_type="butcher",
+                    ))
+                # Eat only if the corpse template marked it edible — query
+                # via the corpses helper so authoring stays in content/data.
+                try:
+                    from ..engine import corpses as _cp
+                    if _cp.is_edible(e) and "eat_corpse" in (e.affordances or []):
+                        out.append(SelectableOption(
+                            option_id=f"eat_{e.entity_id}",
+                            label=f"Zjedz: {name}",
+                            command=f"zjedz {name}",
+                            group=GROUP_OBJECTS, target_id=e.entity_id,
+                            action_type="eat",
+                        ))
+                except Exception:
+                    pass
             continue
         # Prompt 22 fix: hide safehouse `service` entities from Obiekty.
         # Their interaction is mediated by the numbered safehouse-pick
@@ -342,7 +599,16 @@ def _object_options(world, room) -> List[SelectableOption]:
     return out
 
 
-def _entity_options(world, room) -> List[SelectableOption]:
+def _entity_options(world, room, *,
+                    focused: Optional[str] = None) -> List[SelectableOption]:
+    """Two-tier (P24.7)."""
+    flat = _flat_entity_verbs(world, room)
+    return _two_tier_route(flat, focused, group=GROUP_ENTITIES,
+                           subject_label_fn=_object_subject_label,
+                           world=world)
+
+
+def _flat_entity_verbs(world, room) -> List[SelectableOption]:
     out = []
     for e in room.visible_entities():
         if e.entity_type not in ("monster", "crawler", "npc"):
@@ -502,13 +768,33 @@ def _personel_options(world, room) -> List[SelectableOption]:
     return out
 
 
-def _inventory_options(world) -> List[SelectableOption]:
+def _inventory_options(world, *,
+                       focused: Optional[str] = None) -> List[SelectableOption]:
+    """Two-tier (P24.7)."""
+    flat = _flat_inventory_verbs(world)
+    return _two_tier_route(flat, focused, group=GROUP_INVENTORY,
+                           subject_label_fn=_object_subject_label,
+                           world=world)
+
+
+def _flat_inventory_verbs(world) -> List[SelectableOption]:
     out = []
     ch = world.character
     for eid in (ch.inventory_ids or [])[:12]:   # cap visible to 12
         ent = world.entities.get(eid)
         if ent is None: continue
         name = ent.display_name()
+        # P24.7: Sprawdź now lives on every item so the two-tier picker
+        # has at least one entry per subject (so subjects always have
+        # SOMETHING to pick into).
+        if ent.fallback_desc or ent.desc_key:
+            out.append(SelectableOption(
+                option_id=f"inv_inspect_{eid}",
+                label=f"Sprawdź: {name}",
+                command=f"sprawdź {name}",
+                group=GROUP_INVENTORY, target_id=eid,
+                action_type="inspect",
+            ))
         out.append(SelectableOption(
             option_id=f"inv_use_{eid}",
             label=f"Użyj: {name}",
@@ -526,6 +812,14 @@ def _inventory_options(world) -> List[SelectableOption]:
                 group=GROUP_INVENTORY, target_id=eid,
                 action_type="deploy",
             ))
+        # Wyrzuć — always available; cheap escape from over-encumbrance.
+        out.append(SelectableOption(
+            option_id=f"inv_drop_{eid}",
+            label=f"Wyrzuć: {name}",
+            command=f"wyrzuć {name}",
+            group=GROUP_INVENTORY, target_id=eid,
+            action_type="drop",
+        ))
     return out
 
 
@@ -569,7 +863,7 @@ def _crafting_options(world) -> List[SelectableOption]:
 # ── Movement / selection helpers ───────────────────────────────────────────
 
 def move_selection(state: UISelectionState, dy: int) -> None:
-    """Move selection up/down within the current group."""
+    """Move selection up/down within the current group (flat step)."""
     if not state.groups:
         return
     g = state.current_group()
@@ -579,6 +873,52 @@ def move_selection(state: UISelectionState, dy: int) -> None:
     idx = state.selected_index(g)
     idx = (idx + dy) % len(opts)
     state.set_selected_index(idx, g)
+
+
+def move_selection_column(state: UISelectionState, direction: int) -> None:
+    """Move selection LEFT (direction=-1) or RIGHT (direction=+1) by one
+    grid column. The current grid shape is stashed on the state by
+    `draw_nav_panel` at render time (per_col = rows per column).
+
+    Layout is filled top-to-bottom-then-rightward: option i lives at
+    (col = i // per_col, row = i % per_col). So a one-column hop is
+    `idx + direction * per_col`, with bounds-aware wrap that preserves
+    the player's row when possible.
+
+    Falls back to the flat ±1 step when grid shape isn't known yet
+    (first frame before render, or single-column layout).
+    """
+    if not state.groups:
+        return
+    g = state.current_group()
+    opts = state.options_in(g)
+    if not opts:
+        return
+    n = len(opts)
+    per_col = int(getattr(state, "_grid_per_col", 0) or 0)
+    col_count = int(getattr(state, "_grid_col_count", 0) or 0)
+    if per_col <= 0 or col_count <= 1:
+        # Single column or shape unknown — degrade to flat step. Players
+        # at compact resolutions never see multiple columns, so L/R = ±1
+        # is the only useful behavior there.
+        return move_selection(state, direction)
+
+    idx = state.selected_index(g)
+    row = idx % per_col
+    col = idx // per_col
+    new_col = col + direction
+    # Wrap horizontally — past the rightmost column loops to the
+    # leftmost, and vice versa. This matches Up/Down's vertical wrap so
+    # the two axes feel symmetric.
+    new_col = new_col % col_count
+    candidate = new_col * per_col + row
+    # The bottom-right grid cell may be empty if n isn't a multiple of
+    # per_col. In that case snap to the last available option in the
+    # target column (highest row that exists).
+    if candidate >= n:
+        last_in_col = min(n - 1, new_col * per_col + (per_col - 1))
+        candidate = last_in_col
+    state.set_selected_index(candidate, g)
 
 
 def cycle_group(state: UISelectionState, step: int) -> None:

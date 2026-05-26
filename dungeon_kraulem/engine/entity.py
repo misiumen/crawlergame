@@ -62,6 +62,12 @@ class Entity:
     vulnerable_to: List[str] = field(default_factory=list)
     immune_to: List[str] = field(default_factory=list)
 
+    # Prompt 26a — per-zone HP for body-aware combat. dict zone_key →
+    # {hp, max_hp, broken}. Empty by default; lazy-initialized by
+    # `content.data.body_plans.init_body_parts` on first body-aware
+    # combat read so old saves and non-creature entities don't pay.
+    body_parts: Dict[str, Any] = field(default_factory=dict)
+
     def is_alive(self) -> bool:
         return self.hp > 0 if self.max_hp > 0 else True
 
@@ -86,6 +92,7 @@ class Entity:
             "resists": list(self.resists),
             "vulnerable_to": list(self.vulnerable_to),
             "immune_to": list(self.immune_to),
+            "body_parts": {k: dict(v) for k, v in (self.body_parts or {}).items()},
         }
 
     @classmethod
@@ -116,6 +123,8 @@ class Entity:
         e.resists       = list(d.get("resists", []))
         e.vulnerable_to = list(d.get("vulnerable_to", []))
         e.immune_to     = list(d.get("immune_to", []))
+        bp = d.get("body_parts") or {}
+        e.body_parts = {k: dict(v) for k, v in bp.items()}
         return e
 
     def display_name(self):

@@ -55,6 +55,11 @@ class Character:
     wielded_main_id: Optional[int] = None
     wielded_offhand_id: Optional[int] = None
 
+    # Prompt 25 — 5 non-wield equipment slots. dict slot_key →
+    # entity_id. Main/off keep their dedicated fields above so the P23
+    # wield path is unchanged.
+    worn_slots: Dict[str, int] = field(default_factory=dict)
+
     # Prompt 19 — companion ids the player currently owns. Companions
     # themselves live on world.companions; this list just references
     # them by id so save/load can rehydrate the relationship.
@@ -85,13 +90,19 @@ class Character:
         v = self.stats.get(stat, 10)
         return (v - 10) // 2
 
-    def effective_ac(self) -> int:
+    def effective_ac(self, world=None) -> int:
+        """Base AC + DEX mod + any worn-slot AC bonuses. P25: accepts an
+        optional `world` so the AC can include armor / shield bonuses
+        without callers needing a separate function. When world is None
+        (legacy callers), only base + DEX is returned — matches pre-P25
+        behavior so saves and snapshots stay consistent."""
         ac = self.base_ac + self.stat_mod("DEX")
-        # Prompt 23: offhand shield grants +2 AC. Looked up lazily at
-        # call time via the world entity registry — `self.world` isn't
-        # available here, so callers using full-AC math route through
-        # `engine.combat.player_ac(world)` instead. This default keeps
-        # the legacy path working when no world reference is handy.
+        if world is not None:
+            try:
+                from . import equipment as _eq
+                ac += _eq.total_ac_bonus(world, self)
+            except Exception:
+                pass
         return ac
 
     def offhand_ac_bonus(self, world) -> int:
@@ -132,6 +143,7 @@ class Character:
             "companion_ids": list(self.companion_ids),
             "wielded_main_id": self.wielded_main_id,
             "wielded_offhand_id": self.wielded_offhand_id,
+            "worn_slots": dict(self.worn_slots),
             "materials": dict(self.materials),
             "credits": self.credits, "audience_rating": self.audience_rating,
             "unlocked_achievements": list(self.unlocked_achievements),
@@ -154,6 +166,10 @@ class Character:
         c.companion_ids = list(d.get("companion_ids", []))   # Prompt 19
         c.wielded_main_id    = d.get("wielded_main_id")       # Prompt 23
         c.wielded_offhand_id = d.get("wielded_offhand_id")    # Prompt 23
+        # Prompt 25 — worn_slots; coerce values to int (json deserializes
+        # dict KEYS as strings already; we want VALUE ints).
+        ws = d.get("worn_slots") or {}
+        c.worn_slots = {k: int(v) for k, v in ws.items()}
         c.materials = dict(d.get("materials", {}))
         c.unlocked_achievements = list(d.get("unlocked_achievements", []))
         c.journal = {k: list(v) for k, v in d.get("journal", {}).items()}

@@ -98,14 +98,19 @@ def test_move_and_cycle_wraps():
 
 
 def test_commands_are_plain_polish():
-    """Every option's command must be a string that the deterministic
-    parser can recognize without nav-specific magic."""
+    """Every COMMAND-bearing option (plain/verb kind) must carry a
+    parser-recognizable string. Subject/back rows in the P24.7 two-tier
+    picker carry no command (they only mutate nav focus) and are
+    skipped here."""
     w, r = _mk_world()
     state = ui_nav.build_play_options(w)
     from ..engine import parser_core
     seen = 0
     for g in state.groups:
         for o in state.options_in(g):
+            # P24.7: skip nav-only rows (subject pickers + back).
+            if getattr(o, "option_kind", "plain") in ("subject", "back"):
+                continue
             seen += 1
             assert isinstance(o.command, str) and o.command.strip()
             intent = parser_core.parse(o.command)

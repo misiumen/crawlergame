@@ -36,26 +36,31 @@ def _rects_disjoint(a, b) -> bool:
 def test_compact_layout_panels_disjoint():
     lo = L.calculate_layout(1280, 720)
     assert lo.mode == "compact"
-    assert not lo.has_left_sidebar
+    # P24.5: minimap is always visible, so left sidebar is always on.
+    assert lo.has_left_sidebar
     # Nav must be ABOVE the log (no vertical overlap).
     assert _rects_disjoint_vertically(lo.nav_rect, lo.log_rect)
-    # Nav must NOT overlap the right sidebar.
+    # Nav must NOT overlap any sidebar.
     assert _rects_disjoint(lo.nav_rect, lo.right_sidebar_rect), \
         f"nav/sidebar overlap: nav={lo.nav_rect} sidebar={lo.right_sidebar_rect}"
-    # Room and right sidebar are side-by-side, no overlap.
+    assert _rects_disjoint(lo.nav_rect, lo.left_sidebar_rect)
+    # Three columns disjoint.
+    assert _rects_disjoint(lo.left_sidebar_rect, lo.room_rect)
     assert _rects_disjoint(lo.room_rect, lo.right_sidebar_rect)
     # Log and input don't overlap.
     assert _rects_disjoint_vertically(lo.log_rect, lo.input_rect)
-    print(f"  compact: room={lo.room_rect} sidebar={lo.right_sidebar_rect} nav={lo.nav_rect}")
+    print(f"  compact: left={lo.left_sidebar_rect} room={lo.room_rect} right={lo.right_sidebar_rect} nav={lo.nav_rect}")
 
 
 def test_wide_layout():
     lo = L.calculate_layout(1920, 1080)
     assert lo.mode == "wide"
-    assert not lo.has_left_sidebar
+    # P24.5: minimap always visible.
+    assert lo.has_left_sidebar
     assert _rects_disjoint(lo.nav_rect, lo.right_sidebar_rect)
+    assert _rects_disjoint(lo.left_sidebar_rect, lo.room_rect)
     assert _rects_disjoint(lo.room_rect, lo.right_sidebar_rect)
-    print(f"  wide: room w={lo.room_rect[2]} sidebar w={lo.right_sidebar_rect[2]} font_body={lo.font_body}")
+    print(f"  wide: left w={lo.left_sidebar_rect[2]} room w={lo.room_rect[2]} sidebar w={lo.right_sidebar_rect[2]} font_body={lo.font_body}")
 
 
 def test_ultrawide_layout_three_columns():
