@@ -35,12 +35,16 @@ CLASS_CATALOG = {
 
 
 def class_score(character, class_key: str) -> float:
+    """P27.6 (P27-MECH-2): random noise reduced to a tie-breaker scale
+    (was 0..0.5 which dominates when all real scores are tiny). Now
+    just 0..0.01 — only matters for ties between classes that scored
+    identically on the player's affinity profile."""
     weights = CLASS_CATALOG[class_key].affinity_weights
     aff = character.affinity or {}
     total = 0.0
     for k, w in weights.items():
         total += aff.get(k, 0) * w
-    total += random.uniform(0, 0.5)
+    total += random.uniform(0, 0.01)
     return total
 
 

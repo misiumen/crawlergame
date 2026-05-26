@@ -195,7 +195,8 @@ def test_combat_lockdown_move_redirects_to_flee():
     consumed = g._combat_route(intent, cs)
     assert consumed is True
     # Flee log should include "wycofuj" or "wycof" or "uciec"
-    last = w.log[-3:] if len(w.log) >= 3 else w.log
+    # P27.6: symmetric enemy attack log widened tail; scan a bigger window.
+    last = w.log[-8:] if len(w.log) >= 8 else w.log
     txt = " ".join(s for s, _c in last).lower()
     assert "wycof" in txt or "ucie" in txt
     print("  combat lockdown: move → flee redirect: OK")

@@ -23,9 +23,11 @@ class Character:
 
     stats: Dict[str, int] = field(default_factory=lambda: {s: 10 for s in BASE_STATS})
 
-    # Combat shell
-    max_hp: int = 14
-    hp: int = 14
+    # Combat shell — P27.6 balance pass: HP scaled ×7 (14→100) so
+    # individual hits feel like meaningful chunks rather than instant
+    # death, and the player sees real numbers move.
+    max_hp: int = 100
+    hp: int = 100
     base_ac: int = 10
     conditions: List[str] = field(default_factory=list)
 

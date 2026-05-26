@@ -166,27 +166,31 @@ class Game:
         self.world = WorldState()
         self.world.character.name = name or "Bezimienny"
         self.world.character.background = background
-        # Modest stat adjustment based on background
-        adj = {
-            "office_worker": {"INT":+1},
-            "mechanic":      {"INT":+1,"STR":+1},
-            "nurse":         {"WIS":+1,"CHA":+1},
-            "cook":          {"CON":+1,"DEX":+1},
-            "security_guard":{"STR":+1,"CON":+1},
-            "courier":       {"DEX":+2},
-            "student":       {"INT":+2},
-            "streamer":      {"CHA":+2},
-            "soldier":       {"STR":+1,"CON":+1},
-            "unemployed_hustler":{"CHA":+1,"DEX":+1},
-            "janitor":       {"CON":+1,"INT":+1},
-            "paramedic":     {"WIS":+1,"INT":+1},
-            # Prompt 19 — pet-owner background. Modest WIS/CHA bump
-            # (you talk to an animal all day) and a random pet handed
-            # out further down by `_assign_starter_pet`.
-            "opiekun_zwierzaka": {"WIS":+1,"CHA":+1},
-        }.get(background, {})
-        for s, b in adj.items():
-            self.world.character.stats[s] = self.world.character.stats.get(s, 10) + b
+        # P27.6 balance pass: stat allocations per background are now
+        # absolute target values, not modest +1 bumps. Each tło gets a
+        # distinctive profile with at least one stat >=13 (meaningful
+        # +1 or +2 mod) and at least one stat <=9 (clear weakness).
+        # Player feels different from turn 1 across backgrounds.
+        STAT_PROFILES = {
+            # (STR, DEX, CON, INT, WIS, CHA)
+            "office_worker":     {"STR": 8,  "DEX": 10, "CON": 9,  "INT": 14, "WIS": 11, "CHA": 12},
+            "mechanic":          {"STR": 13, "DEX": 12, "CON": 12, "INT": 13, "WIS": 9,  "CHA": 9},
+            "nurse":             {"STR": 9,  "DEX": 11, "CON": 11, "INT": 12, "WIS": 14, "CHA": 13},
+            "cook":              {"STR": 11, "DEX": 14, "CON": 12, "INT": 10, "WIS": 10, "CHA": 9},
+            "security_guard":    {"STR": 14, "DEX": 11, "CON": 13, "INT": 9,  "WIS": 9,  "CHA": 10},
+            "courier":           {"STR": 10, "DEX": 15, "CON": 12, "INT": 9,  "WIS": 11, "CHA": 9},
+            "student":           {"STR": 8,  "DEX": 10, "CON": 9,  "INT": 15, "WIS": 12, "CHA": 12},
+            "streamer":          {"STR": 8,  "DEX": 11, "CON": 9,  "INT": 11, "WIS": 9,  "CHA": 15},
+            "soldier":           {"STR": 14, "DEX": 12, "CON": 14, "INT": 9,  "WIS": 11, "CHA": 8},
+            "unemployed_hustler":{"STR": 9,  "DEX": 13, "CON": 10, "INT": 11, "WIS": 9,  "CHA": 14},
+            "janitor":           {"STR": 12, "DEX": 10, "CON": 14, "INT": 9,  "WIS": 11, "CHA": 8},
+            "paramedic":         {"STR": 10, "DEX": 12, "CON": 11, "INT": 13, "WIS": 14, "CHA": 10},
+            "opiekun_zwierzaka": {"STR": 9,  "DEX": 11, "CON": 10, "INT": 10, "WIS": 14, "CHA": 13},
+        }
+        profile = STAT_PROFILES.get(background)
+        if profile:
+            for stat, value in profile.items():
+                self.world.character.stats[stat] = value
 
         # Some starting items
         from ..content.items import make_item
@@ -380,6 +384,107 @@ class Game:
                            fallback=f"Chowasz „{ent.display_name()}”.",
                            name=ent.display_name()),
                          LOG_SUCCESS)
+
+    def _attempt_rest_short(self):
+        """P27.6 — short rest (D&D-style). Restores ~25% max HP,
+        costs 20 in-game minutes. Refused if: enemies in room, encounter
+        pending in <15 min, already at full HP, or 2 short rests this
+        floor used up."""
+        from . import time_system as ts
+        from . import combat as _cmb
+        ch = self.world.character
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            self.log(t("feedback_no_room", fallback="Nie jesteś nigdzie."), LOG_WARN)
+            return
+        # Enemies present? Refuse.
+        if _cmb.alive_hostiles_in(room):
+            self.log(t("feedback_rest_enemy",
+                       fallback="Wokół ciebie wróg. Odpoczynek niemożliwy."),
+                     LOG_WARN)
+            return
+        # Pending encounter within 15 min?
+        try:
+            from . import encounter as _enc
+            rem = _enc.time_until_next(self.world)
+            if rem is not None and rem < 15:
+                self.log(t("feedback_rest_encounter_close",
+                           fallback="Słyszysz kroki w korytarzu. "
+                                    "To nie jest moment na odpoczynek."),
+                         LOG_WARN)
+                return
+        except Exception:
+            pass
+        # Already full?
+        if ch.hp >= ch.max_hp:
+            self.log(t("feedback_rest_full_hp",
+                       fallback="Jesteś w pełni sił."),
+                     LOG_NORMAL)
+            return
+        # Per-day cooldown — max 2 short rests per day.
+        day_key = f"rests_short_day_{self.world.current_floor.day_number()}"
+        used = int(ch.flags.get(day_key, 0))
+        if used >= 2:
+            self.log(t("feedback_rest_cooldown",
+                       fallback="Już dwa razy odpoczywałeś dziś. "
+                                "Ciało domaga się dłuższego snu."),
+                     LOG_WARN)
+            return
+        # Heal.
+        heal = max(1, ch.max_hp // 4)   # ~25% of max
+        ch.heal(heal)
+        ch.flags[day_key] = used + 1
+        ts.advance(self.world, 20)
+        self.log(t("feedback_rest_short_ok",
+                   fallback=f"Krótki odpoczynek. Odzyskujesz {heal} HP "
+                            f"(HP: {ch.hp}/{ch.max_hp}).",
+                   heal=heal, hp=ch.hp, max=ch.max_hp), LOG_SUCCESS)
+
+    def _attempt_rest_long(self):
+        """P27.6 — long rest. Pełna regeneracja HP + reset most
+        short-term statuses, costs 6 in-game hours, tylko w
+        `safehouse_subtype`-rooms. Sen poza safehouse triggeruje
+        encounter spawn."""
+        from . import time_system as ts
+        from . import combat as _cmb
+        ch = self.world.character
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            return
+        if _cmb.alive_hostiles_in(room):
+            self.log(t("feedback_sleep_enemy",
+                       fallback="Sen w czasie walki kończy się jednoznacznie."),
+                     LOG_DANGER)
+            return
+        if not room.is_safe():
+            # Sleeping in unsafe place — chance of encounter on wake.
+            self.log(t("feedback_sleep_unsafe",
+                       fallback="Spróbujesz spać tu? Z otwartymi oczami "
+                                "nie zaśniesz, z zamkniętymi cię znajdą."),
+                     LOG_WARN)
+            try:
+                from . import encounter as _enc
+                _enc.schedule(self.world, room.room_id,
+                              alarm_type="patrol_routine",
+                              source="unsafe_sleep")
+            except Exception:
+                pass
+            return
+        # Safehouse sleep — full heal + status reset + day advance.
+        ch.hp = ch.max_hp
+        # Remove short-term statuses (keep persistent ones like
+        # corroded that need explicit cure).
+        TRANSIENT = {"shaken","hesitating","prone","stunned","blinded",
+                     "afraid","slowed","disarmed","wounded"}
+        ch.conditions = [c for c in (ch.conditions or [])
+                         if c not in TRANSIENT]
+        ts.advance(self.world, 6 * 60)
+        self.log(t("feedback_sleep_ok",
+                   fallback=f"Śpisz spokojnie. Budzisz się w pełni sił "
+                            f"(HP: {ch.hp}/{ch.max_hp}).",
+                   hp=ch.hp, max=ch.max_hp), LOG_SUCCESS)
 
     def _attempt_wear(self, intent):
         """Prompt 25 — equip a wearable from inventory into its slot.
@@ -1402,6 +1507,12 @@ class Game:
         if intent.intent == "take_off":
             self._attempt_take_off(intent); return
 
+        # P27.6 — rest handlers.
+        if intent.intent == "rest_short":
+            self._attempt_rest_short(); return
+        if intent.intent == "rest_long":
+            self._attempt_rest_long(); return
+
         # Gap 4: deploy a crafted/portable trap or device
         if intent.intent == "deploy":
             self._attempt_deploy(intent); return
@@ -1646,16 +1757,43 @@ class Game:
     # ── Class/species offers ─────────────────────────────────────────────────
 
     def _maybe_offer_class(self):
+        """P27.6 (P27-MECH-2): class offer trigger overhaul.
+
+        Previous logic offered after just 5 total affinity — way too
+        early, with random noise dominating the class pick because
+        no single affinity was meaningfully bigger than the others.
+        Now requires meaningful play AND a dominant affinity.
+        """
         c = self.world.character
-        if c.class_key is not None: return
-        # Offer condition: at least 5 total affinity points or entered floor 3
+        if c.class_key is not None:
+            return
         total = sum(c.affinity.values())
-        if total >= 5 or self.world.floor_number >= 3:
-            from ..systems.classes import suggest_classes
-            self.offer_candidates = suggest_classes(c, n=3)
-            self.state = STATE_CLASS_OFFER
-            self.log(narrate("class_offer") or
-                     t("log_class_offer", fallback="Syndykat ma dla ciebie propozycję."), LOG_SYNDIC)
+        sorted_aff = sorted(c.affinity.values(), reverse=True)
+        top = sorted_aff[0] if sorted_aff else 0
+        second = sorted_aff[1] if len(sorted_aff) >= 2 else 0
+        floor_minute = (self.world.current_floor.current_minute
+                        if self.world.current_floor else 0)
+        # Forced offer at floor 2+ if they've at least played somewhat.
+        force_offer = (self.world.floor_number >= 2 and total >= 15)
+        # Earned offer: enough total, clear dominance, played awhile.
+        earned_offer = (total >= 25
+                        and top >= 8
+                        and top >= 2 * max(1, second)
+                        and floor_minute >= 60)
+        if not (force_offer or earned_offer):
+            return
+        from ..systems.classes import suggest_classes
+        self.offer_candidates = suggest_classes(c, n=3)
+        self.state = STATE_CLASS_OFFER
+        # Surface what behavior drove the offer so it doesn't feel arbitrary.
+        from .dice_labels import intent_pl
+        top_aff_name = next((k for k, v in c.affinity.items() if v == top), "?")
+        self.log(narrate("class_offer") or
+                 t("log_class_offer",
+                   fallback=f"Syndykat ma dla ciebie propozycję. "
+                            f"Widzieliśmy jak {top_aff_name} ({top}) "
+                            f"dominuje twój styl. Wybierz:"),
+                 LOG_SYNDIC)
 
     def _accept_class(self, idx: int):
         if not (0 <= idx < len(self.offer_candidates)): return
@@ -3149,6 +3287,32 @@ class Game:
             return
         if action.kind in ("attack",):
             dmg = int(action.damage or 1)
+            # P27.6 (P27-UX-7): symmetric enemy roll log. Player only
+            # saw final damage — never knew WHY they got hit or what
+            # AC the enemy needed. Now we show the enemy's d20 + atk
+            # vs player AC, so the math is transparent.
+            try:
+                import random as _r_enemy
+                from .dice_labels import stat_pl as _spl_e
+                e_raw = _r_enemy.randint(1, 20)
+                e_atk = int(getattr(ent, "attack_bonus", 0) or 0)
+                player_ac = ch.effective_ac(self.world)
+                e_total = e_raw + e_atk
+                e_outcome = ("KRYT" if e_raw == 20 else
+                             ("trafienie" if e_total >= player_ac else
+                              ("pudło" if e_raw > 1 else "fuks")))
+                self.log(f"  [atak wroga] {ent.display_name()}: "
+                         f"d20({e_raw}) + atak({e_atk:+d}) = "
+                         f"{e_total} vs twoje AC {player_ac} → {e_outcome}",
+                         LOG_SYSTEM)
+                # Honor the roll: if enemy "missed" per the symmetric
+                # math, suppress damage (was always landing before; now
+                # there's a real miss chance shown to player).
+                if e_total < player_ac and e_raw != 20:
+                    self.log(f"{name} chybia.", LOG_NORMAL)
+                    return
+            except Exception:
+                pass
             # P26b: faction-aware retarget. If the AI picked a rival
             # combat participant, damage that rival instead of the
             # player. Crossfire is the audience-pleasing scenario the
@@ -3360,7 +3524,11 @@ class Game:
                 dmg_type = weapon.damage_type or "physical"
                 weapon_name = weapon.display_name()
             else:
-                dmg_dice = "1d6+2"
+                # P27.6 balance: unarmed bumped to match new HP scale
+                # (player now has 100 HP, monsters have ~25-200 HP).
+                # 2d6+8 averages 15 — substantial chunk per hit without
+                # being one-shot territory.
+                dmg_dice = "2d6+8"
                 dmg_type = "physical"
                 weapon_name = "pięść"
             # Coating override.

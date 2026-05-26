@@ -178,7 +178,7 @@ def test_fire_traps_only_kills_arrivers_before_combat():
         "quality": "normal", "armed_at": 0,
         "level": "critical_success",
         "triggered": False,
-        "effect": {"type": "damage", "amount": 50},  # one-shot
+        "effect": {"type": "damage", "amount": 250},  # one-shot (P27.6 HP×5)
     }]
     _enc.schedule(w, "r0", "silent_alarm")
     w.current_floor.current_minute = 20

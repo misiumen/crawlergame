@@ -117,16 +117,16 @@ def test_zone_hp_proportional_to_max_hp():
 def test_targeted_head_break_triggers_stunned():
     from ..engine.game import Game
     w = _mk_world()
-    m = _spawn_humanoid(w, hp=20)
+    # P27.6 balance: HP scaled — bigger pool needs more iterations.
+    m = _spawn_humanoid(w, hp=120)
     g = Game(screen=None); g.world = w; g.state = "play"
     _cmb.start_combat(w.current_floor.current_room(), w)
     cs = _cmb.get_combat(w.current_floor.current_room())
     cs.selected_target_id = m.entity_id
     cs.targeted_zone_by_eid[m.entity_id] = "head"
-    # Cheese: hammer the head until it breaks (deterministic via seed).
     _r.seed(7)
     g.world.character.stats["STR"] = 18
-    for _ in range(20):
+    for _ in range(80):   # was 20; HP×5 needs more swings
         if m.body_parts.get("head", {}).get("broken"):
             break
         if not m.is_alive():
@@ -140,7 +140,7 @@ def test_targeted_head_break_triggers_stunned():
 def test_targeted_arm_break_triggers_disarmed():
     from ..engine.game import Game
     w = _mk_world()
-    m = _spawn_humanoid(w, hp=30)
+    m = _spawn_humanoid(w, hp=180)
     g = Game(screen=None); g.world = w; g.state = "play"
     _cmb.start_combat(w.current_floor.current_room(), w)
     cs = _cmb.get_combat(w.current_floor.current_room())
@@ -148,7 +148,7 @@ def test_targeted_arm_break_triggers_disarmed():
     cs.targeted_zone_by_eid[m.entity_id] = "l_arm"
     _r.seed(11)
     g.world.character.stats["STR"] = 18
-    for _ in range(30):
+    for _ in range(100):   # was 30; HP×5
         if m.body_parts.get("l_arm", {}).get("broken"):
             break
         if not m.is_alive():

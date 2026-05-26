@@ -179,7 +179,8 @@ def test_lockdown_move_routes_to_flee():
     intent = ActionIntent(intent="move", verb="idź", destination="wschód")
     consumed = g._combat_route(intent, cs)
     assert consumed is True
-    last_lines = " ".join(s for s, _c in w.log[-3:]).lower()
+    # P27.6: symmetric enemy attack log widened tail; scan a bigger window.
+    last_lines = " ".join(s for s, _c in w.log[-8:]).lower()
     assert "wycof" in last_lines or "ucie" in last_lines
     print("  lockdown move → flee redirect: OK")
 

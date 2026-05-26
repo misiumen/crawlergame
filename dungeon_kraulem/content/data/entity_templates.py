@@ -1,4 +1,16 @@
-"""Entity templates instantiated by the procgen seeds."""
+"""Entity templates instantiated by the procgen seeds.
+
+P27.6 balance pass: HP and damage dice for all MON entries are
+scaled at MODULE-LOAD time via `_apply_balance_scale()` so the source
+templates stay readable with their original "design" numbers while the
+runtime values match the new HP-100 player scale.
+
+Player baseline went 14 → 100 HP (×7). Monsters scale ×5 (less than
+player so combat doesn't take 7× longer), damage ×4. Outcome: each hit
+takes ~10-25% of the bar, fights last 4-7 turns instead of 1-3.
+"""
+from __future__ import annotations
+import re as _re_balance
 
 # Environmental features (env)
 ENV = {
@@ -561,3 +573,63 @@ MON = {
         vulnerable_to=["acid","psychic"],
     ),
 }
+
+
+# ── P27.6 Balance pass ─────────────────────────────────────────────────────
+
+# Multipliers applied to every MON entry at module-load time.
+_HP_SCALE  = 5     # monster HP × 5 (player HP scaled 7x to 100, monsters
+                   # less to keep fights to 4-7 turns instead of 10+)
+_DMG_MULT  = 4     # damage dice constant × 4 (so 1d4+1 → 1d4+5 approx)
+_DMG_DICE_BUMP = 1 # plus +1 die per `Nd` term (so 1d4 → 2d4 — wider
+                   # damage curve, more variance feels alive)
+
+
+def _scale_damage_dice(spec: str) -> str:
+    """Apply the balance multipliers to a dice spec like '1d4+1'.
+    `NdS+B` → `(N+_DMG_DICE_BUMP)dS+(B*_DMG_MULT + N*S/2)` approximation
+    that lifts average damage by ~3-4×."""
+    if not spec or "d" not in spec:
+        return spec
+    m = _re_balance.match(r"^\s*(\d+)\s*d\s*(\d+)\s*([+\-]\s*\d+)?\s*$", spec)
+    if not m:
+        return spec
+    n = int(m.group(1))
+    s = int(m.group(2))
+    b = int((m.group(3) or "+0").replace(" ", ""))
+    # Lift dice count and add a flat bonus matching old avg × (_DMG_MULT-1).
+    new_n = n + _DMG_DICE_BUMP
+    # old avg = n*(s+1)/2 + b ; we want ~4× that.
+    old_avg = n * (s + 1) / 2 + b
+    new_dice_avg = new_n * (s + 1) / 2
+    target = old_avg * _DMG_MULT
+    new_b = max(0, int(round(target - new_dice_avg)))
+    return f"{new_n}d{s}+{new_b}" if new_b else f"{new_n}d{s}"
+
+
+_BALANCE_APPLIED = False
+
+
+def _apply_balance_scale() -> None:
+    """Mutates every MON entry in place. Called once at module load.
+    Idempotent via module-level `_BALANCE_APPLIED` flag (NOT stored in
+    MON dict — that would pollute iterators expecting every entry to
+    be a monster template)."""
+    global _BALANCE_APPLIED
+    if _BALANCE_APPLIED:
+        return
+    for key, tmpl in list(MON.items()):
+        if not isinstance(tmpl, dict):
+            continue
+        if "hp" in tmpl:
+            tmpl["hp"] = int(tmpl["hp"]) * _HP_SCALE
+        if "max_hp" in tmpl:
+            tmpl["max_hp"] = int(tmpl["max_hp"]) * _HP_SCALE
+        if "damage_dice" in tmpl:
+            tmpl["damage_dice"] = _scale_damage_dice(tmpl["damage_dice"])
+        if "attack_bonus" in tmpl:
+            tmpl["attack_bonus"] = int(tmpl["attack_bonus"]) + 1
+    _BALANCE_APPLIED = True
+
+
+_apply_balance_scale()
