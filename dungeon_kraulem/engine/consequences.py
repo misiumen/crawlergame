@@ -146,6 +146,39 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                 if not hint:
                     hint = t("feedback_silence", fallback="Słyszysz tylko własny oddech.")
                 lines.append(hint)
+            else:
+                # P27.8 (P27-UX-5) — bare `nasłuchuj` (no target room) now
+                # surfaces ambient noise level for the current room AND
+                # each adjacent room, using the noise system. Helps the
+                # player decide which exit is safest BEFORE walking
+                # through a door.
+                if room and floor:
+                    def _noise_label(n: int) -> str:
+                        if n <= 0:   return "cisza"
+                        if n < 8:    return "szmery"
+                        if n < 20:   return "głosy/kroki"
+                        if n < 40:   return "ruch, dudnienie"
+                        return "tłum, wrzaski"
+                    cur_n = int(getattr(room, "noise_level", 0) or 0)
+                    lines.append(t("feedback_listen_self",
+                                   fallback=f"Tutaj: {_noise_label(cur_n)} ({cur_n}).",
+                                   noise=cur_n))
+                    # Walk each exit; show what we can hear behind closed doors.
+                    # room.exits is Dict[label, {"target":..., "locked":..., ...}].
+                    for label, ed in (room.exits or {}).items():
+                        if not isinstance(ed, dict):
+                            continue
+                        if ed.get("hidden"):
+                            continue
+                        nb = floor.rooms.get(ed.get("target"))
+                        if nb is None:
+                            continue
+                        n = int(getattr(nb, "noise_level", 0) or 0)
+                        nb_name = nb.fallback_short_title or nb.room_id
+                        lines.append(f"  → {label} ({nb_name}): {_noise_label(n)} ({n}).")
+                else:
+                    lines.append(t("feedback_silence",
+                                   fallback="Słyszysz tylko własny oddech."))
             if time_system:
                 time_system.advance(world, eff.get("time_cost", 5))
 

@@ -229,19 +229,25 @@ def draw_minimap(surf, world, rect, layout, *,
     cols = max(1, max_col - min_col + 1)
     rows = max(1, max_row - min_row + 1)
 
-    # Available area below header.
+    # Available area below header. P27.8 (P27-UX-18) — reserve 16px at
+    # the bottom for a legend strip so glyphs (@/!/S/B/$/⚔) make sense
+    # to a new player without opening help.
     pad_top = 22
     pad = 8
+    legend_h = 16
     area_x = x + pad
     area_y = y + pad_top
     area_w = w - 2 * pad
-    area_h = h - pad_top - pad
+    area_h = h - pad_top - pad - legend_h
     if area_w <= 0 or area_h <= 0:
         return
 
-    # Cell size fits the bounds. Cap at 28 so cells stay readable.
-    cell_w = max(8, min(28, area_w // cols))
-    cell_h = max(8, min(28, area_h // rows))
+    # Cell size fits the bounds. P27.8 (P27-UX-17): bumped min cell from
+    # 8→14 so glyphs stay legible on dense floors; cap raised 28→34 so
+    # sparse floors don't waste the panel. Cells below 14 px get filled
+    # with a simpler dot instead of a glyph.
+    cell_w = max(14, min(34, area_w // cols))
+    cell_h = max(14, min(34, area_h // rows))
     cell = min(cell_w, cell_h)
 
     # Center the grid within available area.
@@ -332,6 +338,23 @@ def draw_minimap(surf, world, rect, layout, *,
                             break
             click_registry.add((cx, cy, cell, cell), _click,
                                tooltip=tooltip)
+
+    # P27.8 — legend strip at the bottom of the panel.
+    legend_font = _font(max(9, int(layout.font_small) - 2), bold=False)
+    legend_y = y + h - legend_h + 1
+    legend_items = [("@", ACCENT, "tu"), ("S", SUCCESS, "safe"),
+                    ("!", DANGER, "wróg"), ("B", DANGER, "boss"),
+                    ("$", ACCENT2, "sklep")]
+    lx = x + 6
+    for glyph, color, label in legend_items:
+        gimg = legend_font.render(glyph, True, color)
+        timg = legend_font.render(label, True, DIM_TEXT)
+        if lx + gimg.get_width() + 2 + timg.get_width() + 8 > x + w:
+            break
+        surf.blit(gimg, (lx, legend_y))
+        lx += gimg.get_width() + 2
+        surf.blit(timg, (lx, legend_y))
+        lx += timg.get_width() + 8
 
 
 def handle_minimap_click(world, layout, mx: int, my: int) -> Optional[str]:

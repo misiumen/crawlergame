@@ -1927,6 +1927,26 @@ class Game:
             t("controls_help_2", fallback="  Tryb wyboru: [T] wejdź, ↑↓ wybór, ←→/Tab grupa, Enter zatwierdź."),
             t("controls_help_3", fallback="  Hotkeys: I plecak, M mapa, C postać, J wiedza, R odpocznij,"),
             t("controls_help_4", fallback="           Ctrl+S zapisz, F1 pomoc, Esc tryb tekstowy / wyczyść."),
+            # P27.8 (P27-UX-16) — mechanics primer. Always-on, surfaced by
+            # F1 / `pomoc`. Teaches the d20 / AC / TT shorthand the log
+            # uses so a new player can decode `d20(13)+SIŁ(+0)=13 vs AC 12 → trafienie`.
+            t("controls_help_mech_title", fallback="Mechanika (skróty z logu):"),
+            t("controls_help_mech_1",
+              fallback="  d20(X): rzut kostką (1–20). Im wyższy, tym lepiej."),
+            t("controls_help_mech_2",
+              fallback="  AC (klasa pancerza): musisz przekroczyć w ataku — d20+modyfikatory ≥ AC = trafienie."),
+            t("controls_help_mech_3",
+              fallback="  TT (trudność testu): jak AC, ale dla testów niebojowych (skradanie, perswazja, naprawa)."),
+            t("controls_help_mech_4",
+              fallback="  Modyfikatory: SIŁ/ZRĘ/INT/MĄD/CHA = (stat-10)/2. Statystyka 14 → +2, statystyka 8 → -1."),
+            t("controls_help_mech_5",
+              fallback="  HP/AC: HP to życie (zero = śmierć). AC ≈ 10 + ZRĘ + zbroja."),
+            t("controls_help_mech_6",
+              fallback="  Crit/fumble: 20 na kostce = krytyk (×2 obrażeń). 1 na kostce = fumble (auto-pudło)."),
+            t("controls_help_mech_7",
+              fallback="  Klasa: po 60 min na piętrze możesz dostać ofertę klasy. `umiejętność` aktywuje zdolność (raz/piętro)."),
+            t("controls_help_mech_8",
+              fallback="  Odpoczynek: `odpocznij` (krótki, ~25% HP) wymaga bezpiecznego pokoju; `spij` w safehouse = pełne HP."),
         ]:
             self.log(line, LOG_SYSTEM)
 

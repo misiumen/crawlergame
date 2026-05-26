@@ -117,6 +117,15 @@ def validate(intent, world) -> ValidationResult:
     if intent.intent == "listen":
         target_name = intent.destination or (intent.targets[0] if intent.targets else "")
         target_name_f = fold(target_name)
+        # P27.8 (P27-UX-5) — bare `nasłuchuj` (no target) is now valid;
+        # consequences.listen will report ambient noise for the current
+        # room + adjacent rooms.
+        if not target_name_f:
+            result.valid = True
+            result.matched_affordance_key = "listen"
+            result.matched_destination = None
+            result.time_cost = 5
+            return result
         for label, exit_data in room.exits.items():
             if fold(label) == target_name_f or (target_name_f and target_name_f in fold(label)):
                 result.valid = True
