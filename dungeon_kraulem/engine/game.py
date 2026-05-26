@@ -5485,16 +5485,20 @@ class Game:
 
         Returns True if we acted on the click (moved or refused), so the
         default mark-toggle skips. Returns False to fall through to the
-        mark-toggle behavior.
+        mark-toggle behavior — which now only fires for the CURRENT
+        room (a no-op visual ping).
 
         Move rules:
           - Target must be an ADJACENT room (i.e. one of the current
             room's exits points at it).
           - Exit must be unlocked AND not hidden — locked doors require
             keys/picks just like typed `idź <label>`.
-          - Click on the CURRENT room: no-op move; fall through to mark.
-          - Click on a non-adjacent room: fall through to mark (so the
-            player can still plan ahead).
+          - Click on the CURRENT room: no-op move; fall through.
+          - Click on a non-adjacent room: refuse with a log line so the
+            player understands why nothing happened. P28 follow-up:
+            silent mark-toggle was confusing — players read the
+            highlight as "selected, will move next click", which was
+            never the contract.
         """
         floor = self.world.current_floor if self.world else None
         if floor is None:
@@ -5514,8 +5518,18 @@ class Game:
                 matched_ed = ed
                 break
         if matched_label is None:
-            # Non-adjacent: let mark-toggle handle it.
-            return False
+            # Non-adjacent — refuse with explanation instead of silently
+            # marking. Prevents the "I clicked but nothing visible
+            # happened (except weird highlight)" UX bug.
+            target_room = floor.rooms.get(room_id)
+            target_name = (target_room.display_short_title()
+                           if target_room else room_id)
+            self.log(t("feedback_minimap_too_far",
+                       fallback=f"„{target_name}” jest za daleko. "
+                                f"Najpierw przejdź do sąsiedniego pokoju.",
+                       name=target_name),
+                     LOG_WARN)
+            return True   # consume click — don't add a stray mark
         if matched_ed.get("hidden"):
             return False
         if matched_ed.get("locked"):

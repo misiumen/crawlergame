@@ -261,8 +261,25 @@ def draw_minimap(surf, world, rect, layout, *,
     revealed |= set(getattr(floor, "revealed_room_ids", set()) or set())
 
     current_id = getattr(floor, "current_room_id", "")
-    marked = set((getattr(world, "player_map_marks", None) or {}).get(
-        floor.floor_id if hasattr(floor, "floor_id") else "f", []))
+    # P28.4 — "marks" used to silently appear when you clicked a
+    # non-adjacent room. That left players with random highlights they
+    # never asked for, which read as "selected" and made the minimap
+    # confusing. Marks no longer render. (Data stays in save files
+    # harmlessly; we just stop drawing them.) Instead, we highlight the
+    # rooms that left-click actually CAN walk to — the current room's
+    # adjacent unlocked + non-hidden exits — so clickable cells stand
+    # out from "you'd need to walk there first" cells.
+    cur_room = floor.rooms.get(current_id)
+    walkable_targets: Set[str] = set()
+    if cur_room is not None:
+        for _lbl, _ed in (cur_room.exits or {}).items():
+            if not isinstance(_ed, dict):
+                continue
+            if _ed.get("locked") or _ed.get("hidden"):
+                continue
+            tgt = _ed.get("target")
+            if tgt:
+                walkable_targets.add(tgt)
 
     glyph_font = _font(max(10, int(cell * 0.65)), bold=True)
 
@@ -276,8 +293,10 @@ def draw_minimap(surf, world, rect, layout, *,
         # Cell background.
         pygame.draw.rect(surf, DARK_BG, (cx + 1, cy + 1, cell - 2, cell - 2))
         glyph, color = room_marker(room, floor, is_current=(rid == current_id))
-        # Player-marked highlight.
-        if rid in marked:
+        # Border: accent for adjacent walkable cells (left-click moves
+        # here), normal for everything else. Current room keeps its
+        # default border — the @ glyph already calls it out.
+        if rid in walkable_targets:
             pygame.draw.rect(surf, ACCENT, (cx, cy, cell, cell), 2)
         else:
             pygame.draw.rect(surf, BORDER, (cx, cy, cell, cell), 1)

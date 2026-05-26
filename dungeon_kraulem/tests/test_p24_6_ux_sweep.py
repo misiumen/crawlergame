@@ -138,6 +138,11 @@ def test_minimap_click_locked_refuses():
 
 
 def test_minimap_click_nonadjacent_returns_false():
+    """P28.4 contract change: non-adjacent click is now CONSUMED with
+    a 'za daleko' refusal in the log instead of silently dropping a
+    pin. Returns True (handled) so the click_registry doesn't fall
+    through to the now-removed mark-toggle. The old behavior was
+    confusing — players read the auto-mark as 'selected, will move'."""
     from ..engine.game import Game
     w = _mk_world()
     # Add r3 not reachable from r0.
@@ -145,8 +150,10 @@ def test_minimap_click_nonadjacent_returns_false():
     w.current_floor.add_room(r3)
     g = Game(screen=None); g.world = w; g.state = "play"
     handled = g._on_minimap_room_click("r3")
-    assert handled is False, "non-adjacent should fall through to mark"
-    print("  minimap click non-adjacent → False (mark fallback): OK")
+    assert handled is True, "non-adjacent click should be consumed (refusal)"
+    txt = " ".join(s for s, _ in w.log[-3:]).lower()
+    assert "daleko" in txt or "sąsiedn" in txt or "sasiedn" in txt
+    print("  minimap click non-adjacent → True (refusal, no mark): OK")
 
 
 # ── Inventory-first use resolution ─────────────────────────────────────
