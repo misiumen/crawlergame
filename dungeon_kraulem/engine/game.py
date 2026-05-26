@@ -5607,6 +5607,26 @@ class Game:
         except Exception as exc:
             # Don't let a UI handler bug crash the game; log + swallow.
             self.log(f"(klik: {exc})", LOG_WARN)
+        # P28 (P27-UX-12): double-click on a VATS zone commits an
+        # attack. The first click selects the zone (callback above);
+        # a second click on the SAME zone within 400 ms submits
+        # `zaatakuj`. Detection is by `zone.category` prefix.
+        try:
+            import pygame as _pg
+            cat = (zone.category or "")
+            if cat.startswith("vats_zone:"):
+                now_ms = _pg.time.get_ticks()
+                last = getattr(self, "_last_vats_click", None)
+                if last and last[0] == cat and (now_ms - last[1]) < 400:
+                    self.submit_generated_command("zaatakuj")
+                    self._last_vats_click = None
+                else:
+                    self._last_vats_click = (cat, now_ms)
+            else:
+                # Click outside VATS resets the latch.
+                self._last_vats_click = None
+        except Exception:
+            pass
         # Drain side-channel intents the click may have written.
         self._drain_ui_inputs()
 

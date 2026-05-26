@@ -1668,27 +1668,122 @@ def draw_combat_arena(surf, world, cs, layout=None, *, click_registry=None):
         except AttributeError:
             pass
 
+    # P28 (P27-UX-8) — reserve a right column for the VATS silhouette
+    # of the selected target. Cards stack on the left; silhouette on
+    # the right gets ~38% of the width or 260 px, whichever is smaller.
+    # Falls back to full-width cards if no target.
+    chip_h = 76
+    bands_top = y + 42
+    bands_bottom = y + h - chip_h - 16
+    bands_h = max(120, bands_bottom - bands_top)
+    sel_ent = world.get(sel_id) if sel_id is not None else None
+    show_vats = (sel_ent is not None and sel_ent.is_alive()
+                 and (sel_ent.entity_type == "monster"
+                      or "monster" in (sel_ent.tags or [])))
+    if show_vats and w >= 700:
+        vats_w = min(280, max(220, int(w * 0.32)))
+        cards_w = w - vats_w - 28 - 16
+        cards_x = x + 14
+        vats_x = x + 14 + cards_w + 16
+        # Render the silhouette.
+        _draw_arena_vats_panel(surf, world, sel_ent, cs,
+                               vats_x, bands_top, vats_w, bands_h, L,
+                               click_registry=click_registry)
+    else:
+        cards_w = w - 28
+        cards_x = x + 14
+
     # Layout: two horizontal strips for the two bands, then player chip.
-    cy = y + 42
-    card_h = max(70, min(110, (h - 130) // 2))
+    cy = bands_top
+    card_h = max(70, min(110, (bands_h - 30) // 2))
     if ranged_ids:
-        text(surf, "DYSTANS:", x + 14, cy, ACCENT2, L.font_small - 1, True)
+        text(surf, "DYSTANS:", cards_x, cy, ACCENT2, L.font_small - 1, True)
         cy += 14
         cy = _draw_enemy_card_row(surf, world, cs, ranged_ids,
-                                  x + 14, cy, w - 28, card_h,
+                                  cards_x, cy, cards_w, card_h,
                                   L, sel_id, click_registry)
         cy += 6
     if engaged_ids:
-        text(surf, "ZWARCIE:", x + 14, cy, DANGER, L.font_small - 1, True)
+        text(surf, "ZWARCIE:", cards_x, cy, DANGER, L.font_small - 1, True)
         cy += 14
         cy = _draw_enemy_card_row(surf, world, cs, engaged_ids,
-                                  x + 14, cy, w - 28, card_h,
+                                  cards_x, cy, cards_w, card_h,
                                   L, sel_id, click_registry)
 
     # Player chip at the bottom of the arena.
-    chip_h = 76
     chip_y = y + h - chip_h - 10
     _draw_player_combat_chip(surf, world, x + 14, chip_y, w - 28, chip_h, L)
+
+
+def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
+                           *, click_registry=None):
+    """P28 (P27-UX-8, -11, -12) — large VATS silhouette in the combat
+    arena's right column. Replaces the duplicate panel that lived in
+    the right sidebar in P26a.
+
+    -8:  silhouette gets center-arena real estate (~280 px wide).
+    -11: preview metadata wraps across multiple lines instead of one
+         long ellipsized row.
+    -12: each zone hit zone is registered with a "vats_zone:<eid>:<zk>"
+         category tag so the Game's double-click detector can read
+         "click same zone twice → commit attack".
+    """
+    from ..engine import combat as _cmb
+    from ..content.data import body_plans as _bp
+    _bp.init_body_parts(target)
+    plan = _bp.plan_for_entity(target)
+
+    # Panel frame.
+    pygame.draw.rect(surf, PANEL_BG, (x, y, w, h))
+    pygame.draw.rect(surf, BORDER, (x, y, w, h), 1)
+    cy = y + 8
+
+    text(surf, "VATS — CEL", x + 10, cy, DANGER, L.font_small, True); cy += 18
+    text(surf, target.display_name(), x + 10, cy, BRIGHT_TEXT,
+         L.font_small, True); cy += 16
+    hp_bar(surf, x + 10, cy, w - 20, 10, target.hp, target.max_hp); cy += 14
+    text(surf, f"HP {target.hp}/{target.max_hp}   AC {target.ac}",
+         x + 10, cy, NORMAL_TEXT, L.font_small - 1); cy += 14
+
+    selected_zone = (cs.targeted_zone_by_eid or {}).get(target.entity_id) \
+        if cs is not None else None
+    if selected_zone is None or selected_zone not in plan:
+        selected_zone = "torso" if "torso" in plan else next(iter(plan.keys()))
+
+    # Silhouette takes the bulk of the panel.
+    sil_h = max(180, h - 140)
+    _draw_silhouette(surf, target, plan, x + 6, cy, w - 12, sil_h, L,
+                     selected_zone, cs=cs,
+                     click_registry=click_registry,
+                     category_override=f"vats_zone:{target.entity_id}")
+    cy += sil_h + 6
+
+    # Preview line — P27-UX-11 fix: wrap across multiple short lines
+    # instead of one ellipsized blob. Each piece on its own line keeps
+    # values readable in the narrow column.
+    zp = (target.body_parts or {}).get(selected_zone) or {}
+    zp_max = max(1, zp.get("max_hp", 1))
+    zp_hp = zp.get("hp", zp_max)
+    broken = zp.get("broken", False)
+    z_props = plan.get(selected_zone, {})
+    z_label = z_props.get("label_pl", selected_zone)
+    z_mod = int(z_props.get("to_hit_mod", 0))
+    z_mul = float(z_props.get("damage_mul", 1.0))
+    maim = z_props.get("maim_status")
+    maim_label = _cmb.status_label(maim, "pl") if maim else None
+    text(surf, f"Cel: {z_label}",
+         x + 10, cy, ACCENT2, L.font_small - 1, True); cy += 13
+    text(surf, f"  trafienie {z_mod:+d}   obraż. ×{z_mul:.1f}",
+         x + 10, cy, NORMAL_TEXT, L.font_small - 1); cy += 13
+    text(surf, f"  HP strefy: {zp_hp}/{zp_max}"
+               + ("  [złamana]" if broken else ""),
+         x + 10, cy, DANGER if broken else NORMAL_TEXT, L.font_small - 1); cy += 13
+    if maim_label:
+        text(surf, f"  maim: {maim_label}",
+             x + 10, cy, WARN, L.font_small - 1); cy += 13
+    # Hint about double-click to commit.
+    text(surf, "  (dwuklik = zaatakuj)",
+         x + 10, cy, DIM_TEXT, L.font_small - 2); cy += 12
 
 
 def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
@@ -1823,7 +1918,8 @@ def _draw_player_portrait_placeholder(surf, character, x, y, w, h):
 
 def _draw_silhouette(surf, target, plan, x, y, w, h, L,
                      selected_zone, *, cs=None,
-                     click_registry=None) -> None:
+                     click_registry=None,
+                     category_override: str = "vats_zone") -> None:
     """P26a — render a body silhouette with clickable body-part zones.
 
     Layout is plan-dependent. Each zone gets a colored rect (red gradient
@@ -1883,12 +1979,15 @@ def _draw_silhouette(surf, target, plan, x, y, w, h, L,
         surf.blit(img, (rx + (rw - img.get_width()) // 2,
                         ry + (rh - img.get_height()) // 2))
         # Click zone — sets cs.targeted_zone_by_eid for this target.
+        # P28 (P27-UX-12): category encodes "<base>:<zone>" so the
+        # Game's double-click detector can spot two clicks on the
+        # same zone and trigger `zaatakuj` automatically.
         if click_registry is not None and cs is not None:
             def _select(zk=zone_key, eid=target.entity_id, _cs=cs):
                 _cs.targeted_zone_by_eid[eid] = zk
             click_registry.add((rx, ry, rw, rh), _select,
                                tooltip=props.get("label_pl", zone_key),
-                               category="vats_zone")
+                               category=f"{category_override}:{zone_key}")
 
 
 def _zone_layout_rect(zones_in_plan, zone_key, x, y, w, h):
