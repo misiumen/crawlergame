@@ -426,6 +426,30 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.9
         return intent
 
+    # ── Consume: "skonsumuj X" / "zjedz X" / "wypij X" / "eat X" / "drink X" ──
+    # P27.9 (P27-UX-15) — eat/drink alias for `use X` with food semantics.
+    # The handler enforces "food" or "consumable" tag and runs heal/buff
+    # effects per item key (snack_bar, coffee, etc.).
+    #
+    # IMPORTANT: defer to `eat_corpse` (P24 corpse affordance) when the
+    # target word references a body/corpse. We don't want `zjedz ciało
+    # szczurka` to hit the snack-bar path.
+    consume_re = re.compile(
+        r"^(?:skonsumuj|zjedz|wypij|eat|drink|spożyj|spozyj)\s+(.+)$")
+    cm = consume_re.match(folded)
+    if cm:
+        tgt = _strip_articles(cm.group(1))
+        if not any(corpse_kw in tgt for corpse_kw in
+                   ("ciał", "cial", "trup", "padlin", "zwłok", "zwlok",
+                    "corpse", "body", "szczątk", "szczatk")):
+            intent.intent = "consume"
+            intent.verb = "consume"
+            intent.targets.append(tgt)
+            intent.confidence = 0.9
+            return intent
+        # Else fall through — the affordance-based eat_corpse parser
+        # will pick it up downstream.
+
     # ── Use: "użyj X na Y" / "use X on Y" ────────────────────────────────────
     use_re = re.compile(r"^(?:uzyj|użyj|use)\s+(.+?)(?:\s+(?:na|on|at|aby|do)\s+(.+))?$")
     um = use_re.match(folded)

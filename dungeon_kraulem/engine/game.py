@@ -436,6 +436,102 @@ class Game:
         ok, line = _cf.use_active(self.world)
         self.log(line, LOG_SUCCESS if ok else LOG_WARN)
 
+    # P27.9 — food + drink mechanic
+    # ─────────────────────────────────────────────────────────────────
+    # Items tagged "food" or "consumable" give HP back; specific keys
+    # add bonus effects (coffee → wake-up, snack_bar → regen, dirty_bandage
+    # → bleeding clear, etc.). The item is removed from inventory on
+    # success. Class passive `heal_mul` (medic) doubles the heal amount.
+    # Effects are intentionally small so consumables stay tactical
+    # rather than replacing safehouse sleep.
+    _CONSUMABLE_EFFECTS = {
+        "snack_bar":      {"heal": 12, "clear": []},
+        "coffee":         {"heal": 4,  "clear": ["afraid", "shaken"]},
+        "dirty_bandage":  {"heal": 18, "clear": ["bleeding"]},
+        "cracked_mug":    {"heal": 1,  "clear": []},   # tea? whatever's in it.
+        "battery":        {"heal": 0,  "buff": "next_tech_plus2"},
+    }
+
+    def _attempt_consume(self, intent):
+        """Eat/drink an inventory item. Refuses non-food. P27-UX-15."""
+        from ..systems import class_features as _cf
+        from . import combat as _cmb
+        ch = self.world.character
+        # Resolve item by name from inventory.
+        target_name = (intent.targets[0] if intent.targets else "").strip().lower()
+        if not target_name:
+            self.log(t("feedback_consume_what",
+                       fallback="Co chcesz skonsumować? Np. `zjedz batonik`."),
+                     LOG_WARN)
+            return
+        def _name_match(needle: str, hay: str) -> bool:
+            """Loose Polish-friendly match. Splits hay on whitespace and
+            checks each word against the needle as prefix/substring,
+            either direction. Handles `batonik` → `baton energetyczny`."""
+            n = needle.strip().lower()
+            if not n:
+                return False
+            h = hay.lower()
+            if n in h or h in n:
+                return True
+            for word in h.replace("-", " ").split():
+                if word.startswith(n[:4]) or n.startswith(word[:4]):
+                    return True
+            return False
+
+        chosen = None
+        for eid in list(ch.inventory_ids):
+            ent = self.world.get(eid)
+            if ent is None:
+                continue
+            nm = (ent.display_name() or ent.key or "")
+            ek = (ent.key or "")
+            if _name_match(target_name, nm) or _name_match(target_name, ek):
+                # Must be food / consumable.
+                tags = ent.tags or []
+                if "food" in tags or "consumable" in tags or ent.key in self._CONSUMABLE_EFFECTS:
+                    chosen = ent
+                    break
+        if chosen is None:
+            self.log(t("feedback_consume_none",
+                       fallback="Nie masz nic jadalnego pasującego."),
+                     LOG_WARN)
+            return
+        spec = self._CONSUMABLE_EFFECTS.get(chosen.key, {"heal": 5})
+        heal = int(spec.get("heal", 0))
+        if heal > 0:
+            heal = int(round(heal * _cf.heal_multiplier(ch)))
+            pre = ch.hp
+            ch.heal(heal)
+            self.log(t("feedback_consume_heal",
+                       fallback=f"Konsumujesz „{chosen.display_name()}”. "
+                                f"+{ch.hp - pre} HP ({ch.hp}/{ch.max_hp}).",
+                       name=chosen.display_name(),
+                       gained=ch.hp - pre, hp=ch.hp, max=ch.max_hp),
+                     LOG_SUCCESS)
+        else:
+            self.log(f"Konsumujesz „{chosen.display_name()}”.", LOG_NORMAL)
+        # Clear listed statuses.
+        for cond in spec.get("clear", []):
+            if cond in ch.conditions:
+                ch.conditions.remove(cond)
+                self.log(f"  Stan „{cond}” mija.", LOG_SUCCESS)
+        # Buff flag (rare).
+        buff = spec.get("buff")
+        if buff:
+            ch.flags[buff] = True
+        # Remove item.
+        try:
+            ch.inventory_ids.remove(chosen.entity_id)
+        except ValueError:
+            pass
+        # Sponsor tag: consumption events feed memetics.
+        try:
+            from . import sponsors as _sp
+            _sp.note_player_tag(self.world, "consume")
+        except Exception:
+            pass
+
     def _attempt_rest_short(self):
         """P27.6 — short rest (D&D-style). Restores ~25% max HP,
         costs 20 in-game minutes. Refused if: enemies in room, encounter
@@ -1567,6 +1663,10 @@ class Game:
         # P27.7 — class active ability.
         if intent.intent == "class_active":
             self._attempt_class_active(); return
+
+        # P27.9 — consume food/drink (eat/drink/skonsumuj X).
+        if intent.intent == "consume":
+            self._attempt_consume(intent); return
 
         # Gap 4: deploy a crafted/portable trap or device
         if intent.intent == "deploy":
