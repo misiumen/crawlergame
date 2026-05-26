@@ -48,6 +48,25 @@ _CARDINAL_DELTAS: Dict[str, Tuple[int, int]] = {
 }
 
 
+# P28.6 — Z-axis support. Up/down exit labels push the target room onto
+# a different vertical layer of the minimap. Player switches layers
+# with PageUp / PageDown so a 3D dungeon (vents, stairwells, shafts)
+# isn't squashed into one confusing 2D plane.
+_VERTICAL_DELTAS: Dict[str, int] = {
+    # Polish
+    "góra":   +1, "gora":   +1, "w górę":   +1, "w gore":   +1,
+    "dół":    -1, "dol":    -1, "w dół":    -1, "w dol":    -1,
+    "sufit":  +1, "kratka": +1, "szyb":     +1, "winda":    +1,
+    "podłoga": -1, "podloga": -1, "schody w dół": -1, "schody w dol": -1,
+    "schody w górę": +1, "schody w gore": +1,
+    # English
+    "up":      +1, "down":     -1,
+    "ceiling": +1, "floor_hole": -1,
+    "stairs up": +1, "stairs down": -1,
+    "elevator": +1, "vent": +1,
+}
+
+
 def _is_cardinal(label: str) -> bool:
     if not label:
         return False
@@ -55,63 +74,102 @@ def _is_cardinal(label: str) -> bool:
     return key in _CARDINAL_DELTAS
 
 
-def grid_positions(floor) -> Dict[str, Tuple[int, int]]:
-    """BFS the floor's exit graph from start_room_id, deriving an
-    integer (col, row) position per discovered/known room. Non-cardinal
-    exits are queued but placed at the next free slot adjacent to their
-    source (so the room exists on the map even when geometry is
-    non-Euclidean — DCC stairwells, vents, anomalies).
+def _vertical_delta(label: str) -> int:
+    if not label:
+        return 0
+    return _VERTICAL_DELTAS.get(label.strip().lower(), 0)
 
-    Rooms not reachable from start_room_id by ANY exit chain (rare,
-    procgen edge case) get auto-placed at (huge_offset, n) so the map
-    still renders something.
+
+def grid_positions(floor) -> Dict[str, Tuple[int, int]]:
+    """Back-compat 2D positions: drops the Z component from
+    grid_positions_3d. Callers that don't care about layers (legacy
+    tests, simple layouts) keep working unchanged."""
+    return {rid: (c, r) for rid, (c, r, _z) in grid_positions_3d(floor).items()}
+
+
+def grid_positions_3d(floor) -> Dict[str, Tuple[int, int, int]]:
+    """P28.6 — Z-aware BFS. Returns (col, row, z) per room. Up/down
+    exit labels (góra/dół/szyb/winda/sufit/kratka/...) push the target
+    onto a different Z layer instead of squashing it into the same
+    2D plane. Cardinal NESW exits keep the same Z. Non-cardinal,
+    non-vertical exits stay 2D-adjacent on the source's layer (the
+    "place at next free slot" path from before).
+
+    Z=0 is the layer containing start_room_id.
     """
     if floor is None or not getattr(floor, "rooms", None):
         return {}
     start = floor.start_room_id or floor.current_room_id
     if not start or start not in floor.rooms:
-        # Fallback: arbitrary first room.
         start = next(iter(floor.rooms.keys()))
 
-    placed: Dict[str, Tuple[int, int]] = {start: (0, 0)}
-    occupied: Set[Tuple[int, int]] = {(0, 0)}
+    placed: Dict[str, Tuple[int, int, int]] = {start: (0, 0, 0)}
+    # Per-layer occupancy set so we only reject overlaps within the
+    # same Z.
+    occupied_by_z: Dict[int, Set[Tuple[int, int]]] = {0: {(0, 0)}}
     queue = [start]
-    visited_for_bfs: Set[str] = {start}
     while queue:
         rid = queue.pop(0)
         r = floor.rooms.get(rid)
         if r is None:
             continue
-        col, row = placed[rid]
+        col, row, z = placed[rid]
         for label, ed in (r.exits or {}).items():
             tgt = ed.get("target", "")
             if not tgt or tgt not in floor.rooms:
                 continue
             if tgt in placed:
                 continue
-            if _is_cardinal(label):
+            vz = _vertical_delta(label)
+            if vz != 0:
+                # Vertical hop: same (col, row) on a new Z layer.
+                new_z = z + vz
+                desired = (col, row)
+                occ = occupied_by_z.setdefault(new_z, set())
+                if desired in occ:
+                    desired = _next_free_near(desired, occ)
+                placed[tgt] = (desired[0], desired[1], new_z)
+                occ.add(desired)
+            elif _is_cardinal(label):
                 dx, dy = _CARDINAL_DELTAS[label.strip().lower()]
                 desired = (col + dx, row + dy)
-                if desired in occupied:
-                    desired = _next_free_near(desired, occupied)
+                occ = occupied_by_z.setdefault(z, set())
+                if desired in occ:
+                    desired = _next_free_near(desired, occ)
+                placed[tgt] = (desired[0], desired[1], z)
+                occ.add(desired)
             else:
-                # Non-cardinal hop: place adjacent in a free slot,
-                # prefer east, then south, west, north.
-                desired = _next_free_near((col, row), occupied)
-            placed[tgt] = desired
-            occupied.add(desired)
-            visited_for_bfs.add(tgt)
+                # Non-cardinal, non-vertical: 2D-adjacent fallback.
+                occ = occupied_by_z.setdefault(z, set())
+                desired = _next_free_near((col, row), occ)
+                placed[tgt] = (desired[0], desired[1], z)
+                occ.add(desired)
             queue.append(tgt)
 
-    # Place any unreachable rooms in a fallback strip below the main map.
+    # Stranded rooms (no exit chain from start) get parked below.
     leftover = [rid for rid in floor.rooms.keys() if rid not in placed]
     if leftover:
-        # Find bottom row of the placed graph.
         max_row = max((p[1] for p in placed.values()), default=0)
         for i, rid in enumerate(leftover):
-            placed[rid] = (i, max_row + 2)
+            placed[rid] = (i, max_row + 2, 0)
 
     return placed
+
+
+def player_z_layer(floor) -> int:
+    """Z coordinate of the room the player is currently in. Used by
+    the minimap to default-view that layer when first opened."""
+    if floor is None:
+        return 0
+    positions = grid_positions_3d(floor)
+    cur = positions.get(getattr(floor, "current_room_id", ""))
+    return cur[2] if cur else 0
+
+
+def available_z_layers(floor) -> list:
+    """Sorted list of unique Z layers present on this floor."""
+    positions = grid_positions_3d(floor)
+    return sorted({z for (_c, _r, z) in positions.values()})
 
 
 def _next_free_near(origin: Tuple[int, int],
@@ -216,12 +274,36 @@ def draw_minimap(surf, world, rect, layout, *,
     if floor is None:
         return
 
-    # Header.
+    # P28.6 — Z-aware: gather 3D positions, filter to the layer the
+    # player is currently viewing. View layer defaults to the player's
+    # own Z, can be cycled with PageUp/PageDown (Game keystroke ↦
+    # `world.minimap_z_view`).
+    positions_3d = grid_positions_3d(floor)
+    if not positions_3d:
+        return
+    z_layers = sorted({z for (_c, _r, z) in positions_3d.values()})
+    player_z = player_z_layer(floor)
+    viewed_z = int(getattr(world, "minimap_z_view", player_z))
+    if viewed_z not in z_layers:
+        viewed_z = player_z
+    # Header with layer indicator.
     header_font = _font(max(11, int(layout.font_small) - 1), bold=True)
-    himg = header_font.render("MAPA", True, ACCENT)
+    n_layers = len(z_layers)
+    if n_layers > 1:
+        layer_idx = z_layers.index(viewed_z) + 1
+        header_txt = f"MAPA · warstwa {layer_idx}/{n_layers}"
+        # Hint that player is viewing a different layer than where they
+        # actually stand — red asterisk-ish marker.
+        if viewed_z != player_z:
+            header_txt += "  (* nie tutaj)"
+    else:
+        header_txt = "MAPA"
+    himg = header_font.render(header_txt, True, ACCENT)
     surf.blit(himg, (x + 8, y + 4))
 
-    positions = grid_positions(floor)
+    # Restrict positions to the viewed layer.
+    positions = {rid: (c, r) for rid, (c, r, z) in positions_3d.items()
+                 if z == viewed_z}
     if not positions:
         return
 

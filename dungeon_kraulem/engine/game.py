@@ -1064,6 +1064,13 @@ class Game:
         # Prompt 18: any submitted text disarms the nav-selection latch
         # so a subsequent stray Enter can't fire the panel option.
         self._nav_selection_armed = False
+        # P28.6: snapshot the room id BEFORE running the command so we
+        # can detect movement and reset stale nav focus afterwards.
+        # Without this, a subject focused in the OLD room (e.g. exit
+        # label "relay" or NPC "Żelazny Kuba" in Lounge) carried over
+        # to the new room and the player kept clicking refusals.
+        pre_room_id = (self.world.current_floor.current_room_id
+                       if self.world and self.world.current_floor else None)
         if not text_val: return
         if self.state == STATE_PLAY:
             # Record to lightweight command history for Up/Down recall.
@@ -1090,6 +1097,29 @@ class Game:
                     and not _norm.isdigit()):
                 self.world.last_player_command = text_val
             self._handle_play_input(text_val)
+            # P28.6 — after every play command, if the player's room
+            # changed, reset all nav focus + pre-resolved target. This
+            # kills the "spam stale exit option after a move" bug.
+            # Also clears stale focus tracking the no-longer-visible
+            # subject (which used to leak as "Nie ma takiego wyjścia"
+            # spam in the log).
+            post_room_id = (self.world.current_floor.current_room_id
+                            if self.world and self.world.current_floor else None)
+            if pre_room_id != post_room_id and self.nav_state is not None:
+                try:
+                    for grp in list(self.nav_state.focused_subject_by_group.keys()):
+                        self.nav_state.clear_focus(grp)
+                except Exception:
+                    pass
+                self._preresolved_target_id = None
+                # P28.6 — re-sync minimap layer view to the player's
+                # new Z (used stairs / vent → minimap auto-follows).
+                try:
+                    from ..ui import minimap as _mm
+                    self.world.minimap_z_view = _mm.player_z_layer(
+                        self.world.current_floor)
+                except Exception:
+                    pass
         elif self.state == STATE_CREATE:
             self._handle_create_input(text_val)
 
@@ -2190,6 +2220,15 @@ class Game:
         # Pick a salvage table based on target tags
         table_key = _pick_salvage_table_key(target)
         if table_key is None:
+            # P28.6: stamp `no_salvage` so the action bar stops offering
+            # `Zdemontuj` on this entity next frame. Same pattern as the
+            # `stripped` flag — UI builder reads it and filters the
+            # affordance out, ending the spam loop where the player
+            # repeatedly clicked Zdemontuj on a terminal that never
+            # had a salvage table.
+            if target.state is None:
+                target.state = {}
+            target.state["no_salvage"] = True
             self.log(t("feedback_no_salvage",
                        fallback=f"„{target.display_name()}” nie ma z czego ciągnąć surowców."),
                      LOG_WARN)
@@ -5062,6 +5101,36 @@ class Game:
             self.log_scroll = max(0, self.log_scroll - 6)
             self._suppress_textinput = True
             return
+
+        # P28.6 — minimap layer switching with [ / ]. Cycles through
+        # available Z layers on the current floor (góra/dół exits create
+        # multiple layers). The viewed layer lives on `world.minimap_z_view`;
+        # `*` in the header marks "you are not on this layer". Only fires
+        # when the input field is empty so it doesn't intercept brackets
+        # the player might type.
+        if (key in (pygame.K_LEFTBRACKET, pygame.K_RIGHTBRACKET)
+                and not self.journal_state.open
+                and not self.input_text.strip()):
+            try:
+                from ..ui import minimap as _mm
+                floor = self.world.current_floor if self.world else None
+                if floor is not None:
+                    layers = _mm.available_z_layers(floor)
+                    if len(layers) > 1:
+                        cur = int(getattr(self.world, "minimap_z_view",
+                                          _mm.player_z_layer(floor)))
+                        if cur not in layers:
+                            cur = _mm.player_z_layer(floor)
+                        idx = layers.index(cur)
+                        if key == pygame.K_RIGHTBRACKET:
+                            idx = (idx + 1) % len(layers)
+                        else:
+                            idx = (idx - 1) % len(layers)
+                        self.world.minimap_z_view = layers[idx]
+                        self._suppress_textinput = True
+                        return
+            except Exception:
+                pass
 
         # Global hotkeys that work in either mode — Ctrl+S save, F1/? help.
         if ctrl_held and key == pygame.K_s:

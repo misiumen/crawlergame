@@ -468,7 +468,7 @@ ROOM_POOL = [
             "env":  ["broken_monitor", "loose_shelf"],
             "item": ["improvised_lockpick"],
         },
-        "exit_hints": ["szyb", "relay"],
+        "exit_hints": ["szyb", "przekaźnik"],
         "guaranteed_min_exits": 1,
         "guaranteed_max_exits": 2,
         "weight": 4,

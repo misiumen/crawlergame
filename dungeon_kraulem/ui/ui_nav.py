@@ -312,68 +312,50 @@ def _auto_focus_if_single(state_focus: Optional[str],
 
 def _exit_options(world, room, *,
                   focused: Optional[str] = None) -> List[SelectableOption]:
-    """Two-tier (P24.7):
-      * Picker: one row per visible exit.
-      * Verbs (focused): Idź / Sprawdź drzwi / Wyłam (if locked) /
-        Zablokuj (if not locked) + ← Powrót.
+    """P28.6 — collapsed to ONE-TIER. The two-tier subject→verb dance
+    was annoying for exits: every player wants to GO, not Sprawdź /
+    Wyłam (the latter only ever applies to locked doors). Each exit
+    now becomes a single clickable row that directly issues
+    `idź <label>` (unlocked) or `wyłam <label>` (locked). Label
+    includes the destination name so the player sees where they're
+    going without a second click. Hidden exits stay hidden.
     """
     floor = world.current_floor
     visible = [(label, ed) for label, ed in (room.exits or {}).items()
                if not ed.get("hidden")]
     if not visible:
         return []
-    subject_ids = [label for label, _ed in visible]
-    focused = _auto_focus_if_single(focused, subject_ids)
-
-    if focused is None:
-        # PICKER — one row per exit.
-        out: List[SelectableOption] = []
-        for label, ed in visible:
-            target_id = ed.get("target", "")
-            target_room = floor.rooms.get(target_id) if floor else None
-            target_name = (target_room.display_short_title()
-                           if target_room and target_id in (floor.discovered_room_ids or set())
-                           else "?")
-            locked = " (zamkn.)" if ed.get("locked") else ""
+    out: List[SelectableOption] = []
+    for label, ed in visible:
+        target_id = ed.get("target", "")
+        target_room = floor.rooms.get(target_id) if floor else None
+        discovered = (floor.discovered_room_ids
+                      if floor and hasattr(floor, "discovered_room_ids")
+                      else set()) or set()
+        target_name = (target_room.display_short_title()
+                       if target_room and target_id in discovered
+                       else "?")
+        locked = bool(ed.get("locked"))
+        if locked:
             out.append(SelectableOption(
-                option_id=f"exit_pick_{target_id or label}",
-                label=f"{label}{locked}  →  {target_name}",
-                command="",
+                option_id=f"exit_force_{target_id or label}",
+                label=f"Wyłam: {label}  →  {target_name}  🔒",
+                command=f"wyłam {label}",
                 group=GROUP_EXITS,
-                option_kind="subject",
+                option_kind="plain",
                 subject_id=label,
-                target_id=None,
-                action_type="exit_pick",
+                action_type="force",
             ))
-        return out
-
-    # VERBS for the focused exit.
-    ed = dict((room.exits or {}).get(focused, {}))
-    out = [_back_option(GROUP_EXITS)]
-    locked = bool(ed.get("locked"))
-    if not locked:
-        out.append(SelectableOption(
-            option_id=f"exit_go_{focused}",
-            label=f"Idź: {focused}",
-            command=f"idź {focused}",
-            group=GROUP_EXITS, option_kind="verb", subject_id=focused,
-            action_type="move",
-        ))
-    out.append(SelectableOption(
-        option_id=f"exit_inspect_{focused}",
-        label=f"Sprawdź: {focused}",
-        command=f"sprawdź drzwi",
-        group=GROUP_EXITS, option_kind="verb", subject_id=focused,
-        action_type="inspect",
-    ))
-    if locked:
-        out.append(SelectableOption(
-            option_id=f"exit_force_{focused}",
-            label=f"Wyłam: {focused}",
-            command=f"wyłam drzwi",
-            group=GROUP_EXITS, option_kind="verb", subject_id=focused,
-            action_type="force",
-        ))
+        else:
+            out.append(SelectableOption(
+                option_id=f"exit_go_{target_id or label}",
+                label=f"Idź: {label}  →  {target_name}",
+                command=f"idź {label}",
+                group=GROUP_EXITS,
+                option_kind="plain",
+                subject_id=label,
+                action_type="move",
+            ))
     return out
 
 
@@ -565,9 +547,14 @@ def _flat_object_verbs(world, room) -> List[SelectableOption]:
                 group=GROUP_OBJECTS, target_id=e.entity_id,
                 action_type="loot",
             ))
-        # Salvage if tagged or affordance lists it AND not already stripped.
+        # Salvage if tagged or affordance lists it AND not already
+        # stripped AND not flagged no_salvage. P28.6: `no_salvage` is
+        # stamped the first time the player tries to salvage an entity
+        # with no salvage table — stops the bar offering Zdemontuj on
+        # objects that will never yield surowce (e.g. a `zepsuty
+        # terminal` lacking a SALVAGE_TABLES entry).
         if ("salvageable" in tags or "salvage" in affs) and \
-           not state.get("stripped"):
+           not state.get("stripped") and not state.get("no_salvage"):
             out.append(SelectableOption(
                 option_id=f"salvage_{e.entity_id}",
                 label=f"Zdemontuj: {name}",

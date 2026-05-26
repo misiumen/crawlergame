@@ -182,36 +182,42 @@ def test_entity_picker_lists_npcs():
 # ── Exit picker → verbs ───────────────────────────────────────────────
 
 def test_exit_picker_lists_exits():
+    """P28.6 — exits are now ONE-TIER. Each visible exit becomes a
+    direct `plain` option that issues `idź <label>` or `wyłam <label>`
+    immediately. No subject/verb dance."""
     w = _mk_world()
     state = build_play_options(w)
     opts = state.options_in(GROUP_EXITS)
-    # Two visible exits (one locked); both appear as picker subjects.
-    assert all(o.option_kind == "subject" for o in opts), \
+    assert all(o.option_kind == "plain" for o in opts), \
         f"got {[o.option_kind for o in opts]}"
-    print(f"  exit picker rows: {[o.label for o in opts]}: OK")
+    # One unlocked + one locked → one Idź, one Wyłam.
+    assert any(l.startswith("Idź:") for l in [o.label for o in opts]), opts
+    assert any(l.startswith("Wyłam:") for l in [o.label for o in opts]), opts
+    print(f"  exit one-tier rows: {[o.label for o in opts]}: OK")
 
 
-def test_exit_focus_unlocked_offers_move():
+def test_exit_unlocked_issues_move_directly():
+    """One click on unlocked exit submits `idź <label>` — no focus step."""
     w = _mk_world()
     state = build_play_options(w)
-    state.set_focused_subject(GROUP_EXITS, "wschód")
-    state2 = build_play_options(w, prev_state=state)
-    labels = [o.label for o in state2.options_in(GROUP_EXITS)]
-    assert any("Idź: wschód" in l for l in labels), labels
-    assert any("Powrót" in l for l in labels)
-    print(f"  exit unlocked focus: {labels}: OK")
+    for o in state.options_in(GROUP_EXITS):
+        if o.label.startswith("Idź:"):
+            assert o.command.startswith("idź "), o.command
+            print(f"  exit unlocked one-click: command={o.command!r}: OK")
+            return
+    raise AssertionError("no Idź option found")
 
 
-def test_exit_focus_locked_no_move_but_offers_force():
+def test_exit_locked_issues_force_directly():
+    """One click on locked exit submits `wyłam <label>`."""
     w = _mk_world()
     state = build_play_options(w)
-    state.set_focused_subject(GROUP_EXITS, "zachód")
-    state2 = build_play_options(w, prev_state=state)
-    labels = [o.label for o in state2.options_in(GROUP_EXITS)]
-    assert not any(l.startswith("Idź:") for l in labels), \
-        f"locked exit must not offer Idź: {labels}"
-    assert any("Wyłam" in l for l in labels), labels
-    print(f"  exit locked focus: {labels}: OK")
+    for o in state.options_in(GROUP_EXITS):
+        if o.label.startswith("Wyłam:"):
+            assert o.command.startswith("wyłam "), o.command
+            print(f"  exit locked one-click: command={o.command!r}: OK")
+            return
+    raise AssertionError("no Wyłam option found")
 
 
 # ── Flat tabs stay flat ───────────────────────────────────────────────
@@ -354,8 +360,8 @@ def main():
     test_object_picker_then_focus()
     test_entity_picker_lists_npcs()
     test_exit_picker_lists_exits()
-    test_exit_focus_unlocked_offers_move()
-    test_exit_focus_locked_no_move_but_offers_force()
+    test_exit_unlocked_issues_move_directly()
+    test_exit_locked_issues_force_directly()
     test_actions_tab_is_flat()
     test_crafting_tab_is_flat()
     test_commit_subject_focuses_not_runs()

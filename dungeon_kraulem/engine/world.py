@@ -75,6 +75,24 @@ class WorldState:
     # ── Logging helpers ──────────────────────────────────────────────────────
 
     def log_msg(self, text: str, category: str = "normal"):
+        # P28.6: dedupe consecutive identical entries. When the same
+        # message + category would land twice in a row, replace the
+        # last entry with a counted form ("Foo (×2)", "Foo (×3)", …).
+        # Stops the log filling with 20 copies of "Gdzieś brzęczy
+        # alarm." when the player spams a failing action. Player input
+        # echo lines (those starting with "> ") are never deduped —
+        # the player wants to see their own keystrokes individually.
+        import re as _re
+        if (self.log and not text.startswith("> ")):
+            last_text, last_cat = self.log[-1]
+            base_last = _re.sub(r"\s+\(×\d+\)$", "", last_text)
+            if last_cat == category and base_last == text:
+                m = _re.search(r"\(×(\d+)\)$", last_text)
+                count = (int(m.group(1)) + 1) if m else 2
+                self.log[-1] = (f"{text} (×{count})", category)
+                if len(self.log) > 800:
+                    self.log = self.log[-600:]
+                return
         self.log.append((text, category))
         if len(self.log) > 800:
             self.log = self.log[-600:]
