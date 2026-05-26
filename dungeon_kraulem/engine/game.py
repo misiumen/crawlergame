@@ -3201,6 +3201,15 @@ class Game:
                 self.log(f"{name} atakuje, ale nie robi krzywdy.", LOG_NORMAL)
                 return
             ch.take_damage(dmg)
+            # P34-SFX-1 (P27.5): player_hit hook (always); player_crit
+            # variant when ≥50% max HP in one blow.
+            try:
+                if dmg >= max(1, ch.max_hp // 2):
+                    audio.play_sfx("player_crit_hit")
+                else:
+                    audio.play_sfx("player_hit")
+            except Exception:
+                pass
             self.log(f"{name} trafia cię na {dmg} HP "
                      f"(zostało {ch.hp}/{ch.max_hp}).", LOG_DANGER)
             # Heavy hits cause bleeding sometimes.
@@ -3389,6 +3398,11 @@ class Game:
                                name=target.display_name(),
                                zone=zone_label_pl),
                              LOG_DANGER)
+                    # P34-SFX-1 (P27.5): limb_broken hook.
+                    try:
+                        audio.play_sfx("limb_broken")
+                    except Exception:
+                        pass
             # Decrement coating on a landed hit.
             if coating and coating.get("hits_remaining", 0) > 0:
                 coating["hits_remaining"] -= 1
@@ -4827,6 +4841,20 @@ class Game:
             # arrow keys arm here. Nav mode (input_mode == "nav") keeps
             # WASD as nav shortcuts; that path is untouched.
             if key == pygame.K_UP:
+                # P27.5 (P27-UX-25): PowerShell-style command history
+                # WINS over nav-cursor arming when history is non-empty.
+                # Gracz spodziewa się że UP w pustym polu pokaże
+                # poprzednią komendę (jak w bash/powershell). Fallback
+                # do nav arming gdy historia pusta.
+                if self.cmd_history:
+                    if self.cmd_history_idx == -1:
+                        self.cmd_history_idx = len(self.cmd_history) - 1
+                    else:
+                        self.cmd_history_idx = max(0,
+                                                    self.cmd_history_idx - 1)
+                    self.input_text = self.cmd_history[self.cmd_history_idx]
+                    self._suppress_textinput = True
+                    return
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.move_selection(self.nav_state, -1)
@@ -4834,6 +4862,17 @@ class Game:
                     self._suppress_textinput = True
                     return
             if key == pygame.K_DOWN:
+                # P27.5 (P27-UX-25): same PowerShell-style — DOWN walks
+                # forward in history if we're browsing it. Else nav arm.
+                if self.cmd_history_idx >= 0:
+                    self.cmd_history_idx += 1
+                    if self.cmd_history_idx >= len(self.cmd_history):
+                        self.cmd_history_idx = -1
+                        self.input_text = ""
+                    else:
+                        self.input_text = self.cmd_history[self.cmd_history_idx]
+                    self._suppress_textinput = True
+                    return
                 self._ensure_nav_state()
                 if self.nav_state.groups:
                     ui_nav.move_selection(self.nav_state, +1)

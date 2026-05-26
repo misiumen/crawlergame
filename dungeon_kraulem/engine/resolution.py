@@ -86,8 +86,10 @@ def resolve(validation_result, world) -> ResolutionResult:
             # Pull template effects in alongside the affordance-driven ones
             for eff in (outcome.get("effects") or []):
                 result.effects.append(dict(eff))
-            # For audit / debugging
-            result.fallback_description += f"\n  [template={outcome.get('key','?')}]"
+            # P27.5 (P27-UX-19): removed the leaked [template=X] debug
+            # tag from player-facing log. The internal key is still
+            # available on `outcome["key"]` for tests/analytics; we just
+            # don't append it to the displayed description anymore.
 
     # Affordance-driven effects (combat damage, hack-state change, etc.)
     result.effects.extend(_effects_for_level(level, aff_key, validation_result, world))

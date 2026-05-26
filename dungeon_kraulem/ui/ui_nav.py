@@ -425,6 +425,14 @@ def _two_tier_route(flat_options: List[SelectableOption],
             by_subject[sid] = []
         by_subject[sid].append(opt)
 
+    # P27.5 (P27-UX-22/26): if focused subject no longer exists in the
+    # current subject list (left inventory, moved to another room,
+    # exit doesn't exist in new room), auto-clear it back to picker
+    # mode. Otherwise the verb-list block is empty and the player sees
+    # just "← Powrót" — dead end.
+    if focused is not None and focused not in by_subject:
+        focused = None
+
     focused = _auto_focus_if_single(focused, subjects)
 
     if focused is None:

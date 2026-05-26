@@ -67,6 +67,12 @@ _STATUS_PL = {
     STATUS_CHILLED:      "wyziębiony",
     STATUS_DISARMED:     "rozbrojony",
     STATUS_SLOWED:       "okulały",
+    # P27.5 (P27-UX-10): "shaken" was emitted by intimidate but never
+    # had a PL label — leaked as raw English in the enemy panel.
+    "shaken":            "roztrzęsiony",
+    "hesitating":        "niezdecydowany",
+    "sick":              "chory",
+    "encumbered":        "obciążony",
 }
 
 

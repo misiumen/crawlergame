@@ -304,9 +304,14 @@ ROOM_POOL = [
         "actual_type": "loot",
         "tags": ["loot", "search_rewarded"],
         "name_pool": ["Zaplecze Kafejki", "Magazyn 2", "Sekcja Konserwacji"],
+        # P27.5: zmiana flavor — poprzedni „KONTAKT — NIE OTWIERAĆ"
+        # sugerował że pokój jest zamknięty (a w data nie był), co
+        # spowodowało dezorientację playtestera. Nowy tekst opisuje
+        # pomieszczenie jako standardowy magazyn — gracz nie ma
+        # narratywnego oczekiwania że jest zamknięte.
         "first_enter_pool": [
-            "Klimatyzacja wyje. Na regałach stoją kartony z napisem 'KONTAKT — NIE OTWIERAĆ'. "
-            "Ktoś otworzył.",
+            "Magazyn pełen zakurzonych pudeł. Etykiety wyblakłe. "
+            "Klimatyzacja brzęczy nierównomiernie.",
         ],
         "look_pool": [
             "Półki pełne syropów, mleka w proszku i czegoś, co ma datę ważności sprzed dwóch lat.",

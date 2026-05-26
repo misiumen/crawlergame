@@ -453,7 +453,15 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None):
         cy += 6
         text(surf, t("ui_exits", fallback="Wyjścia:"), x + 14, cy, ACCENT,
              L.font_small, True); cy += 18
-        for label, ed in room.exits.items():
+        # P27.5 (P27-UX-21): filter hidden + skip per-exit hint text
+        # when stack is getting tight, so the list doesn't truncate
+        # mid-room (Lounge had 6 exits, last one fell off-screen).
+        visible_exits = [(lbl, ed) for lbl, ed in room.exits.items()
+                         if not ed.get("hidden")]
+        # Compact mode: if more than 5 exits, skip the per-exit hint
+        # lines (which double the height).
+        compact = len(visible_exits) > 5
+        for label, ed in visible_exits:
             target_id = ed.get("target","")
             target = f.rooms.get(target_id)
             target_name = target.display_short_title() if target else "?"
@@ -461,9 +469,9 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None):
             hint = ed.get("fallback_hint") or t(ed.get("hint_key",""), fallback="")
             line = f"  → {label}  ({target_name}) {lock}"
             text(surf, line, x + 16, cy, NORMAL_TEXT, L.font_small); cy += 16
-            if hint:
+            if hint and not compact:
                 text(surf, f"      {hint}", x + 16, cy, DIM_TEXT, L.font_small - 1); cy += 14
-            if cy > y + h - 30: break
+            if cy > y + h - 18: break
 
 
 def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
@@ -754,7 +762,10 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
     text(surf, header_label,
          lx + 10, ly + 4, ACCENT, L.font_small, True)
     f = font(L.font_small)
-    line_h = f.get_height() + 2
+    # P27.5 (P27-UX-9): bumped line spacing 2→5 to eliminate residual
+    # vertical overlap visible when consecutive entries with descender
+    # glyphs (ę, ą, ł) render close together. Cheap fix.
+    line_h = f.get_height() + 5
     max_w = lw - 24
 
     # Prompt 22 bug fix: previously the log render picked the LAST N

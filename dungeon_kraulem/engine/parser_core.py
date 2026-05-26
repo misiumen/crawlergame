@@ -432,6 +432,14 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.tool = _strip_articles(um.group(1))
         if um.group(2):
             intent.targets.append(_strip_articles(um.group(2)))
+        else:
+            # P27.5 (P27-UX-14): `użyj X` single-arg form. Without
+            # this, validator gets empty targets and the inventory-
+            # first resolution (P24.6) never fires — the player sees
+            # "Nie widzisz tu tego" even with the item in their pocket.
+            # Copy `tool` into `targets[0]` so the standard resolver
+            # finds it.
+            intent.targets.append(intent.tool)
         intent.confidence = 0.85
         return intent
 
