@@ -936,7 +936,9 @@ class Game:
         if st is None:
             self.state = STATE_TITLE
             return
-        n_rows = 5
+        # P27 — LLM row removed from UI; 4 rows now: resolution, mode,
+        # apply, back.
+        n_rows = 4
         if key in (pygame.K_UP, pygame.K_w):
             st["row"] = (st["row"] - 1) % n_rows
             self._suppress_textinput = True; return
@@ -948,26 +950,20 @@ class Game:
                 st["res_idx"] = (st["res_idx"] - 1) % len(SUPPORTED_RESOLUTIONS)
             elif st["row"] == 1:
                 st["fullscreen"] = not st["fullscreen"]
-            elif st["row"] == 2:
-                st["llm_idx"] = (st["llm_idx"] - 1) % len(_settings.LLM_MODES)
             self._suppress_textinput = True; return
         if key in (pygame.K_RIGHT, pygame.K_d):
             if st["row"] == 0:
                 st["res_idx"] = (st["res_idx"] + 1) % len(SUPPORTED_RESOLUTIONS)
             elif st["row"] == 1:
                 st["fullscreen"] = not st["fullscreen"]
-            elif st["row"] == 2:
-                st["llm_idx"] = (st["llm_idx"] + 1) % len(_settings.LLM_MODES)
             self._suppress_textinput = True; return
         if key == pygame.K_RETURN:
             row = st["row"]
-            if row in (0, 1, 2, 3):
-                # Apply current selection.
+            if row in (0, 1, 2):
+                # Apply current selection (resolution + fullscreen).
                 w, h = SUPPORTED_RESOLUTIONS[st["res_idx"]]
                 self.set_resolution(w, h, fullscreen=st["fullscreen"])
-                # Persist + activate the LLM mode.
-                _settings.set_llm_mode(_settings.LLM_MODES[st["llm_idx"]])
-            elif row == 4:
+            elif row == 3:
                 self.state = st.get("prev_state", STATE_TITLE)
             self._suppress_textinput = True; return
         if key == pygame.K_ESCAPE or key == pygame.K_F2:
@@ -1563,11 +1559,10 @@ class Game:
 
         # Hooks: class offer trigger
         self._maybe_offer_class()
-        # Hooks: detect victory (reached exit)
+        # Hooks: floor descent (P27) or final victory.
         if self.world.current_floor and self.world.current_floor.current_room_id in self.world.current_floor.exit_room_ids:
-            # Need an unlock condition met
             if self.world.current_floor.exits_unlocked:
-                self.state = STATE_VICTORY
+                self._descend_or_win()
             else:
                 self.log(t("log_at_exit_locked",
                            fallback="Stoisz przed drzwiami wyjścia. Nadal zamknięte."),
@@ -1576,6 +1571,66 @@ class Game:
         # Health check
         if not self.world.character.is_alive():
             self.state = STATE_DEFEAT
+
+    # ── P27 — floor descent ────────────────────────────────────────────
+
+    # Final floor — descending past this triggers true victory.
+    MAX_FLOORS = 18
+
+    def _descend_or_win(self) -> None:
+        """At the unlocked floor exit. If there's a deeper floor, build
+        + transition. Else mark final victory.
+
+        DCC-faithful note: each floor's sponsor rotates, deadline
+        resets, audience bonus on descent (you survived the floor),
+        and pet/companion state carries over.
+        """
+        f = self.world.current_floor
+        if f is None:
+            return
+        cur_num = int(f.floor_number or 1)
+        if cur_num >= self.MAX_FLOORS:
+            # Final floor cleared — true victory.
+            self.state = STATE_VICTORY
+            return
+        next_num = cur_num + 1
+        self.log(t("log_descend_intro",
+                   fallback=f"Schodzisz na piętro {next_num}. Drzwi "
+                            f"się zamykają za tobą. Loch nie pamięta "
+                            f"twojej twarzy.",
+                   floor=next_num), LOG_SUCCESS)
+        # Audience bonus for survival.
+        try:
+            from . import audience as _aud
+            _aud.change_audience(self.world, 5, source="floor_descent")
+        except Exception:
+            pass
+        # SFX hook.
+        try:
+            audio.play_sfx("floor_descent")
+        except Exception:
+            pass
+        # Build next floor.
+        try:
+            from .floor_generator import generate_floor
+            new_floor = generate_floor(self.world, floor_number=next_num)
+        except Exception as exc:
+            self.log(f"(Błąd budowy piętra: {exc})", LOG_DANGER)
+            self.state = STATE_VICTORY
+            return
+        self.world.current_floor = new_floor
+        self.world.floor_number = next_num
+        # Reset some per-floor state.
+        self.world.last_player_command = ""
+        self.world.last_targeted_entity_id = None
+        # Move the pet to the new start room if present.
+        try:
+            from . import companion as _comp
+            pet = _comp.active_pet(self.world)
+            if pet is not None:
+                pet.location_room_id = new_floor.current_room_id
+        except Exception:
+            pass
 
     def _safehouse_pick(self, idx: int):
         room = self.world.current_floor.current_room()
@@ -3275,6 +3330,14 @@ class Game:
                  f"{bonus_str}{zone_mod_str} = {total} vs AC {dc} → "
                  f"{outcome_pl}{zone_str}",
                  LOG_SYSTEM)
+        # P27 — SFX hooks (silent until assets/sfx/* drops).
+        try:
+            if crit:        audio.play_sfx("hit_crit")
+            elif hit:       audio.play_sfx("hit_landed")
+            elif fumble:    audio.play_sfx("attack_fumble")
+            else:           audio.play_sfx("attack_miss")
+        except Exception:
+            pass
         if hit:
             # Prompt 23: damage comes from the wielded main weapon
             # (damage_dice + damage_type). Unarmed default 1d6+2.
@@ -3350,6 +3413,10 @@ class Game:
                      LOG_SUCCESS if crit else LOG_NORMAL)
             if target.hp <= 0:
                 self.log(f"„{target.display_name()}” pada.", LOG_SUCCESS)
+                try:
+                    audio.play_sfx("enemy_death")
+                except Exception:
+                    pass
                 # Prompt 24 — corpse on death. Mutates target in place to
                 # entity_type=corpse so all existing references (combat
                 # state, sponsor tag bus, room.entities) stay valid. The

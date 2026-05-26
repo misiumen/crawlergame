@@ -470,4 +470,94 @@ MON = {
         hp=12, max_hp=12, ac=11, attack_bonus=3, damage_dice="1d6+2",
         vulnerable_to=["acid","psychic"],
     ),
+
+    # ── P27 — Floor 2 roster: Sponsor Bezpieczeństwa Sportu theme
+    # (arena/strip-mall / faction:liga). Per DCC convention, the floor
+    # has multiple minibosses + 1 main boss guarding the exit.
+    # Tagged with `floor_min:2` so content_loader prefers them on F2+.
+    "stadionowy_szaleniec": dict(
+        name_key="ent_stadion_madman_n", fallback_name="Stadionowy Szaleniec",
+        desc_key="ent_stadion_madman_d",
+        fallback_desc=("Pomalowana twarz, znicz w dłoni. Krzyczy "
+                       "skandujące hasła do nikogo."),
+        tags=["monster","humanoid","faction:liga","floor_min:2","flammable"],
+        affordances=["inspect","attack","intimidate"],
+        hp=10, max_hp=10, ac=11, attack_bonus=3, damage_dice="1d6+1",
+        vulnerable_to=["psychic","cold"],
+    ),
+    "ochroniarz_areny": dict(
+        name_key="ent_arena_security_n", fallback_name="Ochroniarz Areny",
+        desc_key="ent_arena_security_d",
+        fallback_desc=("Czarna koszulka „SECURITY”, paralizator. "
+                       "Patrzy na ciebie jak na bilet bez wejścia."),
+        tags=["monster","humanoid","corporate","faction:liga","floor_min:2"],
+        affordances=["inspect","attack","intimidate","bribe"],
+        hp=16, max_hp=16, ac=13, attack_bonus=4, damage_dice="1d8",
+        damage_type="electric",
+        resists=["physical"],
+        vulnerable_to=["acid"],
+    ),
+    "kibic_zlobiarz": dict(
+        name_key="ent_hooligan_n", fallback_name="Kibic Żłobiarz",
+        desc_key="ent_hooligan_d",
+        fallback_desc=("Szalik, łańcuch, oddech tak gęsty że mógłby "
+                       "stać samodzielnie. Nuci coś groźnego."),
+        tags=["monster","humanoid","faction:liga","floor_min:2","drunk"],
+        affordances=["inspect","attack","intimidate"],
+        hp=12, max_hp=12, ac=10, attack_bonus=3, damage_dice="1d8+1",
+        vulnerable_to=["psychic"],
+    ),
+    "spiker_kanalu": dict(
+        name_key="ent_announcer_n", fallback_name="Spiker Kanału",
+        desc_key="ent_announcer_d",
+        fallback_desc=("Mikrofon, podświetlana kamizelka, oczy z "
+                       "wbudowanym opóźnieniem 0,3 sekundy."),
+        tags=["monster","humanoid","faction:liga","floor_min:2","memetic"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=8, max_hp=8, ac=10, attack_bonus=2, damage_dice="1d6",
+        damage_type="psychic",
+        vulnerable_to=["physical","acid"],
+    ),
+
+    # Floor 2 MINIBOSSES (DCC convention — multiple per floor).
+    "kapitan_druzyny": dict(
+        name_key="ent_team_captain_n", fallback_name="Kapitan Drużyny",
+        desc_key="ent_team_captain_d",
+        fallback_desc=("W kapitanskiej opasce, z głową zwycięzcy i "
+                       "rękami zwykłego zabójcy. Komenderuje swoim "
+                       "klubem."),
+        tags=["monster","humanoid","faction:liga","floor_min:2",
+              "miniboss","mini_boss"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=22, max_hp=22, ac=13, attack_bonus=5, damage_dice="1d10",
+        resists=["physical"],
+        vulnerable_to=["cold","psychic"],
+    ),
+    "trener_szkoleniowiec": dict(
+        name_key="ent_coach_n", fallback_name="Trener Szkoleniowiec",
+        desc_key="ent_coach_d",
+        fallback_desc=("Dres, gwizdek, tablica taktyczna w jednej "
+                       "ręce, kij baseballowy w drugiej. „Bieg po linii!”"),
+        tags=["monster","humanoid","faction:liga","floor_min:2",
+              "miniboss","mini_boss"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=20, max_hp=20, ac=12, attack_bonus=4, damage_dice="1d8+2",
+        vulnerable_to=["acid","cold"],
+    ),
+
+    # Floor 2 MAIN BOSS — guards the exit.
+    "arbiter_finalowy": dict(
+        name_key="ent_finals_referee_n", fallback_name="Arbiter Finałowy",
+        desc_key="ent_finals_referee_d",
+        fallback_desc=("Pasiasta koszulka, megafon, wzrok absolutnej "
+                       "władzy regulaminowej. Za nim — wyjście. Przed "
+                       "nim — ty. „Zawodniku — sprawdzimy faul.”"),
+        tags=["monster","humanoid","faction:liga","floor_min:2",
+              "floor_boss","boss","armored"],
+        affordances=["inspect","attack","intimidate","talk","bribe"],
+        hp=40, max_hp=40, ac=15, attack_bonus=6, damage_dice="2d6+2",
+        damage_type="physical",
+        resists=["physical","electric"],
+        vulnerable_to=["acid","psychic"],
+    ),
 }

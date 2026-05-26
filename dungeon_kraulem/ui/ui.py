@@ -82,49 +82,112 @@ def hp_bar(surf, x, y, w, h, val, mx, color=SUCCESS):
 # ── Title ────────────────────────────────────────────────────────────────────
 
 def draw_title(surf, save_exists: bool, selected_idx: int = 0):
-    surf.fill(DARK_BG)
+    """P27 — DCC reality-TV main menu.
+
+    Broadcast-terminal aesthetic: dark slab background, scanlines, a
+    syndicate "logo" mark at top, cycling sponsor stripe at bottom, the
+    title set in a CRT-glow style. Mood: you booted a corporate
+    surveillance terminal and a game show is loading.
+    """
+    surf.fill((6, 8, 12))
     sw, sh = surf.get_size()
     L = _resolve_layout(None)
-    title_size = max(28, int(34 * L.font_scale))
+    title_size = max(36, int(48 * L.font_scale))
     body_size  = max(14, int(15 * L.font_scale))
-    item_size  = max(18, int(20 * L.font_scale))
-    cy = sh // 2 - 140
-    img = font(title_size, bold=True).render("Dungeon Kraulem", True, ACCENT)
-    surf.blit(img, ((sw - img.get_width())//2, cy)); cy += img.get_height() + 4
+    item_size  = max(18, int(22 * L.font_scale))
 
+    # Top broadcast header bar — corp stripe.
+    bar_h = max(48, int(60 * L.font_scale))
+    pygame.draw.rect(surf, (18, 22, 30), (0, 0, sw, bar_h))
+    pygame.draw.line(surf, ACCENT, (0, bar_h), (sw, bar_h), 1)
+    # Syndicate "logo" — ASCII glyph + name on left.
+    logo_img = font(body_size + 2, bold=True).render(
+        "▣ SYNDYKAT // KANAŁ KRAULEM", True, ACCENT)
+    surf.blit(logo_img, (24, (bar_h - logo_img.get_height()) // 2))
+    # Live indicator on right.
+    live_img = font(body_size, bold=True).render("● LIVE", True, DANGER)
+    surf.blit(live_img, (sw - live_img.get_width() - 24,
+                          (bar_h - live_img.get_height()) // 2))
+
+    # CRT scanline overlay — subtle horizontal lines across the whole frame.
+    line_col = (12, 14, 20)
+    for ly in range(bar_h + 8, sh - 60, 4):
+        pygame.draw.line(surf, line_col, (0, ly), (sw, ly), 1)
+
+    # Main title — large, glowy.
+    cy = bar_h + max(60, sh // 8)
+    # Title text with a slight color-ghost behind it for CRT-glow feel.
+    title_text = "DUNGEON KRAULEM"
+    title_font = font(title_size, bold=True)
+    timg = title_font.render(title_text, True, ACCENT)
+    tx = (sw - timg.get_width()) // 2
+    # Ghost (warm offset behind main).
+    ghost = title_font.render(title_text, True, (60, 20, 80))
+    surf.blit(ghost, (tx + 3, cy + 2))
+    surf.blit(timg, (tx, cy))
+    cy += timg.get_height() + 12
+
+    # Show tagline — single dramatic line.
+    tagline = t("title_show_tagline",
+                fallback="JEDNA ŚMIERĆ. WIELE PIĘTER. NIESKOŃCZONA REKLAMA.")
+    timg = font(body_size + 2, bold=True).render(tagline, True, BRIGHT_TEXT)
+    surf.blit(timg, ((sw - timg.get_width()) // 2, cy))
+    cy += timg.get_height() + 6
+
+    # Secondary taglines.
     for line, col in [
-        (t("title_tagline_1", fallback="Tabletopowe przeżycie w sponsorowanym lochu."), NORMAL_TEXT),
-        (t("title_tagline_2", fallback="Każde piętro to wiele dni."), DIM_TEXT),
-        (t("title_tagline_3", fallback="Każda decyzja kosztuje czas."), DIM_TEXT),
+        (t("title_tagline_1", fallback="Sponsorzy patrzą. Widzowie krzyczą."), NORMAL_TEXT),
+        (t("title_tagline_2", fallback="Termin tyka. Loch zapada się powoli."), DIM_TEXT),
     ]:
-        img = font(body_size).render(line, True, col)
-        surf.blit(img, ((sw - img.get_width())//2, cy)); cy += 22
+        timg = font(body_size).render(line, True, col)
+        surf.blit(timg, ((sw - timg.get_width()) // 2, cy))
+        cy += 22
 
-    cy += 30
+    # Menu items.
+    cy += max(40, int(40 * L.font_scale))
     items = [
-        (t("title_build_character", fallback="[1] Nowa gra"), BRIGHT_TEXT),
-        (t("title_load_game",       fallback="[2] Wczytaj grę") if save_exists else
-         t("title_load_disabled",   fallback="[2] Wczytaj grę (brak zapisu)"),
+        (t("title_build_character", fallback="[1] NOWA GRA"), BRIGHT_TEXT),
+        (t("title_load_game",       fallback="[2] WCZYTAJ ZAPIS") if save_exists else
+         t("title_load_disabled",   fallback="[2] WCZYTAJ ZAPIS (brak)"),
          BRIGHT_TEXT if save_exists else DIM_TEXT),
-        (t("title_settings",        fallback="[3] Ustawienia"), BRIGHT_TEXT),
-        (t("title_quit",            fallback="[4] Wyjdź"), BRIGHT_TEXT),
+        (t("title_settings",        fallback="[3] USTAWIENIA"), BRIGHT_TEXT),
+        (t("title_quit",            fallback="[4] WYJDŹ Z TRANSMISJI"), BRIGHT_TEXT),
     ]
     sel = max(0, min(int(selected_idx or 0), len(items) - 1))
     for i, (label, col) in enumerate(items):
         if i == sel:
-            label = "▶ " + label
+            label = "▶  " + label + "  ◀"
             col = ACCENT
-        img = font(item_size, bold=True).render(label, True, col)
-        surf.blit(img, ((sw - img.get_width())//2, cy)); cy += 32
+        timg = font(item_size, bold=True).render(label, True, col)
+        surf.blit(timg, ((sw - timg.get_width()) // 2, cy))
+        cy += item_size + 14
 
-    cy += 16
+    # Sponsor stripe — bottom cycling band.
+    stripe_h = max(36, int(44 * L.font_scale))
+    stripe_y = sh - stripe_h - 30
+    pygame.draw.rect(surf, (16, 12, 22), (0, stripe_y, sw, stripe_h))
+    pygame.draw.line(surf, ACCENT2, (0, stripe_y), (sw, stripe_y), 1)
+    pygame.draw.line(surf, ACCENT2, (0, stripe_y + stripe_h),
+                     (sw, stripe_y + stripe_h), 1)
+    sponsors_strip = (
+        "NovaChem Biotech  ·  Sponsor Bezpieczeństwa Sportu  ·  "
+        "Czarny Rynek Plus  ·  Ministerstwo Słusznej Treści  ·  "
+        "Obywatele Ulicy  ·  Syndykat"
+    )
+    sp_img = font(body_size - 1).render(sponsors_strip, True, DIM_TEXT)
+    surf.blit(sp_img, ((sw - sp_img.get_width()) // 2,
+                       stripe_y + (stripe_h - sp_img.get_height()) // 2))
+
+    # Language toggle + footer.
     lang_str = f"[L] {t('lang_toggle_label', fallback='Język')}: {get_language().upper()}"
-    img = font(body_size - 2).render(lang_str, True, ACCENT2)
-    surf.blit(img, ((sw - img.get_width())//2, cy))
+    lang_img = font(body_size - 2).render(lang_str, True, ACCENT2)
+    surf.blit(lang_img, (24, sh - 24))
 
-    footer = t("title_syndicate_footer", fallback="Syndykat patrzy. Protokół działa.")
-    img = font(body_size - 3).render(footer, True, DIM_TEXT)
-    surf.blit(img, ((sw - img.get_width())//2, sh - 30))
+    footer = t("title_syndicate_footer",
+               fallback="© Syndykat Rozrywki Wydobywczej.  "
+                        "Wszystkie zgony są dobrowolne.")
+    f_img = font(body_size - 3).render(footer, True, DIM_TEXT)
+    surf.blit(f_img, (sw - f_img.get_width() - 24, sh - 24))
 
 
 # ── Character creation ──────────────────────────────────────────────────────
@@ -222,19 +285,61 @@ def draw_topbar(surf, world, layout=None, *, click_registry=None):
     s = f"{t('ui_clock', fallback='Zegar')}: {clock}   {t('ui_deadline', fallback='Termin')}: {deadline}"
     img = font(L.font_small + 1).render(s, True, BRIGHT_TEXT)
     surf.blit(img, (x + w - img.get_width() - 16, y + 14))
-    # Prompt 18: replace raw audience number with BAND label + rating.
-    # The number stays visible (small) so power-players still see it.
+    # P27 — Viewer count HUD. Renders: band label + raw rating + delta
+    # indicator (▲+12 / ▼-5 from last change) + tiny sparkline of recent
+    # audience values. Drives the "you are on TV" feeling — the player
+    # sees their numbers move in real time as they do dramatic things.
     try:
         from ..engine import audience as _aud
         rating = int(world.character.audience_rating or 0)
         band = _aud.band_for(rating)
         band_label = _aud.band_label(band)
+        history = list(getattr(world, "audience_history", []) or [])
+        delta = 0
+        if len(history) >= 2:
+            delta = history[-1] - history[-2]
+        delta_glyph = ""
+        delta_col = WARN
+        if delta > 0:
+            delta_glyph = f" ▲+{delta}"
+            delta_col = SUCCESS
+        elif delta < 0:
+            delta_glyph = f" ▼{delta}"
+            delta_col = DANGER
         aud = (f"{t('ui_audience', fallback='Widownia')}: "
                f"{band_label} ({rating})")
+        a_img = font(L.font_small - 1).render(aud, True, WARN)
+        surf.blit(a_img, (x + w - a_img.get_width() - 16, y + 36))
+        # Delta after the audience line.
+        if delta_glyph:
+            d_img = font(L.font_small - 1, bold=True).render(
+                delta_glyph, True, delta_col)
+            surf.blit(d_img, (x + w - 16, y + 36))
+        # Sparkline: last 16 values as a tiny bar graph.
+        if len(history) >= 2:
+            spark_w = 96
+            spark_h = 12
+            sx = x + w - a_img.get_width() - 16 - spark_w - 8
+            sy = y + 38
+            recent = history[-16:]
+            lo = min(recent); hi = max(recent)
+            span = max(1, hi - lo)
+            bar_w = max(2, spark_w // len(recent))
+            for i, v in enumerate(recent):
+                h_pct = (v - lo) / span
+                h_px = max(1, int(spark_h * h_pct))
+                bx = sx + i * bar_w
+                by = sy + (spark_h - h_px)
+                # Color shifts from danger (low) → success (high).
+                col = (max(60, int(80 + 140 * h_pct)),
+                       max(60, int(120 + 80 * h_pct)),
+                       max(50, int(60 + 40 * h_pct)))
+                pygame.draw.rect(surf, col, (bx, by, max(1, bar_w - 1), h_px))
     except Exception:
-        aud = f"{t('ui_audience', fallback='Widownia')}: {world.character.audience_rating}"
-    img = font(L.font_small - 1).render(aud, True, WARN)
-    surf.blit(img, (x + w - img.get_width() - 16, y + 36))
+        # Defensive fallback — never let HUD math crash the top bar.
+        aud = f"Widownia: {world.character.audience_rating}"
+        img = font(L.font_small - 1).render(aud, True, WARN)
+        surf.blit(img, (x + w - img.get_width() - 16, y + 36))
 
     # Prompt 20: encounter countdown badge. Shown when a scheduled
     # encounter is pending for the player's current room. The badge
@@ -926,23 +1031,16 @@ def draw_settings(surf, settings_state, save_exists=False):
     fullscreen = settings_state.get("fullscreen", False)
     w_cur, h_cur = SUPPORTED_RESOLUTIONS[res_idx]
 
-    # Prompt 13: LLM mode row.
-    llm_idx = settings_state.get("llm_idx", 0)
-    from . import settings as _settings
-    llm_mode = _settings.LLM_MODES[llm_idx % len(_settings.LLM_MODES)]
-    llm_label = {
-        "performance": t("settings_llm_performance", fallback="Performance — bez modeli (najlżejszy)"),
-        "enhanced":    t("settings_llm_enhanced",    fallback="Enhanced — parser + narrator"),
-        "full_show":   t("settings_llm_full_show",   fallback="Full Show — narrator + loot + dialogi"),
-    }.get(llm_mode, llm_mode)
+    # P27 — LLM mode row removed from UI. The settings system still
+    # supports the field internally (for re-enablement when the
+    # online-narrator path lands), but the row is hidden so players
+    # don't see an option that requires a 50GB local model download.
     rows = [
         (t("settings_resolution", fallback="Rozdzielczość"),
          f"<  {w_cur} x {h_cur}  >"),
         (t("settings_display_mode", fallback="Tryb ekranu"),
          t("settings_fullscreen", fallback="Pełny ekran") if fullscreen
          else t("settings_windowed", fallback="Okno")),
-        (t("settings_llm_mode", fallback="Tryb LLM"),
-         f"<  {llm_label}  >"),
         (t("settings_apply", fallback="Zastosuj"), ""),
         (t("settings_back", fallback="Wróć"), ""),
     ]
@@ -1909,7 +2007,9 @@ def draw_paper_doll(surf, world, x, y, w, h, layout=None, *,
     title = "EKWIPUNEK"
     text(surf, title, x + 4, y, ACCENT, L.font_small - 1, True)
     grid_y = y + 16
-    cell = max(36, min(48, (w - 24) // 3))
+    # P27 (P25-UX-1): bump cell size 36→52 so slots are easier to
+    # click precisely.
+    cell = max(48, min(64, (w - 24) // 3))
     grid_w = cell * 3
     grid_x = x + (w - grid_w) // 2
 

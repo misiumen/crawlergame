@@ -784,9 +784,10 @@ def _flat_inventory_verbs(world) -> List[SelectableOption]:
         ent = world.entities.get(eid)
         if ent is None: continue
         name = ent.display_name()
-        # P24.7: Sprawdź now lives on every item so the two-tier picker
-        # has at least one entry per subject (so subjects always have
-        # SOMETHING to pick into).
+        tags = set(ent.tags or [])
+        affs = ent.affordances or []
+        # P24.7: Sprawdź on every item so the two-tier picker has
+        # at least one verb per subject.
         if ent.fallback_desc or ent.desc_key:
             out.append(SelectableOption(
                 option_id=f"inv_inspect_{eid}",
@@ -794,6 +795,27 @@ def _flat_inventory_verbs(world) -> List[SelectableOption]:
                 command=f"sprawdź {name}",
                 group=GROUP_INVENTORY, target_id=eid,
                 action_type="inspect",
+            ))
+        # P27 (P25-UX-1): wearables get Załóż in the Ekwipunek tab
+        # so the player can equip without hunting for the paper-doll
+        # slot. Detected by any slot:X tag.
+        if any(t.startswith("slot:") for t in tags):
+            out.append(SelectableOption(
+                option_id=f"inv_wear_{eid}",
+                label=f"Załóż: {name}",
+                command=f"załóż {name}",
+                group=GROUP_INVENTORY, target_id=eid,
+                action_type="wear",
+            ))
+        # Weapons get Dobądź (P23 wield path) — same idea, equip
+        # without typing.
+        if "weapon" in tags or "wield" in affs:
+            out.append(SelectableOption(
+                option_id=f"inv_wield_{eid}",
+                label=f"Dobądź: {name}",
+                command=f"dobądź {name}",
+                group=GROUP_INVENTORY, target_id=eid,
+                action_type="wield",
             ))
         out.append(SelectableOption(
             option_id=f"inv_use_{eid}",

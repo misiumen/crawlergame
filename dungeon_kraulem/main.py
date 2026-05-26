@@ -62,20 +62,13 @@ def main():
 
     audio.init()
 
-    # Prompt 13: apply the persisted LLM mode + emit one short startup
-    # diagnostic line. No HTTP calls happen here unless a role is enabled.
-    saved_mode = s.get("llm_mode", "performance")
-    _config.apply_llm_mode(saved_mode)
-    from .llm import llm_roles
-    info = llm_roles.summary()
-    if info["mode"] == "performance":
-        print(f"[dungeon_kraulem] LLM mode: performance (no model required)")
-    else:
-        enabled = [r for r, rd in info["roles"].items() if rd["enabled"]]
-        present = [r for r, rd in info["roles"].items() if rd["available"]]
-        print(f"[dungeon_kraulem] LLM mode: {info['mode']} | "
-              f"reachable={info['ollama_reachable']} | "
-              f"enabled={enabled} | available={present}")
+    # P27 — LLM mode permanently defaulted to performance for the
+    # itch.io release (no local-model download requirement). The mode
+    # field is still respected internally; only the startup probe + log
+    # line are removed so a fresh game doesn't ping anything on launch.
+    # Re-enable by setting `llm_mode` to enhanced/full_show manually in
+    # dungeon_kraulem_settings.json and adding back this block.
+    _config.apply_llm_mode("performance")
 
     from .engine.game import Game
     g = Game(screen)

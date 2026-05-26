@@ -123,6 +123,16 @@ def change_audience(world, delta: int, source: str = "",
     # Reset the idle-decay counter — something interesting happened.
     setattr(world, "audience_idle_minutes", 0)
 
+    # P27 — viewer-count HUD sparkline: track recent audience values so
+    # the top bar can render a tiny trend graph. Bounded to 32 entries.
+    history = getattr(world, "audience_history", None)
+    if history is None:
+        world.audience_history = []
+        history = world.audience_history
+    history.append(after)
+    if len(history) > 32:
+        del history[:-32]
+
     if emit_log and hasattr(world, "log"):
         sign = "+" if delta > 0 else ""
         # Prompt 22 bug fix: NEVER print the internal `source` tag in

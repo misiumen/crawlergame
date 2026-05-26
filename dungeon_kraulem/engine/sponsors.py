@@ -144,6 +144,9 @@ def note_player_tag(world, tag: str, weight: int = 1) -> None:
     it in `dislikes_tags` loses `-weight`. Sponsors that ignore the tag
     are unchanged.
 
+    P27 — also routes through `sponsor_voice.maybe_speak` for weight ≥ 2
+    events, surfacing proactive sponsor chatter as LOG_SYNDIC lines.
+
     Safe to call with `world=None` (silently no-ops) so combat-test
     fixtures don't have to mock the world.
     """
@@ -161,6 +164,12 @@ def note_player_tag(world, tag: str, weight: int = 1) -> None:
         if skey == primary:
             bump *= 2
         adjust_attention(world, skey, bump)
+    # P27 — sponsor voice bus: roll for proactive chatter.
+    try:
+        from . import sponsor_voice as _sv
+        _sv.maybe_speak(world, tag, weight)
+    except Exception:
+        pass
 
 
 # ── Interventions ──────────────────────────────────────────────────────────
