@@ -216,6 +216,50 @@ class Game:
             self.world.register(it)
             self.world.character.inventory_ids.append(it.entity_id)
 
+        # P27.7 (P27-MECH-4) — pre-equipped starter loadouts per
+        # background. Items in STARTER_LOADOUT are created and IMMEDIATELY
+        # equipped to the named slot (or wielded in main/off). Player
+        # opens the game already kitted — no "fight the first patrol with
+        # bare hands" phase. Items that fail validation (slot mismatch,
+        # already equipped, etc.) silently fall back into inventory.
+        from . import equipment as _eq
+        STARTER_LOADOUT = {
+            "office_worker":     [("spodnie_robocze","legs"),("opaska_imienna","accessory")],
+            "mechanic":          [("pas_narzedziowy","back"),("spodnie_robocze","legs"),("duct_tape","main")],
+            "nurse":             [("fartuch_laboratoryjny","torso"),("opaska_imienna","accessory")],
+            "cook":              [("fartuch_laboratoryjny","torso"),("cheap_knife","main")],
+            "security_guard":    [("kamizelka_taktyczna","torso"),("buty_taktyczne","legs"),("flashlight","main")],
+            "courier":           [("plecak_taktyczny","back"),("buty_taktyczne","legs")],
+            "student":           [("czapka_uszanka","head"),("spodnie_robocze","legs")],
+            "streamer":          [("sponsor_kepi","head"),("zegarek_sponsora","accessory")],
+            "soldier":           [("kamizelka_taktyczna","torso"),("buty_taktyczne","legs"),("cheap_knife","main")],
+            "unemployed_hustler":[("kurtka_skorzana","torso"),("improvised_lockpick","off")],
+            "janitor":           [("kalosze","legs"),("pas_narzedziowy","back")],
+            "paramedic":         [("fartuch_laboratoryjny","torso"),("buty_taktyczne","legs"),("dirty_bandage","main")],
+            "opiekun_zwierzaka": [("kurtka_skorzana","torso"),("snack_bar","off")],
+        }
+        for item_key, slot in STARTER_LOADOUT.get(background, []):
+            try:
+                it = make_item(item_key, location_id="inventory:player")
+                self.world.register(it)
+                self.world.character.inventory_ids.append(it.entity_id)
+                if slot in ("main", "off"):
+                    if slot == "main":
+                        self.world.character.wielded_main_id = it.entity_id
+                    else:
+                        self.world.character.wielded_offhand_id = it.entity_id
+                    try:
+                        self.world.character.inventory_ids.remove(it.entity_id)
+                    except ValueError:
+                        pass
+                else:
+                    ok, _prev, _why = _eq.equip(self.world,
+                                                self.world.character,
+                                                it, slot)
+                    # If equip fails, item just stays in inventory.
+            except Exception:
+                pass
+
         # Prompt 19 — pet-owner background gets a random companion. The
         # pet is registered BEFORE Floor 1 is built so its location_room_id
         # gets set to the start room (which doesn't exist yet); we patch
@@ -384,6 +428,13 @@ class Game:
                            fallback=f"Chowasz „{ent.display_name()}”.",
                            name=ent.display_name()),
                          LOG_SUCCESS)
+
+    def _attempt_class_active(self):
+        """P27.7 — trigger the character's class active ability. One use
+        per floor; per-floor cooldown lives on character.flags."""
+        from ..systems import class_features as _cf
+        ok, line = _cf.use_active(self.world)
+        self.log(line, LOG_SUCCESS if ok else LOG_WARN)
 
     def _attempt_rest_short(self):
         """P27.6 — short rest (D&D-style). Restores ~25% max HP,
@@ -1512,6 +1563,10 @@ class Game:
             self._attempt_rest_short(); return
         if intent.intent == "rest_long":
             self._attempt_rest_long(); return
+
+        # P27.7 — class active ability.
+        if intent.intent == "class_active":
+            self._attempt_class_active(); return
 
         # Gap 4: deploy a crafted/portable trap or device
         if intent.intent == "deploy":
@@ -3432,6 +3487,17 @@ class Game:
             damage_bonus = _r.randint(1,4)
             defense_change = -2
             noise = 5
+        # P27.7 — class passive bonuses.
+        try:
+            from ..systems import class_features as _cf
+            # Unarmed bruisers / demolitionists get extra damage.
+            if ch.wielded_main_id is None:
+                damage_bonus += _cf.passive_bonus(ch, "unarmed_dmg")
+            # Buff flag set by the bruiser active.
+            if ch.flags.pop("class_buff_next_attack_x2", False):
+                damage_bonus += 10
+        except Exception:
+            pass
         dc = max(6, getattr(target, "ac", 10))
         total = raw + mod + to_hit_bonus
         # Status modifiers

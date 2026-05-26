@@ -61,6 +61,22 @@ def suggest_classes(character, n: int = 3) -> List[str]:
 def assign_class(world, class_key: str) -> bool:
     if class_key not in CLASS_CATALOG:
         return False
-    world.character.class_key = class_key
-    world.character.class_offered_at = world.current_floor.current_minute if world.current_floor else 0
+    ch = world.character
+    # P27.7 — undo any prior class's hp_max bump before applying the new
+    # one. Safe to call repeatedly (the flag tracks how much we added).
+    prior = ch.flags.pop("class_hp_max_added", 0) or 0
+    if prior:
+        ch.max_hp = max(1, ch.max_hp - prior)
+        ch.hp = min(ch.hp, ch.max_hp)
+    ch.class_key = class_key
+    ch.class_offered_at = world.current_floor.current_minute if world.current_floor else 0
+    try:
+        from . import class_features as _cf
+        bump = _cf.passive_bonus(ch, "hp_max")
+        if bump:
+            ch.max_hp += bump
+            ch.hp = min(ch.max_hp, ch.hp + bump)
+            ch.flags["class_hp_max_added"] = bump
+    except Exception:
+        pass
     return True

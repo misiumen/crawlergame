@@ -105,6 +105,12 @@ class Character:
                 ac += _eq.total_ac_bonus(world, self)
             except Exception:
                 pass
+        # P27.7 — class passive (e.g. survivor +1 AC).
+        try:
+            from ..systems import class_features as _cf
+            ac += _cf.passive_bonus(self, "ac")
+        except Exception:
+            pass
         return ac
 
     def offhand_ac_bonus(self, world) -> int:

@@ -67,6 +67,9 @@ _QUICK_INTENTS = {
     "search":        ["przeszukaj","szukaj","przetrzas","search"],
     "wait":          ["czekaj","poczekaj","wait"],
     "rest_short":    ["odpocznij","short rest","odpoczynek"],
+    # P27.7 — class active ability trigger.
+    "class_active":  ["umiejętność","umiejetnosc","umiejetność","umiejetnosć",
+                      "klasa","class ability","ability"],
     "rest_long":     ["spij","śpij","sleep","wyspij","wyśpij","long rest"],
     "check_inventory": ["ekwipunek","plecak","inventory"],
     "check_character": ["postać","postac","karta","character"],

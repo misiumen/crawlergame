@@ -116,6 +116,15 @@ def change_audience(world, delta: int, source: str = "",
         return None
 
     char = world.character
+    # P27.7 — showman passive multiplies positive audience gains.
+    if delta > 0:
+        try:
+            from ..systems import class_features as _cf
+            mul = _cf.audience_multiplier(char)
+            if mul != 1.0:
+                delta = max(1, int(round(delta * mul)))
+        except Exception:
+            pass
     before = max(_AUDIENCE_MIN, min(int(char.audience_rating or 0), _AUDIENCE_MAX))
     after = max(_AUDIENCE_MIN, min(before + delta, _AUDIENCE_MAX))
     char.audience_rating = after
