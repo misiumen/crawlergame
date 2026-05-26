@@ -307,6 +307,33 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.9
         return intent
 
+    # P28.3 (P27-UX-23) — movement UX normalization. Accept bare
+    # cardinal directions as movement: "wschód" → idź wschód, "n" →
+    # idź północ, etc. Maps single-letter (n/s/e/w) and short
+    # English/Polish forms to a canonical exit label so the validator
+    # can find the matching room exit. Anything with leading whitespace
+    # was already stripped by `folded`.
+    BARE_DIRS = {
+        "n": "północ", "p": "północ", "pn": "północ",
+        "polnoc": "północ", "północ": "północ", "north": "północ",
+        "s": "południe", "pd": "południe",
+        "poludnie": "południe", "południe": "południe", "south": "południe",
+        "e": "wschód", "w_": "wschód",  # avoid clash with "w"
+        "wschod": "wschód", "wschód": "wschód", "east": "wschód",
+        "w": "zachód", "z": "zachód",
+        "zachod": "zachód", "zachód": "zachód", "west": "zachód",
+        "u": "góra", "g": "góra",
+        "gora": "góra", "góra": "góra", "up": "góra",
+        "d": "dół",
+        "dol": "dół", "dół": "dół", "down": "dół",
+    }
+    if folded in BARE_DIRS:
+        intent.intent = "move"
+        intent.verb = "idź"
+        intent.destination = BARE_DIRS[folded]
+        intent.confidence = 0.85
+        return intent
+
     # ── Listen: "nasłuchuj <exit>" / "listen at <exit>" ──────────────────────
     if folded.startswith(("nasluchuj","posluchaj","listen")):
         intent.intent = "listen"

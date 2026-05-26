@@ -606,21 +606,60 @@ def _collect_crafting(world) -> List[JournalEntry]:
         from ..content import materials as _mat
     except Exception:
         return out
+    # P28.3 (P27-UX-3/4) — polonize crafting detail. Translate category +
+    # stat + material keys + (where possible) material counts to PL labels
+    # so the journal reads as Polish instead of leaking English keys.
+    _CATEGORY_PL = {
+        "tool":     "narzędzie",
+        "weapon":   "broń",
+        "trap":     "pułapka",
+        "explosive": "ładunek wybuchowy",
+        "armor":    "pancerz",
+        "medical":  "medyczne",
+        "consumable": "konsumpcyjne",
+        "decoy":    "wabik",
+        "lure":     "wabik",
+        "mechanical": "mechaniczne",
+        "chemical": "chemiczne",
+        "electrical": "elektryczne",
+    }
+    _STAT_PL = {
+        "STR": "SIŁ", "DEX": "ZRĘ", "CON": "KON",
+        "INT": "INT", "WIS": "MĄD", "CHA": "CHA",
+    }
+    def _material_pl(key: str) -> str:
+        """Use the material module's PL label when available; fall back
+        to the raw key with underscores swapped for spaces."""
+        try:
+            label = _mat.label_pl(key) if hasattr(_mat, "label_pl") else None
+            if label:
+                return label
+        except Exception:
+            pass
+        return key.replace("_", " ")
     for rk, rv in _craft.all_recipes().items():
         name_pl = rv.get("name_pl", rk)
         needed = rv.get("required_materials") or {}
         have_all = _mat.has_materials(world.character, needed) if needed else True
         status = "gotowe" if have_all else "brakuje materiałów"
-        needs_line = ", ".join(f"{v}× {k}" for k, v in needed.items()) if needed else "—"
+        if needed:
+            needs_line = ", ".join(f"{v}× {_material_pl(k)}"
+                                   for k, v in needed.items())
+        else:
+            needs_line = "—"
         aliases = ", ".join((rv.get("aliases_pl") or [])[:3])
+        cat_pl = _CATEGORY_PL.get(rv.get("category", ""), rv.get("category", "?"))
+        stat_pl = _STAT_PL.get(rv.get("stat", ""), rv.get("stat", "?"))
+        dc = rv.get("dc", "?")
+        time_min = rv.get("time_minutes", "?")
         out.append(JournalEntry(
             title=name_pl,
             subtitle=status,
             status=status,
             detail=(f"Wymaga: {needs_line}\n"
-                    f"Kategoria: {rv.get('category','?')}\n"
-                    f"Stat: {rv.get('stat','?')}   DC: {rv.get('dc','?')}\n"
-                    f"Czas: {rv.get('time_minutes', '?')} min\n"
+                    f"Kategoria: {cat_pl}\n"
+                    f"Test: {stat_pl} vs TT {dc}\n"
+                    f"Czas: {time_min} min\n"
                     + (f"Aliasy: {aliases}\n" if aliases else "")
                     + f"Przykład: zrób {name_pl.lower()}"),
             sort_key=(0 if have_all else 1, name_pl.lower()),

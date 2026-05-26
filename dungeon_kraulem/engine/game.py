@@ -5761,7 +5761,13 @@ class Game:
             ui.draw_hover_tooltip(s, self.click_registry, self._mouse_xy, L)
             # Prompt 10: journal overlay sits on top.
             if self.journal_state.open:
-                ui.draw_journal(s, self.world, self.journal_state, layout=L)
+                # P28.3 — mouse support: pass click_registry so tab + row
+                # clicks dispatch (P27-UX-2). When the overlay is open,
+                # clear the previously-registered world-view zones so
+                # clicks outside the journal don't fire stale handlers.
+                self.click_registry.reset()
+                ui.draw_journal(s, self.world, self.journal_state, layout=L,
+                                click_registry=self.click_registry)
         elif self.state == STATE_CLASS_OFFER:
             self._refresh_layout()
             L = self._layout

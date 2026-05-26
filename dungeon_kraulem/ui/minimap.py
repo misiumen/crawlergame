@@ -286,23 +286,41 @@ def draw_minimap(surf, world, rect, layout, *,
         gx = cx + (cell - img.get_width()) // 2
         gy = cy + (cell - img.get_height()) // 2
         surf.blit(img, (gx, gy))
-        # Connectors to adjacent placed rooms (only for cardinal exits).
+        # Connectors to adjacent placed rooms. P28.3 (P27-UX-20): also
+        # draw connectors for non-cardinal hops — long diagonal / chain
+        # exits used to leave the player wondering whether a room was
+        # actually reachable from another. Now any placed neighbour
+        # whose position differs by 1 in either axis gets a connector.
         if room is not None:
             for label, ed in (room.exits or {}).items():
                 tgt = ed.get("target", "")
-                if tgt not in positions:
-                    continue
-                if tgt not in revealed:
+                if tgt not in positions or tgt not in revealed:
                     continue
                 tcol, trow = positions[tgt]
-                if (tcol, trow) == (col + 1, row):       # east
+                dx = tcol - col
+                dy = trow - row
+                cx_mid = cx + cell // 2
+                cy_mid = cy + cell // 2
+                tcx_mid = off_x + (tcol - min_col) * cell + cell // 2
+                tcy_mid = off_y + (trow - min_row) * cell + cell // 2
+                # Only draw cardinals as a 1-px nub (matches old style);
+                # everything else gets a dashed-style line between cell
+                # centers so the link is visible without dominating.
+                if dx == 1 and dy == 0:
                     pygame.draw.line(surf, BORDER,
-                                     (cx + cell, cy + cell // 2),
-                                     (cx + cell + 2, cy + cell // 2), 1)
-                elif (tcol, trow) == (col, row + 1):     # south
+                                     (cx + cell, cy_mid),
+                                     (cx + cell + 2, cy_mid), 1)
+                elif dx == 0 and dy == 1:
                     pygame.draw.line(surf, BORDER,
-                                     (cx + cell // 2, cy + cell),
-                                     (cx + cell // 2, cy + cell + 2), 1)
+                                     (cx_mid, cy + cell),
+                                     (cx_mid, cy + cell + 2), 1)
+                elif (dx, dy) != (0, 0) and (abs(dx) + abs(dy)) <= 3:
+                    # Non-cardinal link — render as a short dim line
+                    # between cell centers. Only adjacent-ish (Manhattan
+                    # ≤3) to avoid criss-crossing the whole map.
+                    pygame.draw.line(surf, DIM_TEXT,
+                                     (cx_mid, cy_mid),
+                                     (tcx_mid, tcy_mid), 1)
         # Click zone. Default: toggle a player-placed mark. When
         # `on_room_click` is given, defer the decision to the caller —
         # they may choose to move (adjacent + unlocked), preview a

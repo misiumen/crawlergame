@@ -1133,9 +1133,15 @@ def draw_settings(surf, settings_state, save_exists=False):
 
 # ── Prompt 10: tabbed journal overlay ─────────────────────────────────────
 
-def draw_journal(surf, world, j_state, layout=None):
+def draw_journal(surf, world, j_state, layout=None, *, click_registry=None):
     """Render the journal overlay on top of whatever the underlying state
-    drew. j_state is a `journal.JournalState`."""
+    drew. j_state is a `journal.JournalState`.
+
+    P28.3 (P27-UX-2) — accepts a click_registry. When provided, each tab
+    header + each list row becomes mouse-clickable: tab click switches
+    `j_state.tab`, row click sets `j_state.selected()`. Keyboard nav
+    still works in parallel.
+    """
     if j_state is None or not j_state.open:
         return
     from . import journal as J
@@ -1196,6 +1202,12 @@ def draw_journal(surf, world, j_state, layout=None):
             pygame.draw.rect(surf, BORDER, rect, 1)
             img = f_tab.render(lbl, True, col)
         surf.blit(img, (tab_x + pad, tab_y + (tab_h - img.get_height())//2))
+        # P28.3 — click registers a tab switch.
+        if click_registry is not None:
+            def _switch_tab(_k=k, _js=j_state):
+                _js.tab = _k
+            click_registry.add((tab_x, tab_y, w, tab_h), _switch_tab,
+                               tooltip=lbl, category="journal_tab")
         tab_x += w + 6
 
     content_y = tab_y + tab_h + 14
@@ -1247,6 +1259,14 @@ def draw_journal(surf, world, j_state, layout=None):
                 pygame.draw.rect(surf, ACCENT2,
                                  (content_x + 4, row_y - 2, list_w - 8, line_h),
                                  1)
+            # P28.3 — clickable row sets selection.
+            if click_registry is not None:
+                def _pick(_idx=idx, _js=j_state):
+                    _js.set_selected(_idx)
+                    _js.reset_detail_scroll()
+                click_registry.add(
+                    (content_x + 4, row_y - 2, list_w - 8, line_h),
+                    _pick, tooltip=e.title, category="journal_row")
             marker = "▶ " if is_sel else "  "
             line = marker + e.title
             f_b = font(body_size - 1)
