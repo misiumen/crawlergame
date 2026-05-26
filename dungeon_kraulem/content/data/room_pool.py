@@ -242,8 +242,8 @@ ROOM_POOL = [
             "przy dotknięciu z metalem. Stół laboratoryjny zastawiony pustymi szkłami.",
         ],
         "look_pool": [
-            "Kwas na podłodze. Butla gazu pod ścianą. Na ścianie naklejka: NIE LĄCZYĆ "
-            "KWASU Z OGNIEM. PROSIMY.",
+            "Kwas na podłodze. Butla gazu pod ścianą. Na ścianie naklejka: "
+            "NIE MIESZAĆ KWASU Z OGNIEM. DZIĘKUJEMY ZA WSPÓŁPRACĘ.",
         ],
         "search_pool": [
             "Pod stołem zardzewiały, ale ostry nóż. Ktoś musiał stracić cierpliwość.",

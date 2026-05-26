@@ -25,6 +25,15 @@ class WorldState:
     settings: Dict[str, Any] = field(default_factory=dict)
     random_seed: Optional[int] = None
 
+    # Prompt 26c — context pronouns. `last_player_command` is the raw
+    # input string the player typed (NOT the parser's normalized form),
+    # used by `znowu` / `again` to replay. `last_targeted_entity_id`
+    # tracks the last single entity a handler resolved against, used by
+    # `to` / `it` substitution and by mass-action fallbacks. Both reset
+    # to None on floor change so player can't cross-floor replay.
+    last_player_command: str = ""
+    last_targeted_entity_id: Optional[int] = None
+
     # Prompt 07: persistent memetic / belief seeds the player has planted.
     # Keyed by seed_id. Old saves without this field load as {} via from_dict.
     belief_seeds: Dict[str, Any] = field(default_factory=dict)

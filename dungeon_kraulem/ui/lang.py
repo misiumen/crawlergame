@@ -128,13 +128,29 @@ def t(key: str, fallback: Optional[str] = None, **fmt) -> str:
         else:
             return f"[?{key}]" if _DEBUG else key
 
+    # P26c — defensive placeholder check. If the locale template has
+    # `{X}` patterns but no kwargs were passed, the player would see
+    # literal "{minutes}" leaking into the log (this bit us on
+    # `feedback_mass_salvage_summary`). Falling back to the f-string
+    # `fallback` (which is already-substituted at the call site) is
+    # the right move when fmt is empty AND template has placeholders.
+    import re as _re
+    _PH = _re.compile(r"\{[a-zA-Z_][a-zA-Z0-9_]*\}")
     if not fmt:
+        if _PH.search(raw) and fallback is not None and not _PH.search(fallback):
+            return fallback
         return raw
 
     try:
-        return raw.format_map(_Safe(fmt))
+        out = raw.format_map(_Safe(fmt))
     except (ValueError, IndexError):
         return raw
+    # Even with kwargs, if a placeholder slipped through the format_map
+    # (kwarg key didn't match), prefer the fallback over the leaked
+    # template.
+    if _PH.search(out) and fallback is not None and not _PH.search(fallback):
+        return fallback
+    return out
 
 
 _ensure(_DEFAULT_LANG)

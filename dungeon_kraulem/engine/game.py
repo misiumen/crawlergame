@@ -136,6 +136,30 @@ class Game:
         # would silently miss new entries (e.g. an enemy entering combat).
         self.log_scroll = 0
 
+    def _stash_disambiguation_on_invalid(self, v, intent) -> None:
+        """P26c — cross-handler disambiguation latch.
+
+        Any handler that runs its own `validate()` (salvage, break,
+        butcher, wear, deploy, env-fallback, etc.) must call this on
+        the invalid result so that a subsequent `oba` / `1` / partial-
+        name from the player can resolve. Without this, `oba` after a
+        handler-internal validate falls through to the parser, which
+        doesn't understand it as a command and reports "Nie rozumiem".
+
+        Replicates the standard pipeline's behavior at game.py:1433.
+        """
+        if v is None or intent is None:
+            return
+        if (v.reason == "ambiguous_target"
+                and getattr(v, "possible_entity_ids", None)):
+            self.pending_disambiguation = {
+                "intent": intent,
+                "entity_ids": list(v.possible_entity_ids),
+                "names": list(v.possible_interpretations or []),
+            }
+        else:
+            self.pending_disambiguation = None
+
     # ── State transitions ────────────────────────────────────────────────────
 
     def start_new_game(self, name: str, background: str):
@@ -798,6 +822,21 @@ class Game:
                     self.cmd_history = self.cmd_history[-50:]
             self.cmd_history_idx = -1
             self.log(f"> {text_val}", LOG_NORMAL)
+            # P26c — context pronoun support: remember the player's
+            # raw command for `znowu`/`again` replay. Skip the
+            # `znowu` command itself (we don't want znowu→znowu loops)
+            # and skip ambiguity-resolution replies (oba/1/partial).
+            from .polish_text import fold as _fold_pc
+            _norm = _fold_pc(text_val).strip()
+            REPLAY_TOKENS_PERSIST = {"znowu", "znow", "znów", "jeszcze raz",
+                                     "again", "powtorz", "powtórz"}
+            DISAMBIG_TOKENS = {"oba", "obu", "obydwa", "wszystko",
+                               "wszystkie", "both", "all"}
+            if (self.world is not None
+                    and _norm not in REPLAY_TOKENS_PERSIST
+                    and _norm not in DISAMBIG_TOKENS
+                    and not _norm.isdigit()):
+                self.world.last_player_command = text_val
             self._handle_play_input(text_val)
         elif self.state == STATE_CREATE:
             self._handle_create_input(text_val)
@@ -1184,6 +1223,30 @@ class Game:
                 return
             # Non-match — clear the pending state and let parser handle.
             self.pending_disambiguation = None
+
+        # P26c — context pronouns. `znowu` / `again` / `znów` / `jeszcze
+        # raz` replays the last successful player command. No-op when
+        # there's no last command yet (fresh game / floor change).
+        if self.world is not None:
+            from .polish_text import fold as _fold
+            normalized = _fold(text_val).strip()
+            REPLAY_TOKENS = {"znowu", "znow", "znów", "jeszcze raz",
+                             "again", "powtorz", "powtórz"}
+            if normalized in REPLAY_TOKENS:
+                last = (self.world.last_player_command or "").strip()
+                if last:
+                    self.log(t("feedback_replay",
+                               fallback=f"(znowu: {last})",
+                               cmd=last), LOG_SYSTEM)
+                    text_val = last
+                    # Fall through with the replayed command — do NOT
+                    # update last_player_command to "znowu" itself; the
+                    # update at the end stores the original command.
+                else:
+                    self.log(t("feedback_replay_empty",
+                               fallback="Nie było jeszcze nic do powtórzenia."),
+                             LOG_WARN)
+                    return
 
         intent = parse_with_optional_llm(text_val, self.world)
         # Prompt 17: when combat is active, the combat router runs BEFORE
@@ -1693,6 +1756,9 @@ class Game:
             self.log(v.message() or "—", LOG_WARN)
             if v.possible_interpretations:
                 self.log("  ? " + " | ".join(v.possible_interpretations), LOG_NORMAL)
+            # P26c: latch disambiguation so the next `oba`/`1`/partial
+            # name from the player resolves through the standard path.
+            self._stash_disambiguation_on_invalid(v, intent)
             return
 
         target = v.matched_entities[0] if v.matched_entities else None
@@ -2302,6 +2368,8 @@ class Game:
             self.log(v.message() or "—", LOG_WARN)
             if v.possible_interpretations:
                 self.log("  ? " + " | ".join(v.possible_interpretations), LOG_NORMAL)
+            # P26c: latch disambiguation (break path).
+            self._stash_disambiguation_on_invalid(v, intent)
             return
 
         target = v.matched_entities[0] if v.matched_entities else None
@@ -2496,7 +2564,26 @@ class Game:
         for ent in candidates:
             name = ent.display_name()
             tags = set(ent.tags or [])
+            affs = set(ent.affordances or [])
             st = ent.state or {}
+            # P26c — appropriate-target gate: never try to "salvage"
+            # things that aren't salvageable. Hazards (acid puddle,
+            # gas cloud), liquids, and creatures-of-flesh that aren't
+            # corpses get skipped silently. Without this gate, mass
+            # salvage cheerfully tried to disassemble „kałuża kwasu”
+            # and produced absurd materials.
+            if ent.entity_type == "hazard" or "hazard" in tags:
+                continue
+            if "liquid" in tags and not ({"container"} & tags):
+                continue
+            # Must have a salvage pathway (affordance OR salvageable tag).
+            if "salvage" not in affs and "salvageable" not in tags \
+                    and "corpse" not in tags \
+                    and ent.entity_type != "corpse":
+                # Silent skip — not every visible thing is fair game
+                # for `zdemontuj wszystko`. Only mention it if it has
+                # NO obvious "this could be useful" hint at all.
+                continue
             if st.get("stripped") or st.get("depleted") or st.get("destroyed"):
                 skipped.append(f"{name}: już rozebrane")
                 continue
@@ -2548,7 +2635,8 @@ class Game:
         # Big noise + time on top of per-entity bumps already applied.
         room.noise_level += min(5, len(salvaged))
         self.log(t("feedback_mass_salvage_summary",
-                   fallback=f"Czas: ok. {total_minutes} min. Hałas: wysoki."),
+                   fallback=f"Czas: ok. {total_minutes} min. Hałas: wysoki.",
+                   minutes=total_minutes),
                  LOG_SYSTEM)
         # Prompt 18: mass-salvage is the recycling-cult headline move and
         # also drives audience. Emit the tags + audience bump once per
@@ -3530,6 +3618,8 @@ class Game:
         v = validate(intent, self.world)
         if not v.valid:
             self.log(v.message() or "—", LOG_WARN)
+            # P26c: latch disambiguation (env-fallback path).
+            self._stash_disambiguation_on_invalid(v, intent)
             return
         r = resolve(v, self.world)
         lines = apply(r.effects, self.world, time_system=time_system)

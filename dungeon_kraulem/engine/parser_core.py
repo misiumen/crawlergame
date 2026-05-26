@@ -667,11 +667,17 @@ def parse(text: str, world=None) -> ActionIntent:
         if aff is not None:
             intent.intent = aff.key
             intent.verb = verb_token
-            # Everything else is potential target / modifier
-            for tok in tokens[1:]:
-                if tok in _STOP:
-                    continue
-                intent.targets.append(tok)
+            # P26c class-fix: previously this loop appended each
+            # remaining token as a separate target string — so
+            # "zdemontuj rozbity monitor" became targets=["rozbity",
+            # "monitor"]. The validator then only saw "rozbity" and
+            # surfaced an ambiguity prompt for every entity starting
+            # with that word. Now we JOIN the non-stop tokens into
+            # one target phrase, so multi-word adjective+noun names
+            # resolve uniquely.
+            rest_tokens = [tok for tok in tokens[1:] if tok not in _STOP]
+            if rest_tokens:
+                intent.targets.append(" ".join(rest_tokens))
             intent.confidence = 0.6 if intent.targets else 0.7
             return intent
 

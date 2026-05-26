@@ -222,6 +222,35 @@ def test_game_state_flips_to_defeat_on_collapse():
     print("  Game state → defeat on collapse: OK")
 
 
+def test_fresh_game_ticks_without_crashing():
+    """Regression for d3693aa: P26b added a Game.update() poll that read
+    `f.state["collapsed"]`, but FloorState never had a `state` attribute
+    defined — only RoomState did. Every update() tick after
+    start_new_game raised AttributeError, crashing the game on the first
+    frame. The earlier P26b tests only exercised update() AFTER
+    _trigger_floor_collapse had lazily created `f.state`, so they missed
+    this entirely.
+
+    Covers all backgrounds because the bug was background-agnostic; we
+    just iterate through a couple to make the class of bug ("game can
+    run for N frames after fresh start") testable for any future
+    Game.update() regression.
+    """
+    from ..engine.game import Game
+    from ..engine.character import BACKGROUNDS
+    pygame.display.set_mode((1280, 720))
+    for bg in ("janitor", "opiekun_zwierzaka", "office_worker"):
+        assert bg in BACKGROUNDS, f"test fixture stale: {bg} not in BACKGROUNDS"
+        g = Game(screen=pygame.display.get_surface())
+        g.start_new_game("Tester", bg)
+        g.state = "play"
+        # Tick + draw a few frames — this is what crashed before.
+        for _ in range(5):
+            g.update(16)
+            g.draw()
+    print("  fresh game ticks without crashing (3 backgrounds × 5 frames): OK")
+
+
 # ── Faction AI ────────────────────────────────────────────────────────
 
 def test_faction_tags_extract():
@@ -324,6 +353,7 @@ def main():
     test_collapse_threshold_lines_fire()
     test_collapse_at_zero_marks_floor()
     test_game_state_flips_to_defeat_on_collapse()
+    test_fresh_game_ticks_without_crashing()
     test_faction_tags_extract()
     test_rival_target_picked_when_factions_differ()
     test_same_faction_no_retarget()

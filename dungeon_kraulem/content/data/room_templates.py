@@ -234,8 +234,9 @@ ROOMS = [
           "duża butla z gazem.",
         "look_key": "room_chem_look",
         "fallback_look":
-          "Kwas na podłodze. Butla gazu. Na ścianie naklejka: 'NIE LĄCZYĆ KWASU Z OGNIEM. "
-          "PROSIMY.' Drzwi na wschód są ciężkie, opisane jako 'PRZECHOWALNIA'.",
+          "Kwas na podłodze. Butla gazu. Na ścianie naklejka: 'NIE MIESZAĆ KWASU Z "
+          "OGNIEM. DZIĘKUJEMY ZA WSPÓŁPRACĘ.' Drzwi na wschód są ciężkie, opisane "
+          "jako 'PRZECHOWALNIA'.",
         "search_key": "room_chem_search",
         "fallback_search":
           "Pod stołem zardzewiały, ale ostry nóż. Ktoś musiał stracić cierpliwość.",
