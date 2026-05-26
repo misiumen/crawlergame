@@ -344,6 +344,16 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
         elif kind == "add_credits":
             world.character.credits += int(eff.get("amount", 0))
 
+        elif kind == "log_line":
+            # P28.5: explicit narrator line emit from a consequence.
+            # `category` is for future content-loader hookup; `fallback`
+            # is the literal line used today (no LLM, no template
+            # registry yet). Lets resolution.py push feedback text
+            # without needing a special slot in the caller's log loop.
+            ln = eff.get("fallback") or ""
+            if ln:
+                lines.append(ln)
+
         elif kind == "world_flag":
             # Generic world-state flag, used by risks/rewards. Lives on
             # the floor's active_events as well as character.flags so both

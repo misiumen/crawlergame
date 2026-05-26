@@ -184,10 +184,19 @@ def test_invoke_belief_handler():
                                 strength=75, stability=60)
     memetics.register_seed(w, seed)
     g = Game(screen=None); g.world = w
-    g._attempt_invoke_belief(parse("przypominam dronom o skradzionych sercach"))
-    # Either the bot gained a condition or HP dropped (success path).
-    success = ("hesitating" in (bot.conditions or [])) or bot.hp < 8
-    assert success, f"invoke_belief had no visible effect (hp={bot.hp}, cond={bot.conditions})"
+    # invoke_belief is RNG-gated. Retry a few times so a single
+    # unlucky roll doesn't fail the smoke; chance ~60% per try.
+    pre_hp = bot.hp
+    success = False
+    for _ in range(8):
+        g._attempt_invoke_belief(parse("przypominam dronom o skradzionych sercach"))
+        if ("hesitating" in (bot.conditions or [])) or bot.hp < pre_hp:
+            success = True
+            break
+        # Reset for next attempt.
+        bot.hp = pre_hp
+        bot.conditions = []
+    assert success, f"invoke_belief had no visible effect in 8 tries (hp={bot.hp}, cond={bot.conditions})"
     print(f"  invoke_belief handler: OK (cond={bot.conditions}, hp={bot.hp})")
 
 

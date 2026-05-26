@@ -300,9 +300,41 @@ def _effects_for_level(level, aff_key, validation, world):
                             "amount": aff.audience_effect if aff else 5,
                             "source":"env_kill","tag":"env_kill"})
         elif aff_key == "hack" and primary is not None:
-            effects.append({"type":"change_object_state","entity_id":primary.entity_id,
-                            "state_update":{"hacked":True}})
-            effects.append({"type":"add_affinity","kind":"tech","amount":2})
+            # P28.5: hack success used to silently set a `hacked` flag and
+            # do nothing visible. Now it actually rewards the player:
+            #   * marks the entity as hacked (so re-hacking refuses)
+            #   * grants 8 credits (skimmed off the network)
+            #   * +2 tech affinity
+            #   * adds a sponsor `tech_kill` tag (Kanał 7 / Ministerstwo)
+            #   * unlocks any room exit whose `entity_id` points at this
+            #     terminal (door-control terminals)
+            #   * +5 audience (people like watching a hack)
+            already_hacked = bool((primary.state or {}).get("hacked"))
+            if already_hacked:
+                # Re-hacking a known-cracked terminal is a no-op — no
+                # double-dip, no spam.
+                effects.append({"type":"add_affinity","kind":"tech","amount":1})
+            else:
+                effects.append({"type":"change_object_state",
+                                "entity_id": primary.entity_id,
+                                "state_update":{"hacked": True,
+                                                "unlocked": True}})
+                effects.append({"type":"add_credits", "amount": 8})
+                effects.append({"type":"add_affinity","kind":"tech","amount":2})
+                effects.append({"type":"sponsor_tag","tag":"tech_kill","weight":1})
+                effects.append({"type":"add_audience","amount":5,
+                                "source":"hack","tag":"tech_kill"})
+                # P28.5 — narrator line so the player SEES that the hack
+                # paid off. Goes through `log_line` consequence; falls
+                # back to a stock string when no template matches.
+                effects.append({"type":"log_line",
+                                "category":"hack_success",
+                                "fallback": (
+                                    f"„{primary.display_name()}” otwiera "
+                                    f"się z cichym pyknięciem. Skanujesz "
+                                    f"port serwisowy: kilka kredytów "
+                                    f"wpada na twoje konto, a sąsiednie "
+                                    f"drzwi klikają w stronę 'otwarte'.")})
         elif aff_key == "force" and primary is not None:
             effects.append({"type":"change_object_state","entity_id":primary.entity_id,
                             "state_update":{"broken_open":True}})

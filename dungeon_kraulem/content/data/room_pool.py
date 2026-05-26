@@ -81,6 +81,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 3,
         "weight": 8,
         "floor_min": 1,
+        "unique_per_floor": True,   # P28.5: one cafe per floor
     },
     {
         "template_id": "pool_bathroom",
@@ -121,6 +122,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 2,
         "weight": 6,
         "floor_min": 1,
+        "unique_per_floor": True,   # P28.5: one bathroom per floor
     },
     {
         "template_id": "pool_black_market",
@@ -158,6 +160,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 1,
         "weight": 4,
         "floor_min": 1,
+        "unique_per_floor": True,   # P28.5: one black market per floor
     },
     {
         "template_id": "pool_clinic",
@@ -192,6 +195,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 1,
         "weight": 5,
         "floor_min": 1,
+        "unique_per_floor": True,   # P28.5: one clinic per floor
     },
 
     # ── Combat / dangerous ──────────────────────────────────────────────────
@@ -400,6 +404,10 @@ ROOM_POOL = [
         "guaranteed_max_exits": 2,
         "weight": 5,
         "floor_min": 1,
+        "unique_per_floor": True,   # P28.5: one lounge per floor (fixes
+                                     # bug where Druga Szansa + Bar Pod
+                                     # Czerwoną Lampką spawned side-by-side
+                                     # with identical NPCs).
     },
 
     # ── Secret / sneaky ─────────────────────────────────────────────────────
