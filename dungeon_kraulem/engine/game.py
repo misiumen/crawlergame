@@ -1819,6 +1819,20 @@ class Game:
         if intent.intent == "consume":
             self._attempt_consume(intent); return
 
+        # P29.4 — black-market buy/sell follow-ups.
+        if intent.intent == "bm_buy":
+            from ..systems import safehouses as _sh
+            target = intent.targets[0] if intent.targets else ""
+            line = _sh.try_buy(self.world, target)
+            self.log(line, LOG_NORMAL)
+            return
+        if intent.intent == "bm_sell":
+            from ..systems import safehouses as _sh
+            target = intent.targets[0] if intent.targets else ""
+            line = _sh.try_sell(self.world, target)
+            self.log(line, LOG_NORMAL)
+            return
+
         # Gap 4: deploy a crafted/portable trap or device
         if intent.intent == "deploy":
             self._attempt_deploy(intent); return

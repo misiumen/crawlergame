@@ -334,6 +334,26 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.85
         return intent
 
+    # ── P29.4 — Buy / sell follow-ups in black-market safehouses ────────────
+    # "kup <X>" → bm_buy   ;   "sprzedaj <X>" → bm_sell
+    import re as _re_bm
+    bm_buy_re = _re_bm.compile(r"^(?:kup|kupić|buy)\s+(.+)$")
+    bm_sell_re = _re_bm.compile(r"^(?:sprzedaj|sprzedać|sell)\s+(.+)$")
+    bm_m = bm_buy_re.match(folded)
+    if bm_m:
+        intent.intent = "bm_buy"
+        intent.verb = "kup"
+        intent.targets.append(_strip_articles(bm_m.group(1)))
+        intent.confidence = 0.9
+        return intent
+    bm_m = bm_sell_re.match(folded)
+    if bm_m:
+        intent.intent = "bm_sell"
+        intent.verb = "sprzedaj"
+        intent.targets.append(_strip_articles(bm_m.group(1)))
+        intent.confidence = 0.9
+        return intent
+
     # ── Listen: "nasłuchuj <exit>" / "listen at <exit>" ──────────────────────
     if folded.startswith(("nasluchuj","posluchaj","listen")):
         intent.intent = "listen"
