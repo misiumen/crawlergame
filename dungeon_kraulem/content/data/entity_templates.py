@@ -377,28 +377,9 @@ MON = {
         vulnerable_to=["acid"],
     ),
 
-    # ── Prompt 20 — alarm responders ────────────────────────────────────────
-    "patrol_security": dict(
-        name_key="ent_patrol_security_n", fallback_name="Ochroniarz patrolu",
-        desc_key="ent_patrol_security_d",
-        fallback_desc="Standardowy ochroniarz. Pałka, kamizelka, słabe morale.",
-        tags=["monster","humanoid","corporate","responder"],
-        affordances=["inspect","attack","intimidate","bribe","talk"],
-        hp=14, max_hp=14, ac=12, attack_bonus=3, damage_dice="1d6+1",
-        # Kevlar vest = mild physical resist, no chem protection.
-        resists=["physical"],
-        vulnerable_to=["electric"],
-    ),
-    "silent_response": dict(
-        name_key="ent_silent_response_n", fallback_name="Agent ds. wycieków",
-        desc_key="ent_silent_response_d",
-        fallback_desc="Czarna kurtka, tłumik na pistolecie, nie mówi.",
-        tags=["monster","humanoid","corporate","stealth","responder"],
-        affordances=["inspect","attack","sneak"],
-        hp=12, max_hp=12, ac=13, attack_bonus=4, damage_dice="1d8",
-        # No special armor — light and fast.
-        vulnerable_to=["fire"],
-    ),
+    # P29.0 — patrol_security / silent_response REMOVED. They were
+    # only ever spawned by encounter.fire() / alarm scheduling, which
+    # is gone. The dungeon doesn't dispatch responders.
     "biotech_inspector": dict(
         name_key="ent_biotech_inspector_n", fallback_name="Inspektor NovaChem",
         desc_key="ent_biotech_inspector_d",

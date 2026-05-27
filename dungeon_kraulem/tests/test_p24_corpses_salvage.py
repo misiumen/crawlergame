@@ -181,8 +181,10 @@ def test_eat_refuses_non_edible():
     w = _mk_world()
     m = _spawn_monster(w, key="freezer_carver", name="Rzeźnik")
     # Freezer carver IS marked edible but with negative consequences;
-    # use a sponsor responder instead which is explicitly NOT edible.
-    m2 = _spawn_monster(w, key="patrol_security", name="Ochroniarz")
+    # use a sponsor inspector instead which is explicitly NOT edible.
+    # P29.0 — patrol_security removed; biotech_inspector takes its
+    # place as the canonical "non-edible humanoid corpse".
+    m2 = _spawn_monster(w, key="biotech_inspector", name="Inspektor")
     _cp.transform_to_corpse(w, m2)
     res = _cp.eat(w, m2, w.character)
     assert not res.ok
@@ -346,8 +348,11 @@ def test_authored_monsters_have_complete_templates():
     REQUIRED = ("name_pl", "lore", "salvage", "salvage_time_min",
                 "decay_minutes")
     bad = []
+    # P29.0 — patrol_security / silent_response REMOVED with the patrol
+    # system. biotech_inspector covers the "corporate humanoid corpse"
+    # slot now.
     for key in ("tunnel_runt", "freezer_carver", "relay_warden",
-                "patrol_security", "silent_response", "biotech_inspector",
+                "biotech_inspector",
                 "agent_kontroli_jakosci", "egzekutor_ligi", "windykator",
                 "redaktor_naczelny"):
         assert is_authored(key), f"{key} should be authored"

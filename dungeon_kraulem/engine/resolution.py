@@ -361,9 +361,13 @@ def _effects_for_level(level, aff_key, validation, world):
                             {"type":"add_affinity","kind":"stealth","amount":1})
         elif aff_key == "hide":
             effects.append({"type":"add_affinity","kind":"stealth","amount":1})
-            # Prompt 20: if a scheduled encounter is incoming in this room,
-            # a successful hide marks the player concealed so the arriver
-            # search resolves narratively instead of starting combat.
+            # P29.0 — successful hide drops local room threat pool and
+            # steps every alive hostile down one threat rank. Was: only
+            # flagged "hidden_for_encounter" for the (now removed)
+            # patrol arrival system.
+            effects.append({"type":"de_escalate_threat", "amount": 5})
+            # Hidden flag kept for back-compat with class actives that
+            # set it directly (trickster's "Znikanie").
             effects.append({"type":"world_flag",
                             "key":"hidden_for_encounter","value":True})
             effects.append({"type":"sponsor_tag","tag":"hide","weight":1})

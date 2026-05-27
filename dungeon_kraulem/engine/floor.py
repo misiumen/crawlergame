@@ -54,9 +54,9 @@ class FloorState:
     # Prompt 07: belief seeds active on this floor (subset of world.belief_seeds).
     active_belief_seed_ids: List[str] = field(default_factory=list)
 
-    # Prompt 20: pending scheduled encounters (alarms → arrivals).
-    # Elements are `engine.encounter.ScheduledEncounter` instances.
-    # `time_system.advance` drains this list each tick.
+    # P29.0 — `scheduled_encounters` field kept as an empty list for
+    # save/load back-compat with floors written before the patrol
+    # system was removed. Nothing ever appends to it now.
     scheduled_encounters: List = field(default_factory=list)
 
     # ── Helpers ──────────────────────────────────────────────────────────────

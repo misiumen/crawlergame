@@ -142,6 +142,13 @@ class CombatState:
     # target. Empty means "torso" (default body shot).
     targeted_zone_by_eid: Dict[int, str] = field(default_factory=dict)
 
+    # P29.0 — when combat started because an entity escalated to
+    # threat_level=3 (enraged), the enraged hostiles get one free
+    # attack BEFORE the player's next action. Set by threat.bump,
+    # consumed by Game._run_enemy_turn (which fires regardless of
+    # whose turn it normally is) and reset to False.
+    free_attack_pending: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "active": self.active, "round": self.round, "side": self.side,
@@ -156,6 +163,7 @@ class CombatState:
             "selected_target_id": self.selected_target_id,
             "targeted_zone_by_eid": {str(k): v for k, v
                                      in (self.targeted_zone_by_eid or {}).items()},
+            "free_attack_pending": bool(self.free_attack_pending),
         }
 
     @classmethod
@@ -165,7 +173,7 @@ class CombatState:
         cs = cls()
         for k in ("active","round","side","assessed","player_defend",
                   "player_dodge","last_action","noise_added",
-                  "companion_advantage_pending"):
+                  "companion_advantage_pending","free_attack_pending"):
             if k in d:
                 setattr(cs, k, d[k])
         cs.participants = list(d.get("participants", []))

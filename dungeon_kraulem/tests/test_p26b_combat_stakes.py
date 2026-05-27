@@ -30,8 +30,9 @@ from ..engine.floor import FloorState
 from ..engine.room import RoomState
 from ..engine.entity import Entity, T_MONSTER
 from ..engine import combat as _cmb
-from ..engine import noise as _noise
 from ..engine import time_system as _ts
+# P29.0 — noise / encounter modules REMOVED; their tests live in
+# test_p29_threat.py against the new threat-escalation system.
 
 
 def _mk_world():
@@ -56,70 +57,8 @@ def _mk_world():
     return w
 
 
-# ── Noise mechanics ────────────────────────────────────────────────────
-
-def test_noise_decays_over_time():
-    w = _mk_world()
-    a = w.current_floor.rooms["a"]
-    a.noise_level = 10
-    _noise.tick_noise(w, 1)
-    assert a.noise_level < 10, f"expected decay, got {a.noise_level}"
-    print(f"  noise decay: 10 → {a.noise_level}: OK")
-
-
-def test_noise_propagates_to_neighbor():
-    w = _mk_world()
-    a = w.current_floor.rooms["a"]
-    b = w.current_floor.rooms["b"]
-    a.noise_level = 20
-    b.noise_level = 0
-    _noise.tick_noise(w, 1)
-    assert b.noise_level > 0, "noise should bleed to adjacent room"
-    print(f"  propagation a(20)→b: b={b.noise_level}: OK")
-
-
-def test_noise_threshold_schedules_patrol_routine():
-    w = _mk_world()
-    a = w.current_floor.rooms["a"]
-    a.noise_level = _noise.PATROL_THRESHOLD + 2
-    _noise.tick_noise(w, 1)
-    # An encounter should be scheduled with source "noise:low".
-    from ..engine import encounter as _enc
-    queue = _enc._queue(w.current_floor)
-    sources = [e.source for e in queue]
-    assert any(s.startswith("noise:") for s in sources), \
-        f"expected a noise-sourced encounter; got {sources}"
-    print(f"  PATROL_THRESHOLD → encounter scheduled: {sources}: OK")
-
-
-def test_noise_latch_prevents_double_spawn():
-    w = _mk_world()
-    a = w.current_floor.rooms["a"]
-    a.noise_level = _noise.PATROL_THRESHOLD + 2
-    _noise.tick_noise(w, 1)
-    from ..engine import encounter as _enc
-    n_first = len(_enc._queue(w.current_floor))
-    # Bump noise again immediately; the latch should prevent a 2nd spawn.
-    a.noise_level = _noise.PATROL_THRESHOLD + 4
-    _noise.tick_noise(w, 1)
-    n_second = len(_enc._queue(w.current_floor))
-    assert n_second == n_first, \
-        f"latch broke: first={n_first} second={n_second}"
-    print(f"  latch prevents double spawn: ({n_first}={n_second}): OK")
-
-
-def test_noise_high_threshold_schedules_responder():
-    w = _mk_world()
-    a = w.current_floor.rooms["a"]
-    # Bump well above HIGH so the per-minute decay doesn't drop us
-    # under threshold before the check fires.
-    a.noise_level = _noise.PATROL_THRESHOLD_HIGH + 5
-    _noise.tick_noise(w, 1)
-    from ..engine import encounter as _enc
-    queue = _enc._queue(w.current_floor)
-    types = [e.alarm_type for e in queue]
-    assert "patrol_responder" in types, f"got {types}"
-    print(f"  HIGH threshold → patrol_responder: {types}: OK")
+# P29.0 — noise→patrol mechanics REMOVED. Their replacement tests
+# live in test_p29_threat.py against engine/threat.py.
 
 
 # ── Combat lockdown whitelist ─────────────────────────────────────────
@@ -342,11 +281,8 @@ def test_no_faction_tag_no_retarget():
 # ── Suite ──────────────────────────────────────────────────────────────
 
 def main():
-    test_noise_decays_over_time()
-    test_noise_propagates_to_neighbor()
-    test_noise_threshold_schedules_patrol_routine()
-    test_noise_latch_prevents_double_spawn()
-    test_noise_high_threshold_schedules_responder()
+    # P29.0 — patrol/noise tests removed. See test_p29_threat.py for
+    # the replacement (threat escalation in-room).
     test_lockdown_refuses_loot()
     test_lockdown_allows_wield_fallthrough()
     test_lockdown_allows_use_fallthrough()

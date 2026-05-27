@@ -446,27 +446,10 @@ def draw_topbar(surf, world, layout=None, *, click_registry=None):
         img = font(L.font_small - 1).render(aud, True, WARN)
         surf.blit(img, (x + w - img.get_width() - 16, y + 36))
 
-    # Prompt 20: encounter countdown badge. Shown when a scheduled
-    # encounter is pending for the player's current room. The badge
-    # uses warning red and sits below the audience line.
-    try:
-        from ..engine import encounter as _enc
-        rem = _enc.time_until_next(world)
-        if rem is not None:
-            if rem <= 0:
-                label = "⚠ TUŻ-TUŻ"
-            elif rem < 10:
-                label = f"⚠ {rem} min"
-            else:
-                hours = rem // 60
-                mins = rem % 60
-                label = (f"⚠ {hours:d}h {mins:02d}m" if hours
-                         else f"⚠ {mins} min")
-            img = font(L.font_small).render(label, True,
-                                            DANGER if rem < 5 else WARN)
-            surf.blit(img, (x + w - img.get_width() - 16, y + 56))
-    except Exception:
-        pass
+    # P29.0 — encounter countdown badge REMOVED. No more scheduled
+    # patrol arrivals to count down. Threat lives inside the room and
+    # surfaces via entity threat_level on the combat arena cards
+    # instead. See engine/threat.py.
 
 
 def draw_room_panel(surf, world, layout=None, *, click_registry=None):

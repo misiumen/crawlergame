@@ -287,8 +287,29 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                             ed["locked"] = False
 
         elif kind == "add_noise":
+            # P29.0 — route through threat.bump so threshold-crossings
+            # escalate any hostile in the room. Was a direct field
+            # mutation that bypassed escalation.
             if room:
-                room.noise_level += int(eff.get("amount", 1))
+                try:
+                    from . import threat as _threat
+                    for ln in _threat.bump(world, room,
+                                           int(eff.get("amount", 1)),
+                                           source="consequence_add_noise"):
+                        lines.append(ln)
+                except Exception:
+                    room.noise_level += int(eff.get("amount", 1))
+
+        elif kind == "de_escalate_threat":
+            # P29.0 — emitted by `hide` / `ukryj się` success. Drops the
+            # local threat pool and steps any hostiles down one rank.
+            if room:
+                try:
+                    from . import threat as _threat
+                    _threat.de_escalate(world, room,
+                                        amount=int(eff.get("amount", 5)))
+                except Exception:
+                    pass
 
         elif kind == "add_audience":
             # Prompt 18: route audience writes through the audience module
@@ -409,25 +430,22 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                 ent.discovered = True; ent.visible = True
 
         elif kind == "trigger_alarm":
-            # Prompt 18: route through audience so band crossings fire.
-            # Prompt 20: schedule an arriving encounter. `alarm_type`
-            # picks delay + responder type from the alarm table; default
-            # is the generic 30-minute corp patrol.
+            # P29.0 — patrol scheduling REMOVED. "Alarm" effects now
+            # just bump the local room threat pool by a chunk + emit a
+            # narrator line about commotion. No off-screen patrol
+            # spawns. The thing in the room either wakes up here, or
+            # it doesn't.
+            try:
+                from . import threat as _threat
+                _threat.bump(world, room, 8,
+                             source=str(eff.get("source") or "alarm"))
+            except Exception:
+                pass
+            # Still bump audience — sponsors care about commotion.
             from . import audience as _aud
             _aud.change_audience(world, 2, source="alarm")
-            try:
-                from . import encounter as _enc
-                alarm_type = str(eff.get("alarm_type") or "default")
-                room_id = room.room_id if room is not None else \
-                          (floor.current_room_id if floor else "")
-                if room_id:
-                    _enc.schedule(world, room_id, alarm_type,
-                                  source="alarm")
-            except Exception as exc:
-                lines.append(f"(alarm scheduling failed: {exc})")
-            if floor:
-                floor.floor_alert_level = min(10, floor.floor_alert_level + 1 + eff.get("amount", 0))
-            lines.append(t("feedback_alarm", fallback="Gdzieś brzęczy alarm."))
+            lines.append(t("feedback_commotion",
+                           fallback="Hałas niesie się po pokoju."))
 
         elif kind == "add_journal":
             world.character.journal.setdefault(room.room_id if room else "_", []).append(eff.get("text",""))
@@ -435,16 +453,15 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
         # ── Prompt 03 effect types ──────────────────────────────────────────
 
         elif kind == "alert_patrol":
-            if floor:
-                floor.floor_alert_level = min(10, floor.floor_alert_level + 2)
-                # Stash a one-shot "patrol_inbound" event
-                floor.active_events.append({
-                    "minute": floor.current_minute,
-                    "kind":   "patrol_inbound",
-                    "args":   {"source_room": room.room_id if room else ""},
-                })
-            lines.append(t("feedback_patrol_alerted",
-                           fallback="Patrol odebrał sygnał. Idą tu."))
+            # P29.0 — REMOVED. The "patrol incoming" mechanic is gone.
+            # Effects that used to alert_patrol now just bump local
+            # threat. Kept here as a no-op to absorb old data without
+            # crashing (eff = noop).
+            try:
+                from . import threat as _threat
+                _threat.bump(world, room, 6, source="alert_patrol_legacy")
+            except Exception:
+                pass
 
         elif kind == "block_route":
             if room and room.exits:

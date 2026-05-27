@@ -68,6 +68,13 @@ class Entity:
     # combat read so old saves and non-creature entities don't pay.
     body_parts: Dict[str, Any] = field(default_factory=dict)
 
+    # P29.0 — local threat escalation (replaces noise → patrol pipeline).
+    # Hostiles in the same room rise through threat levels as the player
+    # makes loud actions: 0=oblivious, 1=wary, 2=alert, 3=enraged.
+    # Crossing into 3 starts combat with a free attack of opportunity
+    # for the enemy. Stealth/hide and time bring it back down.
+    threat_level: int = 0
+
     def is_alive(self) -> bool:
         return self.hp > 0 if self.max_hp > 0 else True
 
@@ -93,6 +100,7 @@ class Entity:
             "vulnerable_to": list(self.vulnerable_to),
             "immune_to": list(self.immune_to),
             "body_parts": {k: dict(v) for k, v in (self.body_parts or {}).items()},
+            "threat_level": int(self.threat_level or 0),
         }
 
     @classmethod
@@ -125,6 +133,7 @@ class Entity:
         e.immune_to     = list(d.get("immune_to", []))
         bp = d.get("body_parts") or {}
         e.body_parts = {k: dict(v) for k, v in bp.items()}
+        e.threat_level = int(d.get("threat_level", 0) or 0)
         return e
 
     def display_name(self):

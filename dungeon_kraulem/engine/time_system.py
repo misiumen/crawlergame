@@ -22,13 +22,10 @@ def advance(world, minutes: int):
     except Exception:
         pass
 
-    # Prompt 20: drain scheduled encounters — emit T-15/T-5/T-1 warnings,
-    # fire any that came due. Safe when no encounters are queued.
-    try:
-        from . import encounter as _enc
-        _enc.tick_due(world, minutes)
-    except Exception:
-        pass
+    # P29.0 — encounter scheduling REMOVED. The "alarm → patrol arrives
+    # after N minutes" pipeline is gone. The dungeon doesn't send
+    # patrols; the thing already in the room is what wakes up.
+    # See engine/threat.py for the replacement mechanic.
 
     # Prompt 21: slow-decay status clocks out of combat. Burning /
     # poisoned / bleeding / corroded keep ticking at half rate during
@@ -39,12 +36,14 @@ def advance(world, minutes: int):
     except Exception:
         pass
 
-    # Prompt 26b: noise mechanic — decay, propagate, threshold-spawn.
-    # Per-room noise levels are bumped throughout combat / salvage /
-    # break handlers; this tick is where they DO something.
+    # P29.0 — threat decay. Quiet rooms cool down over time, latches
+    # clear when thresholds drop below their levels. Replaces noise
+    # propagation + patrol-spawn from P26b.
     try:
-        from . import noise as _noise
-        _noise.tick_noise(world, minutes)
+        from . import threat as _threat
+        if f and getattr(f, "rooms", None):
+            for r in list(f.rooms.values()):
+                _threat.decay(world, r, minutes)
     except Exception:
         pass
 

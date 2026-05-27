@@ -152,48 +152,9 @@ CORPSE_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "trophy_drop":     ("warden_baton", 0.25),
     },
 
-    # ── Sponsor responders (Prompt 20) ─────────────────────────────────
-    "patrol_security": {
-        "name_pl": "ciało ochroniarza",
-        "lore":    "Standardowy mundur, standardowa kamizelka, standardowo "
-                   "spóźniony refleks. W kieszeni pęka folia po batonie.",
-        "lore_id": "corpse_patrol_security",
-        "salvage": {
-            "scrap_metal":     (1, 2),
-            "cloth_strips":    (1, 2),
-            "leather_scraps":  (1, 1),
-            "meat_chunk":      (1, 1),
-            "plastic_badge":   (0, 1),    # only if you butcher carefully
-        },
-        "salvage_time_min": 6,
-        "salvage_noise": 3,
-        "edible":          False,
-        "eat_audience_tag": "ate_human",
-        "decay_minutes":   240,
-        "smell_budget":    2,
-        "desecration_tag": "desecrator",
-    },
-
-    "silent_response": {
-        "name_pl": "ciało agenta",
-        "lore":    "Czarna kurtka, czarne buty, czarne wszystko. Tłumik "
-                   "wciąż ciepły. Nie ma odznaki — to gość, którego nigdy "
-                   "tu nie było.",
-        "lore_id": "corpse_silent_response",
-        "salvage": {
-            "cloth_strips":    (1, 2),
-            "leather_scraps":  (1, 1),
-            "scrap_metal":     (1, 2),
-            "meat_chunk":      (1, 1),
-            "data_chip":       (0, 1),    # rzadko — coś, czego nie powinien mieć
-        },
-        "salvage_time_min": 7,
-        "salvage_noise": 2,
-        "edible":          False,
-        "decay_minutes":   240,
-        "smell_budget":    1,
-        "desecration_tag": "desecrator",
-    },
+    # P29.0 — patrol_security / silent_response salvage tables REMOVED
+    # along with their entity templates. No more dispatched responders
+    # to leave corpses.
 
     "biotech_inspector": {
         "name_pl": "ciało inspektora NovaChem",

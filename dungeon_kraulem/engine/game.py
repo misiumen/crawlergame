@@ -136,6 +136,31 @@ class Game:
         # would silently miss new entries (e.g. an enemy entering combat).
         self.log_scroll = 0
 
+    def _bump_threat(self, amount: int, source: str = "",
+                     room=None) -> None:
+        """P29.0 — central helper: every loud action routes its noise
+        through `threat.bump` so threshold-crossings fire (entities
+        escalate, log lines emit). Old `room.noise_level += N`
+        mutations leaked threat without escalation; this is the
+        single chokepoint that fixes it everywhere.
+
+        `room` defaults to player's current room. `source` is a
+        free-text analytics tag (never shown to player)."""
+        if self.world is None or amount <= 0:
+            return
+        if room is None:
+            room = (self.world.current_floor.current_room()
+                    if self.world.current_floor else None)
+        if room is None:
+            return
+        try:
+            from . import threat as _threat
+            for ln in _threat.bump(self.world, room, int(amount),
+                                   source=source):
+                self.log(ln, LOG_WARN)
+        except Exception:
+            pass
+
     def _stash_disambiguation_on_invalid(self, v, intent) -> None:
         """P26c — cross-handler disambiguation latch.
 
@@ -551,16 +576,19 @@ class Game:
                        fallback="Wokół ciebie wróg. Odpoczynek niemożliwy."),
                      LOG_WARN)
             return
-        # Pending encounter within 15 min?
+        # P29.0 — encounter scheduling removed. Rest is only refused
+        # for active threat in the current room (any alive hostile with
+        # threat_level >= 1 == has noticed you).
         try:
-            from . import encounter as _enc
-            rem = _enc.time_until_next(self.world)
-            if rem is not None and rem < 15:
-                self.log(t("feedback_rest_encounter_close",
-                           fallback="Słyszysz kroki w korytarzu. "
-                                    "To nie jest moment na odpoczynek."),
-                         LOG_WARN)
-                return
+            for ent in (self.world.current_floor.current_room().entities
+                        if self.world.current_floor else []):
+                if (ent.is_alive() and ent.entity_type == "monster"
+                        and int(getattr(ent, "threat_level", 0) or 0) >= 1):
+                    self.log(t("feedback_rest_threatened",
+                               fallback="Coś cię obserwuje. "
+                                        "To nie jest moment na odpoczynek."),
+                             LOG_WARN)
+                    return
         except Exception:
             pass
         # Already full?
@@ -606,18 +634,23 @@ class Game:
                      LOG_DANGER)
             return
         if not room.is_safe():
-            # Sleeping in unsafe place — chance of encounter on wake.
+            # P29.0 — unsafe sleep: instead of scheduling a patrol that
+            # arrives after sleep, bump the room threat pool hard so
+            # any hostile already present wakes up. Player gets a clean
+            # narrator line and refusal; if they really want to sleep
+            # here, they need to clear the room first.
+            try:
+                from . import threat as _threat
+                lines = _threat.bump(self.world, room, 12,
+                                     source="unsafe_sleep")
+                for ln in lines:
+                    self.log(ln, LOG_WARN)
+            except Exception:
+                pass
             self.log(t("feedback_sleep_unsafe",
                        fallback="Spróbujesz spać tu? Z otwartymi oczami "
                                 "nie zaśniesz, z zamkniętymi cię znajdą."),
                      LOG_WARN)
-            try:
-                from . import encounter as _enc
-                _enc.schedule(self.world, room.room_id,
-                              alarm_type="patrol_routine",
-                              source="unsafe_sleep")
-            except Exception:
-                pass
             return
         # Safehouse sleep — full heal + status reset + day advance.
         ch.hp = ch.max_hp
@@ -859,21 +892,22 @@ class Game:
             return
         self.log("— Plan obrony —", LOG_SYSTEM)
 
-        # Time remaining.
+        # P29.0 — no more "patrol arrival countdown". Show local threat
+        # instead: how aware are the things already in this room?
         try:
-            from . import encounter as _enc
-            rem = _enc.time_until_next(self.world)
-            if rem is not None:
-                if rem <= 0:
-                    self.log(
-                        "  Patrol jest już pod drzwiami.", LOG_DANGER)
-                elif rem <= 5:
-                    self.log(f"  Mniej niż {rem} min do przybycia.",
-                             LOG_WARN)
-                else:
-                    self.log(f"  ~{rem} min do przybycia.", LOG_NORMAL)
+            from . import threat as _threat
+            hostiles = [e for e in room.entities
+                        if e.is_alive() and e.entity_type == "monster"]
+            if not hostiles:
+                self.log("  W pokoju cicho. Nikt nie czeka.", LOG_NORMAL)
             else:
-                self.log("  Nic nie nadchodzi. (Na razie.)", LOG_NORMAL)
+                for ent in hostiles:
+                    lvl = int(getattr(ent, "threat_level", 0) or 0)
+                    label = _threat.threat_label(lvl)
+                    self.log(f"  „{ent.display_name()}” — {label}",
+                             LOG_DANGER if lvl >= 2 else LOG_WARN)
+            self.log(f"  hałas w pokoju: {int(getattr(room, 'noise_level', 0))}",
+                     LOG_NORMAL)
         except Exception:
             pass
 
@@ -1555,6 +1589,28 @@ class Game:
             self._suppress_textinput = True
 
     def _handle_play_input(self, text_val):
+        # P29.0 — if an entity escalated to enraged on the previous
+        # tick, it owes the player a free attack of opportunity.
+        # Run the enemy turn FIRST, then process the player's command
+        # against whatever damage they just took. Self-clears the flag.
+        try:
+            from . import combat as _cmb
+            room = (self.world.current_floor.current_room()
+                    if self.world and self.world.current_floor else None)
+            cs = _cmb.get_combat(room) if room else None
+            if (cs is not None and cs.active
+                    and getattr(cs, "free_attack_pending", False)):
+                cs.free_attack_pending = False
+                self.log("Wróg uderza pierwszy — sprowokowałeś.", LOG_DANGER)
+                self._run_enemy_turn(cs)
+                # If the free attack killed the player, bail before the
+                # command runs.
+                if not self.world.character.is_alive():
+                    self.state = STATE_DEFEAT
+                    return
+        except Exception:
+            pass
+
         # Prompt 20: disambiguation follow-up. If the previous command
         # left an ambiguous_target pending, intercept short replies like
         # "oba" / "obu" / "wszystko" / "1" / "brudny" before the normal
@@ -2433,7 +2489,8 @@ class Game:
         # Time + noise
         ts.advance(self.world, int(table.get("time_minutes", 15)))
         room = self.world.current_floor.current_room()
-        if room: room.noise_level += int(table.get("noise", 1))
+        self._bump_threat(int(table.get("noise", 1)),
+                          source="salvage", room=room)
 
         # Mark entity depleted/stripped (no farming)
         target.state = state
@@ -2552,8 +2609,8 @@ class Game:
         room = (self.world.current_floor.current_room()
                 if self.world.current_floor else None)
         if room is not None and result.noise:
-            room.noise_level = int(getattr(room, "noise_level", 0)) + \
-                               int(result.noise)
+            self._bump_threat(int(result.noise),
+                              source="butcher", room=room)
 
         # Tag bus events — sponsor reactions, P28 titles, P31 vendetta.
         try:
@@ -2891,8 +2948,8 @@ class Game:
             self.log(t("feedback_break_ok",
                        fallback=f"Rozbijasz „{target.display_name()}”.",
                        name=target.display_name()), LOG_SUCCESS)
-            if room:
-                room.noise_level += 2 if level == "critical_success" else 3
+            self._bump_threat(2 if level == "critical_success" else 3,
+                              source="break", room=room)
             # Prompt 22 bug fix: break needs CONSEQUENCES — audience
             # reacts (it's a spectacle), and breaking sponsor property
             # emits the right tags so the sponsor system notices. The
@@ -2986,21 +3043,18 @@ class Game:
             self.log(t("feedback_break_partial",
                        fallback=f"„{target.display_name()}” pęka, ale trzyma się jeszcze w jednym kawałku.",
                        name=target.display_name()), LOG_WARN)
-            if room:
-                room.noise_level += 1
+            self._bump_threat(1, source="break_partial", room=room)
         elif level == "failure":
             self.log(t("feedback_break_fail",
                        fallback=f"Nie udaje ci się rozbić „{target.display_name()}”. Sprzęt cię wyśmiewa.",
                        name=target.display_name()), LOG_WARN)
-            if room:
-                room.noise_level += 1
+            self._bump_threat(1, source="break_fail", room=room)
         else:   # critical_failure
             self.log(t("feedback_break_critfail",
                        fallback=f"Coś trzeszczy — głównie ty. Cios odbija ci się rykoszetem.",
                        name=target.display_name()), LOG_DANGER)
             ch.take_damage(1)
-            if room:
-                room.noise_level += 2
+            self._bump_threat(2, source="break_critfail", room=room)
 
         # Affinity nudge for environment plays.
         ch.affinity["environment"] = ch.affinity.get("environment", 0) + 1
@@ -3105,7 +3159,8 @@ class Game:
                      LOG_WARN)
             return
         # Big noise + time on top of per-entity bumps already applied.
-        room.noise_level += min(5, len(salvaged))
+        self._bump_threat(min(5, len(salvaged)),
+                          source="mass_salvage", room=room)
         self.log(t("feedback_mass_salvage_summary",
                    fallback=f"Czas: ok. {total_minutes} min. Hałas: wysoki.",
                    minutes=total_minutes),
@@ -3334,7 +3389,8 @@ class Game:
                 st["stripped"] = True; st["depleted"] = True
             broken.append(ent.display_name() + (f" ({', '.join(row)})" if row else ""))
         ts.advance(self.world, max(3, 2 * len(broken)))
-        room.noise_level += min(8, 2 * len(broken))
+        self._bump_threat(min(8, 2 * len(broken)),
+                          source="mass_break", room=room)
         if broken:
             self.log(t("feedback_mass_break_results_h",
                        fallback="Roztrzaskane:"), LOG_SUCCESS)
@@ -3920,7 +3976,7 @@ class Game:
         # Defense window for the enemy's reply.
         if defense_change != 0:
             cs.player_defend = max(0, cs.player_defend + max(0, defense_change))
-        room.noise_level += noise
+        self._bump_threat(noise, source="combat_attack", room=room)
         cs.noise_added += noise
         cs.last_action = f"attack:{mode}"
         ch.affinity["melee"] = ch.affinity.get("melee", 0) + 1
@@ -4339,7 +4395,7 @@ class Game:
         self.log(t("feedback_deploy_ok",
                    fallback=f"Rozstawiasz: {item.display_name()}.",
                    name=item.display_name()), LOG_SUCCESS)
-        room.noise_level += 1
+        self._bump_threat(3, source="trap_arm", room=room)
         ch.affinity["trap"] = ch.affinity.get("trap", 0) + 1
 
         # Narrator hook
