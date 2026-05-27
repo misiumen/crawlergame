@@ -81,7 +81,14 @@ def hp_bar(surf, x, y, w, h, val, mx, color=SUCCESS):
 
 # ── Title ────────────────────────────────────────────────────────────────────
 
-def draw_title(surf, save_exists: bool, selected_idx: int = 0):
+def draw_title(surf, save_exists: bool, selected_idx: int = 0,
+               *, click_registry=None,
+               on_select=None):
+    """P28.7 — `click_registry` + `on_select(action_key)` make the
+    title menu fully mouse-driven. `action_key` is one of
+    "new_game" / "load_game" / "settings" / "quit" / "toggle_lang".
+    Keyboard nav (digit / Enter / arrow keys) still works in parallel.
+    """
     """P27 — DCC reality-TV main menu.
 
     Broadcast-terminal aesthetic: dark slab background, scanlines, a
@@ -154,12 +161,29 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0):
         (t("title_quit",            fallback="[4] WYJDŹ Z TRANSMISJI"), BRIGHT_TEXT),
     ]
     sel = max(0, min(int(selected_idx or 0), len(items) - 1))
+    action_keys = ["new_game", "load_game", "settings", "quit"]
     for i, (label, col) in enumerate(items):
         if i == sel:
             label = "▶  " + label + "  ◀"
             col = ACCENT
         timg = font(item_size, bold=True).render(label, True, col)
-        surf.blit(timg, ((sw - timg.get_width()) // 2, cy))
+        ix = (sw - timg.get_width()) // 2
+        # Click zone — generous vertical padding so a click anywhere
+        # in the row triggers. Pass the matching action_key to the
+        # caller's on_select handler.
+        if click_registry is not None and on_select is not None:
+            ak = action_keys[i] if i < len(action_keys) else None
+            if ak is not None and not (ak == "load_game" and not save_exists):
+                pad = 8
+                rect_w = max(timg.get_width() + 60, 320)
+                rect_x = (sw - rect_w) // 2
+                def _click(_ak=ak):
+                    on_select(_ak)
+                click_registry.add(
+                    (rect_x, cy - pad, rect_w, item_size + 2 * pad),
+                    _click, tooltip=label.strip("▶◀ "),
+                    category="title_menu")
+        surf.blit(timg, (ix, cy))
         cy += item_size + 14
 
     # Sponsor stripe — bottom cycling band.
@@ -182,6 +206,11 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0):
     lang_str = f"[L] {t('lang_toggle_label', fallback='Język')}: {get_language().upper()}"
     lang_img = font(body_size - 2).render(lang_str, True, ACCENT2)
     surf.blit(lang_img, (24, sh - 24))
+    if click_registry is not None and on_select is not None:
+        click_registry.add(
+            (20, sh - 30, lang_img.get_width() + 12, lang_img.get_height() + 12),
+            lambda: on_select("toggle_lang"),
+            tooltip="Język / Language", category="title_menu")
 
     footer = t("title_syndicate_footer",
                fallback="© Syndykat Rozrywki Wydobywczej.  "
@@ -192,7 +221,13 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0):
 
 # ── Character creation ──────────────────────────────────────────────────────
 
-def draw_creation(surf, state):
+def draw_creation(surf, state, *, click_registry=None,
+                  on_action=None):
+    """P28.7 — character creation is now mouse-clickable. The
+    on_action callback receives ("confirm_name",) or ("pick_bg", idx)
+    or ("commit_bg",) or ("back",) so the Game can route to the
+    same logic as the keyboard path.
+    """
     surf.fill(DARK_BG)
     sw, sh = surf.get_size()
     L = _resolve_layout(None)
@@ -214,6 +249,32 @@ def draw_creation(surf, state):
         text(surf, t("create_hint_name",
                      fallback="[Enter] Dalej   [Esc] Powrót"),
              80, 260, DIM_TEXT, small_size)
+        # P28.7 — mouse buttons next to the input box.
+        btn_y = 200
+        btn_h = 40
+        if click_registry is not None and on_action is not None:
+            # "Dalej" button
+            ok_label = t("create_next_btn", fallback="Dalej ▶")
+            ok_img = font(body_size, bold=True).render(ok_label, True, ACCENT)
+            ox = 500
+            pygame.draw.rect(surf, ACCENT, (ox, btn_y, 110, btn_h), 2)
+            surf.blit(ok_img, (ox + (110 - ok_img.get_width()) // 2,
+                               btn_y + (btn_h - ok_img.get_height()) // 2))
+            click_registry.add((ox, btn_y, 110, btn_h),
+                               lambda: on_action("confirm_name"),
+                               tooltip="Dalej (Enter)",
+                               category="create_btn")
+            # "Powrót" button
+            back_label = t("create_back_btn", fallback="◀ Powrót")
+            back_img = font(body_size).render(back_label, True, DIM_TEXT)
+            bx = 624
+            pygame.draw.rect(surf, BORDER, (bx, btn_y, 110, btn_h), 1)
+            surf.blit(back_img, (bx + (110 - back_img.get_width()) // 2,
+                                 btn_y + (btn_h - back_img.get_height()) // 2))
+            click_registry.add((bx, btn_y, 110, btn_h),
+                               lambda: on_action("back"),
+                               tooltip="Powrót (Esc)",
+                               category="create_btn")
     elif step == "background":
         text(surf, t("create_select_bg", fallback="Wybierz tło (nie klasę):"),
              60, 100, NORMAL_TEXT, body_size + 2)
@@ -226,14 +287,58 @@ def draw_creation(surf, state):
             col = ACCENT if i == sel else NORMAL_TEXT
             label = t(f"bg_{key}_n", fallback=key)
             marker = "▶ " if i == sel else "  "
+            row_y = cy
             text(surf, f"{marker}[{i+1:2d}] {label}", 80, cy, col,
                  body_size, bold=(i==sel)); cy += 22
             desc = t(f"bg_{key}_d", fallback="")
             if desc:
                 text(surf, "        " + desc, 80, cy, DIM_TEXT, small_size - 1); cy += 18
+            row_h = cy - row_y
+            # P28.7 — clickable row. Single click = select that bg.
+            # If clicking the row that's already selected → commit
+            # (acts like Enter). Double-pick on the same row commits
+            # cleanly without a separate Potwierdź button.
+            if click_registry is not None and on_action is not None:
+                def _pick(_idx=i, _was_sel=(i == sel)):
+                    if _was_sel:
+                        on_action("commit_bg")
+                    else:
+                        on_action(("pick_bg", _idx))
+                click_registry.add((60, row_y - 2, sw - 120, row_h),
+                                   _pick, tooltip=label,
+                                   category="create_bg_row")
+        # Bottom button row.
         text(surf, t("create_keys_bg",
-                     fallback="[1-9/0/↑↓] Wybierz   [Enter] Potwierdź   [Esc] Wstecz"),
+                     fallback="[1-9/0/↑↓] Wybierz   [Enter] Potwierdź   [Esc] Wstecz   (lub kliknij wybrane tło)"),
              80, sh - 40, DIM_TEXT, small_size)
+        if click_registry is not None and on_action is not None:
+            # "Potwierdź" button bottom-right.
+            commit_label = t("create_commit_btn", fallback="Potwierdź ▶")
+            ci = font(body_size, bold=True).render(commit_label, True, ACCENT)
+            cx_btn = sw - ci.get_width() - 60
+            cy_btn = sh - 80
+            pygame.draw.rect(surf, ACCENT, (cx_btn - 12, cy_btn - 8,
+                                             ci.get_width() + 24, ci.get_height() + 16), 2)
+            surf.blit(ci, (cx_btn, cy_btn))
+            click_registry.add(
+                (cx_btn - 12, cy_btn - 8, ci.get_width() + 24, ci.get_height() + 16),
+                lambda: on_action("commit_bg"),
+                tooltip="Potwierdź wybór (Enter)",
+                category="create_btn")
+            # "Wstecz" button bottom-left.
+            back_img = font(body_size).render(
+                t("create_back_btn", fallback="◀ Wstecz"), True, DIM_TEXT)
+            bx_b = 60
+            by_b = sh - 80
+            pygame.draw.rect(surf, BORDER,
+                             (bx_b - 12, by_b - 8,
+                              back_img.get_width() + 24, back_img.get_height() + 16), 1)
+            surf.blit(back_img, (bx_b, by_b))
+            click_registry.add(
+                (bx_b - 12, by_b - 8,
+                 back_img.get_width() + 24, back_img.get_height() + 16),
+                lambda: on_action("back"),
+                tooltip="Wstecz (Esc)", category="create_btn")
 
 
 # ── In-game ─────────────────────────────────────────────────────────────────

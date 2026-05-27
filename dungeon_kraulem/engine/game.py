@@ -1185,6 +1185,71 @@ class Game:
                            fallback="Tryb okna włączony."), LOG_SUCCESS)
         return ok
 
+    # ── P28.7 — mouse handlers for title + creation screens ──────────────
+
+    def _title_action(self, action_key: str) -> None:
+        """Click callback from draw_title. Mirrors the keyboard path in
+        handle_keydown for STATE_TITLE — same effects, just routed
+        through one shared method so mouse and keyboard stay in sync."""
+        if action_key == "new_game":
+            self.cc = {"step": "name", "name_input": "", "selected_bg": 0}
+            self.input_text = ""
+            self.state = STATE_CREATE
+        elif action_key == "load_game":
+            if save_load.exists():
+                w = save_load.load()
+                if w is not None:
+                    self.world = w
+                    self.state = STATE_PLAY
+                    self.log(t("log_save_loaded",
+                               fallback="Zapis wczytany."), LOG_SUCCESS)
+                else:
+                    self.log(t("log_save_load_failed",
+                               fallback="Zapis uszkodzony."), LOG_DANGER)
+        elif action_key == "settings":
+            self._open_settings()
+        elif action_key == "quit":
+            pygame.quit()
+            raise SystemExit
+        elif action_key == "toggle_lang":
+            set_language("en" if get_language() == "pl" else "pl")
+
+    def _create_action(self, action) -> None:
+        """Click callback from draw_creation. `action` is a string for
+        single-arg ops ("confirm_name", "commit_bg", "back") or a
+        tuple ("pick_bg", idx). Mirrors the STATE_CREATE keyboard path."""
+        if isinstance(action, tuple):
+            kind, *args = action
+        else:
+            kind = action
+            args = ()
+        step = self.cc.get("step")
+        if kind == "back":
+            if step == "name":
+                self.state = STATE_TITLE
+            elif step == "background":
+                self.cc["step"] = "name"
+            return
+        if step == "name" and kind == "confirm_name":
+            name = self.cc.get("name_input", "").strip() or "Bezimienny"
+            self.cc["step"] = "background"
+            self.cc["name_input"] = name
+            return
+        if step == "background":
+            if kind == "pick_bg" and args:
+                idx = int(args[0])
+                from .character import BACKGROUNDS
+                if 0 <= idx < len(BACKGROUNDS):
+                    self.cc["selected_bg"] = idx
+            elif kind == "commit_bg":
+                from .character import BACKGROUNDS
+                idx = int(self.cc.get("selected_bg", 0))
+                if 0 <= idx < len(BACKGROUNDS):
+                    name = self.cc.get("name_input", "").strip() or "Bezimienny"
+                    bg = BACKGROUNDS[idx]
+                    self.start_new_game(name, bg)
+                    self.state = STATE_PLAY
+
     # ── Prompt 11: settings popup ─────────────────────────────────────────
 
     def _open_settings(self):
@@ -5795,19 +5860,25 @@ class Game:
     def draw(self):
         s = self.screen
         s.fill((10,12,18))
+        # P28.7 — click registry is now reset BEFORE state-specific draw
+        # so title + create + settings can register click zones too.
+        # Mouse parity across every screen instead of "only works in play".
+        self.click_registry.reset()
         if self.state == STATE_TITLE:
-            ui.draw_title(s, save_load.exists(), selected_idx=self.title_idx)
+            ui.draw_title(s, save_load.exists(), selected_idx=self.title_idx,
+                          click_registry=self.click_registry,
+                          on_select=self._title_action)
         elif self.state == STATE_SETTINGS:
             ui.draw_settings(s, getattr(self, "settings_state", {}),
                              save_exists=save_load.exists())
         elif self.state == STATE_CREATE:
-            ui.draw_creation(s, self.cc)
+            ui.draw_creation(s, self.cc,
+                             click_registry=self.click_registry,
+                             on_action=self._create_action)
         elif self.state == STATE_PLAY:
             self._refresh_layout()
             L = self._layout
-            # P24.5: clear the click registry at frame start; draws
-            # below repopulate it.
-            self.click_registry.reset()
+            # P28.7 — registry already reset at draw() top.
             ui.draw_topbar(s, self.world, layout=L,
                            click_registry=self.click_registry)
             if L.has_left_sidebar:
