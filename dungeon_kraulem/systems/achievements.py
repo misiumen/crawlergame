@@ -238,6 +238,174 @@ _add(AchievementDef(
 ))
 
 
+# ── P29.15 — DCC reality-TV reskin / new content ─────────────────────────
+# Each carries a chyron-style PL name (the line that flashes in studio
+# during a kill or a milestone). The supplemental hooks in game.py fire
+# these on the relevant action sites.
+
+# Combat milestones.
+_add(AchievementDef(
+    key="pierwsza_krew",
+    fallback_name_pl="Pierwsza krew, sezon w toku",
+    fallback_name_en="First Blood, Season Active",
+    fallback_description_pl="Pierwszy zabity uczestnik. Sponsorzy odetchnęli z ulgą.",
+    fallback_description_en="First kill. The sponsors exhale.",
+    category="combat",
+))
+
+_add(AchievementDef(
+    key="finiszer_kanalu",
+    fallback_name_pl="Finiszer Kanału 7",
+    fallback_name_en="Channel 7 Finisher",
+    fallback_description_pl="Krytyczne trafienie na publicznym ujęciu. Kamera 4 łapie szczegół.",
+    fallback_description_en="Critical hit on a live broadcast take.",
+    category="combat",
+))
+
+_add(AchievementDef(
+    key="rzeznia_kontrolowana",
+    fallback_name_pl="Rzeźnia kontrolowana (×50)",
+    fallback_name_en="Controlled Carnage (×50)",
+    fallback_description_pl="Pięćdziesiąt zabitych. Producent kupuje ci drinka — symbolicznie.",
+    fallback_description_en="Fifty kills. The producer buys you a drink — symbolic.",
+    category="combat",
+))
+
+_add(AchievementDef(
+    key="boss_padl_pierwszy",
+    fallback_name_pl="Pierwszy boss pada",
+    fallback_name_en="First Boss Down",
+    fallback_description_pl="Pokonałeś pierwszego bossa piętra. Studio kupuje czas reklamowy.",
+    fallback_description_en="First floor-boss killed. Studio sells extra ad slots.",
+    category="combat",
+))
+
+# Survival / dramatics.
+_add(AchievementDef(
+    key="anty_host_warknal",
+    fallback_name_pl="Anti-host warknął",
+    fallback_name_en="Anti-Host Snarled",
+    fallback_description_pl="Last-stand: pierwszy raz spadłeś do 1 HP i wstałeś. Tylko raz.",
+    fallback_description_en="Last stand: dropped to 1 HP and got back up. Only once.",
+    category="survival",
+    hidden=True,
+))
+
+_add(AchievementDef(
+    key="reklama_przerywa_walke",
+    fallback_name_pl="Reklama przerywa walkę",
+    fallback_name_en="Commercial Break Interrupts Combat",
+    fallback_description_pl="Wszedłeś w stan defensywny pięć rund pod rząd. Studio musi puścić reklamy.",
+    fallback_description_en="Five defensive rounds in a row. Studio cuts to ads.",
+    category="combat",
+    hidden=True,
+))
+
+_add(AchievementDef(
+    key="brak_zwlok_brak_problemu",
+    fallback_name_pl="Brak zwłok, brak problemu",
+    fallback_name_en="No Bodies, No Problem",
+    fallback_description_pl="Pierwsze piętro przeszedłeś bez zabicia nikogo. Sponsorzy pamiętają.",
+    fallback_description_en="First floor cleared without killing anyone. Sponsors remember.",
+    category="stealth",
+    hidden=True,
+))
+
+# Floors / descent.
+_add(AchievementDef(
+    key="dno_jeszcze_dalej",
+    fallback_name_pl="Dno, jeszcze dalej",
+    fallback_name_en="Bottom, Still Going",
+    fallback_description_pl="Schody w dół drugi raz. Loch zaczyna pamiętać twoje imię.",
+    fallback_description_en="Second descent. The dungeon starts remembering your name.",
+    category="floor",
+))
+
+_add(AchievementDef(
+    key="piaty_set",
+    fallback_name_pl="Piąty set",
+    fallback_name_en="Fifth Set",
+    fallback_description_pl="Dotarłeś na piętro 5. Sezon się rozkręca.",
+    fallback_description_en="Reached floor 5. The season is heating up.",
+    category="floor",
+))
+
+_add(AchievementDef(
+    key="dziesiate_pietro",
+    fallback_name_pl="Dziesiąte piętro",
+    fallback_name_en="Floor Ten",
+    fallback_description_pl="Połowa Lochu za tobą. Anti-host przeznaczył ci osobny intro.",
+    fallback_description_en="Half the dungeon done. Anti-host writes you a custom intro.",
+    category="floor",
+))
+
+_add(AchievementDef(
+    key="finalista_sezonu",
+    fallback_name_pl="Finalista sezonu",
+    fallback_name_en="Season Finalist",
+    fallback_description_pl="Pokonałeś Prezesa Syndykatu. Generalny dyrektor pyta o twoje plany.",
+    fallback_description_en="Defeated the Syndicate Chairman. The CEO inquires about your plans.",
+    category="floor",
+    hidden=True,
+))
+
+# Sponsors / audience.
+_add(AchievementDef(
+    key="pakiet_z_sufitu",
+    fallback_name_pl="Pakiet z sufitu",
+    fallback_name_en="Package from the Ceiling",
+    fallback_description_pl="Otwarłeś pierwszy pakiet sponsorski w pokoju. Marka cię polubiła.",
+    fallback_description_en="Opened your first sponsor drop pod. The brand likes you.",
+    category="sponsor",
+))
+
+_add(AchievementDef(
+    key="markowy_uczestnik",
+    fallback_name_pl="Markowy uczestnik",
+    fallback_name_en="Branded Contestant",
+    fallback_description_pl="Odblokowałeś sponsorski przepis. Logo na rękawie.",
+    fallback_description_en="Unlocked a sponsor-branded recipe. Logo on the sleeve.",
+    category="sponsor",
+))
+
+_add(AchievementDef(
+    key="widownia_gorzej_bije",
+    fallback_name_pl="Widownia gorzej bije",
+    fallback_name_en="Audience Beats Harder",
+    fallback_description_pl="Wskaźnik widowni przekroczył 50. Ktoś robi ci memy.",
+    fallback_description_en="Audience meter crossed 50. Someone's making you into memes.",
+    category="audience",
+))
+
+_add(AchievementDef(
+    key="kult_jednostki",
+    fallback_name_pl="Kult jednostki",
+    fallback_name_en="Cult of Personality",
+    fallback_description_pl="Wskaźnik widowni przekroczył 80. Ktoś sprzedaje t-shirty.",
+    fallback_description_en="Audience meter crossed 80. Someone's selling t-shirts.",
+    category="audience",
+))
+
+# Crafting (P29.14).
+_add(AchievementDef(
+    key="dzielo_mistrzowskie",
+    fallback_name_pl="Dzieło mistrzowskie",
+    fallback_name_en="Masterwork",
+    fallback_description_pl="Wytworzyłeś przedmiot mistrzowskiej jakości. Twoje ręce już wiedzą.",
+    fallback_description_en="Crafted a masterwork-quality item. Your hands have learned.",
+    category="craft",
+))
+
+_add(AchievementDef(
+    key="apteka_w_plecaku",
+    fallback_name_pl="Apteka w plecaku",
+    fallback_name_en="Apothecary in the Backpack",
+    fallback_description_pl="Pierwsza nałożona warstwa wzmocnienia. Twoja broń ma teraz drugie życie.",
+    fallback_description_en="First enhancement applied. Your gear has a second life.",
+    category="craft",
+))
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def catalog() -> Dict[str, AchievementDef]:

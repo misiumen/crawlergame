@@ -131,6 +131,15 @@ def change_audience(world, delta: int, source: str = "",
     # P29.8 — running high-water mark for the end-of-run summary.
     if after > int(getattr(char, "run_audience_peak", 0) or 0):
         char.run_audience_peak = after
+    # P29.15 — audience milestone achievements.
+    try:
+        from ..systems import achievements as _ach
+        if after >= 50:
+            _ach.unlock(char, "widownia_gorzej_bije", world=world)
+        if after >= 80:
+            _ach.unlock(char, "kult_jednostki", world=world)
+    except Exception:
+        pass
 
     # Reset the idle-decay counter — something interesting happened.
     setattr(world, "audience_idle_minutes", 0)

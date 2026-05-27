@@ -214,6 +214,12 @@ class Game:
                 _tut.try_show_tip(self.world, "low_hp", force_any_floor=True)
             except Exception:
                 pass
+            # P29.15 — last-stand achievement.
+            try:
+                from ..systems import achievements as _ach
+                _ach.unlock(ch, "anty_host_warknal", world=self.world)
+            except Exception:
+                pass
             return False
         # Real death.
         ch.run_death_cause = cause
@@ -2196,6 +2202,13 @@ class Game:
         cur_num = int(f.floor_number or 1)
         if cur_num >= self.MAX_FLOORS:
             # Final floor cleared — true victory.
+            # P29.15 — final boss / season finalist achievement.
+            try:
+                from ..systems import achievements as _ach
+                _ach.unlock(self.world.character, "finalista_sezonu",
+                            world=self.world)
+            except Exception:
+                pass
             self.state = STATE_VICTORY
             return
         next_num = cur_num + 1
@@ -2211,6 +2224,17 @@ class Game:
                 _tut.try_show_tip(self.world, "descend")
             except Exception:
                 pass
+        # P29.15 — floor-milestone achievements.
+        try:
+            from ..systems import achievements as _ach
+            if cur_num == 1:
+                _ach.unlock(ch, "dno_jeszcze_dalej", world=self.world)
+            if next_num >= 5:
+                _ach.unlock(ch, "piaty_set", world=self.world)
+            if next_num >= 10:
+                _ach.unlock(ch, "dziesiate_pietro", world=self.world)
+        except Exception:
+            pass
         self.log(t("log_descend_intro",
                    fallback=f"Schodzisz na piętro {next_num}. Drzwi "
                             f"się zamykają za tobą. Loch nie pamięta "
@@ -3010,6 +3034,20 @@ class Game:
                 self.log(t("feedback_crafted_item",
                            fallback=f"Wytworzone: {ent.display_name()}",
                            name=ent.display_name()), LOG_SUCCESS)
+            # P29.15 — masterwork + branded-recipe achievements.
+            try:
+                from ..systems import achievements as _ach
+                if quality == "masterwork":
+                    _ach.unlock(self.world.character, "dzielo_mistrzowskie",
+                                world=self.world)
+                # Branded if the recipe has requires_sponsor_unlock set.
+                from ..content.data.recipe_templates import RECIPES as _R
+                rec_def = _R.get(plan.get("recipe_key") or "")
+                if rec_def and rec_def.get("requires_sponsor_unlock"):
+                    _ach.unlock(self.world.character, "markowy_uczestnik",
+                                world=self.world)
+            except Exception:
+                pass
 
         # Risks on partial / failure / critical_failure
         if level in ("partial_success", "failure", "critical_failure"):
@@ -4221,6 +4259,26 @@ class Game:
                         pass
                     # P29.8 — bump kill counter for the run summary.
                     self._bump_run_counter("run_kills", 1)
+                    # P29.15 — combat achievement triggers.
+                    try:
+                        from ..systems import achievements as _ach
+                        ch_ = self.world.character
+                        kills = int(ch_.run_kills or 0)
+                        if kills == 1:
+                            _ach.unlock(ch_, "pierwsza_krew", world=self.world)
+                        if kills >= 50:
+                            _ach.unlock(ch_, "rzeznia_kontrolowana",
+                                        world=self.world)
+                        if crit:
+                            _ach.unlock(ch_, "finiszer_kanalu",
+                                        world=self.world)
+                        if "boss" in (target.tags or []) or \
+                           "floor_boss" in (target.tags or []) or \
+                           "final_boss" in (target.tags or []):
+                            _ach.unlock(ch_, "boss_padl_pierwszy",
+                                        world=self.world)
+                    except Exception:
+                        pass
                 except Exception:
                     pass
             if mode == "heavy" and not crit:
@@ -4913,6 +4971,13 @@ class Game:
             _tut.try_show_tip(self.world, "sponsors")
         except Exception:
             pass
+        # P29.15 — first drop-pod achievement.
+        try:
+            from ..systems import achievements as _ach
+            _ach.unlock(self.world.character, "pakiet_z_sufitu",
+                        world=self.world)
+        except Exception:
+            pass
         try:
             from . import sponsors as _sp
             if sponsor_key:
@@ -5061,6 +5126,12 @@ class Game:
         try:
             from . import time_system as _ts
             _ts.advance(self.world, 2)
+        except Exception:
+            pass
+        # P29.15 — first enhancement applied achievement.
+        try:
+            from ..systems import achievements as _ach
+            _ach.unlock(ch, "apteka_w_plecaku", world=self.world)
         except Exception:
             pass
 
