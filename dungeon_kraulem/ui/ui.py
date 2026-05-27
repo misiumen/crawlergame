@@ -953,29 +953,51 @@ def draw_sidebar(surf, world, layout=None, *, click_registry=None):
     # companion (pet, recruited crawler) as a single compact row with
     # name + HP-bar so the player can see at a glance who's still
     # standing. Only renders when companions exist.
+    # P29.21 — fixed: companions live in world.companions (Companion
+    # instances), not world.entities (Entity instances). Previous
+    # code did `world.get(cid)` which returned None every time, so
+    # the panel was always empty. Also: Companion has display_name_pl
+    # (a field, not a method) and carries bond/stress, NOT hp — those
+    # are Entity-only attrs.
     try:
         from ..engine import companion as _comp
+        comp_reg = getattr(world, "companions", {}) or {}
         pets = []
         for cid in getattr(c, "companion_ids", []) or []:
-            comp_ent = world.get(cid)
-            if comp_ent is not None and comp_ent.is_alive():
-                pets.append(comp_ent)
+            comp = comp_reg.get(cid)
+            if comp is not None and comp.is_alive():
+                pets.append(comp)
         if pets:
             cy += 4
             text(surf, t("ui_party_header", fallback="Drużyna:"),
                  x + 14, cy, ACCENT, L.font_small - 1, True); cy += 14
             for p in pets[:4]:
-                pname = p.display_name()
+                pname = p.display_name_pl or p.species_key or "zwierzę"
                 if font(L.font_small - 1).size(pname)[0] > w - 80:
                     pname = pname[:14] + "…"
                 text(surf, pname, x + 14, cy, NORMAL_TEXT,
                      L.font_small - 2); cy += 11
-                hp_bar(surf, x + 14, cy, w - 28, 6,
-                       p.hp, p.max_hp)
+                # Bond bar (0-10) — replaces the HP bar that didn't
+                # exist on the Companion class.
+                bond = max(0, min(int(p.bond or 0), 10))
+                bar_w = w - 28
+                pygame.draw.rect(surf, (40, 40, 40),
+                                 (x + 14, cy, bar_w, 6))
+                if bond > 0:
+                    fill = int(bar_w * bond / 10)
+                    bond_col = (140, 220, 160) if bond >= 7 else \
+                               (210, 190, 100) if bond >= 4 else \
+                               (210, 110, 110)
+                    pygame.draw.rect(surf, bond_col,
+                                     (x + 14, cy, fill, 6))
+                pygame.draw.rect(surf, BORDER,
+                                 (x + 14, cy, bar_w, 6), 1)
                 cy += 9
-                # HP numbers under the bar.
-                text(surf, f"  HP {p.hp}/{p.max_hp}",
-                     x + 14, cy, DIM_TEXT, L.font_small - 2)
+                stress = max(0, min(int(p.stress or 0), 10))
+                stress_str = (f"  więź {bond}/10"
+                              + (f"  stres {stress}" if stress else ""))
+                text(surf, stress_str, x + 14, cy, DIM_TEXT,
+                     L.font_small - 2)
                 cy += 12
     except Exception:
         pass

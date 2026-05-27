@@ -69,13 +69,14 @@ def _ev_reklama(world) -> str:
 
 
 def _ev_kamera(world) -> str:
-    """Rotacja kamery — sets a one-room "spectacle expected" flag.
-    Next action in this room either bumps audience (loud play) or
-    drops it (quiet). The check is read by audience.change_audience
-    via world.flags['kamera_glowna'] = True."""
-    if not hasattr(world, "flags") or world.flags is None:
-        world.flags = {}
-    world.flags["kamera_glowna"] = True
+    """Rotacja kamery — sets a one-room "spectacle expected" flag
+    on the CHARACTER (so it survives save/load — world.flags is
+    not serialized). Audience consumers read
+    `character.flags['kamera_glowna']`."""
+    ch = world.character
+    if ch.flags is None:
+        ch.flags = {}
+    ch.flags["kamera_glowna"] = True
     return ("ROTACJA KAMERY. Reżyser kieruje główne ujęcie na ciebie. "
             "Następna akcja powinna być widowiskowa.")
 
@@ -122,13 +123,13 @@ def _ev_cut(world) -> str:
 
 def _ev_dramatic_zoom(world) -> str:
     """Dramatic zoom — if the player has a wielded weapon, set a
-    one-room +1 attack bonus flag for theatrical effect. Otherwise
-    just audience +1."""
-    if not hasattr(world, "flags") or world.flags is None:
-        world.flags = {}
+    one-room +1 attack bonus flag on character.flags so combat
+    can consume it. Otherwise audience +1 only."""
     ch = world.character
+    if ch.flags is None:
+        ch.flags = {}
     if ch.wielded_main_id is not None:
-        world.flags["dramatic_zoom_attack"] = 1
+        ch.flags["dramatic_zoom_attack"] = 1
         return ("ZBLIŻENIE NA BROŃ. Następny atak w tej rundzie ma "
                 "+1 do trafienia — kamera lubi twoją broń.")
     try:

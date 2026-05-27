@@ -98,7 +98,15 @@ def load_from_slot(n: int) -> WorldState | None:
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
-    if data.get("version") != SAVE_VERSION:
+    # P29.21 — accept any version <= current. WorldState.from_dict +
+    # Character.from_dict already fill missing fields with safe defaults
+    # (P29.8 added run_* counters with explicit `d.get(..., default)`
+    # patterns), so soft-accepting older saves is safer than nuking
+    # the slot. If we ever ship an incompatible version bump, add a
+    # `_migrate_v<N>_to_v<N+1>(data)` chain here.
+    save_v = int(data.get("version", 0) or 0)
+    if save_v > SAVE_VERSION:
+        # A newer save than the engine knows — refuse.
         return None
     try:
         return WorldState.from_dict(data)

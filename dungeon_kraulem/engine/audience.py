@@ -125,6 +125,18 @@ def change_audience(world, delta: int, source: str = "",
                 delta = max(1, int(round(delta * mul)))
         except Exception:
             pass
+    # P29.21 — consume kamera_glowna flag if active. Positive deltas
+    # double (camera caught spectacle); negative deltas double (camera
+    # caught dud). One-shot; clear after consume.
+    if (char.flags or {}).get("kamera_glowna"):
+        if delta > 0:
+            delta *= 2
+        elif delta < 0:
+            delta *= 2
+        try:
+            char.flags["kamera_glowna"] = False
+        except Exception:
+            pass
     before = max(_AUDIENCE_MIN, min(int(char.audience_rating or 0), _AUDIENCE_MAX))
     after = max(_AUDIENCE_MIN, min(before + delta, _AUDIENCE_MAX))
     char.audience_rating = after

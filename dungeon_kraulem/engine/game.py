@@ -201,7 +201,6 @@ class Game:
             ch.hp = 1
             ch.near_death_used = True
             try:
-                from . import audio
                 audio.play_sfx("player_hit")
             except Exception:
                 pass
@@ -247,7 +246,6 @@ class Game:
             self.log("Tracisz nitkę. Reszta jest hałasem.", LOG_DANGER)
         # SFX
         try:
-            from . import audio
             audio.play_sfx("player_death")
         except Exception:
             pass
@@ -4058,6 +4056,15 @@ class Game:
         damage_bonus = 0
         defense_change = 0
         noise = 3
+        # P29.21 — consume the show-director dramatic_zoom flag if
+        # set. One-shot +1 to-hit. Flag lives on character.flags so
+        # it survives save/load.
+        if (ch.flags or {}).get("dramatic_zoom_attack"):
+            to_hit_bonus += 1
+            try:
+                ch.flags["dramatic_zoom_attack"] = 0
+            except Exception:
+                pass
         # P29.14 — masterwork / good / flawed weapon quality + permanent
         # enhancement bonuses (grip tape, balance weight). Read from the
         # wielded main hand. Quality table:
