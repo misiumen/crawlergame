@@ -562,7 +562,17 @@ def draw_topbar(surf, world, layout=None, *, click_registry=None):
         aud = (f"{t('ui_audience', fallback='Widownia')}: "
                f"{band_label} ({rating})")
         a_img = font(L.font_small - 1).render(aud, True, WARN)
-        surf.blit(a_img, (x + w - a_img.get_width() - 16, y + 36))
+        # P29.17 — icon stamp before the audience line. 14px so it
+        # tucks next to the text without crowding.
+        aud_x = x + w - a_img.get_width() - 16
+        try:
+            from . import assets as _ico
+            ic = _ico.load_icon("audience", 14, 14)
+            if ic is not None:
+                surf.blit(ic, (aud_x - 18, y + 36))
+        except Exception:
+            pass
+        surf.blit(a_img, (aud_x, y + 36))
         # Delta after the audience line.
         if delta_glyph:
             d_img = font(L.font_small - 1, bold=True).render(
@@ -1876,6 +1886,35 @@ def draw_full_map_overlay(surf, world, layout=None, *,
         li = font(L.font_small - 1).render(label, True, NORMAL_TEXT)
         surf.blit(li, (lx + gi.get_width() + 6, ly + 1))
         lx += gi.get_width() + 12 + li.get_width()
+    # P29.17 — icon-strip second row. Shows the room-type icons shipped
+    # in assets/images/ so the player can pattern-match the geometry
+    # the same way they pattern-match the ASCII glyphs above.
+    try:
+        from . import assets as _ico
+        icon_row = [
+            ("room_start",    "start"),
+            ("room_combat",   "walka"),
+            ("room_trap",     "pułapka"),
+            ("room_treasure", "skarb"),
+            ("room_rest",     "odpoczynek"),
+            ("room_merchant", "kupiec"),
+            ("room_boss",     "boss"),
+            ("room_pod",      "pakiet"),
+            ("room_safehouse","kryjówka"),
+        ]
+        ix = fx + 16
+        iy = ly + 18
+        for key, label in icon_row:
+            img = _ico.load_icon(key, 18, 18)
+            if img is not None:
+                surf.blit(img, (ix, iy))
+            li = font(L.font_small - 2).render(label, True, DIM_TEXT)
+            surf.blit(li, (ix + 22, iy + 3))
+            ix += 22 + li.get_width() + 10
+    except Exception:
+        # Icons are best-effort — never break the legend on a load
+        # failure / missing pygame display.
+        pass
 
 
 # ── Prompt 24.5 — hover tooltip overlay ──────────────────────────────────
