@@ -443,6 +443,73 @@ MON = {
         resists=["psychic"],
         vulnerable_to=["fire","acid"],
     ),
+
+    # ── P29.16 — Hunter NPCs for new sponsors ─────────────────────────────
+
+    "asesor_komornika": dict(
+        name_key="ent_asesor_komornika_n",
+        fallback_name="Asesor Komornika",
+        desc_key="ent_asesor_komornika_d",
+        fallback_desc=("Garnitur, teczka, plomby. „Mam tu twoje zaległości "
+                       "i bardzo miłą propozycję — bez prawa wyboru.”"),
+        tags=["monster","humanoid","corporate","bractwo","sponsor_hunter"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=18, max_hp=18, ac=12, attack_bonus=4, damage_dice="1d8",
+        damage_type="physical",
+        resists=["psychic"],
+        vulnerable_to=["fire"],
+    ),
+    "ekstremalny_zawodnik": dict(
+        name_key="ent_ekstremalny_zawodnik_n",
+        fallback_name="Ekstremalny Zawodnik",
+        desc_key="ent_ekstremalny_zawodnik_d",
+        fallback_desc=("Kask, kolce, kamerka na czole. Rzuca się z biegu, "
+                       "zwykle w słusznym kierunku."),
+        tags=["monster","humanoid","brute","liga_brawurowa","sponsor_hunter"],
+        affordances=["inspect","attack","intimidate","lure"],
+        hp=24, max_hp=24, ac=12, attack_bonus=5, damage_dice="1d10+1",
+        damage_type="physical",
+        resists=["physical"],
+        vulnerable_to=["electric"],
+    ),
+    "koordynator_robotniczy": dict(
+        name_key="ent_koordynator_robotniczy_n",
+        fallback_name="Koordynator Robotniczy",
+        desc_key="ent_koordynator_robotniczy_d",
+        fallback_desc=("Kombinezon, broszka spółdzielni, lista uwag. "
+                       "„Towarzyszu, musimy porozmawiać o twojej pracy.”"),
+        tags=["monster","humanoid","cunning","mrowki","sponsor_hunter"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=14, max_hp=14, ac=11, attack_bonus=3, damage_dice="1d6+1",
+        damage_type="physical",
+        vulnerable_to=["psychic"],
+    ),
+    "kaplan_polimerow": dict(
+        name_key="ent_kaplan_polimerow_n",
+        fallback_name="Kapłan Polimerów",
+        desc_key="ent_kaplan_polimerow_d",
+        fallback_desc=("Szaty z plastiku, kadzielnica z reaktora, oddech "
+                       "rozgrzanego ABS. „Zostań miękki. Zostań."),
+        tags=["monster","humanoid","chemical","fungal","polimery","sponsor_hunter"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=20, max_hp=20, ac=12, attack_bonus=4, damage_dice="1d8+1",
+        damage_type="poison",
+        resists=["poison","acid"],
+        vulnerable_to=["fire"],
+    ),
+    "weteran_trybun": dict(
+        name_key="ent_weteran_trybun_n",
+        fallback_name="Weteran Trybun",
+        desc_key="ent_weteran_trybun_d",
+        fallback_desc=("Szalik klubowy, but z metalowym noskiem, megafon. "
+                       "„Dla ojczyzny i ratingów!”"),
+        tags=["monster","humanoid","brute","stadion","sponsor_hunter"],
+        affordances=["inspect","attack","intimidate"],
+        hp=20, max_hp=20, ac=12, attack_bonus=4, damage_dice="1d8+2",
+        damage_type="physical",
+        resists=["physical"],
+        vulnerable_to=["fire","electric"],
+    ),
     "pielgrzym_recyklera": dict(
         name_key="ent_recycler_pilgrim_n", fallback_name="Pielgrzym Recyklera",
         desc_key="ent_recycler_pilgrim_d",

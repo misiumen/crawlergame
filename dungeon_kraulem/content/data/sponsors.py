@@ -42,6 +42,15 @@ SPONSOR_CZARNY_RYNEK   = "czarny_rynek_plus"
 SPONSOR_MINISTERSTWO   = "ministerstwo_pamieci"
 SPONSOR_RECYKLING      = "kult_recyklingu"
 SPONSOR_KANAL_7        = "kanal_7_krawedz"
+# P29.16 — five new sponsors. Audit: 6 sponsors was thin for a
+# DCC-faithful crawler. Each new entry has a distinct mechanical niche
+# (debt, stunt, anarcho, mutation, populist) so likes/dislikes carve
+# different optimal plays.
+SPONSOR_BRACTWO        = "bractwo_komornika"
+SPONSOR_LIGA_BRAWUR    = "liga_brawurowa"
+SPONSOR_MROWKI         = "spoldzielnia_mrowek"
+SPONSOR_POLIMERY       = "bog_polimerow"
+SPONSOR_STADION        = "stadion_wolnosci"
 
 
 SPONSORS: Dict[str, Dict[str, Any]] = {
@@ -187,6 +196,133 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_kanal7_heckle_1",
             "sponsor_kanal7_heckle_2",
             "sponsor_kanal7_heckle_3",
+        ],
+        "intervention_cooldown_minutes": 24 * 60,
+    },
+
+    # ── P29.16 — New sponsors ─────────────────────────────────────────────
+
+    SPONSOR_BRACTWO: {
+        "key": SPONSOR_BRACTWO,
+        "name_key": "sponsor_bractwo_name",
+        "name_fallback": "Bractwo Komornika",
+        "tagline_key": "sponsor_bractwo_tagline",
+        "tagline_fallback": "Każdy dług ma piękną formę.",
+        "tone": "sadystycznie kurtuazyjny",
+        "likes_tags": [
+            "bribe", "intimidate", "sponsor_property_damage", "theft",
+            "credit_spent", "extortion",
+        ],
+        "dislikes_tags": [
+            "charity", "free_giveaway", "amnesty", "negotiate_kindly",
+            "quiet_resolution",
+        ],
+        "gift_pool": ["debt_collector_baton", "blank_iou_pad",
+                      "stim_wytrzymalosci", "cash_voucher"],
+        "hunter_key": "asesor_komornika",
+        "heckle_keys": [
+            "sponsor_bractwo_heckle_1",
+            "sponsor_bractwo_heckle_2",
+            "sponsor_bractwo_heckle_3",
+        ],
+        "intervention_cooldown_minutes": 24 * 60,
+    },
+    SPONSOR_LIGA_BRAWUR: {
+        "key": SPONSOR_LIGA_BRAWUR,
+        "name_key": "sponsor_liga_brawur_name",
+        "name_fallback": "Liga Brawurowa",
+        "tagline_key": "sponsor_liga_brawur_tagline",
+        "tagline_fallback": "Skacz, zanim pomyślisz. Filmuj, póki spadasz.",
+        "tone": "ekstatycznie głośny komentator stuntów",
+        "likes_tags": [
+            "heavy_attack_hit", "env_kill", "dramatic_save",
+            "fall_damage_self", "spectacle", "near_death_recovery",
+        ],
+        "dislikes_tags": [
+            "careful_attack", "wait_spam", "long_idle", "stealth_takedown",
+        ],
+        "gift_pool": ["liga_helmet", "rampage_stim", "improvised_spear",
+                      "premium_painkiller"],
+        "hunter_key": "ekstremalny_zawodnik",
+        "heckle_keys": [
+            "sponsor_liga_brawur_heckle_1",
+            "sponsor_liga_brawur_heckle_2",
+            "sponsor_liga_brawur_heckle_3",
+        ],
+        "intervention_cooldown_minutes": 24 * 60,
+    },
+    SPONSOR_MROWKI: {
+        "key": SPONSOR_MROWKI,
+        "name_key": "sponsor_mrowki_name",
+        "name_fallback": "Spółdzielnia Mrówek",
+        "tagline_key": "sponsor_mrowki_tagline",
+        "tagline_fallback": "Mała stopa, wielki nacisk grupowy.",
+        "tone": "społecznikowski, naiwnie idealistyczny",
+        "likes_tags": [
+            "stealth_takedown", "non_lethal", "negotiate_kindly",
+            "quiet_resolution", "stealth", "free_giveaway",
+        ],
+        "dislikes_tags": [
+            "kill_lethal", "spectacle", "crit_hit", "extortion",
+            "intimidate",
+        ],
+        "gift_pool": ["lockpick", "smoke_bottle", "bandage",
+                      "rope_bundle"],
+        "hunter_key": "koordynator_robotniczy",
+        "heckle_keys": [
+            "sponsor_mrowki_heckle_1",
+            "sponsor_mrowki_heckle_2",
+            "sponsor_mrowki_heckle_3",
+        ],
+        "intervention_cooldown_minutes": 24 * 60,
+    },
+    SPONSOR_POLIMERY: {
+        "key": SPONSOR_POLIMERY,
+        "name_key": "sponsor_polimery_name",
+        "name_fallback": "Bóg Polimerów",
+        "tagline_key": "sponsor_polimery_tagline",
+        "tagline_fallback": "Wszystko miękkie, miękkie, MIĘKKIE.",
+        "tone": "syntetyczna ekstaza, oddech reaktora",
+        "likes_tags": [
+            "chemical", "fungal", "fungal_kill", "mutate_self",
+            "consumable_used", "novachem_accident",
+        ],
+        "dislikes_tags": [
+            "fire_damage_dealt", "burn_organic", "anti_chemical",
+            "sterile_kill",
+        ],
+        "gift_pool": ["fungal_pill", "polymer_balm", "weapon_poison_coat",
+                      "antidote"],
+        "hunter_key": "kaplan_polimerow",
+        "heckle_keys": [
+            "sponsor_polimery_heckle_1",
+            "sponsor_polimery_heckle_2",
+            "sponsor_polimery_heckle_3",
+        ],
+        "intervention_cooldown_minutes": 24 * 60,
+    },
+    SPONSOR_STADION: {
+        "key": SPONSOR_STADION,
+        "name_key": "sponsor_stadion_name",
+        "name_fallback": "Stadion Wolności",
+        "tagline_key": "sponsor_stadion_tagline",
+        "tagline_fallback": "Krzycz głośniej, żeby studio słyszało.",
+        "tone": "populistyczny, fanowski, transmisyjny",
+        "likes_tags": [
+            "rebel_speech", "mass_kill", "audience_high_band",
+            "dramatic_save", "crit_hit", "spectacle",
+        ],
+        "dislikes_tags": [
+            "compliance", "pro_state_dialogue", "report_to_authority",
+            "quiet_resolution",
+        ],
+        "gift_pool": ["megafon_propaganda", "fan_throwable", "improvised_club",
+                      "morale_brew"],
+        "hunter_key": "weteran_trybun",
+        "heckle_keys": [
+            "sponsor_stadion_heckle_1",
+            "sponsor_stadion_heckle_2",
+            "sponsor_stadion_heckle_3",
         ],
         "intervention_cooldown_minutes": 24 * 60,
     },
