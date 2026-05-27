@@ -2,21 +2,32 @@
 title Dungeon Kraulem
 cd /d "%~dp0"
 
-REM Ensure pygame is available (pygame-ce preferred on Windows)
-python -c "import pygame" 2>nul
+REM P28.9 — hide the pygame-ce support banner so the install probe is silent.
+REM Without this, "import pygame" prints its version + SDL info to stdout,
+REM which was showing twice in the launcher console (probe + actual run).
+set PYGAME_HIDE_SUPPORT_PROMPT=1
+
+REM Probe pygame quietly. Only show output if something goes wrong.
+python -c "import pygame" >nul 2>nul
 if errorlevel 1 (
-    echo pygame not found. Attempting to install pygame-ce...
+    echo pygame not found. Installing pygame-ce...
     pip install pygame-ce --prefer-binary
     if errorlevel 1 (
         pip install pygame --prefer-binary
     )
-    python -c "import pygame" 2>nul
+    python -c "import pygame" >nul 2>nul
     if errorlevel 1 (
-        echo Could not install pygame. Ensure Python 3 and pip are in PATH.
+        echo ERROR: Could not install pygame. Ensure Python 3 + pip are in PATH.
         pause
         exit /b 1
     )
 )
 
-python main.py
-pause
+REM P28.9 — launch via pythonw (no-console variant of Python) and DETACH
+REM the .bat immediately. This closes the launcher console window the
+REM moment the game window opens — no more orphaned "Press any key to
+REM continue" prompt after every session.
+REM
+REM `start ""` keeps the .bat from blocking; the empty quoted title is
+REM required by `start` when the first arg looks like a path.
+start "" pythonw main.py
