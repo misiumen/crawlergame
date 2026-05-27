@@ -19,7 +19,9 @@ savegame.json
 revamp_save.json
 settings_revamp.json
 dungeon_kraulem_save.json
+dungeon_kraulem_save_*.json
 dungeon_kraulem_settings.json
+dungeon_kraulem_runs.json
 
 # Editor / OS noise
 .vscode/
