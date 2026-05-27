@@ -4108,6 +4108,37 @@ class Game:
                 # P29.14 — silent enhancement reduces attack noise.
                 if "silent" in (_w.tags or []):
                     noise = max(1, noise - 2)
+                # P29.29 — surface masterwork / good quality + perm
+                # enhancements once per combat, so the player can
+                # SEE that the +1s are working. The dice-roll log
+                # line already shows the resulting bonus number, but
+                # players can't tell which input contributed.
+                if _q in ("masterwork", "good") or \
+                   int(_w.state.get("attack_bonus_perm", 0)) or \
+                   int(_w.state.get("damage_bonus_perm", 0)):
+                    qlabel = _cr.quality_label_pl(_q)
+                    parts = []
+                    if qlabel:
+                        parts.append(qlabel)
+                    if int(_w.state.get("attack_bonus_perm", 0)):
+                        parts.append(f"+{_w.state['attack_bonus_perm']} trafienie")
+                    if int(_w.state.get("damage_bonus_perm", 0)):
+                        parts.append(f"+{_w.state['damage_bonus_perm']} obrażenia")
+                    if parts:
+                        cs_state = getattr(cs, "state", None)
+                        if cs_state is None:
+                            try:
+                                cs.state = {}
+                                cs_state = cs.state
+                            except Exception:
+                                cs_state = None
+                        if cs_state is not None and not cs_state.get(
+                                "logged_weapon_quality"):
+                            self.log(
+                                f"„{_w.display_name()}” — "
+                                f"{' · '.join(parts)}.",
+                                LOG_SYSTEM)
+                            cs_state["logged_weapon_quality"] = True
         except Exception:
             pass
         if mode == "careful":

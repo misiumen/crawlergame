@@ -445,6 +445,18 @@ def unlock(target, key: str, world=None) -> bool:
         return False
     ad = _ACHIEVEMENTS.get(key)
     if ad is None:
+        # P29.29 — surface unknown keys to stderr. Previously a typo
+        # in a call site silently no-op'd; now the dev sees a warning
+        # without breaking the player. Tests can catch the pattern by
+        # asserting len(stderr) == 0 on a hot path.
+        import sys as _sys
+        try:
+            _sys.stderr.write(
+                f"[achievements] unknown key passed to unlock(): "
+                f"{key!r}. Either add to _ACHIEVEMENTS or fix the "
+                f"caller.\n")
+        except Exception:
+            pass
         return False
     if ch.unlocked_achievements is None:
         ch.unlocked_achievements = []
