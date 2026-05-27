@@ -930,10 +930,15 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
     text(surf, header_label,
          lx + 10, ly + 4, ACCENT, L.font_small, True)
     f = font(L.font_small)
-    # P27.5 (P27-UX-9): bumped line spacing 2→5 to eliminate residual
-    # vertical overlap visible when consecutive entries with descender
-    # glyphs (ę, ą, ł) render close together. Cheap fix.
-    line_h = f.get_height() + 5
+    # P29.6: previously +5 padding; user kept seeing overlap. Now we
+    # explicitly base line_h on ascent+descent+ogonek-margin. Polish
+    # diacritics (Ę, Ą) carry ogonek tails that pygame's get_height()
+    # under-reports by 1-2 px depending on font hinting. +8 padding
+    # leaves room for them PLUS for the avatar-circle radius which
+    # spans line_h//2 from cy + line_h//2. Worst case at small fonts:
+    # font.height ~14 + 8 = 22 px, circle r = max(7, 10) = 10, diameter
+    # 20 fits with 2 px breathing room.
+    line_h = max(20, f.get_height() + 8)
     max_w = lw - 24
 
     # Prompt 22 bug fix: previously the log render picked the LAST N
@@ -984,9 +989,22 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
     cy = ly + 22
     bottom_limit = ly + lh - 4
     syndic_color = LOG_COLORS.get("syndicate", None)
-    for line_text, col, is_first in visible_rows:
+    # P29.6: track when we cross an entry boundary so we can draw a
+    # subtle separator. The previous renderer left consecutive entries
+    # visually adjacent enough that they appeared to overlap — even
+    # when y-coords were correct, the eye merged them. A 1-px dim line
+    # between distinct entries gives clear boundaries.
+    prev_was_first = True  # treat top-of-panel as start
+    for row_idx, (line_text, col, is_first) in enumerate(visible_rows):
         if cy + line_h > bottom_limit:
             break
+        # Separator before a new entry (is_first=True) when there's
+        # already content above.
+        if is_first and row_idx > 0:
+            sep_y = cy - 1
+            pygame.draw.line(surf, (40, 44, 56),
+                             (lx + 12, sep_y),
+                             (lx + lw - 12, sep_y), 1)
         is_sponsor = (col == syndic_color) if syndic_color else False
         gutter_w = 0
         if is_sponsor:
