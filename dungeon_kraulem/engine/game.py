@@ -1819,6 +1819,10 @@ class Game:
         if intent.intent == "consume":
             self._attempt_consume(intent); return
 
+        # P29.7 — pick up a deployed trap (fallback for mis-placement).
+        if intent.intent == "trap_pickup":
+            self._attempt_trap_pickup(intent); return
+
         # P29.4 — black-market buy/sell follow-ups.
         if intent.intent == "bm_buy":
             from ..systems import safehouses as _sh
@@ -4432,6 +4436,133 @@ class Game:
         try:
             from ..systems import achievements
             achievements.unlock(ch, "pulapka_z_niczego", world=self.world)
+        except Exception:
+            pass
+
+    # ── P29.7: pick up a deployed trap (mis-placement fallback) ──────────────
+
+    def _attempt_trap_pickup(self, intent):
+        """Reverse of deploy: remove a player-armed trap from
+        room.state['player_traps'] and put the underlying Entity back into
+        inventory. Costs 2 minutes and a DEX (or INT, whichever is higher)
+        check at TT 10. On critical failure the trap fires in your hands.
+
+        Why this exists: the user kept placing traps in dud rooms; without
+        a fallback those items were just lost. Simple test, simple outcome
+        — partial/success → trap back in pack, critical fail → ouch."""
+        from . import time_system as ts
+        from .utils_compat import roll_d20
+        from .affordances import fold as _fold
+
+        ch = self.world.character
+        room = self.world.current_floor.current_room()
+        if room is None:
+            self.log(t("feedback_no_room",
+                       fallback="Nie ma czego zwijać — nie ma pokoju."), LOG_WARN)
+            return
+        traps = (room.state or {}).get("player_traps") or []
+        # Only un-triggered traps can be picked back up.
+        live = [tr for tr in traps if not tr.get("triggered")]
+        if not live:
+            self.log(t("feedback_trap_pickup_none",
+                       fallback="W tym pokoju nie ma twoich rozstawionych pułapek do zwinięcia."),
+                     LOG_WARN)
+            return
+
+        # Match by name from intent.targets[0] if provided.
+        wanted = ""
+        if intent.targets:
+            wanted = (intent.targets[0] or "").strip().lower()
+        trap = None
+        if wanted:
+            wf = _fold(wanted)
+            for tr in live:
+                nm = _fold(tr.get("display_name", ""))
+                tags = [_fold(t or "") for t in (tr.get("tags") or [])]
+                if wf in nm or any(wf in tg for tg in tags) or wf in _fold(tr.get("key", "")):
+                    trap = tr; break
+        if trap is None and len(live) == 1:
+            trap = live[0]
+        if trap is None:
+            names = ", ".join(tr.get("display_name", tr.get("key", "?")) for tr in live[:4])
+            self.log(t("feedback_trap_pickup_ambiguous",
+                       fallback=f"Którą pułapkę zwinąć? {names}"), LOG_WARN)
+            return
+
+        # Roll: best of DEX or INT, TT 10.
+        raw = roll_d20()
+        mod_dex = ch.stat_mod("DEX")
+        mod_int = ch.stat_mod("INT")
+        mod = max(mod_dex, mod_int)
+        total = raw + mod
+        dc = 10
+        if   raw == 20:       level = "critical_success"
+        elif raw == 1:        level = "critical_failure"
+        elif total >= dc + 5: level = "critical_success"
+        elif total >= dc:     level = "success"
+        elif total >= dc - 3: level = "partial_success"
+        else:                 level = "failure"
+        from .dice_labels import format_check as _fc
+        stat_label = "DEX" if mod_dex >= mod_int else "INT"
+        self.log(_fc("trap_pickup", stat_label, raw, mod, total, dc, level),
+                 LOG_SYSTEM)
+
+        # Always costs a beat.
+        ts.advance(self.world, 2)
+
+        if level == "critical_failure":
+            # Trap fires in your hands.
+            payload = trap.get("effect") or {}
+            dmg = int(payload.get("amount", 2))
+            self.log(t("feedback_trap_pickup_critfail",
+                       fallback=f"Próbujesz rozbroić — pułapka odpala ci się w dłoniach. -{dmg} HP.",
+                       amount=dmg), LOG_DANGER)
+            ch.take_damage(dmg)
+            # Mark as triggered so it doesn't keep haunting the room.
+            trap["triggered"] = True
+            self._bump_threat(2, source="trap_self_disarm", room=room)
+            return
+        if level == "failure":
+            self.log(t("feedback_trap_pickup_fail",
+                       fallback="Zwijanie nie idzie. Pułapka zostaje na miejscu, ale ją trochę poluzowałeś."),
+                     LOG_WARN)
+            # Slightly degrade — counts as a "damaged" deploy on re-arm.
+            trap["damaged"] = int(trap.get("damaged", 0)) + 1
+            return
+
+        # success / partial_success / critical_success → trap goes back.
+        eid = trap.get("entity_id")
+        ent = self.world.get(eid) if eid else None
+        if ent is None:
+            # Edge case: entity vanished. Fabricate a no-op restoration:
+            # just drop the trap dict so the room is clean.
+            try:
+                traps.remove(trap)
+            except ValueError:
+                pass
+            self.log(t("feedback_trap_pickup_ghost",
+                       fallback="Zwijasz, ale pułapki już tu nie ma — została po niej tylko siatka."),
+                     LOG_WARN)
+            return
+        # Restore to inventory.
+        ent.location_id = None
+        if ent.entity_id not in ch.inventory_ids:
+            ch.inventory_ids.append(ent.entity_id)
+        # On partial, slap a damaged tick — represents bent mechanism.
+        if level == "partial_success":
+            ent.state = ent.state or {}
+            ent.state["damaged"] = int((ent.state or {}).get("damaged", 0)) + 1
+        try:
+            traps.remove(trap)
+        except ValueError:
+            pass
+        self.log(t("feedback_trap_pickup_ok",
+                   fallback=f"Zwijasz: {ent.display_name()} — wraca do plecaka.",
+                   name=ent.display_name()), LOG_SUCCESS)
+        # Narrator hook (best-effort).
+        try:
+            nline = narrate("trap_pickup_ok")
+            if nline: self.log(nline, LOG_SYNDIC)
         except Exception:
             pass
 

@@ -334,6 +334,22 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.85
         return intent
 
+    # ── P29.7 — Pick up a deployed trap (fallback when placed wrong) ───────
+    # "zwiń pułapkę X" / "podnieś pułapkę X" / "rozbrój pułapkę X"
+    import re as _re_tp
+    trap_pickup_re = _re_tp.compile(
+        r"^(?:zwiń|zwin|podnies|podnieś|rozbrój|rozbroj|disarm|pickup)"
+        r"\s+(?:pułapkę|pulapke|pułapka|pulapka|trap)(?:\s+(.+))?$")
+    tp_m = trap_pickup_re.match(folded)
+    if tp_m:
+        intent.intent = "trap_pickup"
+        intent.verb = "podnieś"
+        target_name = (tp_m.group(1) or "").strip()
+        if target_name:
+            intent.targets.append(_strip_articles(target_name))
+        intent.confidence = 0.9
+        return intent
+
     # ── P29.4 — Buy / sell follow-ups in black-market safehouses ────────────
     # "kup <X>" → bm_buy   ;   "sprzedaj <X>" → bm_sell
     import re as _re_bm
