@@ -267,27 +267,30 @@ def _check_gift_thresholds(world) -> None:
         v = int(att.get(skey, 0))
         sdata = get_sponsor(skey)
         # First gift: attention >= 8 and never sent before.
+        # P29.10 — prefer drop-pod (DCC moment); deliver_sponsor_gift
+        # handles the safehouse fallback when no current room.
         flag1 = f"sponsor_gift1_sent_{skey}"
         if v >= _GIFT_THRESHOLD_FIRST and not flags.get(flag1):
             gifts = list(sdata.get("gift_pool") or [])
             if gifts:
                 item = gifts[0]
-                _queue_safehouse_gift(world, skey, item)
+                mode = deliver_sponsor_gift(world, skey, item)
                 flags[flag1] = True
-                if hasattr(world, "log_msg"):
+                if mode == "safehouse" and hasattr(world, "log_msg"):
                     world.log_msg(
                         f"{_name_pl(sdata)} cię zauważył. Paczka czeka w safehouse.",
                         "sponsor",
                     )
+                # (The "pod" branch logs from inside _spawn_sponsor_drop_pod.)
         # Second gift: deeper bond.
         flag2 = f"sponsor_gift2_sent_{skey}"
         if v >= _GIFT_THRESHOLD_SECOND and not flags.get(flag2):
             gifts = list(sdata.get("gift_pool") or [])
             if len(gifts) >= 2:
                 item = gifts[1]
-                _queue_safehouse_gift(world, skey, item)
+                mode = deliver_sponsor_gift(world, skey, item)
                 flags[flag2] = True
-                if hasattr(world, "log_msg"):
+                if mode == "safehouse" and hasattr(world, "log_msg"):
                     world.log_msg(
                         f"{_name_pl(sdata)} szanuje cię. Druga paczka w safehouse.",
                         "sponsor",
@@ -467,6 +470,78 @@ def _queue_safehouse_gift(world, sponsor_key: str, item_key: str) -> None:
         world.pending_sponsor_gifts = []
         pending = world.pending_sponsor_gifts
     pending.append({"sponsor_key": sponsor_key, "item_key": item_key})
+
+
+# ── P29.10 — Mid-floor sponsor drop-pods ────────────────────────────────────
+
+def _spawn_sponsor_drop_pod(world, sponsor_key: str, item_key: str) -> bool:
+    """Materialize a sponsor-branded loot pod in the player's current
+    room. Returns True on success, False if no room is available
+    (caller should fall back to _queue_safehouse_gift).
+
+    The pod is a normal Entity tagged 'sponsor_pod' + 'container'. It
+    carries the pending item_key in its state; on `otwórz pakiet`,
+    Game._attempt_open_pod materializes the actual item, transfers
+    it to player inventory, and removes the pod from the room.
+    """
+    from .entity import Entity, T_OBJECT
+    floor = getattr(world, "current_floor", None)
+    if floor is None:
+        return False
+    room = floor.current_room() if hasattr(floor, "current_room") else None
+    if room is None:
+        return False
+    sdata = get_sponsor(sponsor_key)
+    sponsor_name = _name_pl(sdata)
+    pod = Entity(
+        key=f"sponsor_pod_{sponsor_key}",
+        entity_type=T_OBJECT,
+        fallback_name=f"pakiet sponsorski ({sponsor_name})",
+        fallback_desc=(
+            f"Zgrzytająca metalowa kapsuła z logo „{sponsor_name}”. "
+            f"Migocze diodą. Otwórz, póki nikt nie patrzy."
+        ),
+        tags=["sponsor_pod", "container", "loot", "deliverable"],
+        affordances=["inspect", "open_pod", "break"],
+        location_id=room.room_id,
+        portable=False,
+        state={
+            "pending_item_key": item_key,
+            "pending_sponsor_key": sponsor_key,
+            "armed_at_minute": _now_minute(world),
+        },
+    )
+    world.register(pod)
+    if not hasattr(room, "entities") or room.entities is None:
+        room.entities = []
+    room.entities.append(pod)
+    # SFX hook (audio module noops if unavailable).
+    try:
+        from . import audio as _audio
+        _audio.play_sfx("sponsor_chime")
+    except Exception:
+        pass
+    if hasattr(world, "log_msg"):
+        world.log_msg(
+            f"PAKIET! {sponsor_name} zrzuca ci kapsułę — ląduje obok. "
+            f"„otwórz pakiet”, jeśli chcesz dobrać.", "sponsor")
+    return True
+
+
+def deliver_sponsor_gift(world, sponsor_key: str, item_key: str) -> str:
+    """P29.10 — public entry point. Try drop-pod first (more DCC), fall
+    back to safehouse-queue when player is between floors or otherwise
+    has no current room. Returns one of:
+      "pod"        — materialized in current room as a pod entity
+      "safehouse"  — queued for next safehouse claim
+      "none"       — failed (no world / no character)
+    """
+    if world is None:
+        return "none"
+    if _spawn_sponsor_drop_pod(world, sponsor_key, item_key):
+        return "pod"
+    _queue_safehouse_gift(world, sponsor_key, item_key)
+    return "safehouse"
 
 
 def _queue_hunter_spawn(world, sponsor_key: str, hunter_key: str) -> None:

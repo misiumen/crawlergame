@@ -334,6 +334,24 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.85
         return intent
 
+    # ── P29.10 — Open a sponsor drop pod (mid-floor gift) ──────────────────
+    # "otwórz/rozbij/zgarnij pakiet" (sponsorski) — drop-pods are how
+    # mid-floor sponsor gifts now arrive (was: queued for safehouse).
+    import re as _re_pod
+    pod_re = _re_pod.compile(
+        r"^(?:otwórz|otworz|rozbij|zgarnij|odbierz|open|claim)"
+        r"\s+(?:pakiet|paczke|paczkę|pakunek|kapsule|kapsułę|drop|pod)"
+        r"(?:\s+(.+))?$")
+    pod_m = pod_re.match(folded)
+    if pod_m:
+        intent.intent = "open_pod"
+        intent.verb = "otwórz"
+        target_name = (pod_m.group(1) or "").strip()
+        if target_name:
+            intent.targets.append(_strip_articles(target_name))
+        intent.confidence = 0.92
+        return intent
+
     # ── P29.7 — Pick up a deployed trap (fallback when placed wrong) ───────
     # "zwiń pułapkę X" / "podnieś pułapkę X" / "rozbrój pułapkę X"
     import re as _re_tp

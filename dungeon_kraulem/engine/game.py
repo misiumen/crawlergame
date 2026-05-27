@@ -1951,6 +1951,10 @@ class Game:
         if intent.intent == "trap_pickup":
             self._attempt_trap_pickup(intent); return
 
+        # P29.10 — open a sponsor drop-pod.
+        if intent.intent == "open_pod":
+            self._attempt_open_pod(intent); return
+
         # P29.4 — black-market buy/sell follow-ups.
         if intent.intent == "bm_buy":
             from ..systems import safehouses as _sh
@@ -4719,6 +4723,117 @@ class Game:
         try:
             nline = narrate("trap_pickup_ok")
             if nline: self.log(nline, LOG_SYNDIC)
+        except Exception:
+            pass
+
+    # ── P29.10: sponsor drop-pod open handler ────────────────────────────
+
+    def _attempt_open_pod(self, intent):
+        """Open a sponsor drop-pod entity in the current room. The pod
+        carries `pending_item_key` + `pending_sponsor_key` in its
+        state. On open: materialize the item into inventory, remove
+        the pod from the room, log a DCC-flavored "podpisz odbiór"
+        line, and bump audience (a brand promotion just landed on
+        camera).
+
+        Multiple pods: if more than one, match by name fragment from
+        intent.targets[0] (e.g. "novachem"); else pop the first one.
+        """
+        ch = self.world.character
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None or not getattr(room, "entities", None):
+            self.log(t("feedback_pod_none",
+                       fallback="W tym pokoju nie ma pakietu do otwarcia."),
+                     LOG_WARN)
+            return
+        pods = [e for e in room.entities
+                if e is not None
+                and "sponsor_pod" in (e.tags or [])
+                and (e.state or {}).get("pending_item_key")]
+        if not pods:
+            self.log(t("feedback_pod_none",
+                       fallback="Nic tu nie wygląda na pakiet sponsorski."),
+                     LOG_WARN)
+            return
+
+        # Optional name filter — fold + substring match against
+        # display_name + sponsor key.
+        wanted = ""
+        if intent.targets:
+            wanted = (intent.targets[0] or "").strip().lower()
+        pod = None
+        if wanted:
+            from .affordances import fold as _fold
+            wf = _fold(wanted)
+            for p in pods:
+                nm = _fold(p.display_name())
+                sk = _fold((p.state or {}).get("pending_sponsor_key", ""))
+                if wf in nm or wf in sk:
+                    pod = p; break
+        if pod is None:
+            pod = pods[0]  # lone / first available
+
+        item_key = (pod.state or {}).get("pending_item_key", "")
+        sponsor_key = (pod.state or {}).get("pending_sponsor_key", "")
+
+        # Materialize the item.
+        new_item = None
+        try:
+            from ..content.items import make_item
+            new_item = make_item(item_key, location_id="inventory:player")
+        except Exception as exc:
+            self.log(f"(Pakiet pusty — błąd zawartości: {exc})", LOG_WARN)
+        if new_item is not None:
+            self.world.register(new_item)
+            ch.inventory_ids.append(new_item.entity_id)
+
+        # Remove the pod from the room.
+        try:
+            room.entities.remove(pod)
+        except ValueError:
+            pass
+        # Clear pod state so it can't be re-opened from a stale ref.
+        pod.state = {**(pod.state or {}), "pending_item_key": "",
+                     "pending_sponsor_key": "", "opened": True}
+
+        # Polish display: sponsor name → friendlier opener line.
+        sponsor_label = ""
+        try:
+            from . import sponsors as _sp
+            sdata = _sp.get_sponsor(sponsor_key)
+            sponsor_label = _sp._name_pl(sdata)
+        except Exception:
+            sponsor_label = sponsor_key or "sponsor"
+        if new_item is not None:
+            self.log(t("feedback_pod_open_ok",
+                       fallback=f"Otwierasz pakiet od {sponsor_label}: "
+                                f"„{new_item.display_name()}” trafia do plecaka.",
+                       sponsor=sponsor_label,
+                       item=new_item.display_name()),
+                     LOG_SUCCESS)
+        else:
+            self.log(t("feedback_pod_open_empty",
+                       fallback=f"Pakiet od {sponsor_label} okazuje się pusty. "
+                                f"Sponsorzy są źli na wszystkich."),
+                     LOG_WARN)
+
+        # Audience bump: opening on camera is good TV. Sponsor attention
+        # also nudges up (you used their product publicly).
+        try:
+            from . import audience as _aud
+            _aud.change_audience(self.world, 3, source="sponsor_pod_open")
+        except Exception:
+            pass
+        try:
+            from . import sponsors as _sp
+            if sponsor_key:
+                _sp.note_player_tag(self.world,
+                                    f"used_{sponsor_key}_gift", weight=1)
+        except Exception:
+            pass
+        try:
+            audio.play_sfx("sponsor_chime")
         except Exception:
             pass
 
