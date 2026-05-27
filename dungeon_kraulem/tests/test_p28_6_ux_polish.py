@@ -114,6 +114,24 @@ def test_log_does_not_dedupe_player_input_echo():
     print(f"  log keeps player echos separate: OK")
 
 
+def test_audience_changes_dedupe_via_log_msg():
+    """P28.8 regression: audience.change_audience() used to bypass
+    log_msg via direct world.log.append, which meant consecutive
+    'Widownia +2' entries piled up without the (×N) suffix and
+    visually bled into adjacent rows. Now routed through log_msg."""
+    from ..engine import audience as _aud
+    w = _mk_world()
+    w.character.audience_rating = 0
+    pre_len = len(w.log)
+    for _ in range(5):
+        _aud.change_audience(w, 2, source="test_repeat", emit_log=True)
+    after = [s for s, _ in w.log[pre_len:] if s.startswith("Widownia")]
+    # Expect ONE deduped entry, not five.
+    assert len(after) == 1, f"expected 1 deduped audience entry; got {after}"
+    assert "(×5)" in after[0], f"expected (×5) suffix; got {after[0]}"
+    print(f"  audience log dedupes: {after[0]}: OK")
+
+
 # ── Ghost-action filter ──────────────────────────────────────────────────
 
 def test_no_salvage_flag_hides_zdemontuj():
@@ -257,6 +275,7 @@ def main():
     test_exit_locked_command_is_wylam()
     test_log_dedupes_consecutive_identicals()
     test_log_does_not_dedupe_player_input_echo()
+    test_audience_changes_dedupe_via_log_msg()
     test_no_salvage_flag_hides_zdemontuj()
     test_room_change_clears_nav_focus()
     test_minimap_3d_separates_up_down_into_layers()

@@ -314,7 +314,11 @@ def _fire_intervention(world, sponsor_key: str, kind: str,
             line = f"{_name_pl(sdata)} prycha w eter."
         payload["locale_key"] = loc_key
         if hasattr(world, "log"):
-            world.log.append((line, "narrator"))
+            # P28.8: route through log_msg for dedupe.
+            if hasattr(world, "log_msg"):
+                world.log_msg(line, "narrator")
+            else:
+                world.log.append((line, "narrator"))
     else:
         return None
 
@@ -360,7 +364,11 @@ def _log_sponsor_line(world, sponsor_key: str, key: str, *,
     from ..ui.lang import t
     line = t(key, fallback=default_pl)
     if hasattr(world, "log"):
-        world.log.append((line, "sponsor"))
+        # P28.8: route through log_msg for dedupe.
+        if hasattr(world, "log_msg"):
+            world.log_msg(line, "sponsor")
+        else:
+            world.log.append((line, "sponsor"))
 
 
 def _name_pl(sdata: Dict[str, Any]) -> str:

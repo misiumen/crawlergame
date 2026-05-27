@@ -144,12 +144,15 @@ def change_audience(world, delta: int, source: str = "",
 
     if emit_log and hasattr(world, "log"):
         sign = "+" if delta > 0 else ""
-        # Prompt 22 bug fix: NEVER print the internal `source` tag in
-        # the player log — those are English snake_case identifiers
-        # ("heavy_hit", "alarm:default") and the game is Polish-only.
-        # `source` is still tracked internally for analytics / debug.
-        # Cat "system" keeps these out of the narrative flow.
-        world.log.append((f"Widownia {sign}{delta}", "system"))
+        # P28.8: route through log_msg so the P28.6 dedupe collapses
+        # repeated "Widownia +2" entries into "Widownia +2 (×N)". This
+        # was THE source of the visible bleed bug — direct .append
+        # bypassed dedupe and the entries piled up adjacent to each
+        # other in the log.
+        if hasattr(world, "log_msg"):
+            world.log_msg(f"Widownia {sign}{delta}", "system")
+        else:
+            world.log.append((f"Widownia {sign}{delta}", "system"))
 
     if after == before:
         return None
@@ -230,7 +233,11 @@ def _emit_band_crossing(world, crossing: BandCrossing) -> None:
     else:
         line = narrator.say("audience_drop", band=band_label(crossing.to_band))
     if line and hasattr(world, "log"):
-        world.log.append((line, "narrator"))
+        # P28.8: route through log_msg for dedupe consistency.
+        if hasattr(world, "log_msg"):
+            world.log_msg(line, "narrator")
+        else:
+            world.log.append((line, "narrator"))
 
     # Hand-off to sponsor engine: a VIRAL crossing is itself a "spectacle"
     # signal that several sponsors care about.
