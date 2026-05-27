@@ -28,7 +28,7 @@ from typing import Optional, Dict, List, Any
 import random
 
 from ..content.data.sponsors import (
-    SPONSORS, get_sponsor, sponsor_for_floor, all_sponsor_keys,
+    SPONSORS, get_sponsor, all_sponsor_keys,
 )
 from . import audience as _aud
 
@@ -91,14 +91,11 @@ def _attention_dict(world) -> Dict[str, int]:
     val = flags.get("sponsor_attention")
     if isinstance(val, dict):
         return val
-    # Migration: legacy bool. True meant "the floor's sponsor noticed you,
-    # mildly negatively". Convert to a tiny negative attention.
-    if val is True:
-        floor_sponsor = current_floor_sponsor_key(world)
-        new = {floor_sponsor: -1} if floor_sponsor else {}
-        flags["sponsor_attention"] = new
-        return new
-    # False / None / missing — start clean.
+    # Legacy bool migration. Old saves wrote `True` to mean "the floor's
+    # primary sponsor noticed you negatively". P29.2: floor primary no
+    # longer exists, so we just convert to an empty dict. Anyone who
+    # cared about that legacy mark would have decayed it by now anyway.
+    # (Avoid calling current_floor_sponsor_key here — would recurse.)
     flags["sponsor_attention"] = {}
     return flags["sponsor_attention"]
 
@@ -121,17 +118,53 @@ def adjust_attention(world, sponsor_key: str, delta: int) -> int:
 
 
 def current_floor_sponsor_key(world) -> str:
-    """Return the floor's primary sponsor key, or "" if unknown."""
-    floor = getattr(world, "current_floor", None)
-    if floor is None:
+    """P29.2 — returns whichever sponsor currently has the highest
+    positive attention on this player. NOT the floor's "assigned"
+    sponsor (that concept is gone — DCC sponsors compete continuously,
+    not by floor-number quota).
+
+    Returns "" if no sponsor has positive attention yet (fresh game,
+    very early floor 1). In that case downstream code treats it as
+    "no primary yet" — note_player_tag's 2× bump skips, topbar shows
+    a generic placeholder, etc.
+
+    Tie-break: catalog order (so behavior is deterministic when two
+    sponsors happen to tie). NEGATIVE attention does NOT make you a
+    sponsor's "primary" — hatred isn't sponsorship.
+    """
+    if world is None:
         return ""
-    # Prefer an explicit `sponsor_key` if it matches our catalog;
-    # otherwise fall back to floor-number rotation.
-    sk = getattr(floor, "sponsor_key", "") or ""
-    if sk in SPONSORS:
-        return sk
-    fn = int(getattr(floor, "floor_number", 1) or 1)
-    return sponsor_for_floor(fn)
+    att = _attention_dict(world)
+    best_key = ""
+    best_val = 0
+    for skey in all_sponsor_keys():
+        v = int(att.get(skey, 0))
+        if v > best_val:
+            best_val = v
+            best_key = skey
+    return best_key
+
+
+def top_sponsors_ranked(world, n: int = 3) -> List[tuple]:
+    """P29.2 — list top-N sponsors by current attention, descending.
+    Returns [(sponsor_key, attention), ...]. Used by the topbar HUD
+    to render the "audience ranking" instead of a single locked-in
+    floor sponsor. Skips sponsors with attention 0 (not watching yet).
+    Includes negatives if there's room — a hostile sponsor is
+    interesting context.
+    """
+    if world is None:
+        return []
+    att = _attention_dict(world)
+    # Sort by abs attention (engagement, whether love or hate); within
+    # ties, positive wins (allies preferred over enemies).
+    ranked = sorted(
+        ((k, int(att.get(k, 0))) for k in all_sponsor_keys()
+         if att.get(k, 0) != 0),
+        key=lambda kv: (-abs(kv[1]), -kv[1],
+                        list(SPONSORS.keys()).index(kv[0])),
+    )
+    return ranked[:max(0, int(n))]
 
 
 # ── Tag routing ────────────────────────────────────────────────────────────
@@ -153,6 +186,12 @@ def note_player_tag(world, tag: str, weight: int = 1) -> None:
     if world is None or not tag:
         return
     primary = current_floor_sponsor_key(world)
+    # P29.2 — current room may carry a `theme_sponsor_boost` dict that
+    # mirrors the floor's DCC vibe (e.g. ZOO room boosts Czarny Rynek
+    # +50% per like-bump, Museum boosts Recykling, etc.). This INSPIRES
+    # without locking — other sponsors can still win attention from
+    # actions they care about more.
+    theme_boost = _current_room_sponsor_boost(world)
     for skey, sdata in SPONSORS.items():
         bump = 0
         if tag in (sdata.get("likes_tags") or []):
@@ -161,8 +200,19 @@ def note_player_tag(world, tag: str, weight: int = 1) -> None:
             bump -= weight
         if bump == 0:
             continue
-        if skey == primary:
+        # Primary doubling (DCC: once a sponsor's locked on, they stay
+        # focused — natural "main sponsor" emergence).
+        if skey == primary and primary:
             bump *= 2
+        # Room theme boost: multiplicative, both for likes (+) and
+        # dislikes (−) — a room themed for sponsor X both feeds them
+        # AND makes them angrier when you mess up.
+        boost = theme_boost.get(skey, 0)
+        if boost:
+            if bump > 0:
+                bump += boost
+            else:
+                bump -= boost
         adjust_attention(world, skey, bump)
     # P27 — sponsor voice bus: roll for proactive chatter.
     try:
@@ -170,6 +220,78 @@ def note_player_tag(world, tag: str, weight: int = 1) -> None:
         _sv.maybe_speak(world, tag, weight)
     except Exception:
         pass
+    # P29.2 — gift trigger check (first time a sponsor crosses attention
+    # threshold). Side-effect free if no crossings.
+    try:
+        _check_gift_thresholds(world)
+    except Exception:
+        pass
+
+
+def _current_room_sponsor_boost(world) -> Dict[str, int]:
+    """Read `theme_sponsor_boost` off the player's current room (if any).
+    Returns an empty dict when no boost defined. ROOM_POOL templates
+    can declare e.g. `theme_sponsor_boost={"czarny_rynek": 1}` to
+    nudge that sponsor when player acts in this kind of room."""
+    floor = getattr(world, "current_floor", None)
+    if floor is None:
+        return {}
+    room = floor.current_room() if hasattr(floor, "current_room") else None
+    if room is None:
+        return {}
+    boost = (room.state or {}).get("theme_sponsor_boost") if room.state else None
+    if isinstance(boost, dict):
+        return {k: int(v) for k, v in boost.items() if v}
+    return {}
+
+
+# ── P29.2 — Gift trigger on first attention-threshold crossing ──────────
+
+_GIFT_THRESHOLD_FIRST = 8       # first gift fires at +8 attention
+_GIFT_THRESHOLD_SECOND = 14     # repeat at +14 (extended sponsor love)
+
+
+def _check_gift_thresholds(world) -> None:
+    """When a sponsor's attention crosses a gift threshold for the first
+    time in this session, queue a gift via _queue_safehouse_gift. Stamps
+    a per-(sponsor, threshold) flag on character.flags so it doesn't
+    re-fire."""
+    if world is None or getattr(world, "character", None) is None:
+        return
+    flags = world.character.flags
+    if flags is None:
+        world.character.flags = {}
+        flags = world.character.flags
+    att = _attention_dict(world)
+    for skey in all_sponsor_keys():
+        v = int(att.get(skey, 0))
+        sdata = get_sponsor(skey)
+        # First gift: attention >= 8 and never sent before.
+        flag1 = f"sponsor_gift1_sent_{skey}"
+        if v >= _GIFT_THRESHOLD_FIRST and not flags.get(flag1):
+            gifts = list(sdata.get("gift_pool") or [])
+            if gifts:
+                item = gifts[0]
+                _queue_safehouse_gift(world, skey, item)
+                flags[flag1] = True
+                if hasattr(world, "log_msg"):
+                    world.log_msg(
+                        f"{_name_pl(sdata)} cię zauważył. Paczka czeka w safehouse.",
+                        "sponsor",
+                    )
+        # Second gift: deeper bond.
+        flag2 = f"sponsor_gift2_sent_{skey}"
+        if v >= _GIFT_THRESHOLD_SECOND and not flags.get(flag2):
+            gifts = list(sdata.get("gift_pool") or [])
+            if len(gifts) >= 2:
+                item = gifts[1]
+                _queue_safehouse_gift(world, skey, item)
+                flags[flag2] = True
+                if hasattr(world, "log_msg"):
+                    world.log_msg(
+                        f"{_name_pl(sdata)} szanuje cię. Druga paczka w safehouse.",
+                        "sponsor",
+                    )
 
 
 # ── Interventions ──────────────────────────────────────────────────────────

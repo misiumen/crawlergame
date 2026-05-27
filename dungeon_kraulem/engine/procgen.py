@@ -43,20 +43,10 @@ def _build_handmade_floor_1(world) -> FloorState:
     f = FloorState(floor_id="floor_1", floor_number=1)
     f.title_key = FLOOR_1_TITLE_KEY; f.title_fallback = FLOOR_1_TITLE_FALLBACK
     f.theme_key = FLOOR_1_THEME_KEY; f.theme_fallback = FLOOR_1_THEME_FALLBACK
-    # Prompt 18: route the handmade floor through the sponsor catalog too
-    # so the sponsor engine has a known key to work with on Floor 1.
-    try:
-        from ..content.data.sponsors import sponsor_for_floor, get_sponsor
-        from ..ui.lang import t as _t
-        skey = sponsor_for_floor(1)
-        sdata = get_sponsor(skey)
-        name_pl = _t(sdata.get("name_key", ""),
-                     fallback=sdata.get("name_fallback", skey))
-        f.sponsor_key = skey
-        f.sponsor_fallback = f"Sponsoruje: {name_pl}."
-    except Exception:
-        f.sponsor_key = FLOOR_1_SPONSOR_KEY
-        f.sponsor_fallback = FLOOR_1_SPONSOR_FALLBACK
+    # P29.2 — no floor sponsor lock. The actual current primary is
+    # whoever wins attention from player actions (see engine.sponsors).
+    f.sponsor_key = ""
+    f.sponsor_fallback = "Sponsorzy obserwują."
 
     # Build rooms
     for tmpl in ROOMS:

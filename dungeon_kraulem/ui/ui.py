@@ -366,21 +366,30 @@ def draw_topbar(surf, world, layout=None, *, click_registry=None):
     if f is None: return
     title = t(f.title_key, fallback=f.title_fallback)
     text(surf, title, x + 12, y + 8, ACCENT, L.font_title - 4, True)
-    # Prompt 18: show sponsor NAME + the player's mood with that
-    # sponsor, so the player has a constant visible signal of who's
-    # watching and how they feel about it.
-    sponsor_label = t(f.sponsor_key, fallback=f.sponsor_fallback)
+    # P29.2 — sponsors are a competitive ranking, not a floor lock.
+    # Show top-3 ranked by attention: name + score + mood. Falls back
+    # to a generic "Sponsorzy obserwują" line when no sponsor has
+    # crossed >0 attention yet (fresh game, early floor 1).
+    sponsor_label = "Sponsorzy obserwują."
     try:
         from ..engine import sponsors as _sp
-        sk = _sp.current_floor_sponsor_key(world)
-        if sk:
-            # Prompt 19 audit fix N2: strip a trailing period from the
-            # sponsor line before appending the mood, so we don't get
-            # "Sponsoruje: NovaChem Biotech. — życzliwy" with a stray
-            # full-stop floating in the middle.
-            base = sponsor_label.rstrip().rstrip(".").rstrip()
-            mood = _sp.sponsor_mood(world, sk)
-            sponsor_label = f"{base} — {mood}"
+        ranked = _sp.top_sponsors_ranked(world, n=3)
+        if ranked:
+            parts = []
+            for skey, att in ranked:
+                sdata = _sp.get_sponsor(skey)
+                name = t(sdata.get("name_key", ""),
+                         fallback=sdata.get("name_fallback", skey))
+                # Compact name (drop long suffix like "Biotech" / "Krawędź")
+                short = name.split()[0] if " " in name else name
+                short = short.rstrip(",.;:")
+                sign = "+" if att > 0 else ""
+                parts.append(f"{short} {sign}{att}")
+            sponsor_label = "Sponsorzy: " + "  ·  ".join(parts)
+            # Append the top sponsor's mood at the end.
+            top_sk = ranked[0][0]
+            mood = _sp.sponsor_mood(world, top_sk)
+            sponsor_label += f"  ({mood})"
     except Exception:
         pass
     text(surf, sponsor_label, x + 12, y + 32, DIM_TEXT, L.font_small - 1)

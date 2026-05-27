@@ -112,14 +112,26 @@ def test_new_monsters_have_salvage_tables():
     print(f"  20 salvage tables complete: OK")
 
 
-def test_sponsor_for_each_themed_floor():
-    """Sponsor per floor matches the DCC vibe brief."""
-    assert _sp.sponsor_for_floor(3) == _sp.SPONSOR_CZARNY_RYNEK
-    assert _sp.sponsor_for_floor(4) == _sp.SPONSOR_MINISTERSTWO
-    assert _sp.sponsor_for_floor(5) == _sp.SPONSOR_RECYKLING
-    assert _sp.sponsor_for_floor(6) == _sp.SPONSOR_KANAL_7
-    print(f"  sponsors map: 3=Czarny Rynek, 4=Ministerstwo, "
-          f"5=Recykling, 6=Kanał 7: OK")
+def test_themed_rooms_carry_sponsor_boost():
+    """P29.2 — themed rooms NUDGE specific sponsors instead of
+    locking them. Each floor's templates declare theme_sponsor_boost.
+    """
+    by_id = {t["template_id"]: t for t in _rp.ROOM_POOL}
+    expected = {
+        "pool_cage_block":         _sp.SPONSOR_CZARNY_RYNEK,
+        "pool_zoo_boss":           _sp.SPONSOR_CZARNY_RYNEK,
+        "pool_kuchnia_sasiada":    _sp.SPONSOR_MINISTERSTWO,
+        "pool_swietlica_boss":     _sp.SPONSOR_MINISTERSTWO,
+        "pool_galeria":            _sp.SPONSOR_RECYKLING,
+        "pool_kurator_boss":       _sp.SPONSOR_RECYKLING,
+        "pool_glowna_sala_baru":   _sp.SPONSOR_KANAL_7,
+        "pool_balkon_vip_boss":    _sp.SPONSOR_KANAL_7,
+    }
+    for tid, expected_key in expected.items():
+        boost = by_id[tid].get("theme_sponsor_boost", {})
+        assert expected_key in boost, \
+            f"{tid} should boost {expected_key}; got boost={boost}"
+    print(f"  themed rooms nudge their sponsors via theme_sponsor_boost: OK")
 
 
 # ── Floor generation ────────────────────────────────────────────────────
@@ -237,7 +249,7 @@ def main():
     test_relay_boss_capped_at_floor_2()
     test_new_monsters_present_in_MON()
     test_new_monsters_have_salvage_tables()
-    test_sponsor_for_each_themed_floor()
+    test_themed_rooms_carry_sponsor_boost()
     test_generate_floor_3_uses_themed_monsters()
     test_generate_floor_4_uses_themed_monsters()
     test_generate_floor_5_uses_themed_monsters()

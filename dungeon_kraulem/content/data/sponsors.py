@@ -193,31 +193,12 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
 }
 
 
-# Floor rotation: which sponsor primary-watches a given floor number.
-# Floors 7-18 cycle but with `secondary_attention_seed` to reuse
-# previous-floor attention (set in engine.sponsors).
-SPONSORS_BY_FLOOR: Dict[int, str] = {
-    1: SPONSOR_NOVACHEM,
-    2: SPONSOR_SPORT,
-    3: SPONSOR_CZARNY_RYNEK,
-    4: SPONSOR_MINISTERSTWO,
-    5: SPONSOR_RECYKLING,
-    6: SPONSOR_KANAL_7,
-    # 7-18: cyclic rotation; engine.sponsors.sponsor_for_floor handles the
-    # modulo and remembers cross-floor attention.
-}
-
-
-def sponsor_for_floor(floor_number: int) -> str:
-    """Return sponsor key for the given floor number (1-indexed)."""
-    if floor_number in SPONSORS_BY_FLOOR:
-        return SPONSORS_BY_FLOOR[floor_number]
-    # Rotate through the first 6 entries for floors 7+.
-    primaries = [SPONSORS_BY_FLOOR[i] for i in range(1, 7)
-                 if i in SPONSORS_BY_FLOOR]
-    if not primaries:
-        return SPONSOR_NOVACHEM
-    return primaries[(floor_number - 1) % len(primaries)]
+# P29.2 — SPONSORS_BY_FLOOR + sponsor_for_floor REMOVED.
+# Sponsors compete continuously based on what the player does, not
+# by floor assignment. See engine/sponsors.py:current_floor_sponsor_key
+# (renamed semantics: now returns whoever has max attention).
+# Floor flavor still INSPIRES via per-room `theme_sponsor_boost` in
+# ROOM_POOL (content/data/room_pool.py).
 
 
 def get_sponsor(key: str) -> Dict[str, Any]:

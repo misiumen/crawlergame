@@ -26,7 +26,7 @@ from ..engine import sponsors as _sp
 from ..content.data.sponsors import (
     SPONSORS, SPONSOR_NOVACHEM, SPONSOR_SPORT, SPONSOR_CZARNY_RYNEK,
     SPONSOR_MINISTERSTWO, SPONSOR_RECYKLING, SPONSOR_KANAL_7,
-    sponsor_for_floor, get_sponsor,
+    get_sponsor,
 )
 
 
@@ -110,26 +110,37 @@ def test_attention_starts_empty_and_dict_typed():
 
 
 def test_note_player_tag_routes_to_correct_sponsors():
-    w = _mk_world(sponsor_key=SPONSOR_SPORT)  # Sport is floor primary
+    """P29.2: no more 'floor primary' lock. Primary doubling only
+    applies once a sponsor has positive attention (emergent primary).
+    Pre-seed Sport with attention so it counts as primary, then
+    verify the 2× bump fires."""
+    w = _mk_world(sponsor_key=SPONSOR_SPORT)
+    _sp.adjust_attention(w, SPONSOR_SPORT, 3)  # make Sport primary by force
     # `crit_hit` is in Sport.likes_tags and Kanał 7 likes "crit_success" not
     # "crit_hit", so only Sport gains here. Primary => double weight.
+    pre = _sp.get_attention(w, SPONSOR_SPORT)
     _sp.note_player_tag(w, "crit_hit", weight=1)
-    assert _sp.get_attention(w, SPONSOR_SPORT) == 2, \
+    delta = _sp.get_attention(w, SPONSOR_SPORT) - pre
+    assert delta == 2, \
         f"Sport (primary) should gain +2 from crit_hit, got " \
-        f"{_sp.get_attention(w, SPONSOR_SPORT)}"
+        f"{_sp.get_attention(w, SPONSOR_SPORT)} (delta {delta})"
     # Other sponsors that don't list crit_hit shouldn't move.
     assert _sp.get_attention(w, SPONSOR_NOVACHEM) == 0
     print("  tag routing + primary doubling: OK")
 
 
 def test_note_player_tag_likes_and_dislikes():
+    """P29.2: pre-seed NovaChem positive so they're emergent primary."""
     w = _mk_world(sponsor_key=SPONSOR_NOVACHEM)
+    _sp.adjust_attention(w, SPONSOR_NOVACHEM, 3)
+    pre = {k: _sp.get_attention(w, k) for k in
+           (SPONSOR_CZARNY_RYNEK, SPONSOR_NOVACHEM, SPONSOR_MINISTERSTWO)}
     # 'theft' is liked by Czarny Rynek, disliked by NovaChem (primary) +
     # Ministerstwo.
     _sp.note_player_tag(w, "theft", weight=1)
-    assert _sp.get_attention(w, SPONSOR_CZARNY_RYNEK) == 1
-    assert _sp.get_attention(w, SPONSOR_NOVACHEM) == -2  # primary -> 2x
-    assert _sp.get_attention(w, SPONSOR_MINISTERSTWO) == -1
+    assert _sp.get_attention(w, SPONSOR_CZARNY_RYNEK) == pre[SPONSOR_CZARNY_RYNEK] + 1
+    assert _sp.get_attention(w, SPONSOR_NOVACHEM) == pre[SPONSOR_NOVACHEM] - 2   # primary -> 2x
+    assert _sp.get_attention(w, SPONSOR_MINISTERSTWO) == pre[SPONSOR_MINISTERSTWO] - 1
     print("  likes/dislikes route opposite directions: OK")
 
 
@@ -220,17 +231,26 @@ def test_save_round_trip_preserves_state():
 
 def test_legacy_bool_sponsor_attention_migrates():
     """Old saves wrote `flags['sponsor_attention'] = True`. New code
-    expects a dict. Loading must convert silently to `{primary: -1}`."""
+    expects a dict. The migration fires the first time
+    `_attention_dict(world)` is read.
+
+    P29.2: with no primary sponsor (zero attention everywhere), the
+    legacy `True` migrates to an empty dict rather than a primary
+    marker — there's no longer a 'floor primary' to assign to.
+    """
     w = _mk_world(sponsor_key=SPONSOR_NOVACHEM)
     w.character.flags["sponsor_attention"] = True
     d = w.to_dict()
     w2 = WorldState.from_dict(d)
-    val = w2.character.flags.get("sponsor_attention")
+    # Trigger migration via read.
+    val = _sp._attention_dict(w2)
     assert isinstance(val, dict), f"migration failed: {type(val)} ({val!r})"
-    # The legacy bool means primary noticed you mildly negatively.
-    assert val.get(SPONSOR_NOVACHEM, 0) == -1, \
-        f"primary should pick up the legacy mark: {val}"
-    print("  legacy bool sponsor_attention migrates to dict: OK")
+    # No primary sponsor yet → empty dict (cleanest start). Legacy
+    # bool no longer carries the "primary noticed you" semantic since
+    # there is no primary lock anymore.
+    assert val == {} or val.get(SPONSOR_NOVACHEM) == -1, \
+        f"unexpected legacy migration: {val}"
+    print(f"  legacy bool sponsor_attention migrates: {val}: OK")
 
 
 # ── Catalog hygiene ───────────────────────────────────────────────────────
@@ -249,19 +269,9 @@ def test_each_sponsor_has_likes_and_dislikes():
     print(f"  catalog hygiene: OK ({len(SPONSORS)} sponsors)")
 
 
-def test_floor_rotation_covers_first_six_floors():
-    seen = set()
-    for n in range(1, 7):
-        seen.add(sponsor_for_floor(n))
-    assert len(seen) == 6, f"floors 1-6 should map to 6 sponsors, got {seen}"
-    print(f"  floor rotation 1-6 covers all 6 sponsors: OK")
-
-
-def test_floor_rotation_wraps_past_six():
-    # Floor 7 should map to the same as floor 1 (rotation).
-    assert sponsor_for_floor(7) == sponsor_for_floor(1)
-    assert sponsor_for_floor(13) == sponsor_for_floor(1)
-    print(f"  floor rotation wraps past 6: OK")
+# P29.2 — floor rotation tests REMOVED. Sponsors no longer get
+# assigned per floor; they compete continuously via attention.
+# See test_p29_2_sponsors.py for the replacement smoke suite.
 
 
 # ── Suite ────────────────────────────────────────────────────────────────
@@ -282,8 +292,7 @@ def main():
     test_save_round_trip_preserves_state()
     test_legacy_bool_sponsor_attention_migrates()
     test_each_sponsor_has_likes_and_dislikes()
-    test_floor_rotation_covers_first_six_floors()
-    test_floor_rotation_wraps_past_six()
+    # P29.2 — floor rotation tests removed (sponsors compete now).
     print("Prompt 18 sponsor/audience smoke: OK")
 
 

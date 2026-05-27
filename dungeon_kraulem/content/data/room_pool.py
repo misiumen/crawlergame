@@ -518,6 +518,9 @@ ROOM_POOL = [
         "guaranteed_max_exits": 3,
         "weight": 6,
         "floor_min": 3,
+        # P29.2 — ZOO inspires Czarny Rynek (exotic exemplars trade)
+        # and slightly Ministerstwo dislikes (illegal pet handling).
+        "theme_sponsor_boost": {"czarny_rynek_plus": 1},
     },
     {
         "template_id": "pool_feeding_pit",
@@ -552,6 +555,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 2,
         "weight": 4,
         "floor_min": 3,
+        "theme_sponsor_boost": {"czarny_rynek_plus": 1},
     },
     {
         "template_id": "pool_zoo_boss",
@@ -585,6 +589,8 @@ ROOM_POOL = [
         "weight": 1,
         "floor_min": 3,
         "unique_per_floor": True,
+        # Boss fight in zoo nets double Czarny Rynek love.
+        "theme_sponsor_boost": {"czarny_rynek_plus": 2},
     },
 
     # ── Piętro 4: NEIGHBORHOOD (sponsor: Ministerstwo) ────────────────────
@@ -622,6 +628,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 3,
         "weight": 6,
         "floor_min": 4,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
     },
     {
         "template_id": "pool_ogrod_szczescia",
@@ -657,6 +664,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 2,
         "weight": 5,
         "floor_min": 4,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
     },
     {
         "template_id": "pool_swietlica_boss",
@@ -691,6 +699,7 @@ ROOM_POOL = [
         "weight": 1,
         "floor_min": 4,
         "unique_per_floor": True,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 2},
     },
 
     # ── Piętro 5: MUSEUM (sponsor: Recykling Świętej Pamięci) ─────────────
@@ -729,6 +738,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 3,
         "weight": 6,
         "floor_min": 5,
+        "theme_sponsor_boost": {"kult_recyklingu": 1},
     },
     {
         "template_id": "pool_magazyn_relikwii",
@@ -765,6 +775,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 2,
         "weight": 4,
         "floor_min": 5,
+        "theme_sponsor_boost": {"kult_recyklingu": 1},
     },
     {
         "template_id": "pool_kurator_boss",
@@ -797,6 +808,7 @@ ROOM_POOL = [
         "weight": 1,
         "floor_min": 5,
         "unique_per_floor": True,
+        "theme_sponsor_boost": {"kult_recyklingu": 2},
     },
 
     # ── Piętro 6: BAR (sponsor: Kanał 7 Krawędź) ──────────────────────────
@@ -839,6 +851,7 @@ ROOM_POOL = [
         "weight": 5,
         "floor_min": 6,
         "unique_per_floor": True,
+        "theme_sponsor_boost": {"kanal_7_krawedz": 1},
     },
     {
         "template_id": "pool_zaplecze_bar",
@@ -873,6 +886,7 @@ ROOM_POOL = [
         "guaranteed_max_exits": 2,
         "weight": 5,
         "floor_min": 6,
+        "theme_sponsor_boost": {"kanal_7_krawedz": 1},
     },
     {
         "template_id": "pool_balkon_vip_boss",
@@ -906,6 +920,7 @@ ROOM_POOL = [
         "weight": 1,
         "floor_min": 6,
         "unique_per_floor": True,
+        "theme_sponsor_boost": {"kanal_7_krawedz": 2},
     },
 
     # ── Boss / objective gate ───────────────────────────────────────────────

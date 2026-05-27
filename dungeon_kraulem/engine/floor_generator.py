@@ -181,18 +181,12 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
     # can find the record; the top-bar `t(sponsor_key, fallback=...)`
     # call falls back to `sponsor_fallback` because catalog keys aren't
     # locale keys themselves.
-    try:
-        from ..content.data.sponsors import sponsor_for_floor, get_sponsor
-        from ..ui.lang import t as _t
-        skey = sponsor_for_floor(floor_number)
-        sdata = get_sponsor(skey)
-        name_pl = _t(sdata.get("name_key", ""),
-                     fallback=sdata.get("name_fallback", skey))
-        f.sponsor_key = skey
-        f.sponsor_fallback = f"Sponsoruje: {name_pl}."
-    except Exception:
-        f.sponsor_key = "floor1_sponsor"
-        f.sponsor_fallback = "Sponsoruje: NovaChem Biotech."
+    # P29.2 — sponsor field on floor is now just a back-compat shell.
+    # Real "current sponsor" is computed dynamically from attention
+    # totals via engine.sponsors.current_floor_sponsor_key, NOT
+    # locked here. The fallback string is generic.
+    f.sponsor_key = ""
+    f.sponsor_fallback = "Sponsorzy obserwują."
 
     # Stash archetype on floor for inspection / save
     f.active_events.append({
@@ -499,6 +493,13 @@ def _build_room_from_template(node_id: str, role: str, tmpl: Dict,
     # Type stays HIDDEN until visited
     from .room import S_UNKNOWN
     r.visible_state = S_UNKNOWN
+    # P29.2 — theme sponsor boost (e.g. ZOO rooms feed Czarny Rynek).
+    # Stashed on room.state for engine.sponsors.note_player_tag to read.
+    tsb = tmpl.get("theme_sponsor_boost")
+    if isinstance(tsb, dict):
+        if r.state is None:
+            r.state = {}
+        r.state["theme_sponsor_boost"] = dict(tsb)
 
     # Instantiate seeded entities
     seeds_by_kind = tmpl.get("entity_seed_pools", {})

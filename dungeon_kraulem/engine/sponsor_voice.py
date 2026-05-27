@@ -100,24 +100,41 @@ def maybe_speak(world, tag: str, weight: int = 1,
 
 
 def _candidate_speakers(world, tag: str, primary: str) -> list:
-    """Sponsors who MIGHT speak about this tag. Floor primary first,
-    then other sponsors with non-zero attention. Caller picks the
-    actual speaker via probability + cooldown."""
+    """Sponsors who MIGHT speak about this tag.
+
+    P29.2: primary may be "" (no sponsor has attention yet). In that
+    case ANY sponsor whose likes/dislikes match the tag is a
+    candidate — early-game sponsors should still be able to speak
+    once before anyone's locked in primary. After a primary
+    emerges, they go first and other sponsors only chime in if they
+    have meaningful attention.
+    """
     from . import sponsors as _sp
     out = []
     if primary and primary in _sp.SPONSORS:
         out.append(primary)
-    # Other sponsors — only those who actually care about the tag (have
-    # it in their likes or dislikes) and have built up some attention.
-    attention = getattr(world, "sponsor_attention", {}) or {}
+    # Find tag-matching sponsors. Threshold depends on whether we
+    # already have a primary: 3+ attention if yes (gating noise),
+    # any tag-match if no (early-game open mic).
+    attention = getattr(world, "sponsor_attention", {})
+    if not isinstance(attention, dict):
+        # fallback if stored on character flags instead
+        char = getattr(world, "character", None)
+        if char and isinstance(getattr(char, "flags", None), dict):
+            attention = char.flags.get("sponsor_attention") or {}
+        else:
+            attention = {}
+    early_game = (primary == "")
     for skey, sdata in _sp.SPONSORS.items():
         if skey == primary:
             continue
-        if abs(int(attention.get(skey, 0) or 0)) < 3:
+        if (tag not in (sdata.get("likes_tags") or [])
+                and tag not in (sdata.get("dislikes_tags") or [])):
             continue
-        if (tag in (sdata.get("likes_tags") or [])
-                or tag in (sdata.get("dislikes_tags") or [])):
-            out.append(skey)
+        if not early_game:
+            if abs(int(attention.get(skey, 0) or 0)) < 3:
+                continue
+        out.append(skey)
     return out
 
 

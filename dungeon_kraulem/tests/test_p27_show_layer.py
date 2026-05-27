@@ -190,9 +190,11 @@ def test_floor_2_builds_with_correct_sponsor():
     g.start_new_game("Tester", "janitor")
     f2 = generate_floor(g.world, floor_number=2)
     assert f2.floor_number == 2
-    # Floor 2 sponsor is Sponsor Bezpieczeństwa Sportu.
-    assert "sport" in f2.sponsor_key.lower(), \
-        f"expected sport sponsor for F2, got {f2.sponsor_key}"
+    # P29.2 — floors no longer get a locked sponsor. The "current
+    # sponsor" emerges from attention totals. We just verify the
+    # field exists and is empty (back-compat shell).
+    assert f2.sponsor_key == "", \
+        f"floor 2 should have no locked sponsor; got '{f2.sponsor_key}'"
     assert len(f2.rooms) >= 8, f"F2 should have ≥8 rooms, got {len(f2.rooms)}"
     print(f"  Floor 2 built: {len(f2.rooms)} rooms, sponsor={f2.sponsor_key}: OK")
 
