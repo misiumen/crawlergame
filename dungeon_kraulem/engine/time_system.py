@@ -47,6 +47,24 @@ def advance(world, minutes: int):
     except Exception:
         pass
 
+    # P29.18 — show-director interventions. One roll per tick; the
+    # module itself gates by audience band, per-floor cap, and an
+    # 8-minute cooldown.
+    try:
+        from . import show_director as _sd
+        _sd.maybe_fire(world)
+    except Exception:
+        pass
+
+    # P29.18 — proxy-war event check. Cheap to call every tick; the
+    # module owns the per-pair cooldown and per-floor cap, so this
+    # only actually fires when conditions converge.
+    try:
+        from . import proxy_wars as _pw
+        _pw.maybe_fire(world)
+    except Exception:
+        pass
+
     # Day-change event
     if f.day_number() != prev_day:
         world.log_msg(_day_change_line(f), "syndicate")

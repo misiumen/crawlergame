@@ -956,6 +956,38 @@ ROOM_POOL = [
         "unique_per_floor": True,
     },
 
+    # ── P29.18 — Vending pod (absurd loot machine) ──────────────────────────
+    {
+        "template_id": "pool_vending_pod",
+        "role": "filler",
+        "actual_type": "loot",
+        "tags": ["loot", "vending", "sponsor"],
+        "name_pool": ["Alkowa Automatów", "Pomieszczenie z Wendingami",
+                      "Korytarz Reklamowy"],
+        "first_enter_pool": [
+            "Wąski korytarz oświetlony reklamami. Trzy automaty z "
+            "logiem różnych sponsorów migają na wpół-pracy. Spróbuj "
+            "którymkolwiek — `użyj automat`.",
+        ],
+        "look_pool": ["Trzy automaty, dwa neony, jedna kałuża chłodziwa."],
+        "search_pool": [
+            "Pod automatem znajdujesz monetę z napisem „PIJ”.",
+        ],
+        "public_hint_pool": ["Reklamy lecą głośniej niż normalnie."],
+        "sensory_tags": ["neon", "chłodziwo", "reklama"],
+        "entity_seed_pools": {
+            "env":  ["vending_machine", "vending_machine",
+                     "sponsor_screen"],
+            "item": ["coffee"],
+        },
+        "exit_hints": ["korytarz", "dalej"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 3,
+        "floor_min": 2,
+        "floor_max": 14,
+    },
+
     # ── P29.11 — DEEP FLOORS 7-18 ───────────────────────────────────────────
     # Floors 7-9: UNDERGROUND (zaplecze, kanały)
     {

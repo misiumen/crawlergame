@@ -2135,6 +2135,10 @@ class Game:
             ent = v.matched_entities[0]
             if ent.key in ("map_fragment", "floor_map"):
                 self._consume_map_item(ent); return
+            # P29.18 — vending machine: dispense one absurd item.
+            if ent.key == "vending_machine" and \
+                    not (ent.state or {}).get("vending_used"):
+                self._attempt_vending_use(ent); return
 
         r = resolve(v, self.world)
         if r.fallback_description and (v.required_checks or r.level != "success"):
@@ -4985,6 +4989,98 @@ class Game:
                                     f"used_{sponsor_key}_gift", weight=1)
         except Exception:
             pass
+        try:
+            audio.play_sfx("sponsor_chime")
+        except Exception:
+            pass
+
+    # ── P29.18: vending-machine use handler ──────────────────────────────
+
+    # Pool of absurd vending-machine items. Each: (key, display_name,
+    # tags, weight). Drawn weighted; one item per machine use; the
+    # machine stamps state["vending_used"]=True so it can't be re-rolled.
+    _VENDING_POOL = (
+        ("plyn_z_napisem_pij", "Płyn z napisem PIJ",
+         ["consumable", "weird", "vending_loot"], 4),
+        ("skarpetka_rozgrzewajaca", "Skarpetka rozgrzewająca (używana)",
+         ["worn", "weird", "vending_loot", "trinket"], 3),
+        ("ostatnia_pigulka", "Ostatnia Pigułka (rocznik nieznany)",
+         ["consumable", "medical", "vending_loot"], 3),
+        ("zardzewialy_klucz", "Zardzewiały klucz (do czegoś)",
+         ["tool", "key", "vending_loot"], 2),
+        ("instant_zupa_3_in_1", "Zupa instant 3w1 (smak: niespodzianka)",
+         ["consumable", "food", "vending_loot"], 4),
+        ("portret_anti_hosta",
+         "Portret anti-hosta w drewnianej ramce",
+         ["junk", "art", "vending_loot"], 2),
+        ("baton_proteinowy_otwarte",
+         "Baton proteinowy (rozprutą folią)",
+         ["consumable", "food", "vending_loot"], 4),
+        ("kostka_lodu_z_napisem",
+         "Kostka lodu z grawerem „WSZYSTKO BĘDZIE DOBRZE”",
+         ["consumable", "weird", "vending_loot"], 2),
+        ("kabel_o_dziwnym_przekroju",
+         "Kabel o dziwnym przekroju",
+         ["scrap", "wire", "vending_loot"], 3),
+    )
+
+    def _attempt_vending_use(self, machine_entity) -> None:
+        """Dispense one absurd item from the vending machine.
+
+        Single-use per machine (state["vending_used"] flag). Roll
+        weighted-random from _VENDING_POOL. Cost: 1 credit per use
+        (the machine is a kiosk, after all). Side effect: small
+        audience bump because the item is always memorable, and a
+        sponsor tag note for "novachem_biotech" (the brand running
+        the machines)."""
+        import random as _r
+        from .entity import Entity, T_ITEM
+        ch = self.world.character
+        # Cost.
+        if ch.credits < 1:
+            self.log(t("feedback_vending_no_credits",
+                       fallback="Automat brzęczy, ale nie ma kredytów."),
+                     LOG_WARN)
+            return
+        ch.credits -= 1
+        # Pick.
+        keys = list(self._VENDING_POOL)
+        weights = [w for _k, _n, _t, w in keys]
+        key, name, tags, _ = _r.choices(keys, weights=weights, k=1)[0]
+        # Materialize.
+        item = Entity(
+            key=key, entity_type=T_ITEM,
+            fallback_name=name,
+            fallback_desc="Automat wypluł to z bólem.",
+            tags=list(tags) + ["crafted"],
+            affordances=["inspect", "use", "loot"],
+            location_id="inventory:player",
+            portable=True,
+            state={"quality": "normal"},
+        )
+        self.world.register(item)
+        ch.inventory_ids.append(item.entity_id)
+        # Mark the machine as used.
+        machine_entity.state = machine_entity.state or {}
+        machine_entity.state["vending_used"] = True
+        self.log(t("feedback_vending_dispense",
+                   fallback=f"Automat: BRZĘK. Dostajesz: „{name}”. "
+                            f"(-1 kr.)",
+                   name=name), LOG_SUCCESS)
+        # Audience nudge — these items are memorable.
+        try:
+            from . import audience as _aud
+            _aud.change_audience(self.world, 1, source="vending",
+                                 emit_log=False)
+        except Exception:
+            pass
+        # Sponsor tag — vendings are NovaChem-branded by default.
+        try:
+            from . import sponsors as _sp
+            _sp.note_player_tag(self.world, "consumable_used", weight=1)
+        except Exception:
+            pass
+        # SFX.
         try:
             audio.play_sfx("sponsor_chime")
         except Exception:
