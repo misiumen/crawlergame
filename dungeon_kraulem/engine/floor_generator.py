@@ -217,6 +217,15 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
     # (and, when belief seeds exist on the world, by their target_tags too).
     _place_encounters(f, rng, world=world)
 
+    # P29.22 — celebrity NPC placement. Roll ~25% per floor for one
+    # named cameo from content/data/celebrities.py. Without this hook,
+    # the celebrity catalog was content rot. Keeps things gated by
+    # `world.character.flags["celeb_met_<key>"]` so repeat runs on the
+    # same character don't re-spawn the same celebrity (DCC immersion:
+    # they're famous; you only meet them once per cycle).
+    if rng.random() < 0.25:
+        _place_celebrity(f, rng, world=world)
+
     # Step 10: ensure objective.required_tags are present somewhere on the floor
     _ensure_required_tags(f, rng)
 
@@ -921,6 +930,78 @@ def _place_encounters(f: FloorState, rng: random.Random, world=None):
                 for tg in actual_overlap:
                     if tg not in room.state["encounter_belief_tags"]:
                         room.state["encounter_belief_tags"].append(tg)
+
+
+# ── P29.22 — Celebrity NPC placement ─────────────────────────────────────────
+
+def _place_celebrity(f: FloorState, rng: random.Random, world=None):
+    """Pick one celebrity from content/data/celebrities.py that's
+    eligible for this floor AND hasn't been met yet on this character,
+    and inject them as a named NPC in a non-start, non-boss room.
+
+    Eligibility: floor_min <= floor_number <= floor_max, and
+    character.flags['celeb_met_<key>'] is not set.
+
+    Side effects on first encounter happen later (Game.on_room_enter
+    or visibility.mark_seen — see hook in game.py). This function
+    only ships the entity into the room.
+    """
+    try:
+        from ..content.data import celebrities as _cel
+    except Exception:
+        return
+    eligible = _cel.for_floor(f.floor_number)
+    if not eligible:
+        return
+    # Filter by already-met flags.
+    char = getattr(world, "character", None) if world else None
+    char_flags = (char.flags or {}) if char else {}
+    fresh = [d for d in eligible
+             if not char_flags.get(f"celeb_met_{d['key']}")]
+    if not fresh:
+        return
+    picked = rng.choice(fresh)
+    # Find a host room: non-start, non-boss, ideally a social room.
+    hosts = [r for r in f.rooms.values()
+             if r.room_id != f.start_room_id
+             and r.actual_type != "boss"
+             and r.actual_type != "loot"]
+    if not hosts:
+        return
+    # Prefer social rooms; fall back to any.
+    social = [r for r in hosts if r.actual_type == "social"]
+    room = rng.choice(social or hosts)
+    # Build the Entity. Celebrities use the existing MON pipeline so
+    # the visibility / combat / sponsor systems all work normally —
+    # they're "monsters" mechanically, even if their disposition is
+    # neutral or friendly.
+    from .entity import Entity, T_NPC, T_MONSTER
+    disp = picked.get("disposition", "neutral")
+    # Hostile celebs use T_MONSTER so combat affordance is available;
+    # neutral/friendly use T_NPC.
+    ent_type = T_MONSTER if disp == "hostile" else T_NPC
+    hp = int(picked.get("hp_design", 20))
+    ent = Entity(
+        key=picked["key"],
+        entity_type=ent_type,
+        fallback_name=picked.get("fallback_name") or picked["key"],
+        fallback_desc=picked.get("fallback_intro", ""),
+        tags=list(picked.get("tags") or []) + ["celebrity"],
+        affordances=["inspect", "talk", "intimidate", "bribe"] +
+                    (["attack"] if disp == "hostile" else []),
+        hp=hp, max_hp=hp,
+        ac=12, attack_bonus=4, damage_dice="1d8",
+        location_id=room.room_id,
+        state={"celebrity_intro_pending": True,
+               "celebrity_data": {
+                   "fan_following": picked.get("fan_following", ""),
+                   "notoriety_boost": picked.get("notoriety_boost", 0),
+                   "intro": picked.get("fallback_intro", ""),
+               }},
+    )
+    if world is not None:
+        world.register(ent)
+    room.entities.append(ent)
 
 
 # ── Required-tag guarantee (Prompt 06a, gap #4) ──────────────────────────────

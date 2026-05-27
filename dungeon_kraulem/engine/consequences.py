@@ -51,6 +51,16 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                     # Prompt 1: encounter-template intro (combat rooms)
                     if r.encounter_intro_fallback:
                         lines.append(r.encounter_intro_fallback)
+                    # P29.22 — celebrity first-encounter side effects.
+                    # When the player enters a room containing a
+                    # pending celebrity intro, fire the intro line,
+                    # bump audience by notoriety_boost, nudge the
+                    # celebrity's fan_following sponsor, and stamp
+                    # `celeb_met_<key>` so they don't re-spawn.
+                    try:
+                        _fire_celebrity_intros(world, r, lines)
+                    except Exception:
+                        pass
                     # Prompt-07b follow-up: consume belief-seed encounter
                     # modifiers for this room. Mods are advisory: at most
                     # one Polish flavor line per entry, and we stash the
@@ -760,3 +770,46 @@ def _consume_pending_gifts(world, room, lines) -> None:
             leftover.append(entry)
     # Replace queue with only the leftovers.
     world.pending_sponsor_gifts = leftover
+
+
+# ── P29.22 — Celebrity first-encounter trigger ──────────────────────────────
+
+def _fire_celebrity_intros(world, room, lines):
+    """Run once per celebrity per character. Reads each entity in
+    `room.entities` whose state has `celebrity_intro_pending: True`,
+    emits the intro line, bumps audience by the celebrity's
+    notoriety_boost, adjusts the fan-following sponsor's attention by
+    +2, and stamps `character.flags['celeb_met_<key>']` so the picker
+    in `floor_generator._place_celebrity` skips them next time."""
+    if world is None or world.character is None or room is None:
+        return
+    ch = world.character
+    if ch.flags is None:
+        ch.flags = {}
+    for ent in list(getattr(room, 'entities', None) or []):
+        state = ent.state if hasattr(ent, 'state') else None
+        if not state or not state.get('celebrity_intro_pending'):
+            continue
+        data = state.get('celebrity_data') or {}
+        intro = data.get('intro') or ''
+        if intro:
+            lines.append(intro)
+        # Audience bump (notoriety).
+        try:
+            from . import audience as _aud
+            _aud.change_audience(world, int(data.get('notoriety_boost', 0)),
+                                 source='celebrity_first_seen', emit_log=False)
+        except Exception:
+            pass
+        # Sponsor attention bump.
+        fan_key = data.get('fan_following', '')
+        if fan_key:
+            try:
+                from . import sponsors as _sp
+                _sp.adjust_attention(world, fan_key, 2)
+            except Exception:
+                pass
+        # Stamp the met-flag and clear the pending flag.
+        ch.flags[f'celeb_met_{ent.key}'] = True
+        state['celebrity_intro_pending'] = False
+
