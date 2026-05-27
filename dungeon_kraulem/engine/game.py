@@ -2617,13 +2617,14 @@ class Game:
         """First time the player reaches floor 3, offer 4 random
         mutations from systems.species.SPECIES_CATALOG. Player picks
         one (commits permanently) or declines (stays whatever they
-        were). One-shot — latched via character.flags."""
+        were). One-shot — the latch flag is set only AFTER the
+        player commits (accept or decline), so a crash mid-offer
+        won't silently consume the only chance."""
         ch = self.world.character
         if ch.flags is None:
             ch.flags = {}
         if ch.flags.get("species_offer_fired"):
             return
-        ch.flags["species_offer_fired"] = True
         # Build offer pool — exclude the player's current species
         # so they don't see themselves in the roll.
         import random as _r
@@ -2641,15 +2642,20 @@ class Game:
 
     def _accept_species(self, idx: int) -> None:
         """Player picked one of the offered species. Apply it and
-        return to play."""
+        return to play. Latches the offer so it can't re-fire."""
         candidates = getattr(self, "species_offer_candidates", None) or []
         if not (0 <= idx < len(candidates)):
             return
         key = candidates[idx]
         from ..systems import species as _sp_cat
         ok = _sp_cat.apply_species(self.world, key)
+        ch = self.world.character
+        if ch.flags is None:
+            ch.flags = {}
         if not ok:
             self.log(f"Komora odrzuca twoją próbkę. ({key})", LOG_WARN)
+            ch.flags["species_offer_fired"] = True
+            self.species_offer_candidates = []
             self.state = STATE_PLAY
             return
         sp = _sp_cat.SPECIES_CATALOG.get(key)
@@ -2664,16 +2670,22 @@ class Game:
                 _sp.apply_all_stats_bonus(self.world.character)
             except Exception:
                 pass
+        # Latch only AFTER the choice committed.
+        ch.flags["species_offer_fired"] = True
         self.species_offer_candidates = []
         self.state = STATE_PLAY
 
     def _decline_species(self) -> None:
-        """Stay baseline_human. The decline path doesn't call
-        apply_species — preserves whatever species the character
-        already had (could be baseline OR a meta-unlocked species)."""
+        """Stay whatever you were. The decline path doesn't call
+        apply_species — preserves the current species_key (could be
+        baseline OR a meta-unlocked species). Latches the offer."""
         self.log("Pozostajesz sobą. Konferansjer: „Nuda, ale "
                  "udokumentowane.” Komora syczy i się otwiera dla "
                  "następnego.", LOG_SYSTEM)
+        ch = self.world.character
+        if ch.flags is None:
+            ch.flags = {}
+        ch.flags["species_offer_fired"] = True
         self.species_offer_candidates = []
         self.state = STATE_PLAY
 

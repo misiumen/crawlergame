@@ -175,7 +175,7 @@ SPECIES_CATALOG: Dict[str, Species] = {
                 "na „grappled”.",
         flavor_pl="Z prawego ramienia wyrasta dodatkowa ręka. "
                   "Sponsorzy się krzywią, Konferansjer się śmieje, "
-                  "anty-anti-host łapie pierwsze ujęcie.",
+                  "operator kamery 2 łapie pierwsze ujęcie.",
         drawback_pl="Pierwsze spotkanie z dowolnym NPC: −3 do "
                     "społecznego (horror wyglądu, trwałe). Uwaga "
                     "sponsorów ograniczona do 10 (oprócz Kanału 7).",

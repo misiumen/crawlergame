@@ -403,20 +403,46 @@ def test_fungal_companion_bond_drift_on_descent():
 # ── Game flow: offer fires once on floor 3 ─────────────────────────────
 
 def test_offer_fires_once_on_floor_3():
+    """P29.36: latch is set on COMMIT (accept or decline), not on
+    initial render — that way a crash mid-offer doesn't silently
+    consume the only chance. Re-calling _maybe_offer_species before
+    commit DOES re-fire (defensive); after decline, it doesn't."""
     from ..engine.game import Game, STATE_SPECIES_OFFER, STATE_PLAY
     g = Game(screen=None)
     g.start_new_game("Test", "janitor")
-    # Simulate "we just arrived on floor 3."
     g.world.floor_number = 3
     g.world.current_floor.floor_number = 3
     g._maybe_offer_species()
     assert g.state == STATE_SPECIES_OFFER
     assert len(getattr(g, "species_offer_candidates", []) or []) == 4
-    # Second call: latched, doesn't re-fire.
-    g.state = STATE_PLAY
+    # Player declines → latch sets.
+    g._decline_species()
+    assert g.state == STATE_PLAY
+    # Second call after commit: latched, doesn't re-fire.
     g._maybe_offer_species()
-    assert g.state == STATE_PLAY, "offer should be one-shot"
-    print("  offer fires on floor 3 first arrival only: OK")
+    assert g.state == STATE_PLAY, "offer should be one-shot after commit"
+    print("  offer one-shot AFTER commit (decline-then-retry): OK")
+
+
+def test_offer_does_not_latch_until_commit():
+    """If the player triggers the offer but crashes/exits before
+    committing, the latch should NOT be set — they'd lose their
+    only chance otherwise."""
+    from ..engine.game import Game, STATE_SPECIES_OFFER, STATE_PLAY
+    g = Game(screen=None)
+    g.start_new_game("Test", "janitor")
+    g.world.floor_number = 3
+    g.world.current_floor.floor_number = 3
+    g._maybe_offer_species()
+    assert g.state == STATE_SPECIES_OFFER
+    # Simulate "player exited without choosing" — manually clear state.
+    g.state = STATE_PLAY
+    g.species_offer_candidates = []
+    # Latch should still be unset → re-call re-opens.
+    g._maybe_offer_species()
+    assert g.state == STATE_SPECIES_OFFER, \
+        "latch shouldn't trigger before commit; reentry must work"
+    print("  no latch before commit (crash-safe re-entry): OK")
 
 
 def test_decline_path_keeps_species_key():
@@ -491,6 +517,7 @@ def main():
     test_enhanced_human_biopsy_on_descent()
     test_fungal_companion_bond_drift_on_descent()
     test_offer_fires_once_on_floor_3()
+    test_offer_does_not_latch_until_commit()
     test_decline_path_keeps_species_key()
     test_accept_path_commits_species()
     test_random_offer_excludes_current()

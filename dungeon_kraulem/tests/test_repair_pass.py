@@ -119,11 +119,22 @@ def test_settings_apply_persists(tmp_path=None):
 
 
 def test_char_creation_page_keys():
+    # P29.35: the background list at character creation now includes
+    # unlocked origins from meta_progression. Reset the persistent
+    # history file first so we're testing the vanilla list. END
+    # lands on len(bg_keys) - 1; we read the live list off the Game
+    # instead of hardcoding 12 (which was correct pre-P29.35 but
+    # brittle once origins extend the picker).
     from ..engine.game import Game, STATE_CREATE
+    from ..engine import run_history as _rh
     import pygame as _pg
+    _rh.reset()
     g = Game(screen=None)
     g.state = STATE_CREATE
-    g.cc = {"step": "background", "name_input": "x", "selected_bg": 0}
+    g.cc = {"step": "background", "name_input": "x", "selected_bg": 0,
+            "selected_species": 0, "selected_companion": 0}
+    bg_keys = g._creation_background_keys()
+    last_idx = len(bg_keys) - 1
 
     class FakeEv:
         def __init__(self, k): self.key = k
@@ -135,11 +146,11 @@ def test_char_creation_page_keys():
     g.handle_keydown(FakeEv(_pg.K_PAGEUP))
     assert g.cc["selected_bg"] == 4
     g.handle_keydown(FakeEv(_pg.K_END))
-    # Prompt 19: opiekun_zwierzaka added -> 13 backgrounds, index 12.
-    assert g.cc["selected_bg"] == 12
+    assert g.cc["selected_bg"] == last_idx
     g.handle_keydown(FakeEv(_pg.K_HOME))
     assert g.cc["selected_bg"] == 0
-    print("  char-creation PageUp/Down/Home/End: OK")
+    print(f"  char-creation PageUp/Down/Home/End: OK "
+          f"(END -> {last_idx})")
 
 
 def test_text_input_after_journal_close():
