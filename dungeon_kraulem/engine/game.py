@@ -1978,6 +1978,16 @@ class Game:
         if intent.intent == "apply_enhancement":
             self._attempt_apply_enhancement(intent); return
 
+        # P29.19 — credit sinks.
+        if intent.intent == "train_stat":
+            self._attempt_train_stat(intent); return
+        if intent.intent == "bribe_sponsor":
+            self._attempt_bribe_sponsor(intent); return
+        if intent.intent == "call_pod":
+            self._attempt_call_pod(intent); return
+        if intent.intent == "upgrade_loadout":
+            self._attempt_upgrade_loadout(intent); return
+
         # P29.4 — black-market buy/sell follow-ups.
         if intent.intent == "bm_buy":
             from ..systems import safehouses as _sh
@@ -5083,6 +5093,217 @@ class Game:
         # SFX.
         try:
             audio.play_sfx("sponsor_chime")
+        except Exception:
+            pass
+
+    # ── P29.19: credit sinks ──────────────────────────────────────────────
+    #
+    # Four buy-it-now actions that give the player meaningful ways to
+    # spend the credits piling up from salvage/sponsors. Each handler:
+    #   * validates affordability + per-use gating
+    #   * deducts credits
+    #   * applies effect (stat bump, sponsor attention, pod spawn, etc.)
+    #   * logs the result
+    # Per-character flags hold the one-shot gates so save/load survives.
+
+    _TRAIN_COST = 80
+    _BRIBE_COST = 20
+    _CALL_POD_COST = 50
+    _UPGRADE_COST = 100
+
+    def _attempt_train_stat(self, intent) -> None:
+        """`trening <stat>` — pay 80 kr for +1 to one stat. Each stat
+        is trainable ONCE per character (flag `trained_<STAT>`)."""
+        if not intent.targets:
+            self.log(t("feedback_train_syntax",
+                       fallback="Składnia: trening <stat> "
+                                "(STR/DEX/CON/INT/WIS/CHA)."), LOG_WARN)
+            return
+        ch = self.world.character
+        # Normalize stat name. Accept both PL words and ASCII codes.
+        STAT_ALIAS = {
+            "str": "STR", "siła": "STR", "sila": "STR", "siłę": "STR",
+            "dex": "DEX", "zręczność": "DEX", "zrecznosc": "DEX",
+            "con": "CON", "kondycja": "CON",
+            "int": "INT", "inteligencja": "INT",
+            "wis": "WIS", "mądrość": "WIS", "madrosc": "WIS",
+            "cha": "CHA", "charyzma": "CHA",
+        }
+        raw = (intent.targets[0] or "").strip().lower()
+        stat = STAT_ALIAS.get(raw)
+        if stat is None:
+            self.log(t("feedback_train_bad_stat",
+                       fallback=f"Nie wiem, jak trenować „{raw}”. "
+                                f"STR / DEX / CON / INT / WIS / CHA."),
+                     LOG_WARN)
+            return
+        flag = f"trained_{stat}"
+        if (ch.flags or {}).get(flag):
+            self.log(t("feedback_train_already_done",
+                       fallback=f"Trener: „{stat} już z tobą "
+                                f"pracował. Nie da więcej.”"),
+                     LOG_WARN)
+            return
+        if ch.credits < self._TRAIN_COST:
+            self.log(t("feedback_train_no_credits",
+                       fallback=f"Trener: {self._TRAIN_COST} kr za sesję. "
+                                f"Masz {ch.credits}."), LOG_WARN)
+            return
+        ch.credits -= self._TRAIN_COST
+        ch.stats[stat] = int(ch.stats.get(stat, 10)) + 1
+        if ch.flags is None: ch.flags = {}
+        ch.flags[flag] = True
+        self.log(t("feedback_train_ok",
+                   fallback=f"Trener z ciebie wyciska — {stat} "
+                            f"+1 (teraz {ch.stats[stat]}). -{self._TRAIN_COST} kr."),
+                 LOG_SUCCESS)
+        try:
+            from . import time_system as _ts
+            _ts.advance(self.world, 30)   # training takes time
+        except Exception:
+            pass
+
+    def _attempt_bribe_sponsor(self, intent) -> None:
+        """`łapówka <sponsor>` — pay 20 kr to nudge a sponsor +2.
+        No per-use gating, just costs credits. Matches sponsor by
+        loose name fragment."""
+        if not intent.targets:
+            self.log(t("feedback_bribe_syntax",
+                       fallback="Składnia: łapówka <nazwa sponsora>."),
+                     LOG_WARN)
+            return
+        ch = self.world.character
+        from .affordances import fold as _fold
+        needle = _fold((intent.targets[0] or "").strip())
+        try:
+            from . import sponsors as _sp
+            keys = _sp.all_sponsor_keys()
+            picked = None
+            for k in keys:
+                if needle in _fold(k):
+                    picked = k; break
+                # Also try the PL display name.
+                sdata = _sp.get_sponsor(k)
+                pl = _fold(_sp._name_pl(sdata))
+                if needle in pl:
+                    picked = k; break
+            if picked is None:
+                self.log(t("feedback_bribe_unknown",
+                           fallback=f"Nie znam sponsora pasującego "
+                                    f"do „{intent.targets[0]}”."), LOG_WARN)
+                return
+            if ch.credits < self._BRIBE_COST:
+                self.log(t("feedback_bribe_no_credits",
+                           fallback=f"Łapówka: {self._BRIBE_COST} kr. "
+                                    f"Masz {ch.credits}."), LOG_WARN)
+                return
+            ch.credits -= self._BRIBE_COST
+            _sp.adjust_attention(self.world, picked, 2)
+            sdata = _sp.get_sponsor(picked)
+            self.log(t("feedback_bribe_ok",
+                       fallback=f"Łapówka dla {_sp._name_pl(sdata)} "
+                                f"przyjęta. +2 uwagi. -{self._BRIBE_COST} kr."),
+                     LOG_SUCCESS)
+        except Exception as exc:
+            self.log(f"(Łapówka nie poszła: {exc})", LOG_WARN)
+
+    def _attempt_call_pod(self, intent) -> None:
+        """`zamów pakiet [<sponsor>]` — pay 50 kr to materialize a
+        sponsor drop-pod in the current room. If no sponsor specified,
+        pick the current top-attention one (whoever's been watching
+        most). No per-use cap — costs scale with use."""
+        ch = self.world.character
+        if ch.credits < self._CALL_POD_COST:
+            self.log(t("feedback_call_pod_no_credits",
+                       fallback=f"Pakiet na żądanie: {self._CALL_POD_COST} kr. "
+                                f"Masz {ch.credits}."), LOG_WARN)
+            return
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            self.log(t("feedback_call_pod_no_room",
+                       fallback="Nie ma pokoju, do którego mógłby "
+                                "spaść pakiet."), LOG_WARN)
+            return
+        # Resolve target sponsor: explicit name OR top-attention.
+        from . import sponsors as _sp
+        sponsor_key = ""
+        if intent.targets:
+            from .affordances import fold as _fold
+            needle = _fold((intent.targets[0] or "").strip())
+            for k in _sp.all_sponsor_keys():
+                if needle in _fold(k):
+                    sponsor_key = k; break
+                sdata = _sp.get_sponsor(k)
+                if needle in _fold(_sp._name_pl(sdata)):
+                    sponsor_key = k; break
+        if not sponsor_key:
+            try:
+                sponsor_key = _sp.current_floor_sponsor_key(self.world) or \
+                              "novachem_biotech"
+            except Exception:
+                sponsor_key = "novachem_biotech"
+        # Pick an item from the sponsor's gift_pool.
+        sdata = _sp.get_sponsor(sponsor_key)
+        gifts = list(sdata.get("gift_pool") or []) or ["stimpak"]
+        import random as _r
+        item_key = _r.choice(gifts)
+        # Charge + spawn.
+        ch.credits -= self._CALL_POD_COST
+        mode = _sp.deliver_sponsor_gift(self.world, sponsor_key, item_key)
+        if mode != "pod":
+            self.log(t("feedback_call_pod_fallback",
+                       fallback="Pakiet zarejestrowano w safehouse "
+                                "(producent nie zdążył przed reklamą)."),
+                     LOG_WARN)
+        # The pod's own spawn log already announces it. Just confirm
+        # the cost here.
+        self.log(t("feedback_call_pod_billed",
+                   fallback=f"Rachunek za pakiet: -{self._CALL_POD_COST} kr "
+                            f"(sponsor: {sponsor_key})."),
+                 LOG_SYSTEM)
+
+    def _attempt_upgrade_loadout(self, intent) -> None:
+        """`wzmocnij hp|ac` — pay 100 kr for a permanent +5 max HP
+        or +1 base AC. Each branch is one-time per character."""
+        if not intent.targets:
+            self.log(t("feedback_upgrade_syntax",
+                       fallback="Składnia: wzmocnij hp / wzmocnij ac."),
+                     LOG_WARN)
+            return
+        which = intent.targets[0]
+        ch = self.world.character
+        flag = f"upgrade_{which}"
+        if (ch.flags or {}).get(flag):
+            self.log(t("feedback_upgrade_already_done",
+                       fallback=f"Wzmocnienie „{which}” już wzięte. "
+                                f"Reszta to mit."), LOG_WARN)
+            return
+        if ch.credits < self._UPGRADE_COST:
+            self.log(t("feedback_upgrade_no_credits",
+                       fallback=f"Wzmocnienie kosztuje "
+                                f"{self._UPGRADE_COST} kr. Masz {ch.credits}."),
+                     LOG_WARN)
+            return
+        ch.credits -= self._UPGRADE_COST
+        if ch.flags is None: ch.flags = {}
+        ch.flags[flag] = True
+        if which == "hp":
+            ch.max_hp += 5
+            ch.hp = min(ch.hp + 5, ch.max_hp)
+            self.log(t("feedback_upgrade_hp_ok",
+                       fallback=f"Wzmocnienie: max HP +5 "
+                                f"(teraz {ch.max_hp}). -{self._UPGRADE_COST} kr."),
+                     LOG_SUCCESS)
+        else:
+            ch.base_ac += 1
+            self.log(t("feedback_upgrade_ac_ok",
+                       fallback=f"Wzmocnienie: base AC +1 "
+                                f"(teraz {ch.base_ac}). -{self._UPGRADE_COST} kr."),
+                     LOG_SUCCESS)
+        try:
+            from . import time_system as _ts
+            _ts.advance(self.world, 20)
         except Exception:
             pass
 

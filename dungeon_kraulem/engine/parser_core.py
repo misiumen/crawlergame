@@ -334,6 +334,60 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.85
         return intent
 
+    # ── P29.19 — Credit-sink commands ──────────────────────────────────────
+    # `trening <stat>`        → train_stat (80 kr → +1 to one stat, once per stat)
+    # `łapówka <sponsor>`     → bribe_sponsor (20 kr → +2 attention)
+    # `zamów pakiet [<sponsor>]` → call_pod (50 kr → spawn pod in room)
+    # `wzmocnij hp|ac`        → upgrade_loadout (100 kr → +5 HP or +1 AC)
+    import re as _re_cs
+    train_re = _re_cs.compile(
+        r"^(?:trening|trenuj|trenowanie|train)\s+(.+)$")
+    tm = train_re.match(folded)
+    if tm:
+        intent.intent = "train_stat"
+        intent.verb = "trening"
+        intent.targets.append(_strip_articles(tm.group(1)))
+        intent.confidence = 0.9
+        return intent
+
+    bribe_re = _re_cs.compile(
+        r"^(?:łapówka|lapowka|łapowka|bribe)\s+(.+)$")
+    bm = bribe_re.match(folded)
+    if bm:
+        intent.intent = "bribe_sponsor"
+        intent.verb = "łapówka"
+        intent.targets.append(_strip_articles(bm.group(1)))
+        intent.confidence = 0.9
+        return intent
+
+    # call-pod uses noun "pakiet" + optional sponsor name
+    pod_call_re = _re_cs.compile(
+        r"^(?:zamów|zamow|wezwij|order|call)"
+        r"\s+(?:pakiet|paczkę|paczke|drop|pod)(?:\s+(.+))?$")
+    pm = pod_call_re.match(folded)
+    if pm:
+        intent.intent = "call_pod"
+        intent.verb = "zamów"
+        target_name = (pm.group(1) or "").strip()
+        if target_name:
+            intent.targets.append(_strip_articles(target_name))
+        intent.confidence = 0.9
+        return intent
+
+    upgrade_re = _re_cs.compile(
+        r"^(?:wzmocnij|ulepsz|upgrade)\s+(hp|ac|punkty|pancerz)$")
+    um = upgrade_re.match(folded)
+    if um:
+        intent.intent = "upgrade_loadout"
+        intent.verb = "wzmocnij"
+        which = um.group(1).lower()
+        if which in ("hp", "punkty"):
+            intent.targets.append("hp")
+        else:
+            intent.targets.append("ac")
+        intent.confidence = 0.9
+        return intent
+
     # ── P29.14 — Apply an enhancement to a weapon/armor ────────────────────
     # "nałóż <enhancement> na <target>" / "zamontuj <X> na <Y>" /
     # "apply <X> to <Y>" — produces intent="apply_enhancement" with the
