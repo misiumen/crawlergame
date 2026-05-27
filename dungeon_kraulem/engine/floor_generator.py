@@ -886,6 +886,12 @@ def _place_encounters(f: FloorState, rng: random.Random, world=None):
         for key, etmpl in pool.items():
             if etmpl.get("floor_min", 1) > f.floor_number:
                 continue
+            # P29.11 — also gate floor_max so floor-5 museum monsters
+            # don't leak into floors 7+. Templates without floor_max
+            # remain available across all floors (back-compat).
+            fmax = etmpl.get("floor_max")
+            if fmax is not None and fmax < f.floor_number:
+                continue
             etags = set(etmpl.get("tags", []))
             overlap_obj    = len(etags & obj_tags)
             overlap_room   = len(etags & room_tags)

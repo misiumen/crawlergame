@@ -834,6 +834,198 @@ MON = {
         vulnerable_to=["fire"],
         floor_min=6, floor_max=6,
     ),
+
+    # ── P29.11 — DEEP FLOORS 7-18 ───────────────────────────────────────────
+    # Four-band thematic split:
+    #   7-9   UNDERGROUND        (zaplecze, kanały, opuszczone instalacje)
+    #   10-12 FUNGAL_BLOOM       (zmutowany biom, NovaChem winy)
+    #   13-15 MACHINE_CHURCH     (korpo-kult, AI z Ministerstwa Pamięci)
+    #   16-18 HELLFLOOR          (sanktuarium Syndykatu)
+    # HP/damage are PRE-SCALE numbers; _apply_balance_scale() multiplies.
+
+    # Band 1: UNDERGROUND (floors 7-9)
+    "kanal_widmo": dict(
+        name_key="ent_kanal_widmo_n", fallback_name="Kanałowy Widmo",
+        desc_key="ent_kanal_widmo_d",
+        fallback_desc="Człowiek, który mieszka w kanałach od trzech "
+                      "sezonów. Nie pamięta swojego imienia. Pamięta "
+                      "twoje, jakimś cudem.",
+        tags=["monster","humanoid","stealth","floor7","floor8","floor9"],
+        affordances=["inspect","attack","talk","intimidate","sneak"],
+        hp=22, max_hp=22, ac=13, attack_bonus=5, damage_dice="1d8+2",
+        damage_type="physical",
+        floor_min=7, floor_max=9,
+    ),
+    "mokry_kolega": dict(
+        name_key="ent_mokry_kolega_n", fallback_name="Mokry Kolega",
+        desc_key="ent_mokry_kolega_d",
+        fallback_desc="Wielki, gruby, pachnie ściekiem. Trzyma w "
+                      "garści rurę zakończoną zaworem. Uśmiecha się.",
+        tags=["monster","humanoid","brute","floor7","floor8","floor9"],
+        affordances=["inspect","attack","intimidate","lure"],
+        hp=30, max_hp=30, ac=12, attack_bonus=5, damage_dice="2d6",
+        damage_type="physical",
+        resists=["acid","poison"],
+        vulnerable_to=["electric"],
+        floor_min=7, floor_max=9,
+    ),
+    "boss_burmistrz_kanalow": dict(
+        name_key="ent_boss_burmistrz_kanalow_n",
+        fallback_name="Burmistrz Kanałów",
+        desc_key="ent_boss_burmistrz_kanalow_d",
+        fallback_desc="Koroniarz w kombinezonie, na głowie hełm z latarką, "
+                      "w dłoni berło z rury kanalizacyjnej. Uważa, że "
+                      "kanały to jego suwerenne terytorium.",
+        tags=["monster","humanoid","floor_boss","boss","cunning","floor9"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=50, max_hp=50, ac=14, attack_bonus=7, damage_dice="2d8+2",
+        damage_type="physical",
+        resists=["acid","poison","physical"],
+        vulnerable_to=["fire"],
+        floor_min=9, floor_max=9,
+    ),
+
+    # Band 2: FUNGAL_BLOOM (floors 10-12) — NovaChem accident biome
+    "kwiat_padliny": dict(
+        name_key="ent_kwiat_padliny_n", fallback_name="Kwiat Padliny",
+        desc_key="ent_kwiat_padliny_d",
+        fallback_desc="Mięsisty, gnijący kwiat o średnicy człowieka. "
+                      "Zarodniki opadają jak deszcz. Nie chce ci dobrze.",
+        tags=["monster","plant","fungal","novachem_accident",
+              "floor10","floor11","floor12"],
+        affordances=["inspect","attack","push_into"],
+        hp=24, max_hp=24, ac=10, attack_bonus=4, damage_dice="1d6+1",
+        damage_type="poison",
+        resists=["poison","cold"],
+        vulnerable_to=["fire"],
+        floor_min=10, floor_max=12,
+    ),
+    "zarodnikowiec": dict(
+        name_key="ent_zarodnikowiec_n", fallback_name="Zarodnikowiec",
+        desc_key="ent_zarodnikowiec_d",
+        fallback_desc="Człowiekształtny, ale grzybnia rozsadziła mu "
+                      "klatkę piersiową — z pęknięć wystaje masa białych "
+                      "włókien. Wciąż próbuje mówić.",
+        tags=["monster","humanoid","fungal","novachem_accident",
+              "floor10","floor11","floor12"],
+        affordances=["inspect","attack","sneak"],
+        hp=26, max_hp=26, ac=12, attack_bonus=5, damage_dice="1d8+2",
+        damage_type="poison",
+        resists=["poison"],
+        vulnerable_to=["fire","cold"],
+        floor_min=10, floor_max=12,
+    ),
+    "boss_matka_zarodników": dict(
+        name_key="ent_boss_matka_zarodnikow_n",
+        fallback_name="Matka Zarodników",
+        desc_key="ent_boss_matka_zarodnikow_d",
+        fallback_desc="Trzymetrowa kopuła z mięsa, pulsuje, śpiewa "
+                      "głosem dziecka. NovaChem zaprzecza, że to ich "
+                      "wyciek. NovaChem zaprzecza wszystkiemu.",
+        tags=["monster","plant","fungal","floor_boss","boss",
+              "novachem_accident","floor12"],
+        affordances=["inspect","attack","intimidate"],
+        hp=70, max_hp=70, ac=13, attack_bonus=7, damage_dice="2d8+3",
+        damage_type="poison",
+        resists=["poison","physical"],
+        vulnerable_to=["fire"],
+        floor_min=12, floor_max=12,
+    ),
+
+    # Band 3: MACHINE_CHURCH (floors 13-15) — corporate AI cult
+    "kantor_pamieci": dict(
+        name_key="ent_kantor_pamieci_n", fallback_name="Kantor Pamięci",
+        desc_key="ent_kantor_pamieci_d",
+        fallback_desc="W szatach z logiem Ministerstwa, oczy zaszyte "
+                      "ekranami. Recytuje statystyki widowni jak modlitwę.",
+        tags=["monster","humanoid","cult","memetic","ministerstwo",
+              "floor13","floor14","floor15"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=20, max_hp=20, ac=11, attack_bonus=4, damage_dice="1d6+1",
+        damage_type="psychic",
+        resists=["psychic"],
+        vulnerable_to=["fire","acid"],
+        floor_min=13, floor_max=15,
+    ),
+    "diakon_korpo": dict(
+        name_key="ent_diakon_korpo_n", fallback_name="Diakon Korpo",
+        desc_key="ent_diakon_korpo_d",
+        fallback_desc="Garnitur, ornat, tablet. Czyta z niego sponsorską "
+                      "homilię tonem, który dobija wiarę.",
+        tags=["monster","humanoid","corporate","cult",
+              "floor13","floor14","floor15"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=28, max_hp=28, ac=13, attack_bonus=5, damage_dice="1d10+1",
+        damage_type="psychic",
+        resists=["psychic","fire"],
+        vulnerable_to=["electric"],
+        floor_min=13, floor_max=15,
+    ),
+    "boss_proboszcz_korpo": dict(
+        name_key="ent_boss_proboszcz_korpo_n",
+        fallback_name="Proboszcz Korpo",
+        desc_key="ent_boss_proboszcz_korpo_d",
+        fallback_desc="W szatach Ministerstwa Pamięci, na ramieniu obraca "
+                      "się serwer z transmisją na żywo. „Twoja "
+                      "widownia czeka na finał. Nie zawiedź jej.”",
+        tags=["monster","humanoid","floor_boss","boss","memetic",
+              "ministerstwo","floor15"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=78, max_hp=78, ac=15, attack_bonus=8, damage_dice="2d8+3",
+        damage_type="psychic",
+        resists=["psychic","fire","cold"],
+        vulnerable_to=["electric","acid"],
+        floor_min=15, floor_max=15,
+    ),
+
+    # Band 4: HELLFLOOR (floors 16-18) — Syndykat sanctum / endgame
+    "windykator_ostateczny": dict(
+        name_key="ent_windykator_ostateczny_n",
+        fallback_name="Windykator Ostateczny",
+        desc_key="ent_windykator_ostateczny_d",
+        fallback_desc="Człowiek-windykator w trzecim cyklu programu. "
+                      "Trzy biczowate ramiona. Tylko jedno przypomina "
+                      "ludzkie. Pyta o twoje rocznice.",
+        tags=["monster","humanoid","cunning","syndykat",
+              "floor16","floor17","floor18"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=38, max_hp=38, ac=14, attack_bonus=7, damage_dice="2d8+1",
+        damage_type="physical",
+        resists=["physical","psychic"],
+        vulnerable_to=["acid","cold"],
+        floor_min=16, floor_max=18,
+    ),
+    "anti_host_lite": dict(
+        name_key="ent_anti_host_lite_n",
+        fallback_name="Anti-host (egzemplarz testowy)",
+        desc_key="ent_anti_host_lite_d",
+        fallback_desc="Demo wersji bossa z Syndykatu. „Słyszysz mnie "
+                      "w każdym pokoju. Tylko tutaj cię widzę.”",
+        tags=["monster","humanoid","syndykat","floor_special",
+              "floor16","floor17","floor18"],
+        affordances=["inspect","attack","intimidate","sneak"],
+        hp=44, max_hp=44, ac=15, attack_bonus=8, damage_dice="2d10",
+        damage_type="psychic",
+        resists=["psychic","fire","physical"],
+        vulnerable_to=["electric"],
+        floor_min=16, floor_max=18,
+    ),
+    "boss_prezes_syndykatu": dict(
+        name_key="ent_boss_prezes_syndykatu_n",
+        fallback_name="Prezes Syndykatu Rozrywki Wydobywczej",
+        desc_key="ent_boss_prezes_syndykatu_d",
+        fallback_desc="Garnitur z poprzednich sezonów. Pięć Emmy na "
+                      "biurku. Pyta cię z troską: „A teraz najważniejsze "
+                      "— do której kamery powiesz: dzień dobry?”",
+        tags=["monster","humanoid","floor_boss","final_boss","boss",
+              "syndykat","floor18"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=120, max_hp=120, ac=16, attack_bonus=9, damage_dice="3d8+4",
+        damage_type="psychic",
+        resists=["psychic","fire","cold","physical"],
+        vulnerable_to=["acid"],
+        floor_min=18, floor_max=18,
+    ),
 }
 
 

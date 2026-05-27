@@ -955,6 +955,365 @@ ROOM_POOL = [
         "floor_max": 2,        # so floors 3-6 use their themed bosses
         "unique_per_floor": True,
     },
+
+    # ── P29.11 — DEEP FLOORS 7-18 ───────────────────────────────────────────
+    # Floors 7-9: UNDERGROUND (zaplecze, kanały)
+    {
+        "template_id": "pool_kanaly_korytarz",
+        "role": "filler",
+        "actual_type": "social",
+        "tags": ["underground","wet","corridor","floor7","floor8","floor9"],
+        "name_pool": ["Kanał Główny", "Tunel Serwisowy", "Ciemny Odpływ"],
+        "first_enter_pool": [
+            "Cuchnący korytarz pod miastem. Woda po kostki. Na ścianach "
+            "graffiti starszych sezonów: imiona, daty, ostrzeżenia.",
+        ],
+        "look_pool": ["Ściek. Echo. Coś się porusza w dali."],
+        "search_pool": [
+            "Znajdujesz monetę z napisem „SR-2027 — pamiętaj o sponsorach”.",
+        ],
+        "public_hint_pool": ["Plusk w głębi. Powolny."],
+        "sensory_tags": ["wet","mold","echo","cold"],
+        "entity_seed_pools": {
+            "env":  ["pipe_cluster","exposed_wiring","trash_bin"],
+            "item": ["dirty_bandage"],
+        },
+        "exit_hints": ["dalej kanałem", "włazem do góry", "boczna komora"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
+        "floor_min": 7,
+        "floor_max": 9,
+    },
+    {
+        "template_id": "pool_kanaly_walka",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["underground","combat","floor7","floor8","floor9"],
+        "name_pool": ["Komora Serwisowa", "Zalany Pokój Pomp",
+                      "Stare Zwężenie"],
+        "first_enter_pool": [
+            "Mała sala z pompami. Wokół zbiera się grupka — mieszkańcy "
+            "kanałów. Patrzą na ciebie jak na dostawę.",
+        ],
+        "look_pool": ["Stare pompy. Krzywe ślady stóp w mule."],
+        "search_pool": [],
+        "public_hint_pool": ["Mokre kroki za plecami."],
+        "sensory_tags": ["wet","metal","threat"],
+        "entity_seed_pools": {
+            "mon": ["kanal_widmo","mokry_kolega"],
+            "env": ["pipe_cluster","exposed_wiring"],
+        },
+        "exit_hints": ["kanałem", "klatka schodowa", "kratka w ścianie"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 7,
+        "floor_max": 9,
+    },
+    {
+        "template_id": "pool_kanaly_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous","boss","objective","underground","floor9"],
+        "name_pool": ["Tron Burmistrza", "Komnata Pod Ratuszem",
+                      "Centralny Zawór"],
+        "first_enter_pool": [
+            "Wielka okrągła komora pod miastem. Pośrodku tron z rur. "
+            "Na tronie postać w hełmie z latarką. „Witam w moim "
+            "miasteczku. Nie zostajesz długo, prawda?”",
+        ],
+        "look_pool": [
+            "Tron z rur. Korona z taśmy klejącej. Wyjście za nim.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": ["Echo: TY-TY-TY-TY."],
+        "sensory_tags": ["wet","echo","authority"],
+        "entity_seed_pools": {
+            "mon": ["boss_burmistrz_kanalow"],
+            "env": ["pipe_cluster","trash_bin"],
+        },
+        "exit_hints": ["wyjście piętra", "wąski tunel"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 9,
+        "floor_max": 9,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"recykling_obywatelski": 2},
+    },
+
+    # Floors 10-12: FUNGAL_BLOOM
+    {
+        "template_id": "pool_zarodniki_korytarz",
+        "role": "filler",
+        "actual_type": "social",
+        "tags": ["fungal","biome","floor10","floor11","floor12"],
+        "name_pool": ["Zarośnięty Korytarz", "Komnata Pleśni",
+                      "Sala Wegetacji"],
+        "first_enter_pool": [
+            "Ściany zarosła grzybnia. W powietrzu unosi się słodki "
+            "zapach. Coś tu kiedyś się zepsuło — i nikt nie sprzątnął.",
+        ],
+        "look_pool": ["Grzybnia. Para. Zapach syropu."],
+        "search_pool": [
+            "Pod warstwą pleśni — stary identyfikator pracownika NovaChem.",
+        ],
+        "public_hint_pool": ["Powolne pulsowanie ścian."],
+        "sensory_tags": ["fungal","sweet","damp","biotic"],
+        "entity_seed_pools": {
+            "env":  ["biohazard_bin","disinfectant_shelf"],
+            "item": ["dirty_bandage"],
+        },
+        "exit_hints": ["dalej w głąb", "boczna szczelina", "klatka schodowa"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
+        "floor_min": 10,
+        "floor_max": 12,
+        "theme_sponsor_boost": {"nova_chem": 1},
+    },
+    {
+        "template_id": "pool_zarodniki_walka",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["fungal","combat","poison","floor10","floor11","floor12"],
+        "name_pool": ["Sala Kwitnienia", "Komnata Zarodników",
+                      "Hala Eksperymentów"],
+        "first_enter_pool": [
+            "Pomieszczenie wypełnione gnijącą roślinnością. Dwa kwiaty "
+            "wielkości człowieka odwracają się w twoją stronę.",
+        ],
+        "look_pool": ["Gnijące kwiaty. Zarodniki w powietrzu."],
+        "search_pool": [],
+        "public_hint_pool": ["Słodkawy zapach. Cisza."],
+        "sensory_tags": ["fungal","poison","damp"],
+        "entity_seed_pools": {
+            "mon": ["kwiat_padliny","zarodnikowiec"],
+            "env": ["biohazard_bin","exposed_wiring"],
+        },
+        "exit_hints": ["dalej", "boczna komora"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 10,
+        "floor_max": 12,
+        "theme_sponsor_boost": {"nova_chem": 1},
+    },
+    {
+        "template_id": "pool_zarodniki_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous","boss","objective","fungal","floor12"],
+        "name_pool": ["Komnata Matki", "Inkubator", "Sala 12-B"],
+        "first_enter_pool": [
+            "Kopuła z mięsa o trzymetrowej średnicy pulsuje pośrodku "
+            "sali. Z każdym uderzeniem opadają zarodniki. Słychać "
+            "dziecięcy śpiew. NovaChem nie odbiera telefonu.",
+        ],
+        "look_pool": ["Pulsująca kopuła. Mglista posadzka. Wyjście za nią."],
+        "search_pool": [],
+        "public_hint_pool": ["Śpiew. Coraz głośniejszy."],
+        "sensory_tags": ["fungal","bio_horror","lullaby"],
+        "entity_seed_pools": {
+            "mon": ["boss_matka_zarodników"],
+            "env": ["biohazard_bin"],
+        },
+        "exit_hints": ["wyjście piętra"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 12,
+        "floor_max": 12,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"nova_chem": 2},
+    },
+
+    # Floors 13-15: MACHINE_CHURCH
+    {
+        "template_id": "pool_kaplica_korytarz",
+        "role": "filler",
+        "actual_type": "social",
+        "tags": ["church","cult","corporate","floor13","floor14","floor15"],
+        "name_pool": ["Nawa Sponsorska", "Krużganek Memetyczny",
+                      "Korytarz Kaplicy 7.0"],
+        "first_enter_pool": [
+            "Korytarz w stylu kaplicy: witraże z logo Ministerstwa, "
+            "ławki, w głębi ołtarz z serwerem. Modlitwa leci z głośników.",
+        ],
+        "look_pool": ["Witraż. Ołtarz-serwer. Echo recytacji."],
+        "search_pool": [
+            "Pod ławką znajdujesz tablet z otwartym aktem darowizny.",
+        ],
+        "public_hint_pool": ["Monotonna recytacja: „kup, daj, słuchaj.”"],
+        "sensory_tags": ["incense","data_hum","reverent"],
+        "entity_seed_pools": {
+            "env":  ["sponsor_screen","server_rack","sponsor_camera"],
+            "item": ["coffee"],
+        },
+        "exit_hints": ["nawa boczna", "zakrystia", "klatka schodowa"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
+        "floor_min": 13,
+        "floor_max": 15,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
+    },
+    {
+        "template_id": "pool_kaplica_walka",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["church","combat","memetic","floor13","floor14","floor15"],
+        "name_pool": ["Konfesjonał", "Sala Posiedzenia Diakonów",
+                      "Galeria Sponsorów"],
+        "first_enter_pool": [
+            "Pomieszczenie z rzędem konfesjonałów. Każdy ma wyświetlacz "
+            "z formularzem. Z trzech wychodzą postacie w szatach.",
+        ],
+        "look_pool": ["Konfesjonały. Wyświetlacze. Cisza."],
+        "search_pool": [],
+        "public_hint_pool": ["Stukot tabletów."],
+        "sensory_tags": ["data_hum","cold_light","incense"],
+        "entity_seed_pools": {
+            "mon": ["kantor_pamieci","diakon_korpo"],
+            "env": ["sponsor_screen","server_rack"],
+        },
+        "exit_hints": ["nawa", "ołtarz", "zakrystia"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 13,
+        "floor_max": 15,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
+    },
+    {
+        "template_id": "pool_kaplica_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous","boss","objective","church","floor15"],
+        "name_pool": ["Ołtarz Główny", "Sanktuarium Pamięci",
+                      "Tron Proboszcza"],
+        "first_enter_pool": [
+            "Ogromna nawa z wysokim sklepieniem. Pośrodku ołtarz, "
+            "na nim serwer. Za ołtarzem Proboszcz Korpo w szatach "
+            "Ministerstwa. „Cieszę się, że dotarłeś. Mamy do omówienia "
+            "twój pakiet sponsorski.”",
+        ],
+        "look_pool": ["Ołtarz. Serwer. Proboszcz. Wyjście za jego plecami."],
+        "search_pool": [],
+        "public_hint_pool": ["Cisza. Świece elektryczne."],
+        "sensory_tags": ["data_hum","incense","spotlight"],
+        "entity_seed_pools": {
+            "mon": ["boss_proboszcz_korpo"],
+            "env": ["server_rack","sponsor_camera","sponsor_screen"],
+        },
+        "exit_hints": ["wyjście piętra", "zakrystia"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 15,
+        "floor_max": 15,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 2},
+    },
+
+    # Floors 16-18: HELLFLOOR (Syndykat sanctum)
+    {
+        "template_id": "pool_syndykat_korytarz",
+        "role": "filler",
+        "actual_type": "social",
+        "tags": ["syndykat","executive","corridor",
+                 "floor16","floor17","floor18"],
+        "name_pool": ["Recepcja Syndykatu", "Korytarz Prezydialny",
+                      "Sala Trofeów"],
+        "first_enter_pool": [
+            "Marmurowy korytarz z czerwonym dywanem. Na ścianach "
+            "fotografie poprzednich Crawlerów-zwycięzców. Wszyscy się "
+            "uśmiechają. Każdy ma już inny zawód.",
+        ],
+        "look_pool": ["Marmur. Fotografie. Cisza grobowa."],
+        "search_pool": [
+            "Pod ramą zdjęcia znajdujesz cudzy kontrakt. Czerwony stempel: "
+            "„ZAWIESZONY 6 PIĘTRO.”",
+        ],
+        "public_hint_pool": ["Klimatyzacja szumi spokojnie."],
+        "sensory_tags": ["luxury","stillness","threat_quiet"],
+        "entity_seed_pools": {
+            "env":  ["sponsor_camera","sponsor_screen","mirror"],
+        },
+        "exit_hints": ["dalej korytarzem", "windą w górę",
+                       "drzwi z numerem 18-B"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
+        "floor_min": 16,
+        "floor_max": 18,
+        "theme_sponsor_boost": {"sport_safety": 1,
+                                "kanal_7_krawedz": 1},
+    },
+    {
+        "template_id": "pool_syndykat_walka",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["syndykat","combat","executive",
+                 "floor16","floor17","floor18"],
+        "name_pool": ["Sala Konferencyjna 18-A",
+                      "Pokój Spotkań Zarządu",
+                      "Gabinet Wiceprezesa"],
+        "first_enter_pool": [
+            "Sala konferencyjna z owalnym stołem. Po obu stronach stołu "
+            "siedzą postacie w garniturach. Wszyscy wstają synchronicznie. "
+            "Jeden z nich przedstawia się: „windykacja końcowa, "
+            "trzeci cykl.”",
+        ],
+        "look_pool": ["Stół. Krzesła. Postacie w garniturach."],
+        "search_pool": [],
+        "public_hint_pool": ["Cisza biurowa. Klimatyzacja. Krzesła odsuwane."],
+        "sensory_tags": ["luxury","threat","silent"],
+        "entity_seed_pools": {
+            "mon": ["windykator_ostateczny","anti_host_lite"],
+            "env": ["sponsor_camera","sponsor_screen"],
+        },
+        "exit_hints": ["korytarz prezydialny", "winda służbowa"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 16,
+        "floor_max": 18,
+        "theme_sponsor_boost": {"czarny_rynek": 1},
+    },
+    {
+        "template_id": "pool_prezes_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous","boss","final","objective","syndykat","floor18"],
+        "name_pool": ["Gabinet Prezesa", "Pokój 18-PR",
+                      "Antresola Korporacyjna"],
+        "first_enter_pool": [
+            "Olbrzymi gabinet z panoramiczną szybą wychodzącą na "
+            "studio Kanału 7. Za biurkiem siedzi Prezes Syndykatu — "
+            "spokojny, uśmiechnięty, z herbatą. „Proszę usiąść. "
+            "Mamy do omówienia twoje przyszłe role.”",
+        ],
+        "look_pool": [
+            "Biurko. Pięć Emmy. Prezes. Drzwi „WOLNOŚĆ?” na bocznej ścianie.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": ["Cisza absolutna. Tylko herbata stygnie."],
+        "sensory_tags": ["luxury","finale","camera"],
+        "entity_seed_pools": {
+            "mon": ["boss_prezes_syndykatu"],
+            "env": ["sponsor_camera","sponsor_screen","server_rack"],
+        },
+        "exit_hints": ["WOLNOŚĆ?", "winda awaryjna"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 18,
+        "floor_max": 18,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"kanal_7_krawedz": 3},
+    },
 ]
 
 
