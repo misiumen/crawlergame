@@ -65,7 +65,11 @@ def test_record_run_death_appends_entry():
     print("  record_run death: entry + meta bumped: OK")
 
 
-def test_record_run_victory_stamps_ng_plus():
+def test_record_run_victory_bumps_meta():
+    """P29.34 — the old `new_game_plus` auto-stamp is gone. Victory
+    just bumps total_runs + victories + fans_total. Meta-progression
+    unlocks land via engine.meta_progression.record_unlocks_for_run
+    in a separate call, not run_history.record_run itself."""
     _rh.reset()
     w = _mk_world(audience_peak=88, kills=42)
     entry = _rh.record_run(w, victory=True)
@@ -74,10 +78,11 @@ def test_record_run_victory_stamps_ng_plus():
     assert m["total_runs"] == 1
     assert m["victories"] == 1
     assert m["fans_total"] == 88
-    assert "new_game_plus" in m["unlocks"]
-    assert _rh.has_unlock("new_game_plus") is True
+    # P29.34 — NG+ is no longer the model. Meta unlocks fire from
+    # a separate evaluator now.
+    assert "new_game_plus" not in (m["unlocks"] or [])
     _rh.reset()
-    print("  record_run victory: NG+ unlock stamped + meta bumped: OK")
+    print("  record_run victory: meta bumped, no NG+ flag: OK")
 
 
 # ── Multiple runs ───────────────────────────────────────────────────────
@@ -171,7 +176,7 @@ def main():
     _rh.reset()
     try:
         test_record_run_death_appends_entry()
-        test_record_run_victory_stamps_ng_plus()
+        test_record_run_victory_bumps_meta()
         test_multiple_runs_accumulate()
         test_leaderboard_sorts_by_audience_peak()
         test_has_unlock_default_false_then_true()

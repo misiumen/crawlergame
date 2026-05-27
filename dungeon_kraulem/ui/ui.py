@@ -186,14 +186,17 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0,
         surf.blit(timg, (ix, cy))
         cy += item_size + 14
 
-    # P29.31 — NG+ chip. If the persistent run-history file marks
-    # new_game_plus as unlocked (set on first victory), show a small
-    # gold badge above the sponsor stripe. Best-effort import so
-    # the title screen doesn't crash if the module is missing.
+    # P29.34 — meta-progression badge. Replaces the empty NG+
+    # placeholder. Shows total runs + victories + how many unlocks
+    # are visible. Click "[U] Postęp sezonów" to see the catalog.
     try:
         from ..engine import run_history as _rh
-        if _rh.has_unlock("new_game_plus"):
-            badge = "✓ NewGame+ ODBLOKOWANE"
+        m = _rh.meta()
+        if int(m.get("total_runs", 0)) > 0:
+            unlocked_n = len(m.get("unlocks", []) or [])
+            badge = (f"Sezony: {m.get('total_runs', 0)}    "
+                     f"Zwycięstwa: {m.get('victories', 0)}    "
+                     f"Odblokowane: {unlocked_n}")
             badge_img = font(body_size - 2, bold=True).render(
                 badge, True, (230, 210, 130))
             surf.blit(badge_img,

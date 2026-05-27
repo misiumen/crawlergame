@@ -253,6 +253,20 @@ class Game:
         with _swallow("run_history.record_run[death]"):
             from . import run_history as _rh
             _rh.record_run(self.world, victory=False)
+        # P29.34 — evaluate meta-progression unlocks before the save
+        # is wiped. Each newly qualifying option fires a Polish line
+        # in the death log so the player knows what got opened.
+        with _swallow("meta_progression.record_unlocks[death]"):
+            from . import meta_progression as _mp
+            new_keys = _mp.record_unlocks_for_run(self.world,
+                                                  victory=False)
+            for k in new_keys:
+                ud = _mp.UNLOCK_CATALOG.get(k)
+                if ud is not None:
+                    self.log(
+                        f"Sezon otwiera nowe opcje: "
+                        f"„{ud.label_pl}” — {ud.reward_pl}",
+                        LOG_SUCCESS)
         # Permadeath: wipe the save so resume can't bring you back.
         with _swallow("save_load.delete[death]"):
             from . import save_load
@@ -297,10 +311,22 @@ class Game:
 
     # ── State transitions ────────────────────────────────────────────────────
 
-    def start_new_game(self, name: str, background: str):
+    def start_new_game(self, name: str, background: str,
+                        species: str = "baseline_human"):
+        """Create a fresh world + character.
+
+        P29.34: optional `species` parameter accepts any species key
+        previously unlocked via meta-progression. Defaults to
+        baseline_human (the pre-P29.34 behavior). Species bonuses
+        get applied AFTER stat-profile + background-loadout so they
+        stack on top of the base.
+        """
         self.world = WorldState()
         self.world.character.name = name or "Bezimienny"
         self.world.character.background = background
+        # P29.34 — species is an extra axis on top of background.
+        # The Character dataclass already has species_key (P29.5).
+        self.world.character.species_key = species or "baseline_human"
         # P27.6 balance pass: stat allocations per background are now
         # absolute target values, not modest +1 bumps. Each tło gets a
         # distinctive profile with at least one stat >=13 (meaningful
@@ -426,6 +452,15 @@ class Game:
                             "'rozbij' albo 'rozbierz' coś — z resztek można "
                             "potem 'zrób' przedmiot. Spróbuj 'pomoc'.)"),
                  LOG_SYSTEM)
+        # P29.34 — apply species + origin bonuses on top of the
+        # background's stat profile + loadout. Each route is idempotent
+        # and only changes the character; world/state stay untouched.
+        try:
+            self._apply_species_bonuses()
+            self._apply_origin_bonuses()
+            self._apply_starting_companion()
+        except Exception:
+            pass
         # P29.12 — first-time welcome tip.
         try:
             from . import tutorial as _tut
@@ -434,6 +469,111 @@ class Game:
         except Exception:
             pass
         self.state = STATE_PLAY
+
+    def _apply_species_bonuses(self) -> None:
+        """P29.34 — apply species stat/tag changes at character
+        creation. Backwards-compatible: baseline_human is a no-op
+        and pre-P29.34 saves continue to work."""
+        ch = self.world.character
+        sk = (ch.species_key or "baseline_human").strip()
+        if sk == "baseline_human" or not sk:
+            return
+        # Stat tweaks. Keep modest — these are starting tilts, not
+        # power spikes. The audit's "additive, not harder" principle.
+        SPECIES_STATS = {
+            "species_mutant_chemiczny": {"CON": +1},
+            "species_grzybica":         {"WIS": +1},
+            "species_cyborg_recyklingu":{"STR": +1},
+            "species_pamietajacy":      {"INT": +1},
+            "species_kolyski_anti_hosta": {"STR": +1, "DEX": +1,
+                                            "CON": +1, "INT": +1,
+                                            "WIS": +1, "CHA": +1},
+        }
+        for stat, delta in (SPECIES_STATS.get(sk) or {}).items():
+            ch.stats[stat] = int(ch.stats.get(stat, 10)) + int(delta)
+        # Resists / vulnerabilities — flag on flags so combat picks
+        # them up via Character.is_resistant / is_vulnerable readers.
+        if ch.flags is None: ch.flags = {}
+        if sk == "species_mutant_chemiczny":
+            ch.flags["species_immune_to"] = "poison"
+            ch.flags["species_vulnerable_to"] = "fire"
+            self.log("Twoje ciało jest pokryte chemicznymi łuskami. "
+                     "Truciznę ignorujesz, ale ogień parzy bardziej.",
+                     LOG_SYSTEM)
+        elif sk == "species_grzybica":
+            ch.flags["species_regenerates"] = 1   # 1 HP / 10 min
+            self.log("Z twojego ramienia wystaje grzybnia. "
+                     "Regenerujesz, ale ogień cię niszczy.", LOG_SYSTEM)
+        elif sk == "species_cyborg_recyklingu":
+            ch.flags["species_metal_limb"] = True
+            self.log("Jedna z twoich kończyn jest mechaniczna. Złom "
+                     "naprawia ją zamiast leków.", LOG_SYSTEM)
+        elif sk == "species_pamietajacy":
+            ch.flags["species_memory"] = True
+            self.log("Ministerstwo edytowało ci pamięć. Czasem "
+                     "wiesz rzeczy, których nie powinieneś.", LOG_SYSTEM)
+        elif sk == "species_kolyski_anti_hosta":
+            self.log("Jesteś rebrandowanym uczestnikiem. Anti-host "
+                     "zna cię osobiście. To nie znaczy, że cię lubi.",
+                     LOG_SYSTEM)
+
+    def _apply_starting_companion(self) -> None:
+        """P29.34 — if the player previously unlocked a companion
+        AND chose to start with it (signaled by self._chosen_companion
+        set by the slot picker), instantiate that companion now.
+
+        Default: no starting companion (pre-P29.34 behavior). Pet
+        catalog still applies via the existing P19 floor-1 grant
+        path."""
+        chosen = getattr(self, "_chosen_companion", "")
+        if not chosen:
+            return
+        if chosen == "companion_papuga_anty_host":
+            try:
+                from . import companion_voice as _cv
+                _cv.add_flagship_pet(self.world)
+                self.log("Papuga Anti-host siada na twoim ramieniu. "
+                         "Patrzy się ironicznie.", LOG_SUCCESS)
+            except Exception:
+                pass
+
+    def _apply_origin_bonuses(self) -> None:
+        """P29.34 — apply origin (meta-unlocked variant) bonuses.
+        Origins extend the existing backgrounds list, so the
+        character's `background` field stores the chosen origin key."""
+        ch = self.world.character
+        bg = (ch.background or "").strip()
+        if not bg.startswith("origin_"):
+            return
+        if ch.flags is None: ch.flags = {}
+        if bg == "origin_drugi_cykl":
+            ch.audience_rating = max(int(ch.audience_rating or 0), 5)
+            ch.run_audience_peak = max(int(ch.run_audience_peak or 0), 5)
+            ch.flags["origin_has_scar"] = True
+            self.log("Drugi cykl. Blizna na lewym policzku otwiera "
+                     "się dla kamery sama.", LOG_SYSTEM)
+        elif bg == "origin_sponsorowany":
+            # Find any sponsor with persistent attention ≥10 from
+            # the previous run; default to NovaChem if none.
+            ch.flags["origin_sponsor_doubled"] = True
+            try:
+                from . import sponsors as _sp
+                _sp.adjust_attention(self.world, "novachem_biotech", 5)
+            except Exception:
+                pass
+            self.log("Kontrakt sponsorski cię trzyma — sponsor już "
+                     "ci ufa, ale błędy też będą podwójne.", LOG_SYSTEM)
+        elif bg == "origin_zhanbiony_showman":
+            ch.audience_rating = 20
+            ch.run_audience_peak = max(int(ch.run_audience_peak or 0), 20)
+            ch.flags["origin_wanted_kanal_7"] = True
+            try:
+                from . import sponsors as _sp
+                _sp.adjust_attention(self.world, "kanal_7_krawedz", -3)
+            except Exception:
+                pass
+            self.log("Wracasz jako zhańbiony showman. Widownia cię "
+                     "pamięta — Kanał 7 też. Niedobrze.", LOG_SYSTEM)
 
     # ── Prompt 23: wield / sheathe / coat handlers ───────────────────────
 
@@ -2247,11 +2387,24 @@ class Game:
                             world=self.world)
             except Exception:
                 pass
-            # P29.26 — append victory to persistent history; stamps
-            # new_game_plus unlock for future runs.
+            # P29.26 — append victory to persistent history.
+            # P29.34 — evaluate + record meta-progression unlocks.
             try:
                 from . import run_history as _rh
                 _rh.record_run(self.world, victory=True)
+            except Exception:
+                pass
+            try:
+                from . import meta_progression as _mp
+                new_keys = _mp.record_unlocks_for_run(self.world,
+                                                      victory=True)
+                for k in new_keys:
+                    ud = _mp.UNLOCK_CATALOG.get(k)
+                    if ud is not None:
+                        self.log(
+                            f"Sezon otwiera nowe opcje: "
+                            f"„{ud.label_pl}” — {ud.reward_pl}",
+                            LOG_SUCCESS)
             except Exception:
                 pass
             self.state = STATE_VICTORY

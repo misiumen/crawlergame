@@ -125,10 +125,11 @@ def record_run(world, *, victory: bool) -> Optional[Dict[str, Any]]:
     meta["total_runs"] = int(meta.get("total_runs", 0)) + 1
     if victory:
         meta["victories"] = int(meta.get("victories", 0)) + 1
-        unlocks = list(meta.get("unlocks", []) or [])
-        if "new_game_plus" not in unlocks:
-            unlocks.append("new_game_plus")
-        meta["unlocks"] = unlocks
+    # P29.34 — NG+ removed. Per-run unlock evaluation lives in
+    # engine.meta_progression.evaluate_run_for_unlocks. That module
+    # writes its findings via run_history.unlock(key) for each
+    # qualifying unlock — additive options at character creation,
+    # not a "harder mode" flag.
     # fans_total = cumulative sum of audience_peak across runs.
     meta["fans_total"] = int(meta.get("fans_total", 0)) + \
                          int(entry.get("audience_peak", 0))
