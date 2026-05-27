@@ -76,7 +76,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_novachem_heckle_2",
             "sponsor_novachem_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_SPORT: {
         "key": SPONSOR_SPORT,
@@ -99,7 +99,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_sport_heckle_2",
             "sponsor_sport_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_CZARNY_RYNEK: {
         "key": SPONSOR_CZARNY_RYNEK,
@@ -123,7 +123,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_czarny_rynek_heckle_2",
             "sponsor_czarny_rynek_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_MINISTERSTWO: {
         "key": SPONSOR_MINISTERSTWO,
@@ -148,7 +148,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_ministerstwo_heckle_2",
             "sponsor_ministerstwo_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_RECYKLING: {
         "key": SPONSOR_RECYKLING,
@@ -173,7 +173,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_recykling_heckle_2",
             "sponsor_recykling_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_KANAL_7: {
         "key": SPONSOR_KANAL_7,
@@ -197,7 +197,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_kanal7_heckle_2",
             "sponsor_kanal7_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
 
     # ── P29.16 — New sponsors ─────────────────────────────────────────────
@@ -225,7 +225,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_bractwo_heckle_2",
             "sponsor_bractwo_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_LIGA_BRAWUR: {
         "key": SPONSOR_LIGA_BRAWUR,
@@ -249,7 +249,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_liga_brawur_heckle_2",
             "sponsor_liga_brawur_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_MROWKI: {
         "key": SPONSOR_MROWKI,
@@ -274,7 +274,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_mrowki_heckle_2",
             "sponsor_mrowki_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_POLIMERY: {
         "key": SPONSOR_POLIMERY,
@@ -299,7 +299,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_polimery_heckle_2",
             "sponsor_polimery_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
     SPONSOR_STADION: {
         "key": SPONSOR_STADION,
@@ -324,7 +324,7 @@ SPONSORS: Dict[str, Dict[str, Any]] = {
             "sponsor_stadion_heckle_2",
             "sponsor_stadion_heckle_3",
         ],
-        "intervention_cooldown_minutes": 24 * 60,
+        "intervention_cooldown_minutes": 120,  # P29.28: 2h was 24h
     },
 }
 

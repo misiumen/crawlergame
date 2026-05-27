@@ -34,9 +34,13 @@ from typing import Optional
 # When the room pool crosses these, ALL alive hostile entities in the room
 # step their threat_level up by 1. Latches prevent the same threshold
 # from firing multiple times before the player de-escalates.
-THRESHOLD_WARY    = 6      # 1-2 loud actions → enemy notices
-THRESHOLD_ALERT   = 12     # 3-4 loud actions → enemy stands up
-THRESHOLD_ENRAGED = 20     # 5-6 loud actions → enemy attacks
+# P29.28 — widened thresholds ~30% per audit. Pre-tune: a salvage
+# (+4) followed by a break (+6) pushed quiet rooms to alert in two
+# actions, and 5 player turns triggered enraged. Now WARY needs
+# more sustained noise; the room cooldown actually feels meaningful.
+THRESHOLD_WARY    = 8      # 2-3 loud actions → enemy notices
+THRESHOLD_ALERT   = 16     # 4-5 loud actions → enemy stands up
+THRESHOLD_ENRAGED = 26     # 6-7 loud actions → enemy attacks
 DECAY_PER_MINUTE  = 1      # passive decay
 
 

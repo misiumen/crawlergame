@@ -212,7 +212,11 @@ def maybe_fire(world, *, rng: Optional[random.Random] = None,
     if (now - last_min) < _COOLDOWN_MIN:
         return None
     # Probability roll (skipped with force).
-    rng = rng or random.Random()
+    # P29.28 — seed RNG with the clock + audience rating so two
+    # advance() ticks at the same in-game minute roll the same number
+    # (helps debug-replay and stops within-tick double-fire when a
+    # caller advances zero minutes twice).
+    rng = rng or random.Random(now * 1000 + rating)
     if not force and rng.random() >= _FIRE_CHANCE:
         return None
     # Pick an event respecting min_band.

@@ -247,8 +247,11 @@ def _current_room_sponsor_boost(world) -> Dict[str, int]:
 
 # ── P29.2 — Gift trigger on first attention-threshold crossing ──────────
 
-_GIFT_THRESHOLD_FIRST = 8       # first gift fires at +8 attention
-_GIFT_THRESHOLD_SECOND = 14     # repeat at +14 (extended sponsor love)
+# P29.28 — lowered first gift from +8 to +5. Pre-tune most runs
+# never saw a single pod; +5 hits within ~one floor of normal play.
+# Second gift at +10 (was +14) keeps repeat-love reachable too.
+_GIFT_THRESHOLD_FIRST = 5
+_GIFT_THRESHOLD_SECOND = 10
 
 
 def _check_gift_thresholds(world) -> None:

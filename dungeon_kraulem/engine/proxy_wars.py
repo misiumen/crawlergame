@@ -24,9 +24,13 @@ import random
 from typing import Optional, Tuple
 
 
-_HOT_THRESHOLD = 5
-_PER_PAIR_COOLDOWN = 60
-_PER_FLOOR_CAP = 2
+# P29.28 — pre-tune: events were test-only fire in practice.
+#   HOT threshold +5 → +4 (one floor of normal play often hits this)
+#   per-pair cooldown 60 → 45 min (still prevents spam)
+#   per-floor cap 2 → 4 (let the show actually happen)
+_HOT_THRESHOLD = 4
+_PER_PAIR_COOLDOWN = 45
+_PER_FLOOR_CAP = 4
 
 
 # Pool of disinformation lines, picked at fire time. Keys substitute
