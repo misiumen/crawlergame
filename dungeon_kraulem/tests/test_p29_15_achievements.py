@@ -64,7 +64,7 @@ def test_new_entries_are_polish():
     with the Polish ą/ć/ę/ł/ń/ó/ś/ź/ż set OR Polish words.
     Per-entry, either the name or the description must read Polish."""
     polish_chars = set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
-    polish_words = ("sezon", "kanał", "widown", "anti-host", "mistrzow",
+    polish_words = ("sezon", "kanał", "widown", "konferansjer", "mistrzow",
                     "pakiet", "krew", "loch", "boss", "studio", "pięt",
                     "wytrz", "schod", "marka", "sponsor")
     for key in ("pierwsza_krew", "anty_host_warknal", "finalista_sezonu",

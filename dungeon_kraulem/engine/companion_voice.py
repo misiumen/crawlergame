@@ -242,7 +242,7 @@ def add_flagship_pet(world) -> Optional["_comp.Companion"]:
     pet = _comp.Companion(
         kind=_comp.KIND_PET,
         species_key="papuga_anty_host",
-        display_name_pl="Papuga Anti-host",
+        display_name_pl="Papuga Konferansjera",
         bond=7,
         stress=0,
         tags=["bird", "talking", "celebrity_pet", "broadcast"],

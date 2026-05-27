@@ -18,24 +18,26 @@ from dataclasses import dataclass, field
 from typing import List, Dict
 
 
-# Pool of DCC-flavored "anti-host last words" lines. Picked randomly
+# Pool of DCC-flavored Konferansjer last-words lines. Picked randomly
 # on death — these are the show's final commentary over the body,
 # not the player's narration.
+# (Field name `anti_host_line` kept as internal slug — saves + tests
+# read it. Display strings are all Konferansjer.)
 ANTI_HOST_DEATH_LINES = (
-    "Anti-host pochyla się do mikrofonu: „I to by było na tyle.”",
+    "Konferansjer pochyla się do mikrofonu: „I to by było na tyle.”",
     "Widownia milknie na pół sekundy. Potem klaszcze.",
     "Kamera 4 łapie ostatnie ujęcie. Reklama za trzy, dwa…",
-    "Anti-host: „Sponsorzy nie zwrócą pieniędzy.”",
+    "Konferansjer: „Sponsorzy nie zwrócą pieniędzy.”",
     "Z głośników leci jingiel końca odcinka. Smaczny.",
-    "Anti-host wzdycha: „Liczyliśmy na dłużej. No cóż.”",
+    "Konferansjer wzdycha: „Liczyliśmy na dłużej. No cóż.”",
     "Tłum w studio krzyczy: „JESZCZE RAZ!” — to nie tak działa.",
     "Operator kamery prosi o cięcie. Producent mówi: „nie, tak zostaje.”",
-    # P29.31 — name-formatted variants. Anti-host calls the player.
-    "Anti-host (do kamery 2): „{name}. Pamiętajcie to imię — bardzo "
+    # P29.31 — name-formatted variants. Konferansjer calls the player.
+    "Konferansjer (do kamery 2): „{name}. Pamiętajcie to imię — bardzo "
     "krótko.”",
-    "Anti-host: „{name}, drogi {name} — dziękujemy za udział w "
+    "Konferansjer: „{name}, drogi {name} — dziękujemy za udział w "
     "sezonie. Twoje resztki wracają do recyklera.”",
-    "Anti-host (głośniej): „Brawa dla {name}! Brawa, kurwa, mówiłem!”",
+    "Konferansjer (głośniej): „Brawa dla {name}! Brawa, kurwa, mówiłem!”",
 )
 
 
@@ -230,8 +232,8 @@ def render_lines(rs: RunSummary, *, victory: bool = False) -> List[str]:
         lines.append("FINAŁ SEZONU. Wracasz na powierzchnię. "
                      "Producent płacze ze szczęścia.")
         if rs.anti_host_line:
-            # Re-cast the anti-host line as a salute.
-            lines.append("Anti-host (na żywo): "
+            # Re-cast the konferansjer line as a salute.
+            lines.append("Konferansjer (na żywo): "
                          "„No proszę. Następny sezon będzie cięższy.”")
     else:
         if rs.death_cause_label:

@@ -544,7 +544,7 @@
   "ent_collector_n":             "Windykator",
   "ent_chief_editor_n":          "Redaktor Naczelny",
   "ent_recycler_pilgrim_n":      "Pielgrzym Recyklera",
-  "ent_antihost_n":              "Anty-gospodarz",
+  "ent_antihost_n":              "Konferansjer",
 
   "ui_monitor_header":     "Dostępne ekrany (aktywny: {idx}):",
   "ui_monitor_hint":       "  Przełącz: 'monitor N' (zacznie działać po restarcie).",

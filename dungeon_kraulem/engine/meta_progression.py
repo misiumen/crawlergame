@@ -153,9 +153,9 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
     ),
     "species_kolyski_anti_hosta": UnlockDef(
         key="species_kolyski_anti_hosta", kind="species",
-        label_pl="Kołyska Anti-hosta",
+        label_pl="Kołyska Konferansjera",
         description_pl="Wygraj sezon — pokonaj Prezesa Syndykatu.",
-        reward_pl="+1 do wszystkich statystyk; anti-host osobiście "
+        reward_pl="+1 do wszystkich statystyk; Konferansjer osobiście "
                   "komentuje twój run.",
         eval_fn=_eval_kolyski_anti_hosta,
     ),
@@ -187,18 +187,18 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
     # ── Companions (selectable at character creation) ──────────────────
     "companion_papuga_anty_host": UnlockDef(
         key="companion_papuga_anty_host", kind="companion",
-        label_pl="Papuga Anti-host",
+        label_pl="Papuga Konferansjera",
         description_pl="Zakończ sezon z uwagą Kanału 7 ≥15.",
         reward_pl="Sarkastyczna papuga startuje z tobą — komentuje "
-                  "każdy walka, każdy upadek.",
+                  "każdą walkę, każdy upadek.",
         eval_fn=_eval_papuga,
     ),
 
     # ── Legendary items (added to global drop / craft pools) ───────────
     "item_mikrofon_anty_hosta": UnlockDef(
         key="item_mikrofon_anty_hosta", kind="item",
-        label_pl="Mikrofon Anty-hosta",
-        description_pl="Pokonaj anty-gospodarza (anti_host_lite, piętra 16-18).",
+        label_pl="Mikrofon Konferansjera",
+        description_pl="Pokonaj Konferansjera (anti_host_lite, piętra 16-18).",
         reward_pl="Mikrofon kierunkowy: +5 widowni na użycie, gada "
                   "do ciebie pomiędzy walkami.",
         eval_fn=lambda w, v: _victory_against(

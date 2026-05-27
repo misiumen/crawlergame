@@ -521,7 +521,7 @@ MON = {
         vulnerable_to=["fire","psychic"],
     ),
     "anty_gospodarz": dict(
-        name_key="ent_antihost_n", fallback_name="Anty-gospodarz",
+        name_key="ent_antihost_n", fallback_name="Konferansjer",
         desc_key="ent_antihost_d",
         fallback_desc=("Idealne włosy, mikrofon, uśmiech wycelowany w "
                        "kamerę, której nie widać."),
@@ -1064,7 +1064,7 @@ MON = {
     ),
     "anti_host_lite": dict(
         name_key="ent_anti_host_lite_n",
-        fallback_name="Anti-host (egzemplarz testowy)",
+        fallback_name="Konferansjer (egzemplarz testowy)",
         desc_key="ent_anti_host_lite_d",
         fallback_desc="Demo wersji bossa z Syndykatu. „Słyszysz mnie "
                       "w każdym pokoju. Tylko tutaj cię widzę.”",

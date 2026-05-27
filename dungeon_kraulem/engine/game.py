@@ -211,7 +211,7 @@ class Game:
             from ._debug import swallow
             with swallow("audio.play_sfx[last_stand]"):
                 audio.play_sfx("player_hit")
-            self.log("Anti-host warknął: „NIE TAK SZYBKO.” "
+            self.log("Konferansjer warknął: „NIE TAK SZYBKO.” "
                      "Resztki adrenaliny — zostajesz na 1 HP. Raz.",
                      LOG_DANGER)
             # P29.12 — tutorial: explain that last-stand is one-shot.
@@ -521,7 +521,7 @@ class Game:
             self.log("Ministerstwo edytowało ci pamięć. Czasem "
                      "wiesz rzeczy, których nie powinieneś.", LOG_SYSTEM)
         elif sk == "species_kolyski_anti_hosta":
-            self.log("Jesteś rebrandowanym uczestnikiem. Anti-host "
+            self.log("Jesteś rebrandowanym uczestnikiem. Konferansjer "
                      "zna cię osobiście. To nie znaczy, że cię lubi.",
                      LOG_SYSTEM)
 
@@ -540,7 +540,7 @@ class Game:
             try:
                 from . import companion_voice as _cv
                 _cv.add_flagship_pet(self.world)
-                self.log("Papuga Anti-host siada na twoim ramieniu. "
+                self.log("Papuga Konferansjera siada na twoim ramieniu. "
                          "Patrzy się ironicznie.", LOG_SUCCESS)
             except Exception:
                 pass
@@ -5384,7 +5384,7 @@ class Game:
         ("instant_zupa_3_in_1", "Zupa instant 3w1 (smak: niespodzianka)",
          ["consumable", "food", "vending_loot"], 4),
         ("portret_anti_hosta",
-         "Portret anti-hosta w drewnianej ramce",
+         "Portret Konferansjera w drewnianej ramce",
          ["junk", "art", "vending_loot"], 2),
         ("baton_proteinowy_otwarte",
          "Baton proteinowy (rozprutą folią)",

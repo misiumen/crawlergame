@@ -73,8 +73,8 @@ def test_victory_mode_swaps_in_finale_header():
     assert "FINAŁ SEZONU" in joined, \
         f"victory header missing from:\n{joined}"
     assert "Producent" in joined
-    # Anti-host present too (re-cast as salute).
-    assert "Anti-host" in joined
+    # Konferansjer present too (re-cast as salute).
+    assert "Konferansjer" in joined
     # And the death-cause line is absent.
     assert "Przyczyna:" not in joined
     print("  victory render: FINAŁ SEZONU header + salute: OK")

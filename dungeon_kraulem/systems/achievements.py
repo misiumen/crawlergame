@@ -283,7 +283,7 @@ _add(AchievementDef(
 # Survival / dramatics.
 _add(AchievementDef(
     key="anty_host_warknal",
-    fallback_name_pl="Anti-host warknął",
+    fallback_name_pl="Konferansjer warknął",
     fallback_name_en="Anti-Host Snarled",
     fallback_description_pl="Last-stand: pierwszy raz spadłeś do 1 HP i wstałeś. Tylko raz.",
     fallback_description_en="Last stand: dropped to 1 HP and got back up. Only once.",
@@ -334,7 +334,7 @@ _add(AchievementDef(
     key="dziesiate_pietro",
     fallback_name_pl="Dziesiąte piętro",
     fallback_name_en="Floor Ten",
-    fallback_description_pl="Połowa Lochu za tobą. Anti-host przeznaczył ci osobny intro.",
+    fallback_description_pl="Połowa Lochu za tobą. Konferansjer przeznaczył ci osobny intro.",
     fallback_description_en="Half the dungeon done. Anti-host writes you a custom intro.",
     category="floor",
 ))
