@@ -86,6 +86,26 @@ class Character:
     # Misc flags
     flags: Dict[str, Any] = field(default_factory=dict)
 
+    # P29.8 — last-stand / "anti-host" save-from-death. Once per
+    # character: the first time a single hit would drop HP to 0,
+    # leaves you at 1 HP instead and burns the flag. Lets a player
+    # who walks into a stupid trap or boss crit feel the danger
+    # without the run ending mid-sentence. DCC-flavored: it's the
+    # anti-host yelling "NIE TAK SZYBKO" for the cameras.
+    near_death_used: bool = False
+
+    # P29.8 — run-summary scratchpad. Cumulative counters bumped by
+    # Game on the fly; consumed at game-over to build the highlight
+    # reel. Defaults to zeros so older saves load cleanly.
+    run_kills: int = 0
+    run_corpses_salvaged: int = 0
+    run_traps_armed: int = 0
+    run_audience_peak: int = 0
+    run_minutes_survived: int = 0
+    run_max_floor_reached: int = 1
+    run_death_cause: str = ""        # short tag e.g. "combat:bandzior" / "trap_self"
+    run_death_cause_label: str = ""  # Polish display, e.g. "od ciosu Bandziora"
+
     # ── Derived ──────────────────────────────────────────────────────────────
 
     def stat_mod(self, stat: str) -> int:
@@ -158,6 +178,16 @@ class Character:
             "journal": {k: list(v) for k, v in self.journal.items()},
             "relationships": dict(self.relationships),
             "flags": dict(self.flags),
+            # P29.8
+            "near_death_used":       self.near_death_used,
+            "run_kills":             self.run_kills,
+            "run_corpses_salvaged":  self.run_corpses_salvaged,
+            "run_traps_armed":       self.run_traps_armed,
+            "run_audience_peak":     self.run_audience_peak,
+            "run_minutes_survived":  self.run_minutes_survived,
+            "run_max_floor_reached": self.run_max_floor_reached,
+            "run_death_cause":       self.run_death_cause,
+            "run_death_cause_label": self.run_death_cause_label,
         }
 
     @classmethod
@@ -183,4 +213,15 @@ class Character:
         c.journal = {k: list(v) for k, v in d.get("journal", {}).items()}
         c.relationships = dict(d.get("relationships", {}))
         c.flags = dict(d.get("flags", {}))
+        # P29.8 — run telemetry + last-stand flag (default to safe zeros so
+        # pre-P29.8 saves keep loading).
+        c.near_death_used       = bool(d.get("near_death_used", False))
+        c.run_kills             = int(d.get("run_kills", 0))
+        c.run_corpses_salvaged  = int(d.get("run_corpses_salvaged", 0))
+        c.run_traps_armed       = int(d.get("run_traps_armed", 0))
+        c.run_audience_peak     = int(d.get("run_audience_peak", 0))
+        c.run_minutes_survived  = int(d.get("run_minutes_survived", 0))
+        c.run_max_floor_reached = int(d.get("run_max_floor_reached", 1))
+        c.run_death_cause       = str(d.get("run_death_cause", "") or "")
+        c.run_death_cause_label = str(d.get("run_death_cause_label", "") or "")
         return c

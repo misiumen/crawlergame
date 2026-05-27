@@ -161,6 +161,88 @@ class Game:
         except Exception:
             pass
 
+    # ── P29.8: death detection ───────────────────────────────────────────────
+
+    def _check_player_dead(self, cause: str = "", cause_label: str = "") -> bool:
+        """Single chokepoint called after any path that can lower the
+        player's HP. Returns True if the player has actually died (and
+        the state has flipped to STATE_DEFEAT); False otherwise.
+
+        Handles last-stand: the first time HP would drop to 0 in a run,
+        we set hp=1 and burn `character.near_death_used`. Lets one
+        accidental crit not end a 90-minute run. The next 0-HP event
+        is the real death.
+
+        Side effects on actual death:
+          * cache run_summary on self for the end screen to render;
+          * emit a death log line + DCC anti-host commentary;
+          * play sfx 'player_death' (best-effort);
+          * wipe the save file (permadeath default);
+          * flip self.state → STATE_DEFEAT.
+        """
+        if self.world is None:
+            return False
+        ch = self.world.character
+        if ch is None or ch.hp > 0:
+            return False
+        # P29.8 — idempotence: if we've already flipped to DEFEAT,
+        # don't overwrite the death cause set by the original site.
+        # The combat round-end check fires AFTER the immediate-hit
+        # check, and without this guard the round-end label would
+        # clobber the (more specific) "od ciosu Bandziora" line.
+        if self.state == STATE_DEFEAT:
+            return True
+        # Last-stand: once per run, leave the player at 1 HP and shout.
+        if not ch.near_death_used:
+            ch.hp = 1
+            ch.near_death_used = True
+            try:
+                from . import audio
+                audio.play_sfx("player_hit")
+            except Exception:
+                pass
+            self.log("Anti-host warknął: „NIE TAK SZYBKO.” "
+                     "Resztki adrenaliny — zostajesz na 1 HP. Raz.",
+                     LOG_DANGER)
+            return False
+        # Real death.
+        ch.run_death_cause = cause
+        ch.run_death_cause_label = cause_label or (cause or "nieznana")
+        # Cache the summary so the end screen can render it without
+        # re-scraping every draw().
+        try:
+            from . import run_summary as _rs
+            self.run_summary = _rs.build_run_summary(self.world)
+            self.log(self.run_summary.death_log_line, LOG_DANGER)
+            self.log(self.run_summary.anti_host_line, LOG_SYNDIC)
+        except Exception:
+            self.log("Tracisz nitkę. Reszta jest hałasem.", LOG_DANGER)
+        # SFX
+        try:
+            from . import audio
+            audio.play_sfx("player_death")
+        except Exception:
+            pass
+        # Permadeath: wipe the save so resume can't bring you back.
+        try:
+            from . import save_load
+            save_load.delete()
+        except Exception:
+            pass
+        self.state = STATE_DEFEAT
+        return True
+
+    def _bump_run_counter(self, field_name: str, by: int = 1) -> None:
+        """Tiny helper used by the death-summary system to bump
+        cumulative run counters on the character. Silently noops when
+        there is no world / character — keeps the call sites
+        single-line. See engine/character.py for the run_* fields."""
+        if self.world is None or self.world.character is None:
+            return
+        ch = self.world.character
+        cur = int(getattr(ch, field_name, 0) or 0)
+        setattr(ch, field_name, cur + int(by))
+
     def _stash_disambiguation_on_invalid(self, v, intent) -> None:
         """P26c — cross-handler disambiguation latch.
 
@@ -1606,7 +1688,8 @@ class Game:
                 # If the free attack killed the player, bail before the
                 # command runs.
                 if not self.world.character.is_alive():
-                    self.state = STATE_DEFEAT
+                    self._check_player_dead("combat_free_attack",
+                                            "od ciosu, na który się sam wystawiłeś")
                     return
         except Exception:
             pass
@@ -2011,7 +2094,8 @@ class Game:
 
         # Health check
         if not self.world.character.is_alive():
-            self.state = STATE_DEFEAT
+            self._check_player_dead("post_action",
+                                    "od kumulatywnych obrażeń")
 
     # ── P27 — floor descent ────────────────────────────────────────────
 
@@ -2035,6 +2119,11 @@ class Game:
             self.state = STATE_VICTORY
             return
         next_num = cur_num + 1
+        # P29.8 — track high-water mark for the run summary.
+        ch = self.world.character
+        if ch is not None:
+            ch.run_max_floor_reached = max(int(ch.run_max_floor_reached or 1),
+                                           next_num)
         self.log(t("log_descend_intro",
                    fallback=f"Schodzisz na piętro {next_num}. Drzwi "
                             f"się zamykają za tobą. Loch nie pamięta "
@@ -3079,6 +3168,9 @@ class Game:
                        name=target.display_name()), LOG_DANGER)
             ch.take_damage(1)
             self._bump_threat(2, source="break_critfail", room=room)
+            if self._check_player_dead("break_critfail",
+                                       "od rykoszetu własnego rozbijania"):
+                return
 
         # Affinity nudge for environment plays.
         ch.affinity["environment"] = ch.affinity.get("environment", 0) + 1
@@ -3613,7 +3705,8 @@ class Game:
         cs.side = "player"
         ts.advance(self.world, 1)
         if not ch.is_alive():
-            self.state = STATE_DEFEAT
+            self._check_player_dead("combat_round_end",
+                                    "na koniec rundy walki")
             return
         # Re-check end: if all hostiles dead/fled/disabled, end combat.
         hostiles = _cmb.alive_hostiles_in(room)
@@ -3738,6 +3831,15 @@ class Game:
             # Heavy hits cause bleeding sometimes.
             if dmg >= 5:
                 _cmb.add_status(ch, _cmb.STATUS_WOUNDED, 4)
+            # P29.8 — check death immediately after the hit lands, not
+            # only at end-of-round. Without this, multiple enemies in
+            # one round can each land a "killing" blow before the
+            # state actually flips, which messes with the log order
+            # and the run-summary "cause of death".
+            if self._check_player_dead(
+                    f"combat:{ent.key}",
+                    f"od ciosu „{ent.display_name()}”"):
+                return
 
     # ── Player combat actions ──────────────────────────────────────────────
 
@@ -3993,6 +4095,8 @@ class Game:
                                             weight=1)
                     except Exception:
                         pass
+                    # P29.8 — bump kill counter for the run summary.
+                    self._bump_run_counter("run_kills", 1)
                 except Exception:
                     pass
             if mode == "heavy" and not crit:
@@ -4344,6 +4448,9 @@ class Game:
                 achievements.unlock(ch, "samo_sie_rozstawilo", world=self.world)
             except Exception:
                 pass
+            if self._check_player_dead("trap_self_deploy",
+                                       "od własnej pułapki przy rozstawianiu"):
+                return
             return
         if level == "failure":
             self.log(t("feedback_deploy_fail",
@@ -4428,6 +4535,7 @@ class Game:
                    name=item.display_name()), LOG_SUCCESS)
         self._bump_threat(3, source="trap_arm", room=room)
         ch.affinity["trap"] = ch.affinity.get("trap", 0) + 1
+        self._bump_run_counter("run_traps_armed", 1)
 
         # Narrator hook
         nline = narrate("deploy_trap_success") or narrate("deploy_trap")
@@ -4521,6 +4629,9 @@ class Game:
             # Mark as triggered so it doesn't keep haunting the room.
             trap["triggered"] = True
             self._bump_threat(2, source="trap_self_disarm", room=room)
+            if self._check_player_dead("trap_self_disarm",
+                                       "od własnej pułapki przy zwijaniu"):
+                return
             return
         if level == "failure":
             self.log(t("feedback_trap_pickup_fail",
@@ -6096,7 +6207,15 @@ class Game:
                 fstate = getattr(f, "state", None) or {}
                 collapsed = bool(fstate.get("collapsed"))
             if collapsed:
-                self.state = STATE_DEFEAT
+                # P29.8 — collapse always kills (no last-stand save).
+                # Force the flag so the helper runs its full death
+                # path instead of granting an extra HP.
+                ch = self.world.character if self.world else None
+                if ch is not None:
+                    ch.near_death_used = True
+                    ch.hp = 0
+                self._check_player_dead("floor_collapse",
+                                        "przygniecony przez zawalające się piętro")
 
     def _music_key_for_state(self):
         return {
@@ -6211,16 +6330,62 @@ class Game:
             ui.text(self.screen, ln, x + 16, cy, NORMAL_TEXT, 16); cy += 24
 
     def _end_screen(self, title_str, success: bool):
-        self.screen.fill((10,12,18))
+        """P29.8 — defeat now renders a DCC highlight reel (kills,
+        floor, top sponsors, audience peak, anti-host send-off).
+        Victory still uses the original two-line minimal screen for
+        now — the next pass can give it an equally rich celebration.
+        """
+        self.screen.fill((10, 12, 18))
         sw, sh = self.screen.get_size()
-        col = (90,210,120) if success else (230,80,80)
-        ui.text(self.screen, title_str, sw//2 - 200, 200, col, 26, True)
-        if self.world:
-            c = self.world.character
-            ui.text(self.screen, f"{c.name} — D{self.world.current_floor.day_number() if self.world.current_floor else 0}",
-                    sw//2 - 200, 260, (190,205,220), 16)
-        ui.text(self.screen, t("end_press_enter", fallback="[Enter] Powrót do menu"),
-                sw//2 - 200, sh - 80, (90,110,130), 14)
+        col = (90, 210, 120) if success else (230, 80, 80)
+        # Title — centered visually by using a slightly larger left
+        # offset; ui.text() doesn't measure for centering, so we
+        # approximate based on a typical 26px width.
+        ui.text(self.screen, title_str, sw // 2 - 240, 80, col, 26, True)
+
+        # Defeat: render the highlight reel. Build the summary lazily
+        # if for some reason it wasn't cached at the death moment
+        # (e.g. an older save loaded into STATE_DEFEAT directly).
+        if (not success) and self.world is not None:
+            rs = getattr(self, "run_summary", None)
+            if rs is None:
+                try:
+                    from . import run_summary as _rs
+                    rs = _rs.build_run_summary(self.world)
+                    self.run_summary = rs
+                except Exception:
+                    rs = None
+            if rs is not None:
+                try:
+                    from . import run_summary as _rs
+                    lines = _rs.render_lines(rs)
+                except Exception:
+                    lines = []
+                cy = 140
+                left = sw // 2 - 280
+                for ln in lines:
+                    color = (190, 205, 220)
+                    # Subtle accent color for the anti-host line.
+                    if ln == rs.anti_host_line:
+                        color = (230, 200, 120)
+                    elif ln.startswith("Top sponsorzy:") or ln.startswith("Przyczyna:"):
+                        color = (180, 220, 240)
+                    elif ln.startswith("Osiągnięcia:"):
+                        color = (160, 230, 160)
+                    ui.text(self.screen, ln, left, cy, color, 16)
+                    cy += 22
+        else:
+            # Victory path (unchanged minimal info).
+            if self.world:
+                c = self.world.character
+                day = (self.world.current_floor.day_number()
+                       if self.world.current_floor else 0)
+                ui.text(self.screen, f"{c.name} — D{day}",
+                        sw // 2 - 200, 260, (190, 205, 220), 16)
+
+        ui.text(self.screen,
+                t("end_press_enter", fallback="[Enter] Powrót do menu"),
+                sw // 2 - 200, sh - 80, (90, 110, 130), 14)
         pygame.display.flip()
 
 

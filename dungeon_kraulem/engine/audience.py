@@ -128,6 +128,9 @@ def change_audience(world, delta: int, source: str = "",
     before = max(_AUDIENCE_MIN, min(int(char.audience_rating or 0), _AUDIENCE_MAX))
     after = max(_AUDIENCE_MIN, min(before + delta, _AUDIENCE_MAX))
     char.audience_rating = after
+    # P29.8 — running high-water mark for the end-of-run summary.
+    if after > int(getattr(char, "run_audience_peak", 0) or 0):
+        char.run_audience_peak = after
 
     # Reset the idle-decay counter — something interesting happened.
     setattr(world, "audience_idle_minutes", 0)
