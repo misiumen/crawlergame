@@ -219,6 +219,145 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0,
     surf.blit(f_img, (sw - f_img.get_width() - 24, sh - 24))
 
 
+# ── P29.9 — Save-slot picker ────────────────────────────────────────────────
+
+def draw_slot_picker(surf, slots, mode: str, selected_idx: int = 0,
+                     *, click_registry=None, on_pick=None, on_back=None):
+    """Three-card slot picker. `slots` is a list of dict|None from
+    save_load.list_slots(). `mode` is "new" or "load" — controls the
+    title bar and the click-disabled state (load can't pick an empty
+    slot; new can pick anything but warns about overwrite).
+
+    Click handler signature: `on_pick(slot_index: int)`.
+    Escape / back-button: `on_back()`.
+    """
+    surf.fill((6, 8, 12))
+    sw, sh = surf.get_size()
+    L = _resolve_layout(None)
+    title_size = max(28, int(36 * L.font_scale))
+    body_size = max(13, int(15 * L.font_scale))
+    small_size = max(11, int(13 * L.font_scale))
+
+    # Top header strip — same vibe as the main menu.
+    bar_h = max(40, int(48 * L.font_scale))
+    pygame.draw.rect(surf, (18, 22, 30), (0, 0, sw, bar_h))
+    pygame.draw.line(surf, ACCENT, (0, bar_h), (sw, bar_h), 1)
+    text(surf, "▣ KANAŁ KRAULEM // WYBÓR SLOTU", 24,
+         (bar_h - body_size) // 2 - 2, ACCENT, body_size, True)
+
+    # Title.
+    if mode == "load":
+        title_text = t("slots_load_title", fallback="WCZYTAJ ZAPIS")
+        sub_text = t("slots_load_sub",
+                     fallback="Wybierz slot, który ma wrócić na antenę.")
+    else:
+        title_text = t("slots_new_title", fallback="NOWA GRA")
+        sub_text = t("slots_new_sub",
+                     fallback="Wybierz slot. Zajęte sloty zostaną nadpisane.")
+    title_font_obj = font(title_size, bold=True)
+    timg = title_font_obj.render(title_text, True, ACCENT)
+    surf.blit(timg, ((sw - timg.get_width()) // 2, bar_h + 40))
+    sub_img = font(body_size).render(sub_text, True, DIM_TEXT)
+    surf.blit(sub_img, ((sw - sub_img.get_width()) // 2,
+                        bar_h + 40 + title_size + 6))
+
+    # Three cards horizontally.
+    card_w = min(360, (sw - 120) // 3)
+    card_h = max(220, int(260 * L.font_scale))
+    gap = 30
+    total_w = card_w * 3 + gap * 2
+    base_x = (sw - total_w) // 2
+    base_y = bar_h + 40 + title_size + 60
+
+    for i, info in enumerate(slots[:3]):
+        x = base_x + i * (card_w + gap)
+        y = base_y
+        is_sel = (i == selected_idx)
+
+        # Card colors.
+        if info is None:
+            border_col = (60, 80, 110) if not is_sel else ACCENT
+            bg_col = (16, 20, 28)
+        elif info.get("dead"):
+            border_col = (120, 60, 60) if not is_sel else (230, 100, 100)
+            bg_col = (28, 16, 18)
+        else:
+            border_col = ACCENT if is_sel else (80, 130, 170)
+            bg_col = (18, 24, 32)
+
+        pygame.draw.rect(surf, bg_col, (x, y, card_w, card_h))
+        pygame.draw.rect(surf, border_col, (x, y, card_w, card_h), 2 if is_sel else 1)
+
+        # Slot label + status pill.
+        text(surf, f"SLOT {i + 1}", x + 14, y + 12, BRIGHT_TEXT, body_size + 4, True)
+        if info is None:
+            pill = "PUSTY"; pcol = DIM_TEXT
+        elif info.get("dead"):
+            pill = "ZMARŁY"; pcol = (230, 100, 100)
+        else:
+            pill = "AKTYWNY"; pcol = (140, 220, 160)
+        pimg = font(small_size, bold=True).render(pill, True, pcol)
+        surf.blit(pimg, (x + card_w - pimg.get_width() - 12, y + 14))
+
+        cy = y + 12 + body_size + 22
+        if info is None:
+            text(surf, t("slots_empty_line",
+                         fallback="— brak zapisu —"),
+                 x + 14, cy + 14, DIM_TEXT, body_size)
+            text(surf, t("slots_empty_hint",
+                         fallback="Kliknij, by zacząć tutaj."),
+                 x + 14, cy + 14 + body_size + 8, DIM_TEXT, small_size)
+        else:
+            name = info.get("name") or "Bezimienny"
+            bg = info.get("background") or "—"
+            cls = info.get("class_key") or "—"
+            floor = info.get("floor", 1)
+            aud = info.get("audience", 0)
+            hp = info.get("hp", 0); hp_max = info.get("hp_max", 0)
+            mins = info.get("minutes", 0)
+            text(surf, name, x + 14, cy, BRIGHT_TEXT, body_size + 2, True)
+            cy += body_size + 8
+            text(surf, f"tło: {bg}", x + 14, cy, NORMAL_TEXT, small_size)
+            cy += small_size + 4
+            text(surf, f"klasa: {cls}", x + 14, cy, NORMAL_TEXT, small_size)
+            cy += small_size + 4
+            text(surf, f"piętro: {floor} / 18", x + 14, cy, NORMAL_TEXT, small_size)
+            cy += small_size + 4
+            text(surf, f"HP: {hp}/{hp_max}", x + 14, cy,
+                 (230, 100, 100) if info.get("dead") else NORMAL_TEXT, small_size)
+            cy += small_size + 4
+            text(surf, f"widownia: {aud}", x + 14, cy, NORMAL_TEXT, small_size)
+            cy += small_size + 4
+            text(surf, f"czas: {mins} min", x + 14, cy, DIM_TEXT, small_size)
+            if mode == "new":
+                cy += small_size + 10
+                text(surf, t("slots_overwrite_warn",
+                             fallback="(klik = nadpisz)"),
+                     x + 14, cy, WARN, small_size, True)
+
+        # Click zone — disabled for load + empty (slot has nothing to load).
+        clickable = True
+        if mode == "load" and info is None:
+            clickable = False
+        if click_registry is not None and on_pick is not None and clickable:
+            def _click(_i=i):
+                on_pick(_i)
+            click_registry.add((x, y, card_w, card_h), _click,
+                               tooltip=f"Slot {i + 1}",
+                               category="slot_picker")
+
+    # Back button row at bottom.
+    back_y = sh - 80
+    back_label = t("slots_back", fallback="[Esc] Wróć do menu")
+    bimg = font(body_size).render(back_label, True, DIM_TEXT)
+    surf.blit(bimg, ((sw - bimg.get_width()) // 2, back_y))
+    if click_registry is not None and on_back is not None:
+        click_registry.add(
+            ((sw - bimg.get_width()) // 2 - 12, back_y - 6,
+             bimg.get_width() + 24, bimg.get_height() + 12),
+            on_back, tooltip="Powrót", category="slot_picker")
+
+
 # ── Character creation ──────────────────────────────────────────────────────
 
 def draw_creation(surf, state, *, click_registry=None,

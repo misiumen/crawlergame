@@ -34,7 +34,10 @@ def test_title_registers_menu_clicks():
 
 
 def test_title_click_new_game_enters_create():
-    from ..engine.game import Game, STATE_TITLE, STATE_CREATE
+    """P29.9 — NOWA GRA now routes through the slot picker. Clicking
+    NOWA GRA lands you on STATE_SLOTS (with mode='new'); picking a
+    slot from there takes you to STATE_CREATE."""
+    from ..engine.game import Game, STATE_TITLE, STATE_CREATE, STATE_SLOTS
     g = Game(screen=pygame.display.get_surface())
     g.state = STATE_TITLE
     g.draw()
@@ -46,8 +49,12 @@ def test_title_click_new_game_enters_create():
             break
     assert target is not None, "no NOWA GRA click zone"
     target.callback()
-    assert g.state == STATE_CREATE, f"state={g.state}"
-    print(f"  click NOWA GRA → STATE_CREATE: OK")
+    assert g.state == STATE_SLOTS, f"state={g.state} (expected STATE_SLOTS)"
+    assert g.slot_picker_mode == "new"
+    # Now pick slot 0 — should advance to STATE_CREATE.
+    g._slot_picker_pick(0)
+    assert g.state == STATE_CREATE, f"state={g.state} (expected STATE_CREATE)"
+    print(f"  click NOWA GRA → STATE_SLOTS → pick slot → STATE_CREATE: OK")
 
 
 def test_create_name_buttons_present():

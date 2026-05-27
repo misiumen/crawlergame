@@ -29,6 +29,7 @@ STATE_SPECIES_OFFER = "species_offer"
 STATE_VICTORY   = "victory"
 STATE_DEFEAT    = "defeat"
 STATE_SETTINGS  = "settings"   # Prompt 11: simple settings popup from title
+STATE_SLOTS     = "slots"      # P29.9: save-slot picker (3 slots)
 
 
 _NUMS = {
@@ -76,6 +77,9 @@ class Game:
         self.nav_state = None         # built lazily per frame in draw()
         # Title-menu cursor index for arrow-key navigation.
         self.title_idx = 0
+        # P29.9 — save-slot picker state (mode + cursor index).
+        self.slot_picker_mode = "new"
+        self.slot_picker_idx = 0
         # Command history (lightweight) — Up/Down in text mode walks it.
         self.cmd_history: list[str] = []
         self.cmd_history_idx = -1     # -1 = "current draft (not in history)"
@@ -1306,22 +1310,21 @@ class Game:
     def _title_action(self, action_key: str) -> None:
         """Click callback from draw_title. Mirrors the keyboard path in
         handle_keydown for STATE_TITLE — same effects, just routed
-        through one shared method so mouse and keyboard stay in sync."""
+        through one shared method so mouse and keyboard stay in sync.
+
+        P29.9 — both "new_game" and "load_game" now route through the
+        slot picker. The picker handles overwrite vs. empty / dead /
+        active per-slot semantics.
+        """
         if action_key == "new_game":
-            self.cc = {"step": "name", "name_input": "", "selected_bg": 0}
-            self.input_text = ""
-            self.state = STATE_CREATE
+            self.slot_picker_mode = "new"
+            self.slot_picker_idx = 0
+            self.state = STATE_SLOTS
         elif action_key == "load_game":
             if save_load.exists():
-                w = save_load.load()
-                if w is not None:
-                    self.world = w
-                    self.state = STATE_PLAY
-                    self.log(t("log_save_loaded",
-                               fallback="Zapis wczytany."), LOG_SUCCESS)
-                else:
-                    self.log(t("log_save_load_failed",
-                               fallback="Zapis uszkodzony."), LOG_DANGER)
+                self.slot_picker_mode = "load"
+                self.slot_picker_idx = 0
+                self.state = STATE_SLOTS
         elif action_key == "settings":
             self._open_settings()
         elif action_key == "quit":
@@ -1329,6 +1332,48 @@ class Game:
             raise SystemExit
         elif action_key == "toggle_lang":
             set_language("en" if get_language() == "pl" else "pl")
+
+    # ── P29.9 — slot picker ──────────────────────────────────────────────
+
+    def _open_slot_picker(self, mode: str) -> None:
+        """Enter STATE_SLOTS. `mode` is 'new' or 'load'."""
+        self.slot_picker_mode = mode if mode in ("new", "load") else "new"
+        self.slot_picker_idx = 0
+        self.input_text = ""
+        self.state = STATE_SLOTS
+
+    def _slot_picker_pick(self, slot_index: int) -> None:
+        """Mouse / Enter callback. Acts based on current mode + slot
+        state:
+          * load + empty/missing: ignored
+          * load + has data: set active slot, load, → STATE_PLAY
+          * new + anything: set active slot, wipe old data, → STATE_CREATE
+        """
+        n = max(0, min(int(slot_index), save_load.SAVE_SLOT_COUNT - 1))
+        mode = getattr(self, "slot_picker_mode", "new")
+        if mode == "load":
+            if not save_load.exists_slot(n):
+                return
+            save_load.set_active_slot(n)
+            w = save_load.load_from_slot(n)
+            if w is None:
+                self.log(t("log_save_load_failed",
+                           fallback="Zapis uszkodzony."), LOG_DANGER)
+                self.state = STATE_TITLE
+                return
+            self.world = w
+            self.state = STATE_PLAY
+            self.log(t("log_save_loaded", fallback="Zapis wczytany."), LOG_SUCCESS)
+            return
+        # New game: pick slot, wipe any old data, enter creation.
+        save_load.set_active_slot(n)
+        save_load.delete_slot(n)
+        self.cc = {"step": "name", "name_input": "", "selected_bg": 0}
+        self.input_text = ""
+        self.state = STATE_CREATE
+
+    def _slot_picker_back(self) -> None:
+        self.state = STATE_TITLE
 
     def _create_action(self, action) -> None:
         """Click callback from draw_creation. `action` is a string for
@@ -5259,19 +5304,13 @@ class Game:
                 return
             if key == pygame.K_RETURN:
                 action = title_actions[self.title_idx]
+                # P29.9 — route new_game / load_game through slot picker.
                 if action == "new_game":
-                    self.cc = {"step":"name","name_input":"","selected_bg":0}
                     self._suppress_textinput = True
-                    self.input_text = ""
-                    self.state = STATE_CREATE
+                    self._open_slot_picker("new")
                 elif action == "load_game" and save_load.exists():
-                    w = save_load.load()
-                    if w is not None:
-                        self.world = w; self.state = STATE_PLAY
-                        self.log(t("log_save_loaded", fallback="Zapis wczytany."), LOG_SUCCESS)
-                    else:
-                        self.log(t("log_save_load_failed",
-                                   fallback="Zapis uszkodzony."), LOG_DANGER)
+                    self._suppress_textinput = True
+                    self._open_slot_picker("load")
                 elif action == "settings":
                     # Prompt 11: open the settings popup.
                     self._open_settings()
@@ -5279,20 +5318,12 @@ class Game:
                     pygame.quit(); raise SystemExit
                 return
             if digit == "1":
-                self.cc = {"step":"name","name_input":"","selected_bg":0}
                 self._suppress_textinput = True
-                self.input_text = ""
-                self.state = STATE_CREATE
+                self._open_slot_picker("new")
                 return
             if digit == "2" and save_load.exists():
-                w = save_load.load()
-                if w is not None:
-                    self.world = w
-                    self.state = STATE_PLAY
-                    self.log(t("log_save_loaded", fallback="Zapis wczytany."), LOG_SUCCESS)
-                else:
-                    self.log(t("log_save_load_failed",
-                               fallback="Zapis uszkodzony."), LOG_DANGER)
+                self._suppress_textinput = True
+                self._open_slot_picker("load")
                 return
             if digit == "3":
                 self._open_settings()
@@ -5306,6 +5337,26 @@ class Game:
 
         if self.state == STATE_SETTINGS:
             return self._handle_settings_keydown(key, shift_held)
+
+        # P29.9 — slot picker.
+        if self.state == STATE_SLOTS:
+            self._suppress_textinput = True
+            if key == pygame.K_ESCAPE:
+                self._slot_picker_back(); return
+            if key in (pygame.K_LEFT, pygame.K_a):
+                self.slot_picker_idx = (self.slot_picker_idx - 1) % save_load.SAVE_SLOT_COUNT
+                return
+            if key in (pygame.K_RIGHT, pygame.K_d):
+                self.slot_picker_idx = (self.slot_picker_idx + 1) % save_load.SAVE_SLOT_COUNT
+                return
+            if key == pygame.K_RETURN:
+                self._slot_picker_pick(self.slot_picker_idx); return
+            if digit is not None:
+                # 1..3 → slots 0..2
+                n = int(digit) - 1
+                if 0 <= n < save_load.SAVE_SLOT_COUNT:
+                    self._slot_picker_pick(n)
+            return
 
         if self.state == STATE_CREATE:
             step = self.cc.get("step")
@@ -6239,6 +6290,15 @@ class Game:
         elif self.state == STATE_SETTINGS:
             ui.draw_settings(s, getattr(self, "settings_state", {}),
                              save_exists=save_load.exists())
+        elif self.state == STATE_SLOTS:
+            # P29.9 — three-card slot picker.
+            slots_info = save_load.list_slots()
+            ui.draw_slot_picker(s, slots_info,
+                                mode=getattr(self, "slot_picker_mode", "new"),
+                                selected_idx=getattr(self, "slot_picker_idx", 0),
+                                click_registry=self.click_registry,
+                                on_pick=self._slot_picker_pick,
+                                on_back=self._slot_picker_back)
         elif self.state == STATE_CREATE:
             ui.draw_creation(s, self.cc,
                              click_registry=self.click_registry,
