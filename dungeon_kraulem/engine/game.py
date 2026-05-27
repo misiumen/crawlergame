@@ -1988,6 +1988,12 @@ class Game:
         if intent.intent == "apply_enhancement":
             self._attempt_apply_enhancement(intent); return
 
+        # P29.23 — cooking + reading.
+        if intent.intent == "cook":
+            self._attempt_cook(intent); return
+        if intent.intent == "read":
+            self._attempt_read(intent); return
+
         # P29.19 — credit sinks.
         if intent.intent == "train_stat":
             self._attempt_train_stat(intent); return
@@ -5349,6 +5355,153 @@ class Game:
             _ts.advance(self.world, 20)
         except Exception:
             pass
+
+    # ── P29.23: cooking + reading verbs ────────────────────────────────
+
+    def _attempt_cook(self, intent) -> None:
+        """`gotuj` / `piecz` / `smaż` — convert raw meat to cooked food.
+
+        The player needs at least 1 `meat_chunk` material. Cooking
+        consumes 1 meat + 1 wood_fragments (the heat source), takes
+        10 minutes, rolls a WIS check at TT 8. Outcomes:
+          critical_success → masterwork cooked_meat (extra HP heal)
+          success / partial → normal cooked_meat
+          failure           → wasted, "spoiled" log line
+          critical_failure  → mild self-damage (raw bite)
+
+        If the player has no `meat_chunk` material, refusal explains.
+        """
+        from . import time_system as _ts
+        from .utils_compat import roll_d20
+        from ..content import crafting as _cr
+
+        ch = self.world.character
+        pool = ch.materials or {}
+        meat_qty = int(pool.get("meat_chunk", 0))
+        wood_qty = int(pool.get("wood_fragments", 0))
+        if meat_qty < 1:
+            self.log(t("feedback_cook_no_meat",
+                       fallback="Nie masz mięsa do gotowania. "
+                                "Rozbierz coś świeżego, najpierw."),
+                     LOG_WARN)
+            return
+        if wood_qty < 1:
+            self.log(t("feedback_cook_no_wood",
+                       fallback="Nie masz drewna ani niczego, na czym "
+                                "rozpalić ogień."), LOG_WARN)
+            return
+
+        # Roll.
+        raw = roll_d20()
+        mod = ch.stat_mod("WIS")
+        dc = 8
+        total = raw + mod
+        if   raw == 20:       level = "critical_success"
+        elif raw == 1:        level = "critical_failure"
+        elif total >= dc + 5: level = "critical_success"
+        elif total >= dc:     level = "success"
+        elif total >= dc - 3: level = "partial_success"
+        else:                 level = "failure"
+
+        # Consume materials.
+        ch.materials["meat_chunk"] = meat_qty - 1
+        ch.materials["wood_fragments"] = wood_qty - 1
+
+        _ts.advance(self.world, 10)
+
+        if level == "critical_failure":
+            self.log(t("feedback_cook_critfail",
+                       fallback="Rozpalasz coś, ale ogień gryzie cię "
+                                "w rękę. -2 HP. Mięso przepada."),
+                     LOG_DANGER)
+            ch.take_damage(2)
+            self._check_player_dead("cook_critfail",
+                                    "od własnego ogniska")
+            return
+        if level == "failure":
+            self.log(t("feedback_cook_fail",
+                       fallback="Mięso spalone na zewnątrz, surowe w "
+                                "środku. Wyrzucasz."), LOG_WARN)
+            return
+
+        # Produce a cooked_meat item.
+        quality = _cr.quality_for_level(level)
+        ent = _cr.make_crafted_entity("cooked_meat", quality=quality)
+        self.world.register(ent)
+        ch.inventory_ids.append(ent.entity_id)
+        qlabel = _cr.quality_label_pl(quality)
+        if qlabel:
+            self.log(t("feedback_cook_ok_qual",
+                       fallback=f"Gotujesz ({qlabel}): {ent.display_name()}.",
+                       quality=qlabel, name=ent.display_name()),
+                     LOG_SUCCESS)
+        else:
+            self.log(t("feedback_cook_ok",
+                       fallback=f"Gotujesz: {ent.display_name()}.",
+                       name=ent.display_name()), LOG_SUCCESS)
+
+    def _attempt_read(self, intent) -> None:
+        """`czytaj` / `przeczytaj` — surface lore text on a lore-tagged
+        item or environmental feature.
+
+        If no target, refuses with hint. Lore source: item.fallback_desc
+        for inventory items; room.search_pool[0] for env. Reading is
+        free (no time cost) and may grant a 'lore' achievement counter
+        in the future."""
+        from .affordances import fold as _fold
+        ch = self.world.character
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if not intent.targets:
+            self.log(t("feedback_read_syntax",
+                       fallback="Co czytać? Spróbuj `czytaj <nazwa>`."),
+                     LOG_WARN)
+            return
+        needle = _fold((intent.targets[0] or "").strip())
+        # Search inventory first.
+        for eid in (ch.inventory_ids or []):
+            e = self.world.get(eid)
+            if e is None:
+                continue
+            if needle in _fold(e.display_name()) or \
+               any(needle in _fold(t or "") for t in (e.tags or [])):
+                if "lore" in (e.tags or []) or \
+                   "readable" in (e.tags or []) or \
+                   "paper" in (e.tags or []):
+                    txt = e.fallback_desc or e.display_name()
+                    self.log(f"„{e.display_name()}”: {txt}", LOG_NORMAL)
+                    return
+                else:
+                    self.log(t("feedback_read_unreadable",
+                               fallback=f"„{e.display_name()}” — "
+                                        f"tu nic nie ma do czytania."),
+                             LOG_WARN)
+                    return
+        # Then room entities.
+        if room is not None:
+            for e in (room.entities or []):
+                if e is None:
+                    continue
+                if needle in _fold(e.display_name()) or \
+                   any(needle in _fold(t or "") for t in (e.tags or [])):
+                    if "lore" in (e.tags or []) or \
+                       "readable" in (e.tags or []) or \
+                       "paper" in (e.tags or []) or \
+                       "screen" in (e.tags or []) or \
+                       "terminal" in (e.tags or []):
+                        txt = e.fallback_desc or e.display_name()
+                        self.log(f"„{e.display_name()}”: {txt}",
+                                 LOG_NORMAL)
+                        return
+                    else:
+                        self.log(t("feedback_read_unreadable",
+                                   fallback=f"„{e.display_name()}” — "
+                                            f"tu nic nie ma do czytania."),
+                                 LOG_WARN)
+                        return
+        self.log(t("feedback_read_nothing",
+                   fallback=f"Nie widzisz tu „{intent.targets[0]}” "
+                            f"do przeczytania."), LOG_WARN)
 
     # ── P29.14: enhancement application ──────────────────────────────────
 

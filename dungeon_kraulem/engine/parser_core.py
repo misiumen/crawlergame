@@ -334,6 +334,35 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.85
         return intent
 
+    # ── P29.23 — Cooking + reading verbs ───────────────────────────────────
+    # `gotuj`/`piecz`/`smaż` <X>     → cook (raw meat → cooked food)
+    # `czytaj`/`przeczytaj`         → read (lore items, posters)
+    import re as _re_cook
+    cook_re = _re_cook.compile(
+        r"^(?:gotuj|gotować|piecz|piec|smaż|smaz|smazyc|smażyć|usmaz|"
+        r"upiec|cook|fry|roast)(?:\s+(.+))?$")
+    cm = cook_re.match(folded)
+    if cm:
+        intent.intent = "cook"
+        intent.verb = "gotuj"
+        target_name = (cm.group(1) or "").strip()
+        if target_name:
+            intent.targets.append(_strip_articles(target_name))
+        intent.confidence = 0.9
+        return intent
+
+    read_re = _re_cook.compile(
+        r"^(?:czytaj|przeczytaj|read)(?:\s+(.+))?$")
+    rm = read_re.match(folded)
+    if rm:
+        intent.intent = "read"
+        intent.verb = "czytaj"
+        target_name = (rm.group(1) or "").strip()
+        if target_name:
+            intent.targets.append(_strip_articles(target_name))
+        intent.confidence = 0.9
+        return intent
+
     # ── P29.19 — Credit-sink commands ──────────────────────────────────────
     # `trening <stat>`        → train_stat (80 kr → +1 to one stat, once per stat)
     # `łapówka <sponsor>`     → bribe_sponsor (20 kr → +2 attention)
