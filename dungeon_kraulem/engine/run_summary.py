@@ -164,22 +164,68 @@ def build_run_summary(world, *, rng=None) -> RunSummary:
     return rs
 
 
-def render_lines(rs: RunSummary) -> List[str]:
-    """Format a RunSummary as the list of Polish lines drawn on the
-    game-over screen. Order is roughly: who, where, how long, what
-    happened, scoreboard. Each entry is a single line of <= ~80 chars
-    so the renderer can lay them out without word-wrap surprises."""
+def _sponsor_pl_name(key: str) -> str:
+    """P29.25 — turn a raw sponsor key into its Polish display name.
+    Falls back to the key itself if the catalog can't be reached."""
+    try:
+        from . import sponsors as _sp
+        sdata = _sp.get_sponsor(key)
+        return _sp._name_pl(sdata)
+    except Exception:
+        return key
+
+
+# Polish-friendly labels for the class/species/background codes.
+_BG_PL = {
+    "office_worker": "biurowy", "mechanic": "mechanik",
+    "nurse": "pielęgniarka", "cook": "kucharz",
+    "security_guard": "ochroniarz", "courier": "kurier",
+    "student": "student", "streamer": "streamer",
+    "soldier": "żołnierz", "unemployed_hustler": "kombinator",
+    "janitor": "konserwator", "paramedic": "ratownik",
+    "opiekun_zwierzaka": "opiekun zwierzaka",
+}
+
+
+def _class_pl(key: str) -> str:
+    """Localize a class_key. Falls back to the key. The full table
+    lives in pl.json; we just lower-case for display safety."""
+    if not key: return ""
+    try:
+        from ..ui.lang import t as _t
+        return _t(f"class_{key}_n", fallback=key.replace("_", " "))
+    except Exception:
+        return key.replace("_", " ")
+
+
+def render_lines(rs: RunSummary, *, victory: bool = False) -> List[str]:
+    """Format a RunSummary as Polish lines for the end screen.
+
+    P29.25 — `victory=True` swaps the "Przyczyna" line for a
+    triumphant header; otherwise behaves identically to the death
+    screen. Sponsor names are now rendered in Polish (not raw keys).
+    Background + class also pass through Polish labels.
+    """
     lines = []
     name = rs.player_name or "Crawler"
-    bg = rs.background or "uczestnik"
+    bg = _BG_PL.get(rs.background, rs.background or "uczestnik")
     lines.append(f"{name} — {bg}")
     if rs.class_key:
-        lines.append(f"klasa: {rs.class_key}    gatunek: {rs.species_key}")
+        cls_pl = _class_pl(rs.class_key) or rs.class_key
+        lines.append(f"klasa: {cls_pl}    gatunek: {rs.species_key or '—'}")
     lines.append("")
-    if rs.death_cause_label:
-        lines.append(f"Przyczyna: {rs.death_cause_label}")
-    if rs.anti_host_line:
-        lines.append(rs.anti_host_line)
+    if victory:
+        lines.append("FINAŁ SEZONU. Wracasz na powierzchnię. "
+                     "Producent płacze ze szczęścia.")
+        if rs.anti_host_line:
+            # Re-cast the anti-host line as a salute.
+            lines.append("Anti-host (na żywo): "
+                         "„No proszę. Następny sezon będzie cięższy.”")
+    else:
+        if rs.death_cause_label:
+            lines.append(f"Przyczyna: {rs.death_cause_label}")
+        if rs.anti_host_line:
+            lines.append(rs.anti_host_line)
     lines.append("")
     lines.append(f"Piętro:               {rs.floor_reached} / 18")
     lines.append(f"Czas w lochu:         {rs.minutes_survived} min")
@@ -193,7 +239,9 @@ def render_lines(rs: RunSummary) -> List[str]:
         lines.append("Top sponsorzy:")
         for k, v in rs.top_sponsors:
             sign = "+" if v > 0 else ""
-            lines.append(f"  {k:20s} {sign}{v}")
+            pl_name = _sponsor_pl_name(k)
+            # Pad the display name to a fixed visual width.
+            lines.append(f"  {pl_name:30s} {sign}{v}")
     else:
         lines.append("Top sponsorzy:        — (żaden nie był pod wrażeniem)")
     if rs.achievements:

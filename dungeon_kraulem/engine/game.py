@@ -7327,23 +7327,20 @@ class Game:
             ui.text(self.screen, ln, x + 16, cy, NORMAL_TEXT, 16); cy += 24
 
     def _end_screen(self, title_str, success: bool):
-        """P29.8 — defeat now renders a DCC highlight reel (kills,
-        floor, top sponsors, audience peak, anti-host send-off).
-        Victory still uses the original two-line minimal screen for
-        now — the next pass can give it an equally rich celebration.
+        """P29.8 — defeat renders the DCC highlight reel.
+        P29.25 — victory ALSO renders the highlight reel via
+        run_summary.render_lines(rs, victory=True). Title color +
+        anti-host gloss swap, scoreboard structure is the same.
         """
         self.screen.fill((10, 12, 18))
         sw, sh = self.screen.get_size()
         col = (90, 210, 120) if success else (230, 80, 80)
-        # Title — centered visually by using a slightly larger left
-        # offset; ui.text() doesn't measure for centering, so we
-        # approximate based on a typical 26px width.
         ui.text(self.screen, title_str, sw // 2 - 240, 80, col, 26, True)
 
-        # Defeat: render the highlight reel. Build the summary lazily
-        # if for some reason it wasn't cached at the death moment
-        # (e.g. an older save loaded into STATE_DEFEAT directly).
-        if (not success) and self.world is not None:
+        # Build / fetch the summary. Cached on death; built fresh on
+        # victory (we don't intercept _descend_or_win → STATE_VICTORY
+        # to cache it, so build it lazily here).
+        if self.world is not None:
             rs = getattr(self, "run_summary", None)
             if rs is None:
                 try:
@@ -7355,7 +7352,7 @@ class Game:
             if rs is not None:
                 try:
                     from . import run_summary as _rs
-                    lines = _rs.render_lines(rs)
+                    lines = _rs.render_lines(rs, victory=success)
                 except Exception:
                     lines = []
                 cy = 140
@@ -7365,20 +7362,15 @@ class Game:
                     # Subtle accent color for the anti-host line.
                     if ln == rs.anti_host_line:
                         color = (230, 200, 120)
-                    elif ln.startswith("Top sponsorzy:") or ln.startswith("Przyczyna:"):
+                    elif ln.startswith("Top sponsorzy:") or \
+                         ln.startswith("Przyczyna:"):
                         color = (180, 220, 240)
                     elif ln.startswith("Osiągnięcia:"):
                         color = (160, 230, 160)
+                    elif ln.startswith("FINAŁ SEZONU"):
+                        color = (140, 220, 160)
                     ui.text(self.screen, ln, left, cy, color, 16)
                     cy += 22
-        else:
-            # Victory path (unchanged minimal info).
-            if self.world:
-                c = self.world.character
-                day = (self.world.current_floor.day_number()
-                       if self.world.current_floor else 0)
-                ui.text(self.screen, f"{c.name} — D{day}",
-                        sw // 2 - 200, 260, (190, 205, 220), 16)
 
         ui.text(self.screen,
                 t("end_press_enter", fallback="[Enter] Powrót do menu"),
