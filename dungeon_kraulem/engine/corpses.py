@@ -380,3 +380,47 @@ def is_edible(entity) -> bool:
         return False
     key = (entity.state or {}).get("original_key", "")
     return bool(template_for(key).get("edible", False))
+
+
+# ── P29.30 — Corpse decay tick ──────────────────────────────────────────
+
+def tick_decay(world, minutes: int) -> None:
+    """Decrement `decay_min_remaining` on every corpse in every room
+    by `minutes`. When a corpse's clock hits 0:
+      * become "decomposed" — mutate fallback_name to add "(zgniłe)"
+      * clear the `salvageable` / `butcher` affordances so it can't
+        be harvested anymore
+      * smell_budget triggers a light log line on the room enter
+        (consumed by display_first_enter / display_look in the
+        future; for now we just mark the state).
+    Called from engine.time_system.advance() per minute-budget.
+    """
+    if world is None or minutes <= 0:
+        return
+    floor = getattr(world, "current_floor", None)
+    if floor is None:
+        return
+    rooms = getattr(floor, "rooms", None)
+    if not rooms:
+        return
+    drop = int(minutes)
+    for room in rooms.values():
+        for ent in (getattr(room, "entities", None) or []):
+            if not is_corpse(ent):
+                continue
+            st = ent.state or {}
+            remaining = int(st.get("decay_min_remaining", 0) or 0)
+            if remaining <= 0:
+                continue
+            new = max(0, remaining - drop)
+            st["decay_min_remaining"] = new
+            if new == 0 and not st.get("decomposed"):
+                st["decomposed"] = True
+                # Strip salvage/butcher affordances — flesh is too far
+                # gone to harvest anything useful.
+                ent.affordances = [a for a in (ent.affordances or [])
+                                   if a not in ("salvage", "butcher")]
+                # Tag the entity so visibility / display can change.
+                if "decomposed" not in (ent.tags or []):
+                    ent.tags = list(ent.tags or []) + ["decomposed"]
+            ent.state = st

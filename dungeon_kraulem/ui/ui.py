@@ -609,6 +609,20 @@ def draw_topbar(surf, world, layout=None, *, click_registry=None):
     # surfaces via entity threat_level on the combat arena cards
     # instead. See engine/threat.py.
 
+    # P29.30 — achievement count chip. Tiny "🏆 N/M" badge on the
+    # left of the topbar so the player sees their progress without
+    # opening the journal.
+    try:
+        from ..systems import achievements as _ach
+        cat = _ach.catalog()
+        unlocked = _ach.count_unlocked(world)
+        if cat:
+            badge = f"Osiągnięcia: {unlocked}/{len(cat)}"
+            b_img = font(L.font_small - 2).render(badge, True, SUCCESS)
+            surf.blit(b_img, (x + 16, y + 36))
+    except Exception:
+        pass
+
 
 def draw_room_panel(surf, world, layout=None, *, click_registry=None):
     """Render the center panel. P24.5: when combat is active in the

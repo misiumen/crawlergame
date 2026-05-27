@@ -47,6 +47,16 @@ def advance(world, minutes: int):
     except Exception:
         pass
 
+    # P29.30 — corpse decay tick. Fields decay_min_remaining +
+    # smell_budget were set on corpse creation since P24 but never
+    # decremented. Now they actually count down; expired corpses
+    # lose their salvage/butcher affordances + gain "decomposed" tag.
+    try:
+        from . import corpses as _corpses
+        _corpses.tick_decay(world, minutes)
+    except Exception:
+        pass
+
     # P29.18 — show-director interventions. One roll per tick; the
     # module itself gates by audience band, per-floor cap, and an
     # 8-minute cooldown.
