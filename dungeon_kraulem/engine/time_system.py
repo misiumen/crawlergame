@@ -80,6 +80,12 @@ def advance(world, minutes: int):
         from . import companion_voice as _cv
         _cv.maybe_say(world, "idle")
 
+    # P29.36 — species passive regen tick (fungal_host +1 HP / min
+    # idle, capped at ½ max). No-op for non-regen species.
+    with _swallow("species_effects.on_idle_tick"):
+        from . import species_effects as _sp
+        _sp.on_idle_tick(world, minutes)
+
     # Day-change event
     if f.day_number() != prev_day:
         world.log_msg(_day_change_line(f), "syndicate")

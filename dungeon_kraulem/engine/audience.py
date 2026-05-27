@@ -125,6 +125,17 @@ def change_audience(world, delta: int, source: str = "",
                 delta = max(1, int(round(delta * mul)))
         except Exception:
             pass
+    # P29.36 — species multiplier (enhanced ×1.25, void ×0.5,
+    # synthetic ×0.85). Applies on positive deltas only — species
+    # don't make negative reactions softer.
+    if delta > 0:
+        try:
+            from . import species_effects as _sp
+            sp_mul = _sp.audience_mul(char)
+            if sp_mul != 1.0:
+                delta = max(1, int(round(delta * sp_mul)))
+        except Exception:
+            pass
     # P29.21 — consume kamera_glowna flag if active. Positive deltas
     # double (camera caught spectacle); negative deltas double (camera
     # caught dud). One-shot; clear after consume.

@@ -324,6 +324,16 @@ def _clocks_for(entity):
 def add_status(entity, key: str, duration: int = 2) -> None:
     if entity is None or not key:
         return
+    # P29.36 — species immunity gate. Synthetic blocks poisoned/bleeding,
+    # chimera blocks grappled, ferromanta iron_grip blocks disarmed.
+    # Applies only to the player (entities with a `species_key` field).
+    try:
+        if hasattr(entity, "species_key"):
+            from . import species_effects as _sp
+            if _sp.status_blocked(entity, key):
+                return
+    except Exception:
+        pass
     entity.conditions = entity.conditions or []
     if key not in entity.conditions:
         entity.conditions.append(key)

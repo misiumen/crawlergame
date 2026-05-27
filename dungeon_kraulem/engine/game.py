@@ -2598,6 +2598,85 @@ class Game:
         except Exception:
             pass
 
+        # P29.36 — species traits "on descent" hooks (biopsy drain,
+        # companion bond drift). Emits a line per side-effect.
+        try:
+            from . import species_effects as _sp
+            for ln in _sp.on_descent(self.world) or []:
+                self.log(ln, LOG_SYSTEM)
+        except Exception:
+            pass
+
+        # P29.36 — DCC-faithful floor-3 mutation chamber.
+        # First entry to floor 3 fires the species offer (4 random
+        # rolls + decline option). Latch keeps it one-shot per run.
+        if next_num == 3:
+            self._maybe_offer_species()
+
+    def _maybe_offer_species(self) -> None:
+        """First time the player reaches floor 3, offer 4 random
+        mutations from systems.species.SPECIES_CATALOG. Player picks
+        one (commits permanently) or declines (stays whatever they
+        were). One-shot — latched via character.flags."""
+        ch = self.world.character
+        if ch.flags is None:
+            ch.flags = {}
+        if ch.flags.get("species_offer_fired"):
+            return
+        ch.flags["species_offer_fired"] = True
+        # Build offer pool — exclude the player's current species
+        # so they don't see themselves in the roll.
+        import random as _r
+        from ..systems import species as _sp_cat
+        excl = (ch.species_key,) if ch.species_key else ()
+        rng = _r.Random(int(self.world.current_floor.current_minute or 0)
+                        * 31 + self.world.floor_number * 7)
+        self.species_offer_candidates = _sp_cat.random_offer(
+            rng, exclude_keys=excl)
+        self.state = STATE_SPECIES_OFFER
+        self.log("Wpadasz do komory mutacyjnej. Loch decyduje. "
+                 "Konferansjer (z głośnika): „A teraz — TRZECIE "
+                 "piętro. Czyli RACE PICK, panie i panowie.”",
+                 LOG_SYNDIC)
+
+    def _accept_species(self, idx: int) -> None:
+        """Player picked one of the offered species. Apply it and
+        return to play."""
+        candidates = getattr(self, "species_offer_candidates", None) or []
+        if not (0 <= idx < len(candidates)):
+            return
+        key = candidates[idx]
+        from ..systems import species as _sp_cat
+        ok = _sp_cat.apply_species(self.world, key)
+        if not ok:
+            self.log(f"Komora odrzuca twoją próbkę. ({key})", LOG_WARN)
+            self.state = STATE_PLAY
+            return
+        sp = _sp_cat.SPECIES_CATALOG.get(key)
+        if sp is not None:
+            self.log(sp.flavor_pl, LOG_SUCCESS)
+            self.log(f"Stałeś się: {sp.name_pl}.", LOG_SUCCESS)
+            # P29.36 — enhanced_human gets +1 to ALL stats on top
+            # of the listed CON/DEX bumps. One-shot via flag inside
+            # species_effects.
+            try:
+                from . import species_effects as _sp
+                _sp.apply_all_stats_bonus(self.world.character)
+            except Exception:
+                pass
+        self.species_offer_candidates = []
+        self.state = STATE_PLAY
+
+    def _decline_species(self) -> None:
+        """Stay baseline_human. The decline path doesn't call
+        apply_species — preserves whatever species the character
+        already had (could be baseline OR a meta-unlocked species)."""
+        self.log("Pozostajesz sobą. Konferansjer: „Nuda, ale "
+                 "udokumentowane.” Komora syczy i się otwiera dla "
+                 "następnego.", LOG_SYSTEM)
+        self.species_offer_candidates = []
+        self.state = STATE_PLAY
+
     def _safehouse_pick(self, idx: int):
         room = self.world.current_floor.current_room()
         if not room or not room.safehouse_subtype:
@@ -6250,6 +6329,23 @@ class Game:
                 self._accept_class(int(digit) - 1)
             return
 
+        if self.state == STATE_SPECIES_OFFER:
+            offered = getattr(self, "species_offer_candidates", None) or []
+            # Digit 1..4 picks one of the four offered species.
+            # 0 (or 5) is the "stay as you are" decline.
+            if digit is not None:
+                self._suppress_textinput = True
+                if int(digit) == 0 or int(digit) == 5:
+                    self._decline_species()
+                    return
+                self._accept_species(int(digit) - 1)
+                return
+            if key == pygame.K_ESCAPE:
+                self._suppress_textinput = True
+                self._decline_species()
+                return
+            return
+
         if self.state in (STATE_VICTORY, STATE_DEFEAT):
             if key in (pygame.K_RETURN, pygame.K_ESCAPE):
                 self.state = STATE_TITLE
@@ -7197,6 +7293,33 @@ class Game:
             for i, key in enumerate(self.offer_candidates, 1):
                 lines.append(f"[{i}] {tr(f'class_{key}_n', fallback=key)} — {tr(f'class_{key}_d', fallback='')}")
             lines.append(tr("offer_pick", fallback="Wybierz numerem (1-3)"))
+            self._overlay(lines)
+        elif self.state == STATE_SPECIES_OFFER:
+            self._refresh_layout()
+            L = self._layout
+            ui.draw_topbar(s, self.world, layout=L)
+            if L.has_left_sidebar:
+                ui.draw_left_sidebar(s, self.world, layout=L)
+            ui.draw_room_panel(s, self.world, layout=L)
+            ui.draw_sidebar(s, self.world, layout=L)
+            ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
+                                  scroll=self.log_scroll,
+                                  layout=L)
+            from ..systems import species as _sp_cat
+            candidates = getattr(self, "species_offer_candidates",
+                                 None) or []
+            lines = ["KOMORA MUTACYJNA — PIĘTRO 3",
+                     "Loch oferuje ci nową formę. Wybierz lub odmów."]
+            for i, k in enumerate(candidates, 1):
+                sp = _sp_cat.SPECIES_CATALOG.get(k)
+                if sp is None:
+                    continue
+                lines.append("")
+                lines.append(f"[{i}] {sp.name_pl}")
+                lines.append(f"    Zysk: {sp.desc_pl}")
+                lines.append(f"    Strata: {sp.drawback_pl}")
+            lines.append("")
+            lines.append("[0/Esc] Pozostań sobą (decline).")
             self._overlay(lines)
         elif self.state == STATE_VICTORY:
             self._end_screen(t("victory_title", fallback="ZEJŚCIE ZALICZONE."), True)

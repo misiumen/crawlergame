@@ -107,12 +107,34 @@ def get_attention(world, sponsor_key: str) -> int:
 
 def adjust_attention(world, sponsor_key: str, delta: int) -> int:
     """Adjust a single sponsor's attention by `delta`. Clamps to
-    [_ATTENTION_MIN, _ATTENTION_MAX]. Returns the new value."""
+    [_ATTENTION_MIN, _ATTENTION_MAX]. Returns the new value.
+
+    P29.36 — species traits can modify the delta before clamping
+    (enhanced_human envy −1 for non-NovaChem positive deltas,
+    half_dead ministerstwo_hostile zeroes positive Ministerstwo
+    deltas) AND can cap the result (chimera sponsor_goodwill_cap
+    forces max 10 except Kanał 7)."""
     if sponsor_key not in SPONSORS:
         return 0
     d = _attention_dict(world)
     cur = int(d.get(sponsor_key, 0))
-    new = max(_ATTENTION_MIN, min(cur + int(delta), _ATTENTION_MAX))
+    delta_adj = int(delta)
+    try:
+        from . import species_effects as _sp
+        ch = getattr(world, "character", None)
+        delta_adj = _sp.sponsor_attention_delta_mul(ch, sponsor_key,
+                                                     delta_adj)
+    except Exception:
+        pass
+    new = max(_ATTENTION_MIN, min(cur + delta_adj, _ATTENTION_MAX))
+    try:
+        from . import species_effects as _sp
+        ch = getattr(world, "character", None)
+        cap = _sp.sponsor_attention_cap(ch, sponsor_key)
+        if cap is not None and new > cap:
+            new = cap
+    except Exception:
+        pass
     d[sponsor_key] = new
     return new
 

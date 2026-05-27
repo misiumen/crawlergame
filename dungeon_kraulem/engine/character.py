@@ -131,6 +131,12 @@ class Character:
             ac += _cf.passive_bonus(self, "ac")
         except Exception:
             pass
+        # P29.36 — species AC bonus (scrapkin metal_skin +2).
+        try:
+            from . import species_effects as _sp
+            ac += _sp.ac_bonus(self)
+        except Exception:
+            pass
         return ac
 
     def offhand_ac_bonus(self, world) -> int:
@@ -149,7 +155,18 @@ class Character:
     def is_alive(self) -> bool:
         return self.hp > 0
 
-    def take_damage(self, n: int):
+    def take_damage(self, n: int, source_tag: str = ""):
+        # P29.36 — species incoming-damage modifier. Glassblood
+        # fragile +25%, synthetic/ferromanta EMP +50% on shock,
+        # half_dead 50% resist on necrotic/bleed. Default source_tag=""
+        # preserves pre-P29.36 callers (all hits go through unchanged).
+        try:
+            from . import species_effects as _sp
+            mul = _sp.incoming_damage_mul(self, source_tag)
+            if mul != 1.0:
+                n = max(0, int(round(n * mul)))
+        except Exception:
+            pass
         self.hp = max(0, self.hp - n)
 
     def heal(self, n: int):

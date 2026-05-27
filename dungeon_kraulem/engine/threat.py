@@ -111,6 +111,22 @@ def bump(world, room, amount: int, *,
     """
     if room is None or amount <= 0:
         return []
+    # P29.36 — fungal_host spore_intimidate scales noise increments
+    # down to 0.7× when this is the player's current room. Other
+    # species (and other rooms) tick normally.
+    try:
+        from . import species_effects as _sp
+        ch = getattr(world, "character", None)
+        cur_room_id = (world.current_floor.current_room_id
+                       if world.current_floor else None)
+        if (ch is not None
+                and cur_room_id is not None
+                and getattr(room, "room_id", None) == cur_room_id):
+            mul = _sp.threat_escalation_mul(ch)
+            if mul != 1.0:
+                amount = max(1, int(round(amount * mul)))
+    except Exception:
+        pass
     pre = int(getattr(room, "noise_level", 0) or 0)
     post = pre + int(amount)
     room.noise_level = post
