@@ -249,6 +249,13 @@ class Game:
             audio.play_sfx("player_death")
         except Exception:
             pass
+        # P29.26 — append run to persistent history BEFORE deleting
+        # the slot. record_run reads the same world so order matters.
+        try:
+            from . import run_history as _rh
+            _rh.record_run(self.world, victory=False)
+        except Exception:
+            pass
         # Permadeath: wipe the save so resume can't bring you back.
         try:
             from . import save_load
@@ -2243,6 +2250,13 @@ class Game:
                 from ..systems import achievements as _ach
                 _ach.unlock(self.world.character, "finalista_sezonu",
                             world=self.world)
+            except Exception:
+                pass
+            # P29.26 — append victory to persistent history; stamps
+            # new_game_plus unlock for future runs.
+            try:
+                from . import run_history as _rh
+                _rh.record_run(self.world, victory=True)
             except Exception:
                 pass
             self.state = STATE_VICTORY
