@@ -294,12 +294,16 @@ def _apply_equip_hooks(world, character, entity, *, equip: bool) -> None:
 
 def slot_ac_bonus(world, character, slot: str) -> int:
     """Return the AC bonus contributed by the item currently in `slot`.
-    Reads `ac_bonus` from the entity's `state` dict."""
+    Reads `ac_bonus` from the entity's `state` dict. P29.14: also
+    picks up `ac_bonus_perm` set by armor enhancements (padding,
+    acid lining) so they actually affect the player's effective AC."""
     ent = equipped_entity(world, character, slot)
     if ent is None or ent.state is None:
         return 0
     try:
-        return int(ent.state.get("ac_bonus", 0) or 0)
+        base = int(ent.state.get("ac_bonus", 0) or 0)
+        perm = int(ent.state.get("ac_bonus_perm", 0) or 0)
+        return base + perm
     except (TypeError, ValueError):
         return 0
 

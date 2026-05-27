@@ -89,6 +89,17 @@ def try_known_recipe(character, recipe_key: str, room=None) -> Dict:
         return _invalid("unknown_recipe",
                         f"Nie znasz takiego przepisu: „{recipe_key}”.")
 
+    # P29.14 — sponsor-branded recipes require an attention-unlock flag.
+    # Set by engine/sponsors.py:_check_gift_thresholds when attention
+    # crosses +5 (mid-tier, between "seen you" and "first gift").
+    needs_sponsor = rec.get("requires_sponsor_unlock")
+    if needs_sponsor:
+        flags = getattr(character, "flags", None) or {}
+        if not flags.get(f"sponsor_recipe_unlocked_{needs_sponsor}"):
+            return _invalid("sponsor_locked",
+                            f"Ten przepis wymaga uznania sponsora "
+                            f"({needs_sponsor}).")
+
     needed = rec.get("required_materials") or {}
     if not materials.has_materials(character, needed):
         # List specifically what's missing
@@ -223,6 +234,47 @@ _IMPROVISED_LABELS = {
 
 # ── Result-item factory ─────────────────────────────────────────────────────
 
+# ── P29.14 — Quality-tier mapping ─────────────────────────────────────────
+#
+# Maps a roll outcome level (from utils_compat / dice resolver) to the
+# `quality` state field on the crafted entity:
+#   critical_success → masterwork  (mechanical bonuses, "of+" name)
+#   success          → good        (slight bonuses)
+#   partial_success  → flawed      (damaged tick)
+#   failure          → no item
+#   critical_failure → no item + waste
+# Combat / equipment code reads ent.state["quality"] and applies the
+# matching bonuses (see _quality_bonus_for_weapon below).
+
+def quality_for_level(level: str) -> str:
+    return {
+        "critical_success": "masterwork",
+        "success":          "good",
+        "partial_success":  "flawed",
+    }.get(level, "normal")
+
+
+def quality_bonus_for_weapon(quality: str) -> Dict:
+    """Return additive (attack_bonus, damage_bonus) for the given quality
+    tier when the player wields the item. Tags also nudge — see
+    combat damage path in engine/game.py."""
+    return {
+        "masterwork": {"attack_bonus": 1, "damage_bonus": 1},
+        "good":       {"attack_bonus": 0, "damage_bonus": 1},
+        "normal":     {"attack_bonus": 0, "damage_bonus": 0},
+        "flawed":     {"attack_bonus": -1, "damage_bonus": 0},
+    }.get(quality, {"attack_bonus": 0, "damage_bonus": 0})
+
+
+def quality_label_pl(quality: str) -> str:
+    return {
+        "masterwork": "mistrzowska",
+        "good":       "solidna",
+        "normal":     "",
+        "flawed":     "wadliwa",
+    }.get(quality, "")
+
+
 _CATEGORY_ITEM_FALLBACKS = {
     "improvised_trap":       ("improwizowana pułapka",
                               "Coś, co ma zadziałać raz, jeśli ofiara tu wejdzie."),
@@ -248,6 +300,20 @@ _CATEGORY_ITEM_FALLBACKS = {
                               "Organiczny argument za tym, żeby potwór poszedł gdzie indziej."),
     "improvised_bandage":    ("prowizoryczny opatrunek",
                               "Brudna, ale lepsza niż nic próba zatrzymania krwawienia."),
+    # P29.14 — Polish display names for P23 weapon entities that the
+    # fallback table missed. Without these they render in English.
+    "improvised_knife":      ("improwizowany nóż",
+                              "Krótki kawałek ostrego metalu owinięty taśmą."),
+    "improvised_spear":      ("improwizowana włócznia",
+                              "Długi kij z ostrym końcem. Obie ręce."),
+    "improvised_club":       ("improwizowana pała",
+                              "Coś ciężkiego z uchwytem. Logika prosta jak dno wiadra."),
+    "improvised_garrote":    ("garota z drutu",
+                              "Cienki drut z rączkami. Cicha sprawa."),
+    "improvised_taser":      ("improwizowany paralizator",
+                              "Bateria, dwa druty, dużo taśmy izolacyjnej."),
+    "improvised_chembottle": ("fiolka żrąca",
+                              "Cieczy w fiolce nie chcesz dotykać. Trzymaj z dystansu — i rzuć."),
     # Prompt 21 — elemental trap variants. They share `trap` tag so the
     # crafted_entity wiring picks them up; the actual damage_type is
     # read from the item.tags by game._attempt_deploy at deploy time.
@@ -259,6 +325,33 @@ _CATEGORY_ITEM_FALLBACKS = {
                               "Cienki kolec na sprężynie. Powolne, ale precyzyjne."),
     "frost_charge":          ("ładunek mrożący",
                               "Sprężona puszka z chłodziwem i bardzo wąską klapką."),
+    # P29.14 — Enhancements (apply-to-item).
+    "weapon_poison_coat":    ("olej zatrucia",
+                              "Lepkie smary z dodatkami. Mazasz na ostrze — trucizna idzie pierwsza."),
+    "weapon_grip_tape":      ("owijka uchwytu",
+                              "Skórzano-taśmowy chwyt. Pewniejsza ręka, lepsze trafienia."),
+    "weapon_balance_weight": ("wyważenie",
+                              "Kawałek metalu w odpowiednim miejscu uderza mocniej."),
+    "weapon_silencer":       ("tłumik dźwięku",
+                              "Gruba osłona z gumy i materiału. Cios robi mniej hałasu."),
+    "armor_padding":         ("wyściółka pancerza",
+                              "Warstwy między tobą a ciosem. Cięższe, ale więcej osłony."),
+    "armor_acid_lining":     ("wyłożenie kwasoodporne",
+                              "Gumowa membrana na zewnątrz pancerza. Kwas spływa zamiast wgryzać."),
+    # P29.14 — Cooking.
+    "cooked_meat":           ("upieczone mięso",
+                              "Mięso nad ogniem przestało być sapaniem. Stało się jedzeniem."),
+    "morale_brew":           ("wywar morale",
+                              "Smak nieokreślony. Działanie pewne — przez chwilę mówisz pewniej."),
+    "caffeine_pill":         ("pigułka kofeiny",
+                              "Pasta z dziwnych proszków. Działa raz mocno, potem płacisz."),
+    # P29.14 — Sponsor-branded.
+    "nova_chem_stim_pack":   ("stimpak NovaChem",
+                              "Profesjonalny opatrunek. NovaChem płaci za każde użycie."),
+    "kanal_7_microphone":    ("mikrofon Kanału 7",
+                              "Kierunkowy mikrofon. Idealne ujęcia, lepsze ratingi."),
+    "czarny_rynek_lockpick_kit": ("wytrychy Czarnego Rynku",
+                                  "Drobne narzędzia w skórzanej rolce. Używane dziś."),
 }
 
 
@@ -302,8 +395,46 @@ def make_crafted_entity(result_key: str, room_id: str = "",
         tags.extend(["bait","organic"])
     if result_key in ("improvised_tool",):
         tags.extend(["tool"])
+
+    # ── P29.14 — Enhancement consumables ────────────────────────────────
+    # Tagged so engine/game.py:_attempt_apply_enhancement picks them up.
+    # Carry the recipe key in `enhancement_key` for the handler to look
+    # up the effect spec at apply time.
+    _ENHANCEMENT_KEYS = ("weapon_poison_coat", "weapon_grip_tape",
+                         "weapon_balance_weight", "weapon_silencer",
+                         "armor_padding", "armor_acid_lining")
+    if result_key in _ENHANCEMENT_KEYS:
+        tags.extend(["enhancement", "consumable", "apply_to_item"])
+        if "use" not in affordances:
+            affordances.append("use")
+
+    # ── P29.14 — Cooked food (consumable, heals/buffs) ───────────────────
+    _FOOD_KEYS = ("cooked_meat", "morale_brew", "caffeine_pill")
+    if result_key in _FOOD_KEYS:
+        tags.extend(["food", "consumable"])
+        if "consume" not in affordances:
+            affordances.append("consume")
+
+    # ── P29.14 — Sponsor-branded gear ────────────────────────────────────
+    if result_key == "nova_chem_stim_pack":
+        tags.extend(["medical", "consumable", "sponsor_nova_chem"])
+        if "consume" not in affordances:
+            affordances.append("consume")
+    if result_key == "kanal_7_microphone":
+        tags.extend(["tool", "sponsor_kanal_7", "broadcast"])
+        if "use" not in affordances:
+            affordances.append("use")
+    if result_key == "czarny_rynek_lockpick_kit":
+        tags.extend(["tool", "lockpick", "sponsor_czarny_rynek"])
+        if "use" not in affordances:
+            affordances.append("use")
+
     state = {"quality": quality, "damaged": damaged, "unstable": unstable}
     if damaged: state["damage_count"] = 1
+    # P29.14 — store the recipe key so enhancement application can
+    # look up the effect spec without re-deriving from tags.
+    if result_key in _ENHANCEMENT_KEYS:
+        state["enhancement_key"] = result_key
 
     # Prompt 23 — weapon templates carry damage_dice + damage_type so
     # the combat code reads them when wielded. Tags here also gate

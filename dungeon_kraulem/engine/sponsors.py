@@ -266,6 +266,17 @@ def _check_gift_thresholds(world) -> None:
     for skey in all_sponsor_keys():
         v = int(att.get(skey, 0))
         sdata = get_sponsor(skey)
+        # P29.14 — sponsor-branded recipe unlock at attention >= 5.
+        # The recipe stays available even if attention later drops.
+        recipe_flag = f"sponsor_recipe_unlocked_{skey}"
+        if v >= 5 and not flags.get(recipe_flag):
+            flags[recipe_flag] = True
+            if hasattr(world, "log_msg"):
+                world.log_msg(
+                    f"{_name_pl(sdata)} udostępnił ci firmowy przepis. "
+                    f"Sprawdź dziennik craftingu.",
+                    "sponsor",
+                )
         # First gift: attention >= 8 and never sent before.
         # P29.10 — prefer drop-pod (DCC moment); deliver_sponsor_gift
         # handles the safehouse fallback when no current room.

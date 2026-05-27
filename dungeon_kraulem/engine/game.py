@@ -1968,6 +1968,10 @@ class Game:
         if intent.intent == "open_pod":
             self._attempt_open_pod(intent); return
 
+        # P29.14 — apply an enhancement (poison oil, grip tape, etc.).
+        if intent.intent == "apply_enhancement":
+            self._attempt_apply_enhancement(intent); return
+
         # P29.4 — black-market buy/sell follow-ups.
         if intent.intent == "bm_buy":
             from ..systems import safehouses as _sh
@@ -2980,20 +2984,32 @@ class Game:
 
         ts.advance(self.world, plan["time_cost"])
 
-        # Produce result item on success / crit-success / partial
+        # Produce result item on success / crit-success / partial.
+        # P29.14 — full 4-tier quality (masterwork / good / normal /
+        # flawed) flows from the roll level. The crafting module
+        # owns the mapping and the resulting Entity carries
+        # state["quality"]; combat reads it when wielded.
         result_key = plan.get("result_item")
         if level in ("critical_success", "success", "partial_success") and result_key:
+            quality = crafting.quality_for_level(level)
             ent = crafting.make_crafted_entity(
                 result_key,
-                quality="good" if level == "critical_success" else "normal",
+                quality=quality,
                 damaged=(level == "partial_success"),
                 unstable=(level == "partial_success" and random.random() < 0.4),
             )
             self.world.register(ent)
             self.world.character.inventory_ids.append(ent.entity_id)
-            self.log(t("feedback_crafted_item",
-                       fallback=f"Wytworzone: {ent.display_name()}",
-                       name=ent.display_name()), LOG_SUCCESS)
+            qlabel = crafting.quality_label_pl(quality)
+            if qlabel:
+                self.log(t("feedback_crafted_item_qual",
+                           fallback=f"Wytworzone ({qlabel}): {ent.display_name()}",
+                           quality=qlabel,
+                           name=ent.display_name()), LOG_SUCCESS)
+            else:
+                self.log(t("feedback_crafted_item",
+                           fallback=f"Wytworzone: {ent.display_name()}",
+                           name=ent.display_name()), LOG_SUCCESS)
 
         # Risks on partial / failure / critical_failure
         if level in ("partial_success", "failure", "critical_failure"):
@@ -3966,6 +3982,31 @@ class Game:
         damage_bonus = 0
         defense_change = 0
         noise = 3
+        # P29.14 — masterwork / good / flawed weapon quality + permanent
+        # enhancement bonuses (grip tape, balance weight). Read from the
+        # wielded main hand. Quality table:
+        #   masterwork: +1 hit, +1 dmg
+        #   good:       +0 hit, +1 dmg
+        #   normal:     0 / 0
+        #   flawed:     -1 hit, 0 dmg
+        # Enhancements stack on top:
+        #   attack_bonus_perm (grip tape)
+        #   damage_bonus_perm (balance weight)
+        try:
+            from ..content import crafting as _cr
+            _w = self.world.get(ch.wielded_main_id) if ch.wielded_main_id else None
+            if _w is not None and _w.state:
+                _q = _w.state.get("quality", "normal")
+                _qb = _cr.quality_bonus_for_weapon(_q)
+                to_hit_bonus += int(_qb.get("attack_bonus", 0))
+                damage_bonus += int(_qb.get("damage_bonus", 0))
+                to_hit_bonus += int(_w.state.get("attack_bonus_perm", 0))
+                damage_bonus += int(_w.state.get("damage_bonus_perm", 0))
+                # P29.14 — silent enhancement reduces attack noise.
+                if "silent" in (_w.tags or []):
+                    noise = max(1, noise - 2)
+        except Exception:
+            pass
         if mode == "careful":
             to_hit_bonus = 2
             damage_bonus = -1
@@ -4881,6 +4922,145 @@ class Game:
             pass
         try:
             audio.play_sfx("sponsor_chime")
+        except Exception:
+            pass
+
+    # ── P29.14: enhancement application ──────────────────────────────────
+
+    def _attempt_apply_enhancement(self, intent):
+        """Apply an enhancement consumable (poison oil, grip tape, etc.)
+        to a weapon or armor item. Routes:
+          intent.tool      → name fragment of the enhancement item
+          intent.targets[0] → name fragment of the target item
+
+        Both items must be in the player's inventory. The enhancement's
+        effect spec lives in its recipe's `enhancement` block (see
+        recipe_templates.py). We look it up via state["enhancement_key"]
+        on the item, fall back to the entity's `key` attribute. Effects:
+
+          * "coating": set weapon.state["coating"] dict (re-applies; the
+            combat damage path reads this and adds the elemental rider).
+          * "permanent": bump damage_dice / attack_bonus / ac / tags
+            directly on the target Entity. Cannot be removed except by
+            losing the item.
+
+        Apply consumes the enhancement (removed from inventory + world).
+        """
+        from .affordances import fold as _fold
+
+        ch = self.world.character
+        if ch is None:
+            return
+        if not intent.tool or not intent.targets:
+            self.log(t("feedback_apply_syntax",
+                       fallback="Składnia: nałóż <wzmocnienie> na <broń lub pancerz>."),
+                     LOG_WARN)
+            return
+
+        # Resolve both items by name within inventory.
+        tool_needle = _fold(intent.tool)
+        target_needle = _fold(intent.targets[0])
+        enhancement = None
+        target = None
+        for eid in list(ch.inventory_ids):
+            e = self.world.get(eid)
+            if e is None:
+                continue
+            nm = _fold(e.display_name())
+            tags = e.tags or []
+            if "enhancement" in tags and enhancement is None and tool_needle in nm:
+                enhancement = e
+            elif target is None and target_needle in nm:
+                target = e
+
+        if enhancement is None:
+            self.log(t("feedback_apply_no_tool",
+                       fallback=f"Nie masz „{intent.tool}” w plecaku, "
+                                f"albo to nie jest wzmocnienie."),
+                     LOG_WARN)
+            return
+        if target is None:
+            self.log(t("feedback_apply_no_target",
+                       fallback=f"Nie masz „{intent.targets[0]}” w plecaku."),
+                     LOG_WARN)
+            return
+
+        # Look up the effect spec from the recipe catalog.
+        from ..content import crafting as _cr
+        recipes = _cr.all_recipes()
+        # State carries the recipe key explicitly; entity.key is the same.
+        enh_key = (enhancement.state or {}).get("enhancement_key") or enhancement.key
+        rec = recipes.get(enh_key) or {}
+        spec = rec.get("enhancement") or {}
+        applies_to = spec.get("applies_to_tags") or []
+        effect = spec.get("effect") or ""
+
+        # Tag check on target.
+        tgt_tags = set(target.tags or [])
+        if applies_to and not (set(applies_to) & tgt_tags):
+            need = ", ".join(applies_to)
+            self.log(t("feedback_apply_wrong_target",
+                       fallback=f"„{target.display_name()}” nie jest w stanie "
+                                f"przyjąć tego wzmocnienia (potrzeba: {need})."),
+                     LOG_WARN)
+            return
+
+        # Apply the effect.
+        applied_label = ""
+        if effect == "coating":
+            coating = dict(spec.get("coating") or {})
+            target.state = target.state or {}
+            target.state["coating"] = coating
+            applied_label = (
+                f"Powlekasz „{target.display_name()}” — następne "
+                f"{coating.get('hits_remaining', 1)} ciosów zada "
+                f"obrażenia typu {coating.get('damage_type', 'physical')}."
+            )
+        elif effect == "permanent":
+            perm = spec.get("permanent") or {}
+            target.state = target.state or {}
+            target.tags = list(target.tags or [])
+            # damage_bonus → stored as state for the combat path to pick up.
+            if "damage_bonus" in perm:
+                cur = int((target.state or {}).get("damage_bonus_perm", 0))
+                target.state["damage_bonus_perm"] = cur + int(perm["damage_bonus"])
+            if "attack_bonus" in perm:
+                cur = int((target.state or {}).get("attack_bonus_perm", 0))
+                target.state["attack_bonus_perm"] = cur + int(perm["attack_bonus"])
+            if "ac_bonus" in perm:
+                cur = int((target.state or {}).get("ac_bonus_perm", 0))
+                target.state["ac_bonus_perm"] = cur + int(perm["ac_bonus"])
+            new_tag = perm.get("tag_add")
+            if new_tag and new_tag not in target.tags:
+                target.tags.append(new_tag)
+            resist = perm.get("resist_add")
+            if resist:
+                resists = list(getattr(target, "resists", None) or [])
+                if resist not in resists:
+                    resists.append(resist)
+                target.resists = resists
+            applied_label = (
+                f"Modyfikujesz „{target.display_name()}”: efekt trwały "
+                f"({new_tag or 'wzmocnienie'})."
+            )
+        else:
+            self.log(t("feedback_apply_unknown_effect",
+                       fallback=f"„{enhancement.display_name()}” nie wie, "
+                                f"jak na to zadziałać."),
+                     LOG_WARN)
+            return
+
+        # Consume the enhancement.
+        try:
+            ch.inventory_ids.remove(enhancement.entity_id)
+        except ValueError:
+            pass
+        if applied_label:
+            self.log(applied_label, LOG_SUCCESS)
+        # Tiny time cost.
+        try:
+            from . import time_system as _ts
+            _ts.advance(self.world, 2)
         except Exception:
             pass
 

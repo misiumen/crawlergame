@@ -334,6 +334,23 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.85
         return intent
 
+    # ── P29.14 — Apply an enhancement to a weapon/armor ────────────────────
+    # "nałóż <enhancement> na <target>" / "zamontuj <X> na <Y>" /
+    # "apply <X> to <Y>" — produces intent="apply_enhancement" with the
+    # enhancement in `tool` and the target item in `targets[0]`.
+    import re as _re_app
+    apply_re = _re_app.compile(
+        r"^(?:nałóż|naloz|nałozyć|załóż|zaloz|zamontuj|zaaplikuj|"
+        r"apply|coat|attach)\s+(.+?)\s+(?:na|on|to|do)\s+(.+)$")
+    app_m = apply_re.match(folded)
+    if app_m:
+        intent.intent = "apply_enhancement"
+        intent.verb = "nałóż"
+        intent.tool = _strip_articles(app_m.group(1))
+        intent.targets.append(_strip_articles(app_m.group(2)))
+        intent.confidence = 0.9
+        return intent
+
     # ── P29.10 — Open a sponsor drop pod (mid-floor gift) ──────────────────
     # "otwórz/rozbij/zgarnij pakiet" (sponsorski) — drop-pods are how
     # mid-floor sponsor gifts now arrive (was: queued for safehouse).
