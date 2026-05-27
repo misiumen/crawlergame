@@ -821,7 +821,8 @@ def _collect_companions(world) -> List[JournalEntry]:
             f"stres {c.stress}/10",
         ]
         if c.status != _comp.STATUS_ACTIVE:
-            subtitle_parts.append(c.status.upper())
+            # P29.38 — Polish display, not raw slug.
+            subtitle_parts.append(_comp.status_pl(c.status).upper())
         subtitle = "  •  ".join(subtitle_parts)
 
         body_lines = []
@@ -835,11 +836,17 @@ def _collect_companions(world) -> List[JournalEntry]:
         ):
             if val:
                 body_lines.append(f"{label}: {val}")
+        # P29.38 — Polish-only display: route abilities + sponsor tags
+        # through companion.*_pl_list helpers. Raw slugs never reach
+        # the player. (_comp already imported above.)
         if c.abilities:
-            body_lines.append("Umiejętności: " + ", ".join(c.abilities))
+            body_lines.append(
+                "Umiejętności: "
+                + ", ".join(_comp.abilities_pl_list(c.abilities)))
         if c.sponsor_likes_tags:
             body_lines.append(
-                "Tagi sponsora: " + ", ".join(c.sponsor_likes_tags))
+                "Tagi sponsora: "
+                + ", ".join(_comp.sponsor_tags_pl_list(c.sponsor_likes_tags)))
         body_lines.append("")
         body_lines.append("Polecenia: sprawdź zwierzę, nakarm zwierzę, "
                           "uspokój zwierzę, wyślij zwierzę na zwiad, "

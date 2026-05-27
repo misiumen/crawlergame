@@ -51,6 +51,86 @@ ALL_KINDS = (KIND_PET, KIND_CRAWLER, KIND_DRONE, KIND_SUMMON, KIND_TEMP_NPC)
 ALL_STATUSES = (STATUS_ACTIVE, STATUS_MISSING, STATUS_INJURED, STATUS_DEAD)
 
 
+# ── Polish display labels ──────────────────────────────────────────────────
+#
+# Internal slugs (above) stay snake_case because saves + tests read them.
+# The game is Polish-only, so anywhere status / abilities / sponsor-tags
+# are rendered to the player, we route through these dicts. status_pl()
+# + abilities_pl_list() + sponsor_tag_pl() are the public helpers — UI
+# code should never f-string the raw slug.
+
+_STATUS_PL = {
+    STATUS_ACTIVE:  "aktywny",
+    STATUS_MISSING: "zaginiony",
+    STATUS_INJURED: "ranny",
+    STATUS_DEAD:    "martwy",
+}
+
+_ABILITY_PL = {
+    "scout_tight":     "zwiad w ciasnych miejscach",
+    "scout_aerial":    "zwiad z powietrza",
+    "find_scrap":      "wynajdywanie złomu",
+    "distract_weak":   "rozproszenie słabych wrogów",
+    "intimidate":      "zastraszanie",
+    "repeat_phrase":   "powtarzanie zasłyszanych zdań",
+    "detect_chemical": "wykrywanie chemii",
+    "morale_boost":    "podnoszenie morale",
+    "mark_trail":      "znakowanie tropu",
+    "unlock_assist":   "pomoc przy zamkach",
+    "reduce_noise":    "tłumienie hałasu",
+    "warn_danger":     "ostrzeganie przed pułapkami",
+}
+
+_SPONSOR_TAG_PL = {
+    "novachem_biotech":           "NovaChem-Biotech",
+    "kanal_7_krawedz":            "Kanał 7 Krawędź",
+    "kult_recyklingu":            "Kult Recyklingu",
+    "ministerstwo_pamieci":       "Ministerstwo Pamięci",
+    "sponsor_bezpieczenstwa_sportu": "Sponsor Bezpieczeństwa Sportu",
+    "czarny_rynek_plus":          "Czarny Rynek+",
+    "bractwo_komornika":          "Bractwo Komornika",
+    "liga_brawurowa":             "Liga Brawurowa",
+    "spoldzielnia_mrowek":        "Spółdzielnia Mrówek",
+    "bog_polimerow":              "Bóg Polimerów",
+    "stadion_wolnosci":           "Stadion Wolności",
+    # Pet-template flavor tags — these aren't sponsor keys, just
+    # descriptive markers ("bird", "cat", "talking"). Translate the
+    # common ones; unknowns fall through as raw slug.
+    "bird":          "ptak",
+    "cat":           "kot",
+    "dog":           "pies",
+    "rat":           "szczur",
+    "talking":       "mówiący",
+    "celebrity_pet": "zwierzę gwiazdy",
+    "broadcast":     "transmisja",
+    "small":         "mały",
+    "large":         "duży",
+    "stealthy":      "skradający",
+    "loyal":         "lojalny",
+    "aggressive":    "agresywny",
+}
+
+
+def status_pl(status_key: str) -> str:
+    """Polish display name for a companion status. Falls back to the
+    raw slug if unmapped (loud signal that we need to add an entry)."""
+    return _STATUS_PL.get(status_key, status_key)
+
+
+def abilities_pl_list(abilities) -> list:
+    """Polish display labels for a list of ability slugs. Unknown
+    slugs pass through (signals 'we forgot to translate this')."""
+    return [_ABILITY_PL.get(a, a) for a in (abilities or [])]
+
+
+def sponsor_tag_pl(tag: str) -> str:
+    return _SPONSOR_TAG_PL.get(tag, tag)
+
+
+def sponsor_tags_pl_list(tags) -> list:
+    return [sponsor_tag_pl(t) for t in (tags or [])]
+
+
 # ── Data model ────────────────────────────────────────────────────────────
 
 @dataclass

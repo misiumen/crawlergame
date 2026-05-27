@@ -139,12 +139,18 @@ def _h_inspect(game, intent, pet) -> None:
         ):
             if val:
                 game.log(f"  {label}: {val}", LOG_NORMAL)
+    # P29.38 — Polish-only display: status + abilities go through
+    # companion.status_pl / abilities_pl_list. Raw slugs (active,
+    # scout_aerial, etc.) should never reach the player.
+    from . import companion as _comp
     game.log(
         f"  Więź: {pet.bond}/10  •  Stres: {pet.stress}/10  •  "
-        f"Stan: {pet.status}",
+        f"Stan: {_comp.status_pl(pet.status)}",
         LOG_NORMAL)
     if pet.abilities:
-        game.log("  Umiejętności: " + ", ".join(pet.abilities), LOG_NORMAL)
+        game.log("  Umiejętności: "
+                 + ", ".join(_comp.abilities_pl_list(pet.abilities)),
+                 LOG_NORMAL)
     _advance_time(game, 1)
 
 
