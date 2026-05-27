@@ -84,8 +84,16 @@ class Game:
         self.cmd_history: list[str] = []
         self.cmd_history_idx = -1     # -1 = "current draft (not in history)"
 
-        # Character creation sub-state
-        self.cc = {"step": "name", "name_input": "", "selected_bg": 0}
+        # Character creation sub-state.
+        # P29.35 — extended with species + companion pickers driven by
+        # meta_progression unlocks. selected_species == 0 always means
+        # baseline_human; selected_companion == 0 means "no starting
+        # companion" (the companion step is skipped entirely when
+        # nothing is unlocked).
+        self.cc = {"step": "name", "name_input": "",
+                   "selected_bg": 0,
+                   "selected_species": 0,
+                   "selected_companion": 0}
 
         # Class / species offers
         self.offer_candidates = []
@@ -1539,17 +1547,88 @@ class Game:
         # New game: pick slot, wipe any old data, enter creation.
         save_load.set_active_slot(n)
         save_load.delete_slot(n)
-        self.cc = {"step": "name", "name_input": "", "selected_bg": 0}
+        self.cc = {"step": "name", "name_input": "",
+                   "selected_bg": 0,
+                   "selected_species": 0,
+                   "selected_companion": 0}
         self.input_text = ""
         self.state = STATE_CREATE
 
     def _slot_picker_back(self) -> None:
         self.state = STATE_TITLE
 
+    # ── P29.35 — creation pickers + option list builders ──────────────────
+
+    def _creation_background_keys(self) -> list:
+        """All background keys offered at character creation: vanilla
+        BACKGROUNDS list + any meta-unlocked `origin_*` keys."""
+        from .character import BACKGROUNDS
+        from . import meta_progression as _mp
+        keys = list(BACKGROUNDS)
+        try:
+            for ud in _mp.unlocked_origins():
+                if ud.key not in keys:
+                    keys.append(ud.key)
+        except Exception:
+            pass
+        return keys
+
+    def _creation_species_keys(self) -> list:
+        """Species pool: baseline_human is always offered; unlocked
+        species append after."""
+        from . import meta_progression as _mp
+        keys = ["baseline_human"]
+        try:
+            for ud in _mp.unlocked_species():
+                if ud.key not in keys:
+                    keys.append(ud.key)
+        except Exception:
+            pass
+        return keys
+
+    def _creation_companion_keys(self) -> list:
+        """Companion options. Index 0 means 'no starting companion'.
+        Returns at least [""] (the no-pick sentinel). When the player
+        has unlocked companions, the picker step is opened; otherwise
+        the step is skipped silently and start_new_game runs with
+        _chosen_companion left empty."""
+        from . import meta_progression as _mp
+        keys = [""]
+        try:
+            for ud in _mp.unlocked_companions():
+                if ud.key not in keys:
+                    keys.append(ud.key)
+        except Exception:
+            pass
+        return keys
+
+    def _creation_commit(self) -> None:
+        """Finalize creation: read all four cc fields and launch the
+        world. Called from `commit_species` (when no companions are
+        unlocked) and `commit_companion`."""
+        name = self.cc.get("name_input", "").strip() or "Bezimienny"
+        bg_keys = self._creation_background_keys()
+        sp_keys = self._creation_species_keys()
+        comp_keys = self._creation_companion_keys()
+        bg = bg_keys[int(self.cc.get("selected_bg", 0)) % len(bg_keys)]
+        species = sp_keys[int(self.cc.get("selected_species", 0)) % len(sp_keys)]
+        comp_idx = int(self.cc.get("selected_companion", 0)) % len(comp_keys)
+        chosen = comp_keys[comp_idx] if comp_idx > 0 else ""
+        # _apply_starting_companion (called from start_new_game) reads
+        # this attribute. Empty string = no starting companion.
+        self._chosen_companion = chosen
+        self.start_new_game(name, bg, species=species)
+        self.state = STATE_PLAY
+
     def _create_action(self, action) -> None:
         """Click callback from draw_creation. `action` is a string for
-        single-arg ops ("confirm_name", "commit_bg", "back") or a
-        tuple ("pick_bg", idx). Mirrors the STATE_CREATE keyboard path."""
+        single-arg ops ("confirm_name", "commit_bg", "commit_species",
+        "commit_companion", "back") or a tuple ("pick_bg", idx) /
+        ("pick_species", idx) / ("pick_companion", idx). Mirrors the
+        STATE_CREATE keyboard path.
+
+        P29.35 — step machine is now name → background → species →
+        (companion if anything unlocked) → world."""
         if isinstance(action, tuple):
             kind, *args = action
         else:
@@ -1561,6 +1640,10 @@ class Game:
                 self.state = STATE_TITLE
             elif step == "background":
                 self.cc["step"] = "name"
+            elif step == "species":
+                self.cc["step"] = "background"
+            elif step == "companion":
+                self.cc["step"] = "species"
             return
         if step == "name" and kind == "confirm_name":
             name = self.cc.get("name_input", "").strip() or "Bezimienny"
@@ -1568,19 +1651,41 @@ class Game:
             self.cc["name_input"] = name
             return
         if step == "background":
+            bgs = self._creation_background_keys()
             if kind == "pick_bg" and args:
                 idx = int(args[0])
-                from .character import BACKGROUNDS
-                if 0 <= idx < len(BACKGROUNDS):
+                if 0 <= idx < len(bgs):
                     self.cc["selected_bg"] = idx
             elif kind == "commit_bg":
-                from .character import BACKGROUNDS
                 idx = int(self.cc.get("selected_bg", 0))
-                if 0 <= idx < len(BACKGROUNDS):
-                    name = self.cc.get("name_input", "").strip() or "Bezimienny"
-                    bg = BACKGROUNDS[idx]
-                    self.start_new_game(name, bg)
-                    self.state = STATE_PLAY
+                if 0 <= idx < len(bgs):
+                    self.cc["step"] = "species"
+            return
+        if step == "species":
+            sp = self._creation_species_keys()
+            if kind == "pick_species" and args:
+                idx = int(args[0])
+                if 0 <= idx < len(sp):
+                    self.cc["selected_species"] = idx
+            elif kind == "commit_species":
+                idx = int(self.cc.get("selected_species", 0))
+                if 0 <= idx < len(sp):
+                    # If any companions are unlocked, route to that
+                    # picker; otherwise commit directly.
+                    if len(self._creation_companion_keys()) > 1:
+                        self.cc["step"] = "companion"
+                    else:
+                        self._creation_commit()
+            return
+        if step == "companion":
+            comp = self._creation_companion_keys()
+            if kind == "pick_companion" and args:
+                idx = int(args[0])
+                if 0 <= idx < len(comp):
+                    self.cc["selected_companion"] = idx
+            elif kind == "commit_companion":
+                self._creation_commit()
+            return
 
     # ── Prompt 11: settings popup ─────────────────────────────────────────
 
@@ -6048,10 +6153,7 @@ class Game:
                 elif key == pygame.K_ESCAPE:
                     self.state = STATE_TITLE
             elif step == "background":
-                # Prompt 19 audit fix S2: single source from character.py.
-                from .character import BACKGROUNDS
-                bgs = list(BACKGROUNDS)
-                # Arrow navigation for the background list.
+                bgs = self._creation_background_keys()
                 if key in (pygame.K_UP, pygame.K_w):
                     self.cc["selected_bg"] = (self.cc.get("selected_bg",0) - 1) % len(bgs)
                     self._suppress_textinput = True
@@ -6073,18 +6175,57 @@ class Game:
                     self.cc["selected_bg"] = len(bgs) - 1
                     self._suppress_textinput = True; return
                 if key == pygame.K_RETURN:
-                    idx = self.cc.get("selected_bg", 0)
-                    if 0 <= idx < len(bgs):
-                        self._suppress_textinput = True
-                        self.start_new_game(self.cc["name_input"], bgs[idx])
+                    self._suppress_textinput = True
+                    self._create_action("commit_bg")
                     return
                 if digit is not None:
                     idx = int(digit) - 1
                     if 0 <= idx < len(bgs):
                         self._suppress_textinput = True
-                        self.start_new_game(self.cc["name_input"], bgs[idx])
+                        self.cc["selected_bg"] = idx
+                        self._create_action("commit_bg")
                 elif key == pygame.K_ESCAPE or key == pygame.K_BACKSPACE:
                     self.cc["step"] = "name"
+            elif step == "species":
+                sp = self._creation_species_keys()
+                if key in (pygame.K_UP, pygame.K_w):
+                    self.cc["selected_species"] = (self.cc.get("selected_species",0) - 1) % len(sp)
+                    self._suppress_textinput = True; return
+                if key in (pygame.K_DOWN, pygame.K_s):
+                    self.cc["selected_species"] = (self.cc.get("selected_species",0) + 1) % len(sp)
+                    self._suppress_textinput = True; return
+                if key == pygame.K_RETURN:
+                    self._suppress_textinput = True
+                    self._create_action("commit_species")
+                    return
+                if digit is not None:
+                    idx = int(digit) - 1
+                    if 0 <= idx < len(sp):
+                        self._suppress_textinput = True
+                        self.cc["selected_species"] = idx
+                        self._create_action("commit_species")
+                elif key == pygame.K_ESCAPE or key == pygame.K_BACKSPACE:
+                    self.cc["step"] = "background"
+            elif step == "companion":
+                comp = self._creation_companion_keys()
+                if key in (pygame.K_UP, pygame.K_w):
+                    self.cc["selected_companion"] = (self.cc.get("selected_companion",0) - 1) % len(comp)
+                    self._suppress_textinput = True; return
+                if key in (pygame.K_DOWN, pygame.K_s):
+                    self.cc["selected_companion"] = (self.cc.get("selected_companion",0) + 1) % len(comp)
+                    self._suppress_textinput = True; return
+                if key == pygame.K_RETURN:
+                    self._suppress_textinput = True
+                    self._create_action("commit_companion")
+                    return
+                if digit is not None:
+                    idx = int(digit) - 1
+                    if 0 <= idx < len(comp):
+                        self._suppress_textinput = True
+                        self.cc["selected_companion"] = idx
+                        self._create_action("commit_companion")
+                elif key == pygame.K_ESCAPE or key == pygame.K_BACKSPACE:
+                    self.cc["step"] = "species"
             return
 
         if self.state == STATE_PLAY:

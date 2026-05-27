@@ -85,9 +85,16 @@ def test_create_name_dalej_advances_to_background():
 
 
 def test_create_bg_row_clicks_select_then_commit():
+    # P29.35 — bg row click commit now routes to the species step, not
+    # straight to STATE_PLAY. From species, with no companion unlocks,
+    # commit lands in STATE_PLAY.
     from ..engine.game import Game, STATE_CREATE, STATE_PLAY
+    from ..engine import run_history as _rh
+    _rh.reset()    # make sure no companion is unlocked
     g = Game(screen=pygame.display.get_surface())
-    g.cc = {"step": "background", "name_input": "Test", "selected_bg": 0}
+    g.cc = {"step": "background", "name_input": "Test",
+            "selected_bg": 0, "selected_species": 0,
+            "selected_companion": 0}
     g.state = STATE_CREATE
     g.draw()
     bg_rows = [z for z in g.click_registry.zones if z.category == "create_bg_row"]
@@ -98,11 +105,22 @@ def test_create_bg_row_clicks_select_then_commit():
     # Re-draw to refresh click zones (selected row index changed).
     g.draw()
     bg_rows2 = [z for z in g.click_registry.zones if z.category == "create_bg_row"]
-    # Click the now-selected row → commits → STATE_PLAY.
+    # Click the now-selected row → routes to species step.
     bg_rows2[1].callback()
+    assert g.cc.get("step") == "species", \
+        f"expected step=species, got {g.cc.get('step')}"
+    # On species, commit baseline_human → launches (no companion unlocks).
+    g.draw()
+    sp_rows = [z for z in g.click_registry.zones
+               if z.category == "create_species_row"]
+    assert sp_rows, "no species rows"
+    # baseline_human is the only row, and selected_species defaults to 0,
+    # so clicking it commits.
+    sp_rows[0].callback()
     assert g.state == STATE_PLAY, f"expected STATE_PLAY, got {g.state}"
     assert g.world is not None and g.world.character.name == "Test"
-    print(f"  bg row click select + commit → STATE_PLAY: OK")
+    _rh.reset()
+    print(f"  bg row + species row click commit -> STATE_PLAY: OK")
 
 
 def main():

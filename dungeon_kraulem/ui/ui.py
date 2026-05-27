@@ -434,28 +434,39 @@ def draw_creation(surf, state, *, click_registry=None,
                                tooltip="Powrót (Esc)",
                                category="create_btn")
     elif step == "background":
+        # P29.35 — bg list now includes any unlocked origins.
         text(surf, t("create_select_bg", fallback="Wybierz tło (nie klasę):"),
              60, 100, NORMAL_TEXT, body_size + 2)
-        # Prompt 19 audit fix S2: single source from engine.character.
         from ..engine.character import BACKGROUNDS
+        from ..engine import meta_progression as _mp
         bgs = list(BACKGROUNDS)
+        origin_meta = {}
+        try:
+            for ud in _mp.unlocked_origins():
+                if ud.key not in bgs:
+                    bgs.append(ud.key)
+                origin_meta[ud.key] = ud
+        except Exception:
+            pass
         sel = state.get("selected_bg", 0)
         cy = 140
         for i, key in enumerate(bgs):
             col = ACCENT if i == sel else NORMAL_TEXT
-            label = t(f"bg_{key}_n", fallback=key)
+            if key in origin_meta:
+                label = origin_meta[key].label_pl + " ✦"
+            else:
+                label = t(f"bg_{key}_n", fallback=key)
             marker = "▶ " if i == sel else "  "
             row_y = cy
             text(surf, f"{marker}[{i+1:2d}] {label}", 80, cy, col,
                  body_size, bold=(i==sel)); cy += 22
-            desc = t(f"bg_{key}_d", fallback="")
+            if key in origin_meta:
+                desc = origin_meta[key].reward_pl
+            else:
+                desc = t(f"bg_{key}_d", fallback="")
             if desc:
                 text(surf, "        " + desc, 80, cy, DIM_TEXT, small_size - 1); cy += 18
             row_h = cy - row_y
-            # P28.7 — clickable row. Single click = select that bg.
-            # If clicking the row that's already selected → commit
-            # (acts like Enter). Double-pick on the same row commits
-            # cleanly without a separate Potwierdź button.
             if click_registry is not None and on_action is not None:
                 def _pick(_idx=i, _was_sel=(i == sel)):
                     if _was_sel:
@@ -465,38 +476,144 @@ def draw_creation(surf, state, *, click_registry=None,
                 click_registry.add((60, row_y - 2, sw - 120, row_h),
                                    _pick, tooltip=label,
                                    category="create_bg_row")
-        # Bottom button row.
         text(surf, t("create_keys_bg",
                      fallback="[1-9/0/↑↓] Wybierz   [Enter] Potwierdź   [Esc] Wstecz   (lub kliknij wybrane tło)"),
              80, sh - 40, DIM_TEXT, small_size)
-        if click_registry is not None and on_action is not None:
-            # "Potwierdź" button bottom-right.
-            commit_label = t("create_commit_btn", fallback="Potwierdź ▶")
-            ci = font(body_size, bold=True).render(commit_label, True, ACCENT)
-            cx_btn = sw - ci.get_width() - 60
-            cy_btn = sh - 80
-            pygame.draw.rect(surf, ACCENT, (cx_btn - 12, cy_btn - 8,
-                                             ci.get_width() + 24, ci.get_height() + 16), 2)
-            surf.blit(ci, (cx_btn, cy_btn))
-            click_registry.add(
-                (cx_btn - 12, cy_btn - 8, ci.get_width() + 24, ci.get_height() + 16),
-                lambda: on_action("commit_bg"),
-                tooltip="Potwierdź wybór (Enter)",
-                category="create_btn")
-            # "Wstecz" button bottom-left.
-            back_img = font(body_size).render(
-                t("create_back_btn", fallback="◀ Wstecz"), True, DIM_TEXT)
-            bx_b = 60
-            by_b = sh - 80
-            pygame.draw.rect(surf, BORDER,
-                             (bx_b - 12, by_b - 8,
-                              back_img.get_width() + 24, back_img.get_height() + 16), 1)
-            surf.blit(back_img, (bx_b, by_b))
-            click_registry.add(
-                (bx_b - 12, by_b - 8,
-                 back_img.get_width() + 24, back_img.get_height() + 16),
-                lambda: on_action("back"),
-                tooltip="Wstecz (Esc)", category="create_btn")
+        _draw_creation_buttons(surf, sw, sh, body_size,
+                               click_registry, on_action,
+                               commit_kind="commit_bg")
+
+    elif step == "species":
+        # P29.35 — species picker. baseline_human is always offered.
+        text(surf, t("create_select_species",
+                     fallback="Wybierz gatunek (odblokowane między sezonami):"),
+             60, 100, NORMAL_TEXT, body_size + 2)
+        from ..engine import meta_progression as _mp
+        keys = ["baseline_human"]
+        meta = {}
+        try:
+            for ud in _mp.unlocked_species():
+                if ud.key not in keys:
+                    keys.append(ud.key)
+                meta[ud.key] = ud
+        except Exception:
+            pass
+        sel = state.get("selected_species", 0)
+        cy = 140
+        for i, key in enumerate(keys):
+            col = ACCENT if i == sel else NORMAL_TEXT
+            if key == "baseline_human":
+                label = "Człowiek (standard)"
+                desc = "Bez specjalnych bonusów. Bezpieczny start."
+            else:
+                ud = meta.get(key)
+                label = (ud.label_pl if ud else key) + " ✦"
+                desc = (ud.reward_pl if ud else "")
+            marker = "▶ " if i == sel else "  "
+            row_y = cy
+            text(surf, f"{marker}[{i+1:2d}] {label}", 80, cy, col,
+                 body_size, bold=(i==sel)); cy += 22
+            if desc:
+                text(surf, "        " + desc, 80, cy, DIM_TEXT, small_size - 1); cy += 18
+            row_h = cy - row_y
+            if click_registry is not None and on_action is not None:
+                def _pick(_idx=i, _was_sel=(i == sel)):
+                    if _was_sel:
+                        on_action("commit_species")
+                    else:
+                        on_action(("pick_species", _idx))
+                click_registry.add((60, row_y - 2, sw - 120, row_h),
+                                   _pick, tooltip=label,
+                                   category="create_species_row")
+        text(surf, "[1-9/↑↓] Wybierz   [Enter] Potwierdź   [Esc] Wstecz",
+             80, sh - 40, DIM_TEXT, small_size)
+        _draw_creation_buttons(surf, sw, sh, body_size,
+                               click_registry, on_action,
+                               commit_kind="commit_species")
+
+    elif step == "companion":
+        # P29.35 — companion picker. Index 0 is always "no companion".
+        text(surf, t("create_select_companion",
+                     fallback="Wybierz towarzysza startowego (opcjonalnie):"),
+             60, 100, NORMAL_TEXT, body_size + 2)
+        from ..engine import meta_progression as _mp
+        keys = [""]
+        meta = {}
+        try:
+            for ud in _mp.unlocked_companions():
+                if ud.key not in keys:
+                    keys.append(ud.key)
+                meta[ud.key] = ud
+        except Exception:
+            pass
+        sel = state.get("selected_companion", 0)
+        cy = 140
+        for i, key in enumerate(keys):
+            col = ACCENT if i == sel else NORMAL_TEXT
+            if key == "":
+                label = "Bez towarzysza"
+                desc = "Sam na sam z lochem. Standard."
+            else:
+                ud = meta.get(key)
+                label = (ud.label_pl if ud else key) + " ✦"
+                desc = (ud.reward_pl if ud else "")
+            marker = "▶ " if i == sel else "  "
+            row_y = cy
+            text(surf, f"{marker}[{i+1:2d}] {label}", 80, cy, col,
+                 body_size, bold=(i==sel)); cy += 22
+            if desc:
+                text(surf, "        " + desc, 80, cy, DIM_TEXT, small_size - 1); cy += 18
+            row_h = cy - row_y
+            if click_registry is not None and on_action is not None:
+                def _pick(_idx=i, _was_sel=(i == sel)):
+                    if _was_sel:
+                        on_action("commit_companion")
+                    else:
+                        on_action(("pick_companion", _idx))
+                click_registry.add((60, row_y - 2, sw - 120, row_h),
+                                   _pick, tooltip=label,
+                                   category="create_companion_row")
+        text(surf, "[1-9/↑↓] Wybierz   [Enter] Start   [Esc] Wstecz",
+             80, sh - 40, DIM_TEXT, small_size)
+        _draw_creation_buttons(surf, sw, sh, body_size,
+                               click_registry, on_action,
+                               commit_kind="commit_companion",
+                               commit_label_override="Start ▶")
+
+
+def _draw_creation_buttons(surf, sw, sh, body_size, click_registry,
+                           on_action, *, commit_kind="commit_bg",
+                           commit_label_override=None):
+    """P29.35 — shared bottom button row (Potwierdź + Wstecz) used by
+    background, species, and companion picker steps."""
+    if click_registry is None or on_action is None:
+        return
+    commit_label = commit_label_override or t(
+        "create_commit_btn", fallback="Potwierdź ▶")
+    ci = font(body_size, bold=True).render(commit_label, True, ACCENT)
+    cx_btn = sw - ci.get_width() - 60
+    cy_btn = sh - 80
+    pygame.draw.rect(surf, ACCENT, (cx_btn - 12, cy_btn - 8,
+                                     ci.get_width() + 24, ci.get_height() + 16), 2)
+    surf.blit(ci, (cx_btn, cy_btn))
+    click_registry.add(
+        (cx_btn - 12, cy_btn - 8, ci.get_width() + 24, ci.get_height() + 16),
+        lambda: on_action(commit_kind),
+        tooltip="Potwierdź wybór (Enter)",
+        category="create_btn")
+    back_img = font(body_size).render(
+        t("create_back_btn", fallback="◀ Wstecz"), True, DIM_TEXT)
+    bx_b = 60
+    by_b = sh - 80
+    pygame.draw.rect(surf, BORDER,
+                     (bx_b - 12, by_b - 8,
+                      back_img.get_width() + 24, back_img.get_height() + 16), 1)
+    surf.blit(back_img, (bx_b, by_b))
+    click_registry.add(
+        (bx_b - 12, by_b - 8,
+         back_img.get_width() + 24, back_img.get_height() + 16),
+        lambda: on_action("back"),
+        tooltip="Wstecz (Esc)", category="create_btn")
 
 
 # ── In-game ─────────────────────────────────────────────────────────────────
