@@ -87,6 +87,8 @@ def main():
                 g.handle_mousedown(ev)
             elif ev.type == pygame.MOUSEMOTION:
                 g.handle_mousemotion(ev)
+            elif ev.type == pygame.MOUSEWHEEL:
+                g.handle_mousewheel(ev)
         g.update(dt)
         g.draw()
 

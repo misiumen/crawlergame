@@ -5840,6 +5840,41 @@ class Game:
         except AttributeError:
             self._mouse_xy = (-1, -1)
 
+    def handle_mousewheel(self, ev):
+        """P29.3 — mouse wheel scrolls the log when hovering over the
+        log panel. Up = older history, down = newer (back to live).
+        Same step as PgUp/PgDn (3 per notch). Pygame-CE MOUSEWHEEL
+        events have `ev.y`: +1 per notch up, -1 per notch down.
+
+        Outside the log panel the wheel is a no-op (we don't hijack
+        scroll on inventory popovers, minimap, etc.).
+        """
+        try:
+            dy = int(getattr(ev, "y", 0))
+        except (AttributeError, TypeError):
+            return
+        if dy == 0:
+            return
+        # Only act when cursor is over the log panel.
+        try:
+            mx, my = self._mouse_xy
+        except Exception:
+            return
+        L = getattr(self, "_layout", None)
+        if L is None:
+            return
+        lx, ly, lw, lh = L.log_rect
+        if not (lx <= mx < lx + lw and ly <= my < ly + lh):
+            return
+        # Up (positive y) → scroll back into history; down → toward live.
+        step = 3
+        if dy > 0:
+            self.log_scroll = min(self.log_scroll + step * dy,
+                                  max(0, len(self.world.log) - 1)
+                                  if self.world else 0)
+        else:
+            self.log_scroll = max(0, self.log_scroll + step * dy)
+
     def _drain_ui_inputs(self):
         """Pick up side-channel signals that UI click handlers wrote to
         the world / game. Kept separate from the click callbacks so UI

@@ -2382,6 +2382,44 @@ def draw_quick_strip(surf, world, x, y, w, h, layout=None, *,
     if extra > 0:
         text(surf, f"+{extra} więcej…", x + 4, cy, DIM_TEXT, L.font_small - 2)
         cy += row_h
+
+    # P29.3 — Materials are stored separately from items (qty-only,
+    # not Entity instances). Without surfacing them here, salvage
+    # appears to "do nothing" — the materials live in the Materiały
+    # tab but the sidebar gave no hint. Show top 4 + a hint.
+    mats = getattr(ch, "materials", None) or {}
+    if mats:
+        cy += 4
+        text(surf, "MATERIAŁY", x + 4, cy, ACCENT,
+             L.font_small - 1, True); cy += 16
+        # Sort by quantity desc; show up to 4 top materials.
+        try:
+            from ..content import materials as _mat
+        except Exception:
+            _mat = None
+        ranked = sorted(mats.items(), key=lambda kv: -int(kv[1] or 0))
+        for key, qty in ranked[:4]:
+            label = key.replace("_", " ")
+            if _mat is not None:
+                try:
+                    md = _mat.get(key)
+                    if md is not None:
+                        label = md.name()
+                except Exception:
+                    pass
+            line = f"  {int(qty):>2}× {label}"
+            f_m = font(L.font_small - 2)
+            max_w = w - 12
+            if f_m.size(line)[0] > max_w:
+                while line and f_m.size(line + "…")[0] > max_w:
+                    line = line[:-1]
+                line += "…"
+            text(surf, line, x + 4, cy, NORMAL_TEXT, L.font_small - 2)
+            cy += 13
+        if len(mats) > 4:
+            text(surf, f"  +{len(mats) - 4} więcej (M)",
+                 x + 4, cy, DIM_TEXT, L.font_small - 2)
+            cy += 13
     return cy
 
 
