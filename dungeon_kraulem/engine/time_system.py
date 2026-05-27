@@ -65,6 +65,14 @@ def advance(world, minutes: int):
     except Exception:
         pass
 
+    # P29.20 — companion idle chatter. Module owns its own cooldown
+    # (~25 min between idle lines), so calling every tick is safe.
+    try:
+        from . import companion_voice as _cv
+        _cv.maybe_say(world, "idle")
+    except Exception:
+        pass
+
     # Day-change event
     if f.day_number() != prev_day:
         world.log_msg(_day_change_line(f), "syndicate")

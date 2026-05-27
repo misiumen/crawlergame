@@ -220,6 +220,12 @@ class Game:
                 _ach.unlock(ch, "anty_host_warknal", world=self.world)
             except Exception:
                 pass
+            # P29.20 — companion chatter on near-death.
+            try:
+                from . import companion_voice as _cv
+                _cv.maybe_say(self.world, "hp_low")
+            except Exception:
+                pass
             return False
         # Real death.
         ch.run_death_cause = cause
@@ -231,6 +237,12 @@ class Game:
             self.run_summary = _rs.build_run_summary(self.world)
             self.log(self.run_summary.death_log_line, LOG_DANGER)
             self.log(self.run_summary.anti_host_line, LOG_SYNDIC)
+            # P29.20 — companion's last words.
+            try:
+                from . import companion_voice as _cv
+                _cv.maybe_say(self.world, "player_death", force=True)
+            except Exception:
+                pass
         except Exception:
             self.log("Tracisz nitkę. Reszta jest hałasem.", LOG_DANGER)
         # SFX
@@ -2179,6 +2191,12 @@ class Game:
                         _tut.try_show_tip(self.world, "threat")
                     except Exception:
                         pass
+                    # P29.20 — companion chatter at combat start.
+                    try:
+                        from . import companion_voice as _cv
+                        _cv.maybe_say(self.world, "combat_start")
+                    except Exception:
+                        pass
                     self._run_enemy_turn(cs2)
 
         # Hooks: class offer trigger
@@ -2247,6 +2265,12 @@ class Game:
                 _ach.unlock(ch, "piaty_set", world=self.world)
             if next_num >= 10:
                 _ach.unlock(ch, "dziesiate_pietro", world=self.world)
+        except Exception:
+            pass
+        # P29.20 — companion chatter on floor descent.
+        try:
+            from . import companion_voice as _cv
+            _cv.maybe_say(self.world, "floor_descent")
         except Exception:
             pass
         self.log(t("log_descend_intro",
@@ -4273,6 +4297,12 @@ class Game:
                         pass
                     # P29.8 — bump kill counter for the run summary.
                     self._bump_run_counter("run_kills", 1)
+                    # P29.20 — companion chatter on kill.
+                    try:
+                        from . import companion_voice as _cv
+                        _cv.maybe_say(self.world, "enemy_killed")
+                    except Exception:
+                        pass
                     # P29.15 — combat achievement triggers.
                     try:
                         from ..systems import achievements as _ach
@@ -4990,6 +5020,12 @@ class Game:
             from ..systems import achievements as _ach
             _ach.unlock(self.world.character, "pakiet_z_sufitu",
                         world=self.world)
+        except Exception:
+            pass
+        # P29.20 — companion chatter on sponsor pod open.
+        try:
+            from . import companion_voice as _cv
+            _cv.maybe_say(self.world, "sponsor_pod_open")
         except Exception:
             pass
         try:
