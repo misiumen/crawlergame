@@ -7183,6 +7183,17 @@ class Game:
                 # which is recoverable.
                 fstate = getattr(f, "state", None) or {}
                 collapsed = bool(fstate.get("collapsed"))
+                # P29.24 — escape-at-exit: time_system flagged that
+                # the player was at the exit when collapse fired.
+                # Run the existing descent path instead of dying.
+                if fstate.get("collapse_descend_requested"):
+                    fstate["collapse_descend_requested"] = False
+                    try:
+                        self._descend_or_win()
+                    except Exception:
+                        # Defensive: if descent itself errors, fall
+                        # through to defeat so we don't deadlock.
+                        collapsed = True
             if collapsed:
                 # P29.8 — collapse always kills (no last-stand save).
                 # Force the flag so the helper runs its full death

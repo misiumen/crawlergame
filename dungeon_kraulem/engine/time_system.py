@@ -144,24 +144,51 @@ def advance(world, minutes: int):
 
 
 def _trigger_floor_collapse(world) -> None:
-    """Called when deadline_remaining_minutes hits 0. Sets the world
-    flag `floor_collapsed` which `Game.update` polls to switch state to
-    DEFEAT. A separate "escape-at-exit" check could land in P31 (run
-    summary + meta progression); for now collapse = run over.
+    """Called when deadline_remaining_minutes hits 0. Sets the floor
+    state flag `collapsed` which `Game.update` polls to switch state
+    to DEFEAT.
+
+    P29.24 — escape-at-exit: if the player is already in a room flagged
+    as the floor exit (actual_type == "boss" with exits_unlocked, OR
+    a room tagged "exit") at the moment of collapse, they descend to
+    the next floor instead of dying. The descent path is driven by
+    `floor.state["collapse_descend_requested"]` so Game.update can run
+    the existing _descend_or_win path on the next tick without
+    crossing engine layers here.
     """
     if not getattr(world, "current_floor", None):
         return
-    flags = getattr(world, "flags", None)
-    if flags is None:
-        # WorldState doesn't currently carry a top-level flags dict;
-        # store on the floor instead.
-        st = getattr(world.current_floor, "state", None)
-        if st is None:
-            world.current_floor.state = {}
-            st = world.current_floor.state
-        st["collapsed"] = True
-    else:
-        flags["floor_collapsed"] = True
+    floor = world.current_floor
+    if not hasattr(floor, "state") or floor.state is None:
+        floor.state = {}
+    # P29.24 — escape check. Player_at_exit + unlocked → flag descent.
+    player_room = floor.current_room() if hasattr(
+        floor, "current_room") else None
+    at_exit = False
+    if player_room is not None:
+        room_tags = set(getattr(player_room, "sensory_tags", None) or []) | \
+                    ({player_room.actual_type} if player_room.actual_type else set())
+        # An "exit" tag, an "objective" tag, or being in the boss room
+        # after exits_unlocked all count as "you found the way down."
+        if ("exit" in room_tags or
+                ("objective" in room_tags and
+                 bool(getattr(floor, "exits_unlocked", False)))):
+            at_exit = True
+        # Also accept: actual_type=="boss" + exits already unlocked
+        # (you killed the boss and were about to descend anyway).
+        if player_room.actual_type == "boss" and \
+                bool(getattr(floor, "exits_unlocked", False)):
+            at_exit = True
+    if at_exit:
+        floor.state["collapse_descend_requested"] = True
+        world.log_msg(t("time_collapse_escape",
+                        fallback="Strop pęka, ale jesteś już przy "
+                                 "drzwiach. Wciskasz się w lukę. "
+                                 "Piętro za tobą znika."),
+                      "success")
+        return
+    # No escape — game over.
+    floor.state["collapsed"] = True
     world.log_msg(t("time_collapse_final",
                     fallback="Sufit się zapada. To koniec twojej trasy."),
                   "danger")
