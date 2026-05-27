@@ -186,6 +186,22 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0,
         surf.blit(timg, (ix, cy))
         cy += item_size + 14
 
+    # P29.31 — NG+ chip. If the persistent run-history file marks
+    # new_game_plus as unlocked (set on first victory), show a small
+    # gold badge above the sponsor stripe. Best-effort import so
+    # the title screen doesn't crash if the module is missing.
+    try:
+        from ..engine import run_history as _rh
+        if _rh.has_unlock("new_game_plus"):
+            badge = "✓ NewGame+ ODBLOKOWANE"
+            badge_img = font(body_size - 2, bold=True).render(
+                badge, True, (230, 210, 130))
+            surf.blit(badge_img,
+                      ((sw - badge_img.get_width()) // 2,
+                       sh - 100))
+    except Exception:
+        pass
+
     # Sponsor stripe — bottom cycling band.
     stripe_h = max(36, int(44 * L.font_scale))
     stripe_y = sh - stripe_h - 30

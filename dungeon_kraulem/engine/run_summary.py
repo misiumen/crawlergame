@@ -30,6 +30,12 @@ ANTI_HOST_DEATH_LINES = (
     "Anti-host wzdycha: „Liczyliśmy na dłużej. No cóż.”",
     "Tłum w studio krzyczy: „JESZCZE RAZ!” — to nie tak działa.",
     "Operator kamery prosi o cięcie. Producent mówi: „nie, tak zostaje.”",
+    # P29.31 — name-formatted variants. Anti-host calls the player.
+    "Anti-host (do kamery 2): „{name}. Pamiętajcie to imię — bardzo "
+    "krótko.”",
+    "Anti-host: „{name}, drogi {name} — dziękujemy za udział w "
+    "sezonie. Twoje resztki wracają do recyklera.”",
+    "Anti-host (głośniej): „Brawa dla {name}! Brawa, kurwa, mówiłem!”",
 )
 
 
@@ -159,7 +165,13 @@ def build_run_summary(world, *, rng=None) -> RunSummary:
         fnum = int(getattr(f, "floor_number", 1) or 1)
     rs.floor_reached = max(int(getattr(ch, "run_max_floor_reached", 1)), fnum)
     rs.top_sponsors = _top_sponsors(world, n=3)
-    rs.anti_host_line = rng.choice(ANTI_HOST_DEATH_LINES)
+    # P29.31 — name-personalize the anti-host line when the template
+    # contains `{name}`. Variants without it pass through unchanged.
+    raw_host_line = rng.choice(ANTI_HOST_DEATH_LINES)
+    try:
+        rs.anti_host_line = raw_host_line.format(name=rs.player_name)
+    except (KeyError, IndexError):
+        rs.anti_host_line = raw_host_line
     rs.death_log_line = rng.choice(DEATH_LOG_LINES)
     return rs
 

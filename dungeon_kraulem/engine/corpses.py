@@ -116,6 +116,10 @@ def transform_to_corpse(world, entity, *, killer=None) -> Optional[Entity]:
             st["killed_by"] = f"player:{killer.name}"
         else:
             st["killed_by"] = "player"
+    # P29.31 — last words. A Polish quip tied to the monster's tags
+    # gets stashed so inspect_corpse can surface it. Players who
+    # read the dead remember the kill.
+    st["last_words"] = _pick_last_words(entity, monster_key)
     entity.state = st
 
     # Visible mutations.
@@ -154,14 +158,23 @@ def transform_to_corpse(world, entity, *, killer=None) -> Optional[Entity]:
 # ── Inspect lore ────────────────────────────────────────────────────────
 
 def inspect_corpse(world, corpse: Entity) -> str:
-    """Return the lore string for an inspected corpse. Pure read."""
+    """Return the lore string for an inspected corpse. Pure read.
+
+    P29.31 — if state['last_words'] was set on death, append it to
+    the lore so the player who inspects gets a kill-flavored quip.
+    """
     if corpse is None:
         return ""
     if corpse.entity_type != T_CORPSE:
         return corpse.fallback_desc or ""
     key = (corpse.state or {}).get("original_key", "")
     tpl = template_for(key)
-    return tpl.get("lore") or corpse.fallback_desc or ""
+    base = tpl.get("lore") or corpse.fallback_desc or ""
+    last_words = (corpse.state or {}).get("last_words", "")
+    if last_words:
+        # Two-line composite: lore + "Ostatnie słowa: ..."
+        return f"{base}\n  Ostatnie słowa: {last_words}".strip()
+    return base
 
 
 # ── Butcher ─────────────────────────────────────────────────────────────
@@ -424,3 +437,65 @@ def tick_decay(world, minutes: int) -> None:
                 if "decomposed" not in (ent.tags or []):
                     ent.tags = list(ent.tags or []) + ["decomposed"]
             ent.state = st
+
+
+# ── P29.31 — Corpse "last words" picker ─────────────────────────────────
+
+# Tag → list of Polish quips. The picker selects by first matching tag.
+_LAST_WORDS_BY_TAG = {
+    "boss": (
+        "„…to nie ja… to producent…”",
+        "„Drugi sezon… miałem być w drugim sezonie…”",
+        "„Brawa… chociaż dla… brawa…”",
+    ),
+    "humanoid": (
+        "„Niech to ktoś nakręci.”",
+        "„Powiedz mojej matce, że…”",
+        "„Kanał 7… płaci wam… na pewno…”",
+    ),
+    "sponsor_hunter": (
+        "„Sponsor… nie zapomni…”",
+        "„Spisałem cię w raporcie. Już za późno.”",
+    ),
+    "cult": (
+        "„Cykl… się… domknie…”",
+        "„Wszystko wraca do obwodu, nawet ja.”",
+    ),
+    "machine": (
+        "(z głośnika: „Błąd 547 — kończę pracę.”)",
+        "(diody migają w nieregularnym rytmie i gasną.)",
+    ),
+    "fungal": (
+        "(grzybnia jeszcze chwilę pulsuje — bezgłośnie.)",
+        "(zarodniki opadają na ciebie. Każdy z nich coś pamięta.)",
+    ),
+    "beast": (
+        "(charczy. Patrzy. Zamyka oczy.)",
+        "(machinalnie ślini się ostatni raz.)",
+    ),
+}
+
+# Generic fallback when no tag matches.
+_LAST_WORDS_FALLBACK = (
+    "(jeszcze przez chwilę porusza ustami — nic nie wychodzi.)",
+    "(coś szepcze, ale niewyraźnie.)",
+    "(spojrzenie. Cisza. Koniec.)",
+)
+
+
+def _pick_last_words(entity, monster_key: str) -> str:
+    """Pick a Polish last-words line for a freshly-killed monster.
+    Routes by tag priority: boss > sponsor_hunter > cult > machine >
+    fungal > humanoid > beast > generic.
+    """
+    import random as _r
+    tags = set(entity.tags or [])
+    priority = ("boss", "floor_boss", "final_boss", "sponsor_hunter",
+                "cult", "machine", "drone", "fungal", "humanoid", "beast")
+    for tag in priority:
+        if tag in tags:
+            pool = _LAST_WORDS_BY_TAG.get(tag) or \
+                   _LAST_WORDS_BY_TAG.get("humanoid", ())
+            if pool:
+                return _r.choice(pool)
+    return _r.choice(_LAST_WORDS_FALLBACK)

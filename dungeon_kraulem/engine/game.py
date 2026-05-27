@@ -2291,6 +2291,22 @@ class Game:
             _cv.maybe_say(self.world, "floor_descent")
         except Exception:
             pass
+        # P29.31 — between-floor sponsor scoreboard. Tiny "Sponsorzy
+        # oddali głos" line listing top-3 by current attention.
+        try:
+            from . import sponsors as _sp
+            att = _sp._attention_dict(self.world)
+            ranked = sorted(att.items(), key=lambda kv: int(kv[1]),
+                            reverse=True)
+            ranked = [(k, int(v)) for k, v in ranked if int(v) != 0][:3]
+            if ranked:
+                self.log("Sponsorzy oddali głos:", LOG_SYNDIC)
+                for skey, val in ranked:
+                    name = _sp._name_pl(_sp.get_sponsor(skey))
+                    sign = "+" if val > 0 else ""
+                    self.log(f"  • {name}: {sign}{val}", LOG_SYNDIC)
+        except Exception:
+            pass
         self.log(t("log_descend_intro",
                    fallback=f"Schodzisz na piętro {next_num}. Drzwi "
                             f"się zamykają za tobą. Loch nie pamięta "
