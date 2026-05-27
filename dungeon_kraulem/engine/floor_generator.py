@@ -428,7 +428,8 @@ def _instantiate_rooms(f: FloorState, world, graph: Dict,
     """Pick a template per role + node, build RoomState, wire exits."""
     used_templates: List[str] = []
     for node_id, role in role_plan.items():
-        tmpl = _pick_template_for_role(role, rng, used_templates)
+        tmpl = _pick_template_for_role(role, rng, used_templates,
+                                       floor_num=floor_num)
         if tmpl is None:
             tmpl = _fallback_template(role)
         used_templates.append(tmpl.get("template_id", ""))
@@ -580,10 +581,16 @@ def _entity_from_table(table: Dict, key: str, room_id: str, etype: str):
 
 
 def _pick_template_for_role(role: str, rng: random.Random,
-                            used: List[str]) -> Optional[Dict]:
+                            used: List[str],
+                            floor_num: int = 1) -> Optional[Dict]:
     pool = cl.room_templates_for_role(role)
     # Avoid reusing unique-per-floor templates
     pool = [t for t in pool if not (t.get("unique_per_floor") and t.get("template_id") in used)]
+    # P29.1 — floor_min / floor_max gate so e.g. pool_zaplecze_bar
+    # (floor_min=6) can't be picked for a floor-3 combat slot.
+    pool = [t for t in pool if t.get("floor_min", 1) <= floor_num]
+    pool = [t for t in pool
+            if t.get("floor_max") is None or t.get("floor_max") >= floor_num]
     if not pool:
         return None
     weights = [max(1, int(t.get("weight", 1))) for t in pool]

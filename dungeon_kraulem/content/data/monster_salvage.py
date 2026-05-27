@@ -260,6 +260,385 @@ CORPSE_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "butcher_audience_tag": "killed_editor",
         "desecration_tag": "ministerstwo_enemy",
     },
+
+    # ═════════════════════════════════════════════════════════════════════
+    # P29.1 — Floors 3-6 salvage tables. Materials map to standard
+    # crafting tables (meat_chunk, bone_fragments, leather_scraps,
+    # cloth_strips, scrap_metal, data_chip).
+    # ═════════════════════════════════════════════════════════════════════
+
+    # ── Piętro 3: ZOO ─────────────────────────────────────────────────────
+    "mutant_szczur": {
+        "name_pl": "ciało zmutowanego szczura",
+        "lore":    "Trzy oczy patrzą w trzy strony jednocześnie. "
+                   "Sponsor Czarnego Rynku ceni te ciała za organy.",
+        "lore_id": "corpse_mutant_szczur",
+        "salvage": {
+            "meat_chunk":      (1, 2),
+            "bone_fragments":  (1, 2),
+            "tooth":           (0, 2),
+        },
+        "salvage_time_min": 4,
+        "salvage_noise": 2,
+        "edible":          True,
+        "eat_hp_delta":    -2,   # mutant meat upsets the stomach
+        "decay_minutes":   180,
+        "smell_budget":    2,
+    },
+    "klatkowy_kot": {
+        "name_pl": "ciało klatkowego kota",
+        "lore":    "Mięso na pasie sprężyn. Pazury wciąż wysunięte.",
+        "lore_id": "corpse_klatkowy_kot",
+        "salvage": {
+            "meat_chunk":      (1, 2),
+            "leather_scraps":  (1, 2),
+            "tooth":           (1, 2),
+        },
+        "salvage_time_min": 5,
+        "salvage_noise": 2,
+        "edible":          True,
+        "eat_hp_delta":    3,
+        "decay_minutes":   180,
+        "smell_budget":    1,
+    },
+    "bekajacy_paw": {
+        "name_pl": "ciało bekającego pawa",
+        "lore":    "Wciąż wydaje z siebie dźwięk co kilka minut, nawet "
+                   "martwe. Klatka piersiowa pełna mikrofonu.",
+        "lore_id": "corpse_bekajacy_paw",
+        "salvage": {
+            "meat_chunk":      (1, 1),
+            "feather_clump":   (1, 3),
+            "scrap_metal":     (0, 1),
+        },
+        "salvage_time_min": 4,
+        "salvage_noise": 3,   # the corpse keeps making noise
+        "edible":          True,
+        "eat_hp_delta":    1,
+        "decay_minutes":   120,
+        "smell_budget":    1,
+    },
+    "miniboss_alfa_szczur": {
+        "name_pl": "ciało Alfa Szczurów",
+        "lore":    "Krwawe kółka wokół oczu — kiedyś miała obrożę. Pod "
+                   "skórą wciśnięty chip sponsorski.",
+        "lore_id": "corpse_alfa_szczur",
+        "salvage": {
+            "meat_chunk":      (2, 3),
+            "bone_fragments":  (2, 3),
+            "tooth":           (2, 3),
+            "data_chip":       (0, 1),    # sponsorski tracking chip
+        },
+        "salvage_time_min": 8,
+        "salvage_noise": 3,
+        "edible":          True,
+        "eat_hp_delta":    -1,
+        "butcher_audience_tag": "killed_miniboss_zoo",
+        "decay_minutes":   240,
+        "smell_budget":    2,
+    },
+    "boss_panicz_zoo": {
+        "name_pl": "ciało Panicza Zoo",
+        "lore":    "Headliner sezonu. Sierść w dwóch kolorach od reflektora. "
+                   "Trofeum na każdej ścianie korporacji.",
+        "lore_id": "corpse_boss_panicz_zoo",
+        "salvage": {
+            "meat_chunk":      (3, 5),
+            "bone_fragments":  (3, 5),
+            "leather_scraps":  (3, 5),
+            "tooth":           (2, 4),
+            "trophy_drop":     ("zoo_pelt", 1.0),
+        },
+        "salvage_time_min": 12,
+        "salvage_noise": 4,
+        "edible":          False,
+        "butcher_audience_tag": "killed_boss_zoo",
+        "decay_minutes":   480,
+        "smell_budget":    3,
+    },
+
+    # ── Piętro 4: NEIGHBORHOOD ────────────────────────────────────────────
+    "usmiechniety_sasiad": {
+        "name_pl": "ciało sąsiada",
+        "lore":    "Mundur firmowy 'Witamy w Sąsiedztwie' wciąż wisi "
+                   "schludnie. Identyfikator 'OBYWATEL ROKU 11'.",
+        "lore_id": "corpse_usmiechniety_sasiad",
+        "salvage": {
+            "cloth_strips":    (1, 2),
+            "meat_chunk":      (1, 1),
+            "scrap_metal":     (0, 1),
+            "plastic_badge":   (0, 1),
+        },
+        "salvage_time_min": 5,
+        "salvage_noise": 2,
+        "edible":          False,
+        "eat_audience_tag": "ate_human",
+        "decay_minutes":   240,
+        "smell_budget":    1,
+        "desecration_tag": "ministerstwo_enemy",
+    },
+    "dzieciak_z_blokowiska": {
+        "name_pl": "ciało dzieciaka",
+        "lore":    "Czapeczka logo Ministerstwa wciąż na głowie. Kieszenie "
+                   "ciężkie od cegieł.",
+        "lore_id": "corpse_dzieciak",
+        "salvage": {
+            "cloth_strips":    (1, 2),
+            "scrap_metal":     (1, 2),    # cegły = surowiec
+            "meat_chunk":      (1, 1),
+        },
+        "salvage_time_min": 4,
+        "salvage_noise": 2,
+        "edible":          False,
+        "eat_audience_tag": "ate_child",     # mocne audience consequence
+        "decay_minutes":   240,
+        "smell_budget":    1,
+        "desecration_tag": "desecrator",     # Kanał 7 też zauważy
+    },
+    "kucharka_z_swietlicy": {
+        "name_pl": "ciało kucharki",
+        "lore":    "Fartuch w plamach, których nikt nie chce identyfikować. "
+                   "Wałek wciąż w ręku.",
+        "lore_id": "corpse_kucharka",
+        "salvage": {
+            "cloth_strips":    (2, 3),
+            "meat_chunk":      (1, 1),
+            "scrap_metal":     (0, 1),
+        },
+        "salvage_time_min": 5,
+        "salvage_noise": 2,
+        "edible":          False,
+        "eat_audience_tag": "ate_human",
+        "decay_minutes":   240,
+        "smell_budget":    1,
+        "desecration_tag": "ministerstwo_enemy",
+    },
+    "miniboss_oddzialowa": {
+        "name_pl": "ciało Oddziałowej Osiedlowej",
+        "lore":    "Pełen mundur z odznaką, pas z latarką, gwizdek na "
+                   "szyi. Wciąż wisi etyk: 'Bezpieczeństwo i Porządek'.",
+        "lore_id": "corpse_oddzialowa",
+        "salvage": {
+            "cloth_strips":    (2, 3),
+            "leather_scraps":  (1, 2),
+            "scrap_metal":     (1, 2),
+            "plastic_badge":   (1, 1),
+        },
+        "salvage_time_min": 7,
+        "salvage_noise": 2,
+        "edible":          False,
+        "butcher_audience_tag": "killed_miniboss_neighborhood",
+        "decay_minutes":   300,
+        "smell_budget":    2,
+        "desecration_tag": "ministerstwo_enemy",
+    },
+    "boss_blok_parent": {
+        "name_pl": "ciało Block Parenta",
+        "lore":    "Pęk kluczy do każdych drzwi osiedla. Notatnik z "
+                   "planami życiowymi cudzych dzieci. Pierścień rodzinny.",
+        "lore_id": "corpse_blok_parent",
+        "salvage": {
+            "cloth_strips":    (2, 3),
+            "scrap_metal":     (2, 3),
+            "meat_chunk":      (1, 2),
+            "data_chip":       (1, 1),
+            "trophy_drop":     ("klucze_osiedlowe", 1.0),
+        },
+        "salvage_time_min": 12,
+        "salvage_noise": 3,
+        "edible":          False,
+        "butcher_audience_tag": "killed_boss_neighborhood",
+        "decay_minutes":   480,
+        "smell_budget":    2,
+        "desecration_tag": "ministerstwo_enemy",
+    },
+
+    # ── Piętro 5: MUSEUM ──────────────────────────────────────────────────
+    "kostny_kurator": {
+        "name_pl": "szkielet kuratora",
+        "lore":    "Zsuszony i ożywiony żartem. Kości tylko częściowo "
+                   "trzymają się siebie nawzajem.",
+        "lore_id": "corpse_kostny_kurator",
+        "salvage": {
+            "bone_fragments":  (2, 4),
+            "cloth_strips":    (1, 2),
+            "scrap_metal":     (0, 1),
+        },
+        "salvage_time_min": 4,
+        "salvage_noise": 1,
+        "edible":          False,
+        "decay_minutes":   600,    # kości się nie psują szybko
+        "smell_budget":    0,
+    },
+    "duch_zwiedzajacego": {
+        "name_pl": "rozpadające się ślady ducha",
+        "lore":    "Półprzezroczyste resztki. Nie da się dotknąć, da się "
+                   "spakować do termosu (jeśli masz odpowiedni termos).",
+        "lore_id": "corpse_duch",
+        "salvage": {
+            "ectoplasm":       (1, 2),     # nowy material
+            "data_chip":       (0, 1),     # 'pamięć ze świata przed'
+        },
+        "salvage_time_min": 6,
+        "salvage_noise": 1,
+        "edible":          False,
+        "decay_minutes":   60,             # ulatnia się
+        "smell_budget":    0,
+    },
+    "mechaniczny_strazak": {
+        "name_pl": "wrak mechanicznego strażaka",
+        "lore":    "Hydrant na nogach. Pomalowany czerwono, plamy rdzy "
+                   "wokół spawów. Pojemnik wciąż pełny czegoś żrącego.",
+        "lore_id": "corpse_mechaniczny_strazak",
+        "salvage": {
+            "scrap_metal":     (3, 5),
+            "battery":         (1, 1),     # jako entity
+            "pek_przewodow":   (1, 2),
+        },
+        "salvage_time_min": 7,
+        "salvage_noise": 3,
+        "edible":          False,
+        "decay_minutes":   720,    # nie ulega rozkładowi
+        "smell_budget":    1,
+    },
+    "miniboss_strazak_galerii": {
+        "name_pl": "ciało Strażaka Galerii",
+        "lore":    "Mundur galeryjny z naszywką naczelnika. Pierwsza "
+                   "generacja pałki elektrycznej — antyk dla kolekcjonera.",
+        "lore_id": "corpse_strazak_galerii",
+        "salvage": {
+            "scrap_metal":     (2, 3),
+            "cloth_strips":    (1, 2),
+            "meat_chunk":      (1, 1),
+            "battery":         (1, 1),
+            "trophy_drop":     ("zabytkowa_palka", 1.0),
+        },
+        "salvage_time_min": 8,
+        "salvage_noise": 2,
+        "edible":          False,
+        "eat_audience_tag": "ate_human",
+        "butcher_audience_tag": "killed_miniboss_museum",
+        "decay_minutes":   300,
+        "smell_budget":    2,
+    },
+    "boss_kurator_naczelny": {
+        "name_pl": "ciało Kuratora Naczelnego",
+        "lore":    "Sześciopalca dłoń. Monokl ze szkła, którego już nikt "
+                   "nie produkuje. Pierścień z czaszką w środku.",
+        "lore_id": "corpse_boss_kurator",
+        "salvage": {
+            "cloth_strips":    (2, 3),
+            "scrap_metal":     (1, 2),
+            "data_chip":       (1, 2),
+            "bone_fragments":  (1, 2),
+            "trophy_drop":     ("monokl_kuratora", 1.0),
+        },
+        "salvage_time_min": 12,
+        "salvage_noise": 2,
+        "edible":          False,
+        "butcher_audience_tag": "killed_boss_museum",
+        "decay_minutes":   480,
+        "smell_budget":    2,
+        "desecration_tag": "occult_meddler",
+    },
+
+    # ── Piętro 6: BAR ─────────────────────────────────────────────────────
+    "pijany_crawler": {
+        "name_pl": "ciało pijanego crawlera",
+        "lore":    "Spóźniony bohater. Tatuaż sponsorski wyblakły. W "
+                   "kieszeni wciąż butelka, nadal pełna.",
+        "lore_id": "corpse_pijany_crawler",
+        "salvage": {
+            "cloth_strips":    (1, 2),
+            "meat_chunk":      (1, 1),
+            "scrap_metal":     (0, 1),
+        },
+        "salvage_time_min": 5,
+        "salvage_noise": 2,
+        "edible":          False,
+        "eat_audience_tag": "ate_human",
+        "decay_minutes":   240,
+        "smell_budget":    2,
+        "desecration_tag": "cannibal",   # killing a fellow crawler
+    },
+    "lokator_baru": {
+        "name_pl": "ciało stałego bywalca",
+        "lore":    "Pił tu od piętra trzeciego. Wiedział więcej niż "
+                   "powinien. Teraz wie zero.",
+        "lore_id": "corpse_lokator_baru",
+        "salvage": {
+            "cloth_strips":    (1, 2),
+            "meat_chunk":      (1, 1),
+            "data_chip":       (0, 1),   # zapisywał wszystko
+        },
+        "salvage_time_min": 5,
+        "salvage_noise": 2,
+        "edible":          False,
+        "eat_audience_tag": "ate_human",
+        "decay_minutes":   240,
+        "smell_budget":    1,
+        "desecration_tag": "cannibal",
+    },
+    "bramkarz": {
+        "name_pl": "ciało bramkarza",
+        "lore":    "Garnitur skrojony na zamówienie. Słuchawka wciąż "
+                   "syczy w uchu. Ręce wielkości twojej głowy.",
+        "lore_id": "corpse_bramkarz",
+        "salvage": {
+            "cloth_strips":    (2, 3),
+            "leather_scraps":  (1, 2),
+            "meat_chunk":      (2, 3),
+            "scrap_metal":     (0, 1),
+        },
+        "salvage_time_min": 7,
+        "salvage_noise": 2,
+        "edible":          False,
+        "eat_audience_tag": "ate_human",
+        "decay_minutes":   300,
+        "smell_budget":    2,
+    },
+    "miniboss_szef_baru": {
+        "name_pl": "ciało Szefa Baru",
+        "lore":    "Trzykrotny zwycięzca, wrócił do roboty. Rewolwer z "
+                   "czasów, kiedy nie szanowano klientów.",
+        "lore_id": "corpse_szef_baru",
+        "salvage": {
+            "cloth_strips":    (2, 3),
+            "leather_scraps":  (1, 2),
+            "meat_chunk":      (1, 2),
+            "scrap_metal":     (1, 2),
+            "trophy_drop":     ("stary_rewolwer", 0.6),
+        },
+        "salvage_time_min": 8,
+        "salvage_noise": 2,
+        "edible":          False,
+        "eat_audience_tag": "ate_human",
+        "butcher_audience_tag": "killed_miniboss_bar",
+        "decay_minutes":   300,
+        "smell_budget":    2,
+        "desecration_tag": "cannibal",
+    },
+    "boss_showman": {
+        "name_pl": "ciało Showmana",
+        "lore":    "Smoking od krawca, którego już nie ma. Mikrofon "
+                   "wciąż ciepły. Zęby zbyt regularne — wszystkie "
+                   "wymienne.",
+        "lore_id": "corpse_boss_showman",
+        "salvage": {
+            "cloth_strips":    (3, 4),
+            "leather_scraps":  (1, 2),
+            "data_chip":       (1, 2),
+            "scrap_metal":     (1, 2),
+            "trophy_drop":     ("mikrofon_showmana", 1.0),
+        },
+        "salvage_time_min": 12,
+        "salvage_noise": 3,
+        "edible":          False,
+        "butcher_audience_tag": "killed_boss_bar",
+        "decay_minutes":   480,
+        "smell_budget":    2,
+        "desecration_tag": "kanal_7_enemy",
+    },
 }
 
 

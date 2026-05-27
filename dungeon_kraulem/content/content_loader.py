@@ -35,6 +35,9 @@ def random_encounter_template(floor_num: int = 1,
             continue
         if tmpl.get("floor_min", 1) > floor_num:
             continue
+        if (tmpl.get("floor_max") is not None
+                and tmpl.get("floor_max") < floor_num):
+            continue
         if required_tags:
             tags = set(tmpl.get("tags", []))
             if not all(t in tags for t in required_tags):
@@ -255,6 +258,11 @@ def random_room_template(role: Optional[str] = None,
     if required_tag:
         pool = [t for t in pool if required_tag in t.get("tags", [])]
     pool = [t for t in pool if t.get("floor_min", 1) <= floor_num]
+    # P29.1 — optional floor_max gate. Used to retire generic
+    # templates after a themed range takes over (e.g. pool_relay_boss
+    # is the floor-2 fallback boss; floors 3-6 use themed bosses).
+    pool = [t for t in pool
+            if t.get("floor_max") is None or t.get("floor_max") >= floor_num]
     if exclude_template_ids:
         pool = [t for t in pool if t.get("template_id") not in exclude_template_ids]
     if not pool:

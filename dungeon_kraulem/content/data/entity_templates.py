@@ -553,6 +553,287 @@ MON = {
         resists=["physical","electric"],
         vulnerable_to=["acid","psychic"],
     ),
+
+    # ═════════════════════════════════════════════════════════════════════
+    # P29.1 — Floors 3-6 themed monsters. HP/dmg values are pre-balance
+    # (×5 HP, ×4 dmg applied at module load by _apply_balance_scale).
+    # ═════════════════════════════════════════════════════════════════════
+
+    # ── Piętro 3: ZOO ─────────────────────────────────────────────────────
+    "mutant_szczur": dict(
+        name_key="ent_mutant_szczur_n", fallback_name="zmutowany szczur",
+        desc_key="ent_mutant_szczur_d",
+        fallback_desc="Dwa razy większy niż powinien. Trzy oczy. "
+                      "Ślina kapie na podłogę i syczy.",
+        tags=["monster","beast","zoo","pack","floor_min:3"],
+        affordances=["inspect","attack"],
+        hp=12, max_hp=12, ac=12, attack_bonus=3, damage_dice="1d6+1",
+        damage_type="physical",
+        vulnerable_to=["fire"],
+        floor_min=3, floor_max=4,
+    ),
+    "klatkowy_kot": dict(
+        name_key="ent_klatkowy_kot_n", fallback_name="klatkowy kot",
+        desc_key="ent_klatkowy_kot_d",
+        fallback_desc="Coś między pumą a sponsorem. Cienie pod oczami. "
+                      "Skacze na sygnał klaksonu.",
+        tags=["monster","beast","zoo","fast","floor_min:3"],
+        affordances=["inspect","attack"],
+        hp=14, max_hp=14, ac=13, attack_bonus=4, damage_dice="1d8+1",
+        damage_type="physical",
+        floor_min=3, floor_max=4,
+    ),
+    "bekajacy_paw": dict(
+        name_key="ent_bekajacy_paw_n", fallback_name="bekający paw",
+        desc_key="ent_bekajacy_paw_d",
+        fallback_desc="Paw z dodatkową szyją. Wydaje dźwięk podobny do "
+                      "głośnika z zerwanego kabla. Boli tylko z bliska.",
+        tags=["monster","beast","zoo","mental","floor_min:3"],
+        affordances=["inspect","attack"],
+        hp=10, max_hp=10, ac=12, attack_bonus=2, damage_dice="1d4",
+        damage_type="psychic",
+        vulnerable_to=["physical"],
+        floor_min=3, floor_max=4,
+    ),
+    "miniboss_alfa_szczur": dict(
+        name_key="ent_miniboss_alfa_szczur_n",
+        fallback_name="Alfa Szczurów",
+        desc_key="ent_miniboss_alfa_szczur_d",
+        fallback_desc="Tak duży, że ledwo mieści się w korytarzu. Krwawe "
+                      "kółka wokół oczu — ślad obroży, której już nie ma.",
+        tags=["monster","beast","zoo","miniboss","floor_min:3"],
+        affordances=["inspect","attack"],
+        hp=25, max_hp=25, ac=13, attack_bonus=5, damage_dice="2d4+2",
+        damage_type="physical",
+        resists=["physical"],
+        floor_min=3, floor_max=3,    # miniboss tied to ZOO floor only
+    ),
+    "boss_panicz_zoo": dict(
+        name_key="ent_boss_panicz_zoo_n",
+        fallback_name="Panicz Zoo",
+        desc_key="ent_boss_panicz_zoo_d",
+        fallback_desc="Egzemplarz numer jeden. Coś między niedźwiedziem a "
+                      "wyłudzonym kontraktem reklamowym. Nienawidzi kamer.",
+        tags=["monster","beast","zoo","floor_boss","boss","floor_min:3"],
+        affordances=["inspect","attack","intimidate"],
+        hp=40, max_hp=40, ac=14, attack_bonus=6, damage_dice="2d6+3",
+        damage_type="physical",
+        resists=["physical"],
+        vulnerable_to=["electric"],
+        floor_min=3, floor_max=3,
+    ),
+
+    # ── Piętro 4: NEIGHBORHOOD ────────────────────────────────────────────
+    "usmiechniety_sasiad": dict(
+        name_key="ent_usmiechniety_sasiad_n",
+        fallback_name="uśmiechnięty sąsiad",
+        desc_key="ent_usmiechniety_sasiad_d",
+        fallback_desc="Mundur firmowy 'Witamy w Sąsiedztwie'. Uśmiecha się "
+                      "zbyt szeroko. W ręku nóż do steka.",
+        tags=["monster","humanoid","neighborhood","floor_min:4"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=15, max_hp=15, ac=12, attack_bonus=4, damage_dice="1d6+2",
+        damage_type="physical",
+        floor_min=4, floor_max=5,
+    ),
+    "dzieciak_z_blokowiska": dict(
+        name_key="ent_dzieciak_z_blokowiska_n",
+        fallback_name="dzieciak z blokowiska",
+        desc_key="ent_dzieciak_z_blokowiska_d",
+        fallback_desc="Czapeczka z logo Ministerstwa, kieszenie pełne "
+                      "cegieł. Patrzy ci w oczy bez mrugnięcia.",
+        tags=["monster","humanoid","neighborhood","fast","floor_min:4"],
+        affordances=["inspect","attack","throw_at"],
+        hp=8, max_hp=8, ac=13, attack_bonus=3, damage_dice="1d4+1",
+        damage_type="physical",
+        floor_min=4, floor_max=5,
+    ),
+    "kucharka_z_swietlicy": dict(
+        name_key="ent_kucharka_z_swietlicy_n",
+        fallback_name="kucharka ze świetlicy",
+        desc_key="ent_kucharka_z_swietlicy_d",
+        fallback_desc="Fartuch w plamach o niejasnym pochodzeniu. Wałek "
+                      "do ciasta wielkości twojej głowy.",
+        tags=["monster","humanoid","neighborhood","floor_min:4"],
+        affordances=["inspect","attack"],
+        hp=18, max_hp=18, ac=11, attack_bonus=4, damage_dice="2d4+1",
+        damage_type="physical",
+        floor_min=4, floor_max=5,
+    ),
+    "miniboss_oddzialowa": dict(
+        name_key="ent_miniboss_oddzialowa_n",
+        fallback_name="Oddziałowa Osiedlowa",
+        desc_key="ent_miniboss_oddzialowa_d",
+        fallback_desc="Pełen mundur ochrony osiedlowej. Pas z latarką, "
+                      "gwizdkiem i pałką. Wszystko za szybko.",
+        tags=["monster","humanoid","neighborhood","miniboss","floor_min:4"],
+        affordances=["inspect","attack","intimidate"],
+        hp=28, max_hp=28, ac=13, attack_bonus=5, damage_dice="1d8+2",
+        damage_type="physical",
+        resists=["physical"],
+        floor_min=4, floor_max=4,
+    ),
+    "boss_blok_parent": dict(
+        name_key="ent_boss_blok_parent_n",
+        fallback_name="Block Parent",
+        desc_key="ent_boss_blok_parent_d",
+        fallback_desc="Matka/ojciec osiedla. Klucze do każdych drzwi. "
+                      "Pyta cię o twoje plany na życie i ma odpowiedź "
+                      "gotową, niezależnie od twojej.",
+        tags=["monster","humanoid","neighborhood","floor_boss","boss",
+              "floor_min:4"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=45, max_hp=45, ac=14, attack_bonus=6, damage_dice="2d6+2",
+        damage_type="physical",
+        resists=["psychic"],
+        vulnerable_to=["acid"],
+        floor_min=4, floor_max=4,
+    ),
+
+    # ── Piętro 5: MUSEUM ──────────────────────────────────────────────────
+    "kostny_kurator": dict(
+        name_key="ent_kostny_kurator_n",
+        fallback_name="kostny kurator",
+        desc_key="ent_kostny_kurator_d",
+        fallback_desc="Zsuszony eksponat ożywiony jakimś żartem kuratora. "
+                      "Krawat, monokl, dziura w czaszce.",
+        tags=["monster","undead","museum","floor_min:5"],
+        affordances=["inspect","attack"],
+        hp=16, max_hp=16, ac=13, attack_bonus=4, damage_dice="1d6+2",
+        damage_type="physical",
+        immune_to=["psychic"],
+        vulnerable_to=["physical"],
+        floor_min=5, floor_max=6,
+    ),
+    "duch_zwiedzajacego": dict(
+        name_key="ent_duch_zwiedzajacego_n",
+        fallback_name="duch zwiedzającego",
+        desc_key="ent_duch_zwiedzajacego_d",
+        fallback_desc="Półprzezroczysty staruszek w niemodnym płaszczu. "
+                      "Powtarza w kółko: 'GDZIE JEST WYJŚCIE? JA TYLKO "
+                      "PRZYSZEDŁEM ZOBACZYĆ.'",
+        tags=["monster","ghost","museum","mental","floor_min:5"],
+        affordances=["inspect","attack","talk"],
+        hp=12, max_hp=12, ac=14, attack_bonus=3, damage_dice="1d6",
+        damage_type="psychic",
+        immune_to=["physical"],
+        vulnerable_to=["fire","electric"],
+        floor_min=5, floor_max=6,
+    ),
+    "mechaniczny_strazak": dict(
+        name_key="ent_mechaniczny_strazak_n",
+        fallback_name="mechaniczny strażak",
+        desc_key="ent_mechaniczny_strazak_d",
+        fallback_desc="Sprzęt z czasów, gdy gasili pożary. Teraz zrasza "
+                      "wszystko co się rusza. Hose w prawej dłoni, w lewej "
+                      "ostrzeżenie.",
+        tags=["monster","machine","museum","floor_min:5"],
+        affordances=["inspect","attack","hack"],
+        hp=20, max_hp=20, ac=14, attack_bonus=4, damage_dice="1d8+1",
+        damage_type="acid",
+        resists=["fire","physical"],
+        vulnerable_to=["electric"],
+        floor_min=5, floor_max=6,
+    ),
+    "miniboss_strazak_galerii": dict(
+        name_key="ent_miniboss_strazak_galerii_n",
+        fallback_name="Strażak Galerii",
+        desc_key="ent_miniboss_strazak_galerii_d",
+        fallback_desc="Mundur galeryjny z odznaką naczelnika. Elektryczna "
+                      "pałka pierwszej generacji — bije mocno, ładuje "
+                      "się długo.",
+        tags=["monster","humanoid","museum","miniboss","floor_min:5"],
+        affordances=["inspect","attack"],
+        hp=28, max_hp=28, ac=14, attack_bonus=5, damage_dice="2d4+3",
+        damage_type="electric",
+        resists=["physical"],
+        vulnerable_to=["psychic"],
+        floor_min=5, floor_max=5,
+    ),
+    "boss_kurator_naczelny": dict(
+        name_key="ent_boss_kurator_naczelny_n",
+        fallback_name="Kurator Naczelny",
+        desc_key="ent_boss_kurator_naczelny_d",
+        fallback_desc="Sześciopalca prawa dłoń, monokl z drugiej strony, "
+                      "szlafrok który nigdy nie zaznał prania. Patrzy "
+                      "na ciebie jak na nową kolekcję.",
+        tags=["monster","humanoid","museum","floor_boss","boss",
+              "occult","floor_min:5"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=42, max_hp=42, ac=15, attack_bonus=6, damage_dice="2d6+2",
+        damage_type="psychic",
+        resists=["psychic","cold"],
+        vulnerable_to=["physical","fire"],
+        floor_min=5, floor_max=5,
+    ),
+
+    # ── Piętro 6: BAR ─────────────────────────────────────────────────────
+    "pijany_crawler": dict(
+        name_key="ent_pijany_crawler_n",
+        fallback_name="pijany crawler",
+        desc_key="ent_pijany_crawler_d",
+        fallback_desc="Spóźniony bohater poprzednich pięter. Tatuaż z "
+                      "logo sponsora wyblakły. Pije, póki nie pomyśli.",
+        tags=["monster","humanoid","crawler","bar","floor_min:6"],
+        affordances=["inspect","attack","talk"],
+        hp=14, max_hp=14, ac=11, attack_bonus=3, damage_dice="1d6+1",
+        damage_type="physical",
+        floor_min=6, floor_max=8,
+    ),
+    "lokator_baru": dict(
+        name_key="ent_lokator_baru_n",
+        fallback_name="lokator baru",
+        desc_key="ent_lokator_baru_d",
+        fallback_desc="Pije tu od piętra trzeciego. Wie wszystko. Nic nie "
+                      "powie za darmo. Atakuje tylko gdy go obrażasz.",
+        tags=["monster","humanoid","crawler","bar","social","floor_min:6"],
+        affordances=["inspect","attack","talk","bribe"],
+        hp=16, max_hp=16, ac=12, attack_bonus=3, damage_dice="1d6+1",
+        damage_type="physical",
+        floor_min=6, floor_max=8,
+    ),
+    "bramkarz": dict(
+        name_key="ent_bramkarz_n",
+        fallback_name="bramkarz",
+        desc_key="ent_bramkarz_d",
+        fallback_desc="Czarny garnitur, mała słuchawka w uchu, ręce "
+                      "wielkości twojej głowy. Praca mu się podoba.",
+        tags=["monster","humanoid","bar","floor_min:6"],
+        affordances=["inspect","attack","intimidate"],
+        hp=22, max_hp=22, ac=13, attack_bonus=5, damage_dice="1d10+1",
+        damage_type="physical",
+        resists=["physical"],
+        floor_min=6, floor_max=8,
+    ),
+    "miniboss_szef_baru": dict(
+        name_key="ent_miniboss_szef_baru_n",
+        fallback_name="Szef Baru",
+        desc_key="ent_miniboss_szef_baru_d",
+        fallback_desc="Stary crawler, który wygrał trzy razy i wrócił "
+                      "do roboty. W kaburze pod ladą rewolwer z czasów "
+                      "kiedy nie szanowano klientów.",
+        tags=["monster","humanoid","bar","miniboss","floor_min:6"],
+        affordances=["inspect","attack","intimidate","talk","bribe"],
+        hp=30, max_hp=30, ac=13, attack_bonus=5, damage_dice="2d6+1",
+        damage_type="physical",
+        floor_min=6, floor_max=6,
+    ),
+    "boss_showman": dict(
+        name_key="ent_boss_showman_n",
+        fallback_name="Showman",
+        desc_key="ent_boss_showman_d",
+        fallback_desc="Smoking, mikrofon, zęby zbyt regularne. Prowadzi "
+                      "skecz Kanału 7 od piętnastu sezonów. Wie, że "
+                      "twoja śmierć podniesie ratingi.",
+        tags=["monster","humanoid","bar","floor_boss","boss","social",
+              "floor_min:6"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=44, max_hp=44, ac=14, attack_bonus=6, damage_dice="2d6+3",
+        damage_type="physical",
+        resists=["psychic"],
+        vulnerable_to=["fire"],
+        floor_min=6, floor_max=6,
+    ),
 }
 
 

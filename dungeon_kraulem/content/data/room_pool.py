@@ -475,6 +475,439 @@ ROOM_POOL = [
         "floor_min": 1,
     },
 
+    # ═════════════════════════════════════════════════════════════════════
+    # P29.1 — Piętra 3-6 content. DCC-themed: ZOO / NEIGHBORHOOD /
+    # MUSEUM / BAR. Each floor has 3 themed templates: a combat room,
+    # a danger/loot room, and the floor boss. Monsters & sponsors are
+    # in entity_templates.py and content/data/sponsors.py respectively.
+    # ═════════════════════════════════════════════════════════════════════
+
+    # ── Piętro 3: ZOO (sponsor: Czarny Rynek) ─────────────────────────────
+    {
+        "template_id": "pool_cage_block",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "zoo", "animal"],
+        "name_pool": ["Klatkowy Sektor B", "Sala Egzotyczna",
+                      "Korytarz Klatek 3"],
+        "first_enter_pool": [
+            "Klatki. Niektóre puste, niektóre nie. Powietrze pachnie sianem, "
+            "potem i czymś, co kiedyś żyło zbyt długo. Ze ścian odbija się "
+            "wycie — nie wiesz, czy zwierzęce, czy z głośnika.",
+        ],
+        "look_pool": [
+            "Pręty wygięte od środka. Karmnik przewrócony. W kącie kałuża, "
+            "której nikt nie sprząta. Coś chodzi tu i z powrotem.",
+        ],
+        "search_pool": [
+            "Pod złamaną kratą znajdujesz kartkę: 'EGZEMPLARZ 7 — NIE KARMIĆ "
+            "PALCAMI. PALCE NA WYŻYWIENIE'.",
+        ],
+        "public_hint_pool": [
+            "Pazury po podłodze. Ciężkie sapanie zza krat.",
+            "Coś macha ogonem o pręt. Rytmicznie.",
+        ],
+        "sensory_tags": ["fur", "blood", "animal_smell"],
+        "entity_seed_pools": {
+            "mon":  ["mutant_szczur", "klatkowy_kot"],
+            "env":  ["broken_cage", "feeding_trough", "loose_chain"],
+            "item": ["snack_bar"],
+        },
+        "exit_hints": ["wschód", "zachód", "korytarz"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_feeding_pit",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "zoo"],
+        "name_pool": ["Pit Karmienia", "Resztki Atrakcji", "Dół"],
+        "first_enter_pool": [
+            "Schodzisz po metalowych szczeblach w dół. Smród uderza pierwszy. "
+            "Na dnie szczątki — kości, futro, paragony. Ktoś prowadził tu "
+            "rachunkowość, a potem przestał.",
+        ],
+        "look_pool": [
+            "Stos szkieletów, pęknięta beczka po krwi, połamana sponsoreska "
+            "tabliczka. Wgnieciona barierka — coś tu z dołu wyszło.",
+        ],
+        "search_pool": [
+            "W gruzowisku znajdujesz nadgryzioną torbę z odznaczeniem "
+            "Czarnego Rynku i parę kredytów rozsypanych po kościach.",
+        ],
+        "public_hint_pool": [
+            "Brzęczą muchy. Inaczej cicho.",
+        ],
+        "sensory_tags": ["rot", "metal", "blood_dried"],
+        "entity_seed_pools": {
+            "mon":  ["bekajacy_paw"],
+            "env":  ["bone_pile", "broken_barrel", "sponsor_plaque_cracked"],
+            "item": ["dirty_bandage", "snack_bar"],
+        },
+        "exit_hints": ["góra", "drabina"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_zoo_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "zoo"],
+        "name_pool": ["Apex Klatka", "Sala Główna Pokazów",
+                      "Arena Egzemplarza"],
+        "first_enter_pool": [
+            "Olbrzymia okrągła sala. Trybuny puste. Pośrodku — klatka "
+            "centralna, otwarta. Coś z niej wyszło i siedzi na trybunach. "
+            "Reflektor punktowo śledzi to coś. Drzwi wyjściowe za areną.",
+        ],
+        "look_pool": [
+            "Arena. Trybuny. Reflektor podąża za tym czymś. Drzwi na "
+            "drugim końcu mają tabliczkę: 'WYJŚCIE Z PIĘTRA — TYLKO PO "
+            "ROZWIĄZANIU PROBLEMU'.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Pomruk. Bardzo niski. Nie wiesz, czy z głośnika, czy z gardła.",
+        ],
+        "sensory_tags": ["bright", "loud", "blood"],
+        "entity_seed_pools": {
+            "mon": ["boss_panicz_zoo"],
+            "env": ["sponsor_camera", "feeding_trough"],
+        },
+        "exit_hints": ["wyjście piętra", "wschód"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 3,
+        "unique_per_floor": True,
+    },
+
+    # ── Piętro 4: NEIGHBORHOOD (sponsor: Ministerstwo) ────────────────────
+    {
+        "template_id": "pool_kuchnia_sasiada",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "domestic", "neighborhood"],
+        "name_pool": ["Kuchnia Pana Sąsiada", "Jadalnia z Frywolnością",
+                      "Bistro Mieszkańca"],
+        "first_enter_pool": [
+            "Wnętrze tańsze niż wygląda. Stół zastawiony jak na święta, "
+            "ale wszystko zimne. Z piekarnika sączy się dym, który nie "
+            "pachnie jak chleb. Sąsiad uśmiecha się od progu — za szeroko.",
+        ],
+        "look_pool": [
+            "Stół. Talerze. Sąsiad. Sąsiad nie mruga. Z piekarnika płynie "
+            "wąska strużka czerwonego.",
+        ],
+        "search_pool": [
+            "Pod talerzem znajdujesz wycinek z gazety: 'PRAWDZIWE SĄSIEDZTWO "
+            "GŁOSUJE GOTOWE NOŻE'.",
+        ],
+        "public_hint_pool": [
+            "Cichy dzwonek z piekarnika. Sąsiad nuci coś z reklamy.",
+        ],
+        "sensory_tags": ["warm", "burnt_meat", "polish_floor"],
+        "entity_seed_pools": {
+            "mon":  ["usmiechniety_sasiad"],
+            "env":  ["set_table", "smoking_oven", "wall_clock"],
+            "item": ["cheap_knife"],
+        },
+        "exit_hints": ["korytarz", "ogród", "spiżarnia"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
+        "floor_min": 4,
+    },
+    {
+        "template_id": "pool_ogrod_szczescia",
+        "role": "danger",
+        "actual_type": "trap",
+        "tags": ["dangerous", "hazard", "neighborhood", "non_combat"],
+        "name_pool": ["Ogród Szczęścia", "Ogródek Pani M.",
+                      "Trawnik z Hasłem"],
+        "first_enter_pool": [
+            "Sztuczna trawa, sztuczne słońce. Płot z plastiku. Na "
+            "pagórku tabliczka: 'TUTAJ JEST DOBRZE. NIE WCHODŹ NA "
+            "TRAWNIK.' Pod trawą — coś metalowego, błyszczy.",
+        ],
+        "look_pool": [
+            "Płot. Tabliczka. Pod trawą widać setki cienkich linek. "
+            "Krzaki kiwają się bez wiatru.",
+        ],
+        "search_pool": [
+            "Pod sztuczną darnią znajdujesz potykacz z drutu i pęczek "
+            "etykietek 'GOSPODARCZA ZNALEZIONA'.",
+        ],
+        "public_hint_pool": [
+            "Wieje wiatr, którego nie czujesz na skórze.",
+        ],
+        "sensory_tags": ["plastic", "fake_sun", "wire"],
+        "entity_seed_pools": {
+            "mon":  ["dzieciak_z_blokowiska"],
+            "haz":  ["trip_wire_array"],
+            "env":  ["plastic_fence", "neighborhood_sign", "fake_grass"],
+        },
+        "exit_hints": ["bramka", "tylne wejście"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 5,
+        "floor_min": 4,
+    },
+    {
+        "template_id": "pool_swietlica_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "neighborhood"],
+        "name_pool": ["Świetlica Osiedlowa", "Sala Wspólnoty",
+                      "Dom Sąsiedzki"],
+        "first_enter_pool": [
+            "Sala konferencyjna z plastikowymi krzesełkami w okręgu. "
+            "Pośrodku — fotel z poduszką. W fotelu siedzi Block Parent. "
+            "Uśmiecha się tak, jak uśmiecha się ktoś, kto wie więcej "
+            "o twoim dzieciństwie niż ty sam.",
+        ],
+        "look_pool": [
+            "Krzesełka. Fotel. Block Parent. Tabliczka z napisem "
+            "'KIEROWNICTWO OSIEDLOWE — WSTĘP PO ZATWIERDZENIU' nad "
+            "drzwiami wyjściowymi.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Stary plakat 'Dobry sąsiad nie pyta o twoje plany' szeleści.",
+        ],
+        "sensory_tags": ["fluorescent", "old_carpet", "tea"],
+        "entity_seed_pools": {
+            "mon": ["boss_blok_parent"],
+            "env": ["sponsor_camera", "wall_clock", "neighborhood_sign"],
+        },
+        "exit_hints": ["wyjście piętra", "biuro"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 4,
+        "unique_per_floor": True,
+    },
+
+    # ── Piętro 5: MUSEUM (sponsor: Recykling Świętej Pamięci) ─────────────
+    {
+        "template_id": "pool_galeria",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "museum", "fragile"],
+        "name_pool": ["Galeria Wschodnia", "Sala Eksponatów",
+                      "Krużganek Pamięci"],
+        "first_enter_pool": [
+            "Wysokie sklepienie, marmurowa posadzka. Gabloty z eksponatami. "
+            "Pod jedną z nich błyska niebieska dioda — alarm gotowy. "
+            "Cisza tak głęboka, że słyszysz własne oczy.",
+        ],
+        "look_pool": [
+            "Gabloty. Eksponaty: stara konsola gier, dyplom uczelni, "
+            "płyta winylowa, telefon z klapką. Każde ma tabliczkę "
+            "'PAMIĘĆ ZE ŚWIATA PRZED ZAŁAMANIEM'.",
+        ],
+        "search_pool": [
+            "Pod jedną gablotą znajdujesz mosiężny klucz z etykietą "
+            "'MAGAZYN B-2 / RELIKWIE NIEAUTORYZOWANE'.",
+        ],
+        "public_hint_pool": [
+            "Z głębi szepty. Brzęk metalu o szkło.",
+        ],
+        "sensory_tags": ["echo", "dust", "old_paper"],
+        "entity_seed_pools": {
+            "mon":  ["kostny_kurator", "duch_zwiedzajacego"],
+            "haz":  ["broken_glass_field"],
+            "env":  ["display_case", "exhibit_plaque", "velvet_rope"],
+        },
+        "exit_hints": ["wschód", "magazyn", "korytarz"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
+        "floor_min": 5,
+    },
+    {
+        "template_id": "pool_magazyn_relikwii",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "museum", "contraband"],
+        "name_pool": ["Magazyn B-2", "Skarbiec Niepowiązany",
+                      "Archiwum Pomijane"],
+        "first_enter_pool": [
+            "Sala zamknięta. Regały do sufitu, na nich pudła oznaczone "
+            "kodem. Klimatyzacja syczy. Na jednej półce — przedmiot, "
+            "który wygląda jak zwykła rękawiczka, ale dłoń pamięta "
+            "co miała w niej zrobić.",
+        ],
+        "look_pool": [
+            "Regały. Pudła. Kilka rzeczy stoi otwartych — ktoś tu "
+            "ostatnio przebierał.",
+        ],
+        "search_pool": [
+            "W jednym z pudeł znajdujesz mały okrągły artefakt z "
+            "ciepłym rdzeniem. 'NIE NOSIĆ DŁUŻEJ NIŻ 4h'.",
+        ],
+        "public_hint_pool": [
+            "Klimatyzacja syczy. Coś szura w głębi półek.",
+        ],
+        "sensory_tags": ["cold", "stale_air", "rust"],
+        "entity_seed_pools": {
+            "mon":  ["mechaniczny_strazak"],
+            "env":  ["metal_shelf", "sealed_crate", "ventilation_grate"],
+            "item": ["amulet_szczescia"],
+        },
+        "exit_hints": ["galeria", "wentylacja"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 5,
+    },
+    {
+        "template_id": "pool_kurator_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "museum"],
+        "name_pool": ["Gabinet Kuratora", "Sala Tronowa Eksponatów",
+                      "Pokój Naczelnika Zbiorów"],
+        "first_enter_pool": [
+            "Półokrągła sala. Pośrodku — biurko z mahonu. Za biurkiem "
+            "Kurator Naczelny: szlafrok, monokl, sześć palców u prawej "
+            "dłoni. Za nim drzwi z napisem 'EKSPONOWANIE ZAKOŃCZONE'.",
+        ],
+        "look_pool": [
+            "Biurko. Kurator. Drzwi. Na ścianie wisi twoje zdjęcie "
+            "z metryczką: 'EGZEMPLARZ — DO ZAKLASYFIKOWANIA'.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Cichy tykot zegara, którego nigdzie nie widać.",
+        ],
+        "sensory_tags": ["wood", "leather", "old_books"],
+        "entity_seed_pools": {
+            "mon": ["boss_kurator_naczelny"],
+            "env": ["display_case", "exhibit_plaque"],
+        },
+        "exit_hints": ["wyjście piętra", "galeria"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 5,
+        "unique_per_floor": True,
+    },
+
+    # ── Piętro 6: BAR (sponsor: Kanał 7 Krawędź) ──────────────────────────
+    {
+        "template_id": "pool_glowna_sala_baru",
+        "role": "social",
+        "actual_type": "safehouse",
+        "tags": ["social", "bar", "crawler", "rumor"],
+        "safehouse_subtype": "bar",
+        "name_pool": ["Bar 'Ostatni Łyk Piętra 6'",
+                      "Pub 'Pod Zerwaną Antenę'",
+                      "Knajpa 'Kanał Siódmy'"],
+        "first_enter_pool": [
+            "Drewniana podłoga lepi się od piwa wczorajszego. Bar pełny "
+            "crawlerów. Wszyscy wyglądają, jakby tu siedzieli zbyt długo. "
+            "Z głośnika leci skecz Kanału 7, ale nikt się nie śmieje.",
+        ],
+        "look_pool": [
+            "Bar. Krzesła. Kilkunastu crawlerów. Kilkoro patrzy na ciebie, "
+            "kilkoro nie. Drzwi do zaplecza nad wejściem mają 'CISZA — "
+            "FIGHT CLUB W CISZY'.",
+        ],
+        "search_pool": [
+            "Pod kontuarem znajdujesz kupon na darmowy drink i wycinek "
+            "z papier-mâché o Showmanie z VIPu.",
+        ],
+        "public_hint_pool": [
+            "Brzęk szkła. Cichy śmiech. Kanał 7 mruczy z głośnika.",
+        ],
+        "sensory_tags": ["dim", "beer", "smoke", "crowd"],
+        "entity_seed_pools": {
+            "npc":  [("pijany_crawler", "neutral"),
+                     ("lokator_baru", "neutral")],
+            "env":  ["beer_tap", "broken_chair", "tv_with_kanal_7"],
+            "item": ["coffee"],
+        },
+        "exit_hints": ["zaplecze", "balkon VIP", "korytarz"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 6,
+        "unique_per_floor": True,
+    },
+    {
+        "template_id": "pool_zaplecze_bar",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "bar", "underground"],
+        "name_pool": ["Zaplecze 'Cisza'", "Sala Bez Imienia",
+                      "Beton Pod Barem"],
+        "first_enter_pool": [
+            "Beton, gołe ściany, krew na podłodze. Krąg crawlerów wokół "
+            "dwóch walczących. Bramkarz cię widzi i pokazuje palcem: "
+            "'Następny.' Z głośników syk.",
+        ],
+        "look_pool": [
+            "Beton. Krew. Krąg. Bramkarz. Wyjście do baru i zejście "
+            "do piwnicy.",
+        ],
+        "search_pool": [
+            "Pod jednym z krzeseł znajdujesz zwitek banknotów z napisem "
+            "'JEŚLI NIE WYJDZIESZ — TO JEST DLA TWOICH'.",
+        ],
+        "public_hint_pool": [
+            "Pięść w kość. Brawa bez radości.",
+        ],
+        "sensory_tags": ["concrete", "sweat", "blood_fresh"],
+        "entity_seed_pools": {
+            "mon":  ["bramkarz"],
+            "env":  ["broken_chair", "blood_pool", "old_speaker"],
+        },
+        "exit_hints": ["bar", "piwnica"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 5,
+        "floor_min": 6,
+    },
+    {
+        "template_id": "pool_balkon_vip_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "bar", "social"],
+        "name_pool": ["Balkon VIP Kanału 7", "Sala Showmana",
+                      "Wieczorny Specjalny"],
+        "first_enter_pool": [
+            "Wąskie schody w górę kończą się drzwiami z czerwonym "
+            "kotarą. Za kotarą — mały bar oświetlony jak studio. "
+            "W fotelu Showman: smoking, mikrofon, zęby. 'Witaj, "
+            "gościu. Nasi widzowie czekali na ciebie cały odcinek.'",
+        ],
+        "look_pool": [
+            "Studio-bar. Showman. Mikrofon. Drzwi za jego plecami "
+            "to wyjście z piętra — ale Showman blokuje.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Brawy z głośnika. Showman pyta o twoje plany.",
+        ],
+        "sensory_tags": ["spotlight", "champagne", "applause_loop"],
+        "entity_seed_pools": {
+            "mon": ["boss_showman"],
+            "env": ["sponsor_camera", "studio_light", "microphone"],
+        },
+        "exit_hints": ["wyjście piętra", "schody w dół"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 6,
+        "unique_per_floor": True,
+    },
+
     # ── Boss / objective gate ───────────────────────────────────────────────
     {
         "template_id": "pool_relay_boss",
@@ -503,7 +936,8 @@ ROOM_POOL = [
         "guaranteed_min_exits": 2,
         "guaranteed_max_exits": 3,
         "weight": 1,            # only 1 per floor; generator forces uniqueness
-        "floor_min": 1,
+        "floor_min": 2,        # P29.1: gated to floor 2 (fallback gate)
+        "floor_max": 2,        # so floors 3-6 use their themed bosses
         "unique_per_floor": True,
     },
 ]
