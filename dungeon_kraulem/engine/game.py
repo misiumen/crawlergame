@@ -200,10 +200,9 @@ class Game:
         if not ch.near_death_used:
             ch.hp = 1
             ch.near_death_used = True
-            try:
+            from ._debug import swallow
+            with swallow("audio.play_sfx[last_stand]"):
                 audio.play_sfx("player_hit")
-            except Exception:
-                pass
             self.log("Anti-host warknął: „NIE TAK SZYBKO.” "
                      "Resztki adrenaliny — zostajesz na 1 HP. Raz.",
                      LOG_DANGER)
@@ -245,23 +244,19 @@ class Game:
         except Exception:
             self.log("Tracisz nitkę. Reszta jest hałasem.", LOG_DANGER)
         # SFX
-        try:
+        from ._debug import swallow
+        with swallow("audio.play_sfx[player_death]"):
             audio.play_sfx("player_death")
-        except Exception:
-            pass
         # P29.26 — append run to persistent history BEFORE deleting
         # the slot. record_run reads the same world so order matters.
-        try:
+        from ._debug import swallow as _swallow
+        with _swallow("run_history.record_run[death]"):
             from . import run_history as _rh
             _rh.record_run(self.world, victory=False)
-        except Exception:
-            pass
         # Permadeath: wipe the save so resume can't bring you back.
-        try:
+        with _swallow("save_load.delete[death]"):
             from . import save_load
             save_load.delete()
-        except Exception:
-            pass
         self.state = STATE_DEFEAT
         return True
 

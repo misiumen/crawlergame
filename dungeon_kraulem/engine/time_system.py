@@ -60,28 +60,25 @@ def advance(world, minutes: int):
     # P29.18 — show-director interventions. One roll per tick; the
     # module itself gates by audience band, per-floor cap, and an
     # 8-minute cooldown.
-    try:
+    # P29.32 — silent swallow now goes through _debug.swallow so
+    # devs can flip DK_DEBUG=1 and see what's actually breaking.
+    from ._debug import swallow as _swallow
+    with _swallow("show_director.maybe_fire"):
         from . import show_director as _sd
         _sd.maybe_fire(world)
-    except Exception:
-        pass
 
     # P29.18 — proxy-war event check. Cheap to call every tick; the
     # module owns the per-pair cooldown and per-floor cap, so this
     # only actually fires when conditions converge.
-    try:
+    with _swallow("proxy_wars.maybe_fire"):
         from . import proxy_wars as _pw
         _pw.maybe_fire(world)
-    except Exception:
-        pass
 
     # P29.20 — companion idle chatter. Module owns its own cooldown
     # (~25 min between idle lines), so calling every tick is safe.
-    try:
+    with _swallow("companion_voice.maybe_say[idle]"):
         from . import companion_voice as _cv
         _cv.maybe_say(world, "idle")
-    except Exception:
-        pass
 
     # Day-change event
     if f.day_number() != prev_day:
