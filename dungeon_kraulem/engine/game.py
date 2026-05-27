@@ -1933,29 +1933,35 @@ class Game:
         # Successful validation also consumes the preresolved hint.
         self._preresolved_target_id = None
 
-        # Prompt 22 bug fix: `sprawdź X` was silent — inspect had no
-        # handler that printed the entity's description. Affordances
-        # resolve happily but no line lands in the log. Now we
-        # surface the desc directly when the player inspects a
-        # matched entity.
+        # P29.5 — `sprawdź X` is now a state-driven scout action with
+        # real mechanical cost (1 turn + noise bump). State machine:
+        #   unknown → seen  (partial info: shape + "look closer")
+        #   seen    → inspected (full stats card)
+        #   inspected → re-print, no state change
         if intent.intent == "inspect" and v.matched_entities:
             ent = v.matched_entities[0]
-            from ..ui.lang import t as _t
-            desc = ""
-            if getattr(ent, "desc_key", ""):
-                desc = _t(ent.desc_key, fallback=ent.fallback_desc or "")
-            else:
-                desc = ent.fallback_desc or ""
-            if desc:
-                self.log(desc, LOG_NORMAL)
-            else:
-                # Fallback when content omits a desc: at least don't
-                # be silent — say something neutral.
-                self.log(t("feedback_inspect_empty",
-                           fallback=f"Patrzysz na: {ent.display_name()}. "
-                                    f"Nic ponad to.",
-                           name=ent.display_name()),
+            from . import visibility as _vis
+            state = _vis.get_state(ent)
+            if state == _vis.STATE_UNKNOWN:
+                _vis.mark_seen(ent)
+                shape = _vis.shape_for_unknown(ent)
+                self.log(f"Przyglądasz się. {shape.capitalize()} — "
+                         f"„{ent.display_name()}”. (następna sprawdź ujawni szczegóły)",
                          LOG_NORMAL)
+            else:
+                # seen or inspected → emit full card and (if seen) promote
+                lines = _vis.build_inspect_block(self.world, ent)
+                _vis.mark_inspected(self.world, ent)
+                for ln in lines:
+                    self.log(ln, LOG_NORMAL)
+            # Time cost + noise — scouting takes a turn and slightly
+            # rouses the room (you're moving / poking).
+            try:
+                if time_system is not None:
+                    time_system.advance(self.world, 1)
+                self._bump_threat(1, source="inspect")
+            except Exception:
+                pass
 
         # P24.5: use-handler for map items. Reveals rooms via the
         # floor's known/revealed sets so the minimap surfaces them.
@@ -3903,6 +3909,13 @@ class Game:
             # Prompt 26a — scale damage by the zone's multiplier (head 1.5×,
             # limbs 0.8×, etc.).
             dmg = max(1, int(round(dmg * zone_dmg_mul)))
+            # P29.5 — landing a hit reveals full stats (you learn HP
+            # and AC from combat math). Promote target → inspected.
+            try:
+                from . import visibility as _vis
+                _vis.mark_inspected(self.world, target)
+            except Exception:
+                pass
             # Apply via damage module (resistance + status on hit).
             res = _dmg.apply_damage(self.world, target, dmg,
                                     damage_type=dmg_type,

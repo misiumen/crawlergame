@@ -507,6 +507,14 @@ def _build_room_from_template(node_id: str, role: str, tmpl: Dict,
         for key in keys:
             ent = _seed_to_entity(kind, key, node_id, world, floor_num, rng)
             if ent is not None:
+                # P29.5 — fog of war: new spawn defaults to `unknown`.
+                # If player has previously inspected this entity key,
+                # promote to `seen` (recognition across floors).
+                try:
+                    from . import visibility as _vis
+                    _vis.respect_known_key_on_spawn(world, ent)
+                except Exception:
+                    pass
                 r.entities.append(ent)
                 world.register(ent)
 

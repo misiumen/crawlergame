@@ -75,6 +75,14 @@ class Entity:
     # for the enemy. Stealth/hide and time bring it back down.
     threat_level: int = 0
 
+    # P29.5 — fog-of-war / scout layer. Player must `sprawdź X` to
+    # learn what something actually is. States:
+    #   "unknown"    — sylwetka tylko (vague shape from tags)
+    #   "seen"       — display_name + HP bar (no stats numbers)
+    #   "inspected"  — full card (HP/AC/dmg/threat/resists/etc.)
+    # See engine/visibility.py for transitions.
+    visibility_state: str = "unknown"
+
     def is_alive(self) -> bool:
         return self.hp > 0 if self.max_hp > 0 else True
 
@@ -101,6 +109,7 @@ class Entity:
             "immune_to": list(self.immune_to),
             "body_parts": {k: dict(v) for k, v in (self.body_parts or {}).items()},
             "threat_level": int(self.threat_level or 0),
+            "visibility_state": str(self.visibility_state or "unknown"),
         }
 
     @classmethod
@@ -134,6 +143,7 @@ class Entity:
         bp = d.get("body_parts") or {}
         e.body_parts = {k: dict(v) for k, v in bp.items()}
         e.threat_level = int(d.get("threat_level", 0) or 0)
+        e.visibility_state = str(d.get("visibility_state") or "unknown")
         return e
 
     def display_name(self):

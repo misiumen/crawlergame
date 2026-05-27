@@ -46,6 +46,14 @@ class WorldState:
     known_passwords: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     unlocked_paths: List[str] = field(default_factory=list)
 
+    # P29.5 — entity-key recognition. Once you `sprawdź` (or kill) an
+    # entity of a given `key`, future spawns of that same key arrive
+    # as already `seen` (you know what tunnel_runt looks like).
+    # NOTE per user: DCC floors should differ radically, so in practice
+    # the same key rarely repeats — but the field is here for the rare
+    # cases when it does.
+    known_entity_keys: List[str] = field(default_factory=list)
+
     # Prompt 18: sponsor / audience v1.
     # `sponsor_interventions_used` is a list of InterventionRecord — set
     # by `engine.sponsors`. Old saves load as []. Pending queues are
@@ -126,6 +134,7 @@ class WorldState:
             "known_routes": dict(self.known_routes or {}),
             "known_passwords": dict(self.known_passwords or {}),
             "unlocked_paths": list(self.unlocked_paths or []),
+            "known_entity_keys": list(self.known_entity_keys or []),
             # Prompt 18 — sponsor/audience state. Lazy import to avoid a
             # circular dependency at module load.
             "sponsor_interventions_used": _serialize_interventions(self),
@@ -160,6 +169,7 @@ class WorldState:
         w.known_routes    = dict(d.get("known_routes") or {})
         w.known_passwords = dict(d.get("known_passwords") or {})
         w.unlocked_paths  = list(d.get("unlocked_paths") or [])
+        w.known_entity_keys = list(d.get("known_entity_keys") or [])
         # Prompt 18 — sponsor/audience. Old saves predate these fields;
         # default-empty values are safe. Lazy import keeps the engine
         # importable when the sponsor module is being unit-tested in

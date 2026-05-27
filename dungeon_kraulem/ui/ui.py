@@ -537,13 +537,27 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None):
     if visible:
         text(surf, t("ui_visible", fallback="Widzisz:"), x + 14, cy, ACCENT,
              L.font_small, True); cy += 18
+        # P29.5 — fog of war: unknown entities render as vague shapes
+        # in dim text; only seen/inspected show real names.
+        try:
+            from ..engine import visibility as _vis
+        except Exception:
+            _vis = None
         for e in visible:
-            name = e.display_name()
-            tag = ""
-            if e.entity_type == "monster":   tag = " ⚔"
-            elif e.entity_type == "crawler": tag = " ☻"
-            elif e.entity_type == "hazard":  tag = " ⚠"
-            text(surf, f"  • {name}{tag}", x + 16, cy, NORMAL_TEXT, L.font_small); cy += 16
+            if _vis is not None and _vis.is_unknown(e):
+                name = _vis.shape_for_unknown(e)
+                line_col = DIM_TEXT
+                tag = " ?"   # marker: needs `sprawdź`
+            else:
+                name = e.display_name()
+                line_col = NORMAL_TEXT
+                if e.entity_type == "monster":   tag = " ⚔"
+                elif e.entity_type == "crawler": tag = " ☻"
+                elif e.entity_type == "hazard":  tag = " ⚠"
+                else:                            tag = ""
+                if _vis is not None and _vis.is_inspected(e):
+                    tag += " ✓"
+            text(surf, f"  • {name}{tag}", x + 16, cy, line_col, L.font_small); cy += 16
             if cy > y + h - 80: break
 
     if room.exits:
@@ -1986,9 +2000,26 @@ def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
                                           cx + 6, y + 6,
                                           port_size, port_size)
         # Name + HP + statuses.
+        # P29.5 — fog of war: unknown → "???" + vague shape, no stats.
+        # seen → name + HP bar but no AC/HP numbers. inspected → all.
+        try:
+            from ..engine import visibility as _vis
+            vis_state = _vis.get_state(ent)
+        except Exception:
+            _vis = None
+            vis_state = "inspected"
         nm_x = cx + 6 + port_size + 8
         nm_w = card_w - (port_size + 22)
-        nm = ent.display_name()
+        if vis_state == "unknown":
+            nm = "???"
+            stats_line = (_vis.shape_for_unknown(ent) if _vis else "?")
+        else:
+            nm = ent.display_name()
+            if vis_state == "seen":
+                # Name shows; numbers hidden.
+                stats_line = "HP ??/??  AC ??"
+            else:   # inspected
+                stats_line = f"HP {ent.hp}/{ent.max_hp}  AC {ent.ac}"
         f_nm = font(L.font_small - 1, bold=is_sel)
         # Trim to fit.
         if f_nm.size(nm)[0] > nm_w:
@@ -1997,9 +2028,15 @@ def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
             nm += "…"
         img = f_nm.render(nm, True, BRIGHT_TEXT if is_sel else NORMAL_TEXT)
         surf.blit(img, (nm_x, y + 6))
-        # HP bar.
-        hp_bar(surf, nm_x, y + 22, nm_w, 8, ent.hp, ent.max_hp)
-        text(surf, f"HP {ent.hp}/{ent.max_hp}  AC {ent.ac}",
+        # HP bar — empty box for unknown, partial for seen, exact for
+        # inspected. Pass max_hp=0 to force "unknown" rendering when
+        # unknown; otherwise use real values.
+        if vis_state == "unknown":
+            # Draw empty grey rect as silhouette of an HP bar.
+            pygame.draw.rect(surf, BORDER, (nm_x, y + 22, nm_w, 8), 1)
+        else:
+            hp_bar(surf, nm_x, y + 22, nm_w, 8, ent.hp, ent.max_hp)
+        text(surf, stats_line,
              nm_x, y + 32, NORMAL_TEXT, L.font_small - 2)
         # Statuses (truncated).
         if ent.conditions:
