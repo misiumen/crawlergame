@@ -208,6 +208,12 @@ class Game:
             self.log("Anti-host warknął: „NIE TAK SZYBKO.” "
                      "Resztki adrenaliny — zostajesz na 1 HP. Raz.",
                      LOG_DANGER)
+            # P29.12 — tutorial: explain that last-stand is one-shot.
+            try:
+                from . import tutorial as _tut
+                _tut.try_show_tip(self.world, "low_hp", force_any_floor=True)
+            except Exception:
+                pass
             return False
         # Real death.
         ch.run_death_cause = cause
@@ -402,6 +408,13 @@ class Game:
                             "'rozbij' albo 'rozbierz' coś — z resztek można "
                             "potem 'zrób' przedmiot. Spróbuj 'pomoc'.)"),
                  LOG_SYSTEM)
+        # P29.12 — first-time welcome tip.
+        try:
+            from . import tutorial as _tut
+            _tut.try_show_tip(self.world, "welcome")
+            _tut.try_show_tip(self.world, "save_slots")
+        except Exception:
+            pass
         self.state = STATE_PLAY
 
     # ── Prompt 23: wield / sheathe / coat handlers ───────────────────────
@@ -2077,6 +2090,13 @@ class Game:
         if intent.intent == "inspect" and v.matched_entities:
             ent = v.matched_entities[0]
             from . import visibility as _vis
+            # P29.12 — tutorial: explain the fog-of-war state machine
+            # the first time a player issues sprawdź.
+            try:
+                from . import tutorial as _tut
+                _tut.try_show_tip(self.world, "fog_of_war")
+            except Exception:
+                pass
             state = _vis.get_state(ent)
             if state == _vis.STATE_UNKNOWN:
                 _vis.mark_seen(ent)
@@ -2128,6 +2148,13 @@ class Game:
                                             triggered_by="player_attack")
                     self.log(t("feedback_combat_start",
                                fallback="Walka się zaczyna."), LOG_WARN)
+                    # P29.12 — tutorial: VATS + threat on first combat.
+                    try:
+                        from . import tutorial as _tut
+                        _tut.try_show_tip(self.world, "combat_vats")
+                        _tut.try_show_tip(self.world, "threat")
+                    except Exception:
+                        pass
                     self._run_enemy_turn(cs2)
 
         # Hooks: class offer trigger
@@ -2173,6 +2200,13 @@ class Game:
         if ch is not None:
             ch.run_max_floor_reached = max(int(ch.run_max_floor_reached or 1),
                                            next_num)
+        # P29.12 — tutorial: explain descent the first time.
+        if cur_num == 1:
+            try:
+                from . import tutorial as _tut
+                _tut.try_show_tip(self.world, "descend")
+            except Exception:
+                pass
         self.log(t("log_descend_intro",
                    fallback=f"Schodzisz na piętro {next_num}. Drzwi "
                             f"się zamykają za tobą. Loch nie pamięta "
@@ -4585,6 +4619,12 @@ class Game:
         self._bump_threat(3, source="trap_arm", room=room)
         ch.affinity["trap"] = ch.affinity.get("trap", 0) + 1
         self._bump_run_counter("run_traps_armed", 1)
+        # P29.12 — tutorial: trap pickup fallback on first deploy.
+        try:
+            from . import tutorial as _tut
+            _tut.try_show_tip(self.world, "trap_deploy")
+        except Exception:
+            pass
 
         # Narrator hook
         nline = narrate("deploy_trap_success") or narrate("deploy_trap")
@@ -4823,6 +4863,13 @@ class Game:
         try:
             from . import audience as _aud
             _aud.change_audience(self.world, 3, source="sponsor_pod_open")
+        except Exception:
+            pass
+        # P29.12 — tutorial: explain drop pods + sponsors on first open.
+        try:
+            from . import tutorial as _tut
+            _tut.try_show_tip(self.world, "drop_pods")
+            _tut.try_show_tip(self.world, "sponsors")
         except Exception:
             pass
         try:
