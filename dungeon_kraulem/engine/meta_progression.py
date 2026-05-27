@@ -118,6 +118,82 @@ def _eval_total_runs(world, victory, n: int) -> bool:
         return False
 
 
+# ── P29.37 — Extended evaluators ────────────────────────────────────────
+
+def _eval_total_victories(world, victory: bool, n: int) -> bool:
+    """True when victories AFTER this run lands >= n."""
+    try:
+        from . import run_history as _rh
+        cur = int(_rh.meta().get("victories", 0))
+        if victory:
+            cur += 1
+        return cur >= n
+    except Exception:
+        return False
+
+
+def _eval_audience_peak(world, victory, n: int) -> bool:
+    return _audience_peak(world) >= n
+
+
+def _eval_corpses_salvaged(world, victory, n: int) -> bool:
+    try:
+        return int(getattr(world.character, "run_corpses_salvaged",
+                            0) or 0) >= n
+    except Exception:
+        return False
+
+
+def _eval_zero_kills(world, victory) -> bool:
+    """Pacifist run — finished with run_kills == 0."""
+    try:
+        return int(getattr(world.character, "run_kills", 0) or 0) == 0
+    except Exception:
+        return False
+
+
+def _eval_sponsor_hostile(world, victory) -> bool:
+    """True if any sponsor's attention is at -5 or lower at end of
+    run. Models "Sponsor's Choice Reject" — someone hates you enough
+    to be hostile."""
+    try:
+        from . import sponsors as _sp
+        att = _sp._attention_dict(world)
+        return any(int(v) <= -5 for v in att.values())
+    except Exception:
+        return False
+
+
+def _eval_three_sponsors_friendly(world, victory) -> bool:
+    """3+ sponsors at attention >= 10 simultaneously."""
+    try:
+        from . import sponsors as _sp
+        att = _sp._attention_dict(world)
+        return sum(1 for v in att.values() if int(v) >= 10) >= 3
+    except Exception:
+        return False
+
+
+def _eval_achievement(world, victory, ach_key: str) -> bool:
+    """True if the character has unlocked this achievement key."""
+    try:
+        return ach_key in (world.character.unlocked_achievements or [])
+    except Exception:
+        return False
+
+
+def _any_sponsor_at(world, threshold: int) -> bool:
+    """True if ANY sponsor has attention >= threshold. Iterates
+    the live attention dict — no hardcoded sponsor key list, so it
+    stays in sync as the sponsor catalog evolves."""
+    try:
+        from . import sponsors as _sp
+        att = _sp._attention_dict(world)
+        return any(int(v) >= threshold for v in att.values())
+    except Exception:
+        return False
+
+
 # ── Catalog ─────────────────────────────────────────────────────────────
 
 UNLOCK_CATALOG: Dict[str, UnlockDef] = {
@@ -220,6 +296,187 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
                   "kiedy jest na tobie. Nie pytaj.",
         eval_fn=lambda w, v: _eval_total_runs(w, v, 5),
     ),
+
+    # ────────── P29.37 — Expanded catalog ──────────────────────────────
+    # Three new species, four new origins, three new companions,
+    # five new items, and a brand-new "start_perk" kind (one-shot
+    # mid-run effects spendable at character creation).
+
+    # ── Species (extends creation picker via meta_progression.unlocked_species)
+    "species_stary_uczestnik": UnlockDef(
+        key="species_stary_uczestnik", kind="species",
+        label_pl="Stary Uczestnik",
+        description_pl="Wygraj trzy sezony.",
+        reward_pl="Zaczynasz z blizną poprzedniego zwycięzcy i "
+                  "widownią bazową 25 (zamiast 0).",
+        eval_fn=lambda w, v: _eval_total_victories(w, v, 3),
+    ),
+    "species_bez_twarzy": UnlockDef(
+        key="species_bez_twarzy", kind="species",
+        label_pl="Bez Twarzy",
+        description_pl="Przetrwaj pięć sezonów (porażki też się "
+                       "liczą).",
+        reward_pl="Widownia nigdy nie spada poniżej 10, ale CHA "
+                  "wymuszone na 5 (twoja twarz nie ma rysów).",
+        eval_fn=lambda w, v: _eval_total_runs(w, v, 5),
+    ),
+    "species_ferromanta_meta": UnlockDef(
+        key="species_ferromanta_meta", kind="species",
+        label_pl="Ferromanta (start)",
+        description_pl="Dotrzyj na piętro 15 w jakimkolwiek sezonie.",
+        reward_pl="Startujesz jako Ferromanta — magnetyczna skóra, "
+                  "metal sam do ciebie idzie. Pomiń losowanie na "
+                  "piętrze 3 jeśli chcesz to zostawić jak jest.",
+        eval_fn=lambda w, v: _floor_reached(w, 15),
+    ),
+
+    # ── Origins (extend BACKGROUNDS at character creation)
+    "origin_wieczny_stazysta": UnlockDef(
+        key="origin_wieczny_stazysta", kind="origin",
+        label_pl="Wieczny Stażysta",
+        description_pl="Przetrwaj trzy sezony.",
+        reward_pl="Startujesz z credits ×2. Konferansjer nigdy nie "
+                  "zaoferuje ci klasy w tym runie (jesteś stażystą, "
+                  "Syndykat ci nie ufa).",
+        eval_fn=lambda w, v: _eval_total_runs(w, v, 3),
+    ),
+    "origin_sponsor_reject": UnlockDef(
+        key="origin_sponsor_reject", kind="origin",
+        label_pl="Sponsor's Choice Reject",
+        description_pl="Zakończ sezon ze sponsorem na uwadze ≤ −5.",
+        reward_pl="Każdy sponsor startuje z uwagą −5 (nielubiany), "
+                  "ale jeden losowy ma cię za swojego (+10).",
+        eval_fn=_eval_sponsor_hostile,
+    ),
+    "origin_byly_konferansjer": UnlockDef(
+        key="origin_byly_konferansjer", kind="origin",
+        label_pl="Były Konferansjer",
+        description_pl="Dotrzyj na piętro 17.",
+        reward_pl="Konferansjer mówi o tobie ze współczuciem. "
+                  "Pomijasz jedną dezambiguację na piętro (znasz "
+                  "montaż programu).",
+        eval_fn=lambda w, v: _floor_reached(w, 17),
+    ),
+    "origin_dziedzic_k7": UnlockDef(
+        key="origin_dziedzic_k7", kind="origin",
+        label_pl="Dziedzic Kanału 7",
+        description_pl="Osiągnij szczyt widowni 120 w jednym runie.",
+        reward_pl="Startujesz z wbudowanym mikrofonem kierunkowym + "
+                  "dron-kamera leci za tobą (audience +1 co minutę "
+                  "w pierwszym dniu piętra 1).",
+        eval_fn=lambda w, v: _eval_audience_peak(w, v, 120),
+    ),
+
+    # ── Companions (creation-time picker via unlocked_companions)
+    "companion_suczka_recyklingu": UnlockDef(
+        key="companion_suczka_recyklingu", kind="companion",
+        label_pl="Suczka Recyklingu",
+        description_pl="Zakończ sezon z uwagą Kultu Recyklingu ≥ 20.",
+        reward_pl="Trzy-nożna sunia, która scrappuje 1 losowy "
+                  "przedmiot z każdego trupa wroga w pokoju.",
+        eval_fn=lambda w, v: _has_attention(w, "kult_recyklingu", 20),
+    ),
+    "companion_kot_ministerstwa": UnlockDef(
+        key="companion_kot_ministerstwa", kind="companion",
+        label_pl="Kot Ministerstwa",
+        description_pl="Zakończ sezon z uwagą Ministerstwa Pamięci "
+                       "≥ 20.",
+        reward_pl="Kot z legitymacją służbową. 1 raz na piętro "
+                  "cofa twój ostatni nieudany rzut (re-roll).",
+        eval_fn=lambda w, v: _has_attention(w, "ministerstwo_pamieci", 20),
+    ),
+    "companion_dron_sponsorski": UnlockDef(
+        key="companion_dron_sponsorski", kind="companion",
+        label_pl="Dron Sponsorski",
+        description_pl="Zakończ sezon z jakimś sponsorem ≥ 18 "
+                       "(niemal pełna uwaga).",
+        reward_pl="Latająca kamera, audience ×1.5. Jeśli zdradzisz "
+                  "sponsora-właściciela, jego pody się rozwścieczają.",
+        eval_fn=lambda w, v: _any_sponsor_at(w, 18),
+    ),
+
+    # ── Items (legendary drops + craft pool extensions)
+    "item_mosiezny_pierscien_producenta": UnlockDef(
+        key="item_mosiezny_pierscien_producenta", kind="item",
+        label_pl="Mosiężny Pierścień Producenta",
+        description_pl="Zakończ sezon bez ani jednego zabójstwa "
+                       "(pacyfista).",
+        reward_pl="Na początku piętra możesz przerolować layout "
+                  "jednego pokoju.",
+        eval_fn=_eval_zero_kills,
+    ),
+    "item_stara_czaszka_z_markerem": UnlockDef(
+        key="item_stara_czaszka_z_markerem", kind="item",
+        label_pl="Stara Czaszka z Markerem",
+        description_pl="Rozbierz 10 zwłok w jednym runie.",
+        reward_pl="Gadająca czaszka w safehouse'ach. Mówi, którzy "
+                  "sponsorzy najbardziej nienawidzą mobów z "
+                  "ostatniego piętra.",
+        eval_fn=lambda w, v: _eval_corpses_salvaged(w, v, 10),
+    ),
+    "item_czerwony_telefon_k7": UnlockDef(
+        key="item_czerwony_telefon_k7", kind="item",
+        label_pl="Czerwony Telefon Kanału 7",
+        description_pl="Zakończ sezon z uwagą Kanału 7 ≥ 20.",
+        reward_pl="Raz na run zadzwoń po drop-pod wybranego sponsora "
+                  "(zamiast czekać na losowy).",
+        eval_fn=lambda w, v: _has_attention(w, "kanal_7_krawedz", 20),
+    ),
+    "item_klucz_do_kantyny": UnlockDef(
+        key="item_klucz_do_kantyny", kind="item",
+        label_pl="Klucz do Kantyny Sponsorów",
+        description_pl="Zakończ sezon z 3+ sponsorami na ≥ 10 "
+                       "uwagi jednocześnie.",
+        reward_pl="Otwiera ukryty pokój na piętrze 18 — credits + "
+                  "apteczka + pełna butelka wody (rzecz święta).",
+        eval_fn=_eval_three_sponsors_friendly,
+    ),
+    "item_pamiatkowa_lyzka": UnlockDef(
+        key="item_pamiatkowa_lyzka", kind="item",
+        label_pl="Pamiątkowa Łyżka",
+        description_pl="Otwórz drop-pod (osiągnięcie pakiet_z_sufitu).",
+        reward_pl="Łyżka do podważania. +2 do otwierania zamków, "
+                  "działa też na automaty bez płacenia kredytów.",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "pakiet_z_sufitu"),
+    ),
+
+    # ── Start perks — NEW KIND ────────────────────────────────────────
+    # One-shot effects spent at character creation. The picker shows
+    # them as a 4th tier alongside species/origin/companion.
+    "perk_lapowka_dla_portiera": UnlockDef(
+        key="perk_lapowka_dla_portiera", kind="start_perk",
+        label_pl="Łapówka dla portiera",
+        description_pl="Zakończ sezon z jakimś sponsorem na 20 (max).",
+        reward_pl="Startujesz z 1 darmowym uzupełnieniem usług "
+                  "w pierwszym safehouse'ie (cokolwiek wybierzesz).",
+        eval_fn=lambda w, v: _any_sponsor_at(w, 20),
+    ),
+    "perk_insiderskie_info": UnlockDef(
+        key="perk_insiderskie_info", kind="start_perk",
+        label_pl="Insiderskie info",
+        description_pl="Przetrwaj pięć sezonów.",
+        reward_pl="Startujesz znając gatunek bossa pierwszego "
+                  "piętra (pokazane przy wyborze postaci).",
+        eval_fn=lambda w, v: _eval_total_runs(w, v, 5),
+    ),
+    "perk_stara_legitymacja": UnlockDef(
+        key="perk_stara_legitymacja", kind="start_perk",
+        label_pl="Stara legitymacja Syndykatu",
+        description_pl="Wygraj trzy sezony.",
+        reward_pl="Pierwszy nieudany rzut społeczny auto-sukces. "
+                  "Wypala się po użyciu.",
+        eval_fn=lambda w, v: _eval_total_victories(w, v, 3),
+    ),
+    "perk_lyzka_cudu": UnlockDef(
+        key="perk_lyzka_cudu", kind="start_perk",
+        label_pl="Łyżka Cudu",
+        description_pl="Przeżyj piętro mając 1 HP (osiągnięcie "
+                       "anty_host_warknal).",
+        reward_pl="Startujesz z jednorazowym „drugim oddechem” — "
+                  "pierwsza śmierć przywraca cię do 5 HP. Osobno "
+                  "od last-stand.",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "anty_host_warknal"),
+    ),
 }
 
 
@@ -293,6 +550,12 @@ def unlocked_items() -> List[UnlockDef]:
 
 def unlocked_classes() -> List[UnlockDef]:
     return _by_kind("class")
+
+
+def unlocked_start_perks() -> List[UnlockDef]:
+    """P29.37 — one-shot character-creation perks (Łapówka,
+    Insiderskie info, Stara legitymacja, Łyżka Cudu)."""
+    return _by_kind("start_perk")
 
 
 def catalog_summary() -> Dict[str, Dict]:
