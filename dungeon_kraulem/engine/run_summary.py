@@ -260,6 +260,18 @@ def render_lines(rs: RunSummary, *, victory: bool = False) -> List[str]:
         lines.append("Top sponsorzy:        — (żaden nie był pod wrażeniem)")
     if rs.achievements:
         lines.append("")
-        lines.append(f"Osiągnięcia: {', '.join(rs.achievements[:5])}"
+        # P29.59 — lookup polish display name z achievements catalog
+        # zamiast surowych slugów (np. 'anty_host_warknal' →
+        # 'Konferansjer warknął').
+        try:
+            from ..systems import achievements as _ach
+            pretty = []
+            for key in rs.achievements[:5]:
+                a = _ach.get(key)
+                pretty.append(a.fallback_name_pl if a and a.fallback_name_pl
+                              else key)
+        except Exception:
+            pretty = list(rs.achievements[:5])
+        lines.append(f"Osiągnięcia: {', '.join(pretty)}"
                      + (f" (+{len(rs.achievements)-5})" if len(rs.achievements) > 5 else ""))
     return lines

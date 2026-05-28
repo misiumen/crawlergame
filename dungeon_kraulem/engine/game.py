@@ -8234,7 +8234,7 @@ class Game:
         elif self.state == STATE_VICTORY:
             self._end_screen(t("victory_title", fallback="ZEJŚCIE ZALICZONE."), True)
         elif self.state == STATE_DEFEAT:
-            self._end_screen(t("defeat_title", fallback="UCZESTNIK ZAKOŃCZONY."), False)
+            self._end_screen(t("defeat_title", fallback="ZAWODNIK WYELIMINOWANY."), False)
         pygame.display.flip()
 
     def _overlay(self, lines):
