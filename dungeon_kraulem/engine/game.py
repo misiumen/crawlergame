@@ -105,6 +105,12 @@ class Game:
         # that doesn't match a disambiguation follow-up.
         self.pending_disambiguation = None  # dict | None
 
+        # P29.41 — runtime stan otwartego dialogu z NPC. Patrz
+        # engine/dialogue.py + STATE_DIALOG. None == brak otwartej
+        # rozmowy. Ustawiane przy interceptcie "talk", czyszczone
+        # przy zakończeniu drzewka.
+        self.dialogue_state = None  # engine.dialogue.DialogueState | None
+
         # Prompt 23.5 (backlog #1): log scrollback. 0 = pinned to newest.
         # PgUp / PgDn bump this in `_handle_play_keydown`; new log writes
         # auto-reset to 0 so the player never misses the latest hit.
@@ -1687,6 +1693,73 @@ class Game:
                 self._creation_commit()
             return
 
+    # ── P29.41: dialog tree handlers ──────────────────────────────────────
+
+    def _open_dialogue(self, npc_entity, tree_key: str) -> None:
+        """Otwórz rozmowę z NPC. Uruchamia drzewko, ustawia
+        self.dialogue_state i przełącza state na STATE_DIALOG."""
+        # Lazy-load content żeby drzewka się zarejestrowały.
+        try:
+            from ..content.data import npc_dialogues  # noqa: F401
+        except Exception:
+            pass
+        from . import dialogue as _dlg
+        state = _dlg.start_dialogue(
+            self.world, npc_entity, tree_key,
+            log_callback=self._dialogue_log_callback)
+        if state is None:
+            name = npc_entity.display_name()
+            self.log(f'Z „{name}" nie da się teraz rozmawiać.',
+                     LOG_WARN)
+            return
+        self.dialogue_state = state
+        self.state = STATE_DIALOG
+
+    def _dialogue_log_callback(self, text: str, severity: str) -> None:
+        """Most między dialogue.apply_consequences a Game.log
+        (mapowanie severity string → constant)."""
+        sev_map = {
+            "normal": LOG_NORMAL,
+            "success": LOG_SUCCESS,
+            "warn": LOG_WARN,
+            "danger": LOG_DANGER,
+            "system": LOG_SYSTEM,
+        }
+        self.log(text, sev_map.get(severity, LOG_NORMAL))
+
+    def _pick_dialogue_option(self, opt_idx: int) -> None:
+        """Wybierz opcję `opt_idx` w bieżącym węźle drzewka. Może
+        zamknąć dialog (przejście do None / end consequence) — wtedy
+        czyścimy state i wracamy do STATE_PLAY."""
+        if self.dialogue_state is None:
+            return
+        from . import dialogue as _dlg
+        node = _dlg.current_node(self.dialogue_state)
+        if node is None:
+            self._close_dialogue()
+            return
+        # Mapowanie idx widziany przez gracza (1-9) na oryginalny
+        # indeks w node.options (z uwzględnieniem ukrytych opcji).
+        avail = _dlg.available_options(self.world, self.dialogue_state,
+                                        node)
+        if not (0 <= opt_idx < len(avail)):
+            return
+        real_idx, opt = avail[opt_idx]
+        # Odnajdź NPC entity.
+        npc = self.world.get(self.dialogue_state.npc_entity_id)
+        keep_going, info_line = _dlg.pick_option(
+            self.world, npc, self.dialogue_state, real_idx,
+            log_callback=self._dialogue_log_callback)
+        if info_line:
+            self.log(info_line, LOG_SYSTEM)
+        if not keep_going:
+            self._close_dialogue()
+
+    def _close_dialogue(self) -> None:
+        """Zamknij aktywny dialog. Przywraca STATE_PLAY."""
+        self.dialogue_state = None
+        self.state = STATE_PLAY
+
     # ── Prompt 11: settings popup ─────────────────────────────────────────
 
     def _open_settings(self):
@@ -2420,6 +2493,17 @@ class Game:
             if ent.key == "vending_machine" and \
                     not (ent.state or {}).get("vending_used"):
                 self._attempt_vending_use(ent); return
+
+        # P29.41 — talk dialog tree intercept. Jeśli NPC ma na
+        # stanie pole `dialogue_tree_key`, otwieramy STATE_DIALOG
+        # z odpowiednim drzewkiem. Inaczej fallthrough do
+        # starego skill-check'a (legacy social).
+        if intent.intent == "talk" and v.matched_entities:
+            target = v.matched_entities[0]
+            tree_key = (target.state or {}).get("dialogue_tree_key")
+            if tree_key:
+                self._open_dialogue(target, tree_key)
+                return
 
         r = resolve(v, self.world)
         if r.fallback_description and (v.required_checks or r.level != "success"):
@@ -6504,6 +6588,20 @@ class Game:
                 return
             return
 
+        # P29.41 — dialog tree z NPC. 1-9 wybiera opcję, Esc zamyka.
+        if self.state == STATE_DIALOG:
+            if digit is not None:
+                self._suppress_textinput = True
+                idx = int(digit) - 1
+                if idx >= 0:
+                    self._pick_dialogue_option(idx)
+                return
+            if key == pygame.K_ESCAPE:
+                self._suppress_textinput = True
+                self._close_dialogue()
+                return
+            return
+
         if self.state in (STATE_VICTORY, STATE_DEFEAT):
             if key in (pygame.K_RETURN, pygame.K_ESCAPE):
                 self.state = STATE_TITLE
@@ -7478,6 +7576,42 @@ class Game:
                 lines.append(f"    Strata: {sp.drawback_pl}")
             lines.append("")
             lines.append("[0/Esc] Pozostań sobą (decline).")
+            self._overlay(lines)
+        elif self.state == STATE_DIALOG and self.dialogue_state is not None:
+            self._refresh_layout()
+            L = self._layout
+            ui.draw_topbar(s, self.world, layout=L)
+            if L.has_left_sidebar:
+                ui.draw_left_sidebar(s, self.world, layout=L)
+            ui.draw_room_panel(s, self.world, layout=L)
+            ui.draw_sidebar(s, self.world, layout=L)
+            ui.draw_log_and_input(s, self.world.log, self.input_text,
+                                   self.blink, scroll=self.log_scroll,
+                                   layout=L)
+            # P29.41 — dialog overlay: speaker + tekst + ponumerowane
+            # opcje. Klawisz 1-9 wybiera, Esc zamyka.
+            from . import dialogue as _dlg
+            import textwrap as _tw
+            node = _dlg.current_node(self.dialogue_state)
+            lines = []
+            if node is not None:
+                lines.append(f"— {node.speaker} —")
+                # Łamanie długiego tekstu na 80 znaków per linia.
+                txt = node.text or ""
+                lines.extend(_tw.wrap(txt, width=80) or [""])
+                lines.append("")
+                avail = _dlg.available_options(
+                    self.world, self.dialogue_state, node)
+                for i, (_real, opt) in enumerate(avail, 1):
+                    suffix = ""
+                    if opt.skill_check is not None:
+                        stat, dc = opt.skill_check
+                        suffix = f"  [{stat} vs TT {dc}]"
+                    lines.append(f"[{i}] {opt.label}{suffix}")
+                lines.append("")
+                lines.append("[Esc] Wyjdź z rozmowy.")
+            else:
+                lines = ["(rozmowa zakończona — Esc)"]
             self._overlay(lines)
         elif self.state == STATE_VICTORY:
             self._end_screen(t("victory_title", fallback="ZEJŚCIE ZALICZONE."), True)
