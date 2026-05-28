@@ -166,15 +166,33 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
         archetype_key = rng.choice(list(FLOOR_ARCHETYPES.keys()))
     arch = FLOOR_ARCHETYPES[archetype_key]
 
+    # P29.42a — biom piętra. Po wylosowaniu archetypu losujemy z puli
+    # biomów dostępnych dla tego floor_number (filter floor_min/max +
+    # enabled + starting/meta-unlock). Jeśli pula jest pusta (np. nikt
+    # nie odblokował, F-out-of-range), zostajemy bez biomu — tytuł
+    # idzie z archetypu, generator nie filtruje pokoi.
+    from ..content.data.floor_biomes import (
+        available_biomes, FloorBiome)
+    biome_candidates = available_biomes(floor_number, world=world)
+    biome: Optional[FloorBiome] = None
+    if biome_candidates:
+        weights = [max(1, int(b.weight)) for b in biome_candidates]
+        biome = rng.choices(biome_candidates, weights=weights, k=1)[0]
+
     # Step 2: theme  (reuse procgen helper — keep theme simple for now)
-    theme_label = arch.get("fallback_label", "Piętro 1")
     f = FloorState(
         floor_id=f"gen_floor_{floor_number}",
         floor_number=floor_number,
     )
     f.title_key = ""
-    f.title_fallback = f"Piętro {floor_number} — {theme_label}"
-    f.theme_fallback = theme_label
+    if biome is not None:
+        f.biome_key = biome.key
+        f.title_fallback = f"Piętro {floor_number} — {biome.name_pl}"
+        f.theme_fallback = biome.theme_pl
+    else:
+        theme_label = arch.get("fallback_label", "Piętro 1")
+        f.title_fallback = f"Piętro {floor_number} — {theme_label}"
+        f.theme_fallback = theme_label
     # Prompt 18: pick floor sponsor from the sponsor catalog by
     # floor-number rotation. `sponsor_key` holds the *catalog* key (e.g.
     # "novachem_biotech") so engine.sponsors.current_floor_sponsor_key
@@ -202,7 +220,8 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
 
     # Step 5-12: place content. Pick role assignment per node, then instantiate.
     role_plan = _plan_roles(graph, arch, rng)
-    _instantiate_rooms(f, world, graph, role_plan, rng, floor_number)
+    _instantiate_rooms(f, world, graph, role_plan, rng, floor_number,
+                       biome=biome)
 
     # Step 6: pick objective and seed required hints
     _pick_objective(f, arch, rng)
@@ -427,12 +446,17 @@ def _plan_roles(graph: Dict, arch: Dict, rng: random.Random) -> Dict[str, str]:
 
 def _instantiate_rooms(f: FloorState, world, graph: Dict,
                        role_plan: Dict[str, str], rng: random.Random,
-                       floor_num: int):
-    """Pick a template per role + node, build RoomState, wire exits."""
+                       floor_num: int, biome=None):
+    """Pick a template per role + node, build RoomState, wire exits.
+
+    P29.42a — biome (FloorBiome | None) filtruje pokoje: jeśli biom
+    jest podany, generator preferuje pokoje z `biome.room_tag` w
+    tags, fallback do neutralnych (bez żadnego biome tagu)."""
     used_templates: List[str] = []
     for node_id, role in role_plan.items():
         tmpl = _pick_template_for_role(role, rng, used_templates,
-                                       floor_num=floor_num)
+                                       floor_num=floor_num,
+                                       biome=biome)
         if tmpl is None:
             tmpl = _fallback_template(role)
         used_templates.append(tmpl.get("template_id", ""))
@@ -600,7 +624,8 @@ def _entity_from_table(table: Dict, key: str, room_id: str, etype: str):
 
 def _pick_template_for_role(role: str, rng: random.Random,
                             used: List[str],
-                            floor_num: int = 1) -> Optional[Dict]:
+                            floor_num: int = 1,
+                            biome=None) -> Optional[Dict]:
     pool = cl.room_templates_for_role(role)
     # Avoid reusing unique-per-floor templates
     pool = [t for t in pool if not (t.get("unique_per_floor") and t.get("template_id") in used)]
@@ -609,10 +634,40 @@ def _pick_template_for_role(role: str, rng: random.Random,
     pool = [t for t in pool if t.get("floor_min", 1) <= floor_num]
     pool = [t for t in pool
             if t.get("floor_max") is None or t.get("floor_max") >= floor_num]
+
+    # P29.42a — filtr biomu. Pokoje pasujące do biomu (biome.room_tag
+    # w `tags`) ALBO neutralne (bez żadnego biome tagu — kafejki,
+    # korytarze, safehouse'y). Inne biomy są wykluczone — żeby w obrębie
+    # jednego piętra był spójny krajobraz.
+    if biome is not None and pool:
+        biome_tag = biome.room_tag
+        BIOME_TAGS = _ALL_BIOME_TAGS
+        def _is_neutral(t):
+            tags = set(t.get("tags") or [])
+            return not (tags & BIOME_TAGS)
+        def _matches_biome(t):
+            return biome_tag in (t.get("tags") or [])
+        filtered = [t for t in pool if _matches_biome(t) or _is_neutral(t)]
+        if filtered:    # fallback do oryginału jeśli filtr za ostry
+            pool = filtered
+
     if not pool:
         return None
     weights = [max(1, int(t.get("weight", 1))) for t in pool]
     return rng.choices(pool, weights=weights, k=1)[0]
+
+
+# P29.42a — wszystkie znane biome-tagi z FLOOR_BIOMES. Pokoje BEZ
+# żadnego z nich są „neutralne" i pasują do dowolnego biomu.
+def _build_biome_tag_set():
+    try:
+        from ..content.data.floor_biomes import FLOOR_BIOMES
+        return frozenset(b.room_tag for b in FLOOR_BIOMES.values()
+                         if b.room_tag)
+    except Exception:
+        return frozenset()
+
+_ALL_BIOME_TAGS = _build_biome_tag_set()
 
 
 def _fallback_template(role: str) -> Dict:

@@ -17,6 +17,12 @@ class FloorState:
     sponsor_key: str = ""
     sponsor_fallback: str = ""
 
+    # P29.42a — biom piętra. Losowany w generate_floor z
+    # content.data.floor_biomes.FLOOR_BIOMES. Sterujący nazwą piętra,
+    # filtrowaniem pokoi, i bonusami uwagi sponsorów. Pusty string =
+    # legacy save lub fallback.
+    biome_key: str = ""
+
     current_minute: int = 0
     deadline_minute: int = MINUTES_PER_DAY * FLOOR1_DEADLINE_DAYS
 
@@ -108,6 +114,7 @@ class FloorState:
             "theme_key": self.theme_key, "theme_fallback": self.theme_fallback,
             "title_key": self.title_key, "title_fallback": self.title_fallback,
             "sponsor_key": self.sponsor_key, "sponsor_fallback": self.sponsor_fallback,
+            "biome_key": self.biome_key,
             "current_minute": self.current_minute, "deadline_minute": self.deadline_minute,
             "rooms": {rid: r.to_dict() for rid, r in self.rooms.items()},
             "current_room_id": self.current_room_id,
@@ -134,7 +141,8 @@ class FloorState:
     def from_dict(cls, d):
         f = cls(floor_id=d.get("floor_id", "floor_1"))
         for k in ("floor_number","theme_key","theme_fallback","title_key","title_fallback",
-                 "sponsor_key","sponsor_fallback","current_minute","deadline_minute",
+                 "sponsor_key","sponsor_fallback","biome_key",
+                 "current_minute","deadline_minute",
                  "current_room_id","start_room_id","floor_alert_level",
                  "audience_rating","crawler_population"):
             setattr(f, k, d.get(k, getattr(f, k)))

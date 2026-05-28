@@ -21,6 +21,25 @@ from ..content.data import monster_salvage as _ms
 from ..content.data import sponsors as _sp
 
 
+# P29.42a — biom piętra jest teraz LOSOWANY z zoo / neighborhood /
+# museum / bar dla F3-8. Test akceptuje monstery z dowolnego z 4
+# biomów, bo nie wiemy z góry który wylosuje generator dla danego seedu.
+_ANY_F3_8_THEMED_MONSTERS = {
+    # zoo
+    "mutant_szczur", "klatkowy_kot", "bekajacy_paw",
+    "miniboss_alfa_szczur", "boss_panicz_zoo",
+    # neighborhood
+    "usmiechniety_sasiad", "dzieciak_z_blokowiska",
+    "kucharka_z_swietlicy", "miniboss_oddzialowa", "boss_blok_parent",
+    # museum
+    "kostny_kurator", "duch_zwiedzajacego", "mechaniczny_strazak",
+    "miniboss_strazak_galerii", "boss_kurator_naczelny",
+    # bar
+    "pijany_crawler", "lokator_baru", "bramkarz",
+    "miniboss_szef_baru", "boss_showman",
+}
+
+
 # ── Data layer ───────────────────────────────────────────────────────────
 
 def test_new_room_templates_present():
@@ -176,10 +195,10 @@ def test_generate_floor_3_uses_themed_monsters():
         for ent in r.entities:
             if ent.entity_type == "monster":
                 monsters_used.add(ent.key)
-    themed = monsters_used & {
-        "mutant_szczur", "klatkowy_kot", "bekajacy_paw",
-        "miniboss_alfa_szczur", "boss_panicz_zoo",
-    }
+    # P29.42a — biom piętra jest teraz LOSOWY (zoo / neighborhood /
+    # museum / bar — losowanie z 3 enabled). Test akceptuje dowolny
+    # zestaw themed monsters z tych biomów.
+    themed = monsters_used & _ANY_F3_8_THEMED_MONSTERS
     assert themed, f"floor 3 had no themed monsters; got {monsters_used}"
     print(f"  floor 3 spawned themed monsters: {themed}: OK")
 
@@ -195,10 +214,7 @@ def test_generate_floor_4_uses_themed_monsters():
         for ent in r.entities:
             if ent.entity_type == "monster":
                 monsters_used.add(ent.key)
-    themed = monsters_used & {
-        "usmiechniety_sasiad", "dzieciak_z_blokowiska",
-        "kucharka_z_swietlicy", "miniboss_oddzialowa", "boss_blok_parent",
-    }
+    themed = monsters_used & _ANY_F3_8_THEMED_MONSTERS
     assert themed, f"floor 4 had no themed monsters; got {monsters_used}"
     print(f"  floor 4 spawned themed monsters: {themed}: OK")
 
@@ -214,10 +230,7 @@ def test_generate_floor_5_uses_themed_monsters():
         for ent in r.entities:
             if ent.entity_type == "monster":
                 monsters_used.add(ent.key)
-    themed = monsters_used & {
-        "kostny_kurator", "duch_zwiedzajacego", "mechaniczny_strazak",
-        "miniboss_strazak_galerii", "boss_kurator_naczelny",
-    }
+    themed = monsters_used & _ANY_F3_8_THEMED_MONSTERS
     assert themed, f"floor 5 had no themed monsters; got {monsters_used}"
     print(f"  floor 5 spawned themed monsters: {themed}: OK")
 
@@ -233,10 +246,7 @@ def test_generate_floor_6_uses_themed_monsters():
         for ent in r.entities:
             if ent.entity_type == "monster":
                 monsters_used.add(ent.key)
-    themed = monsters_used & {
-        "pijany_crawler", "lokator_baru", "bramkarz",
-        "miniboss_szef_baru", "boss_showman",
-    }
+    themed = monsters_used & _ANY_F3_8_THEMED_MONSTERS
     assert themed, f"floor 6 had no themed monsters; got {monsters_used}"
     print(f"  floor 6 spawned themed monsters: {themed}: OK")
 

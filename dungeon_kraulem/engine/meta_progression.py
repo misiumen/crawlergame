@@ -477,6 +477,86 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
                   "od last-stand.",
         eval_fn=lambda w, v: _eval_achievement(w, v, "anty_host_warknal"),
     ),
+
+    # ────────── P29.42a — Biome unlocks ───────────────────────────────
+    # Każdy z tych biomów ląduje w puli generatora dla piętra po
+    # spełnieniu warunku. Reward_pl mówi GDZIE biom się pojawi.
+
+    "biome_oboz_goblinski": UnlockDef(
+        key="biome_oboz_goblinski", kind="biome",
+        label_pl="Obóz Gobliński",
+        description_pl="Wygraj sezon.",
+        reward_pl="Biom dostępny na piętrach 3-8: palisady, ogniska, "
+                  "gobliny krzyczące bez kontekstu.",
+        eval_fn=lambda w, v: _eval_total_victories(w, v, 1),
+    ),
+    "biome_siec_kanalizacyjna": UnlockDef(
+        key="biome_siec_kanalizacyjna", kind="biome",
+        label_pl="Sieć Kanalizacyjna",
+        description_pl="Przetrwaj trzy sezony.",
+        reward_pl="Biom dostępny na piętrach 3-8: rury, smród, "
+                  "szczury wielkości terierów.",
+        eval_fn=lambda w, v: _eval_total_runs(w, v, 3),
+    ),
+    "biome_tunel_karnawalowy": UnlockDef(
+        key="biome_tunel_karnawalowy", kind="biome",
+        label_pl="Tunel Karnawałowy",
+        description_pl="Osiągnij szczyt widowni 60.",
+        reward_pl="Biom dostępny na piętrach 3-8: luna park po nocy, "
+                  "klauni-manekiny, słodki smród waty cukrowej.",
+        eval_fn=lambda w, v: _eval_audience_peak(w, v, 60),
+    ),
+    "biome_katakumby_faktur": UnlockDef(
+        key="biome_katakumby_faktur", kind="biome",
+        label_pl="Katakumby Spóźnionych Faktur",
+        description_pl="Zakończ sezon z uwagą Bractwa Komornika ≥ 15.",
+        reward_pl="Biom dostępny na piętrach 9-12: świece, ołtarze "
+                  "z plastiku, mnisi w lateksowych szatach.",
+        eval_fn=lambda w, v: _has_attention(w, "bractwo_komornika", 15),
+    ),
+    "biome_farma_klonow": UnlockDef(
+        key="biome_farma_klonow", kind="biome",
+        label_pl="Farma Klonów",
+        description_pl="Zakończ sezon z uwagą NovaChem-Biotech ≥ 15.",
+        reward_pl="Biom dostępny na piętrach 9-12: kapsuły z biopłynem, "
+                  "klony w różnych stadiach.",
+        eval_fn=lambda w, v: _has_attention(w, "novachem_biotech", 15),
+    ),
+    "biome_elfia_kolonia": UnlockDef(
+        key="biome_elfia_kolonia", kind="biome",
+        label_pl="Elfia Kolonia",
+        description_pl="Wygraj sezon klasą occultist.",
+        reward_pl="Biom dostępny na piętrach 9-12: drzewa rosną przez "
+                  "beton, łuki, lutnie, elfy zbyt zadbane.",
+        eval_fn=lambda w, v: (
+            v and (getattr(w.character, "class_key", "") == "occultist")),
+    ),
+    "biome_redakcja_krawedzi": UnlockDef(
+        key="biome_redakcja_krawedzi", kind="biome",
+        label_pl="Redakcja Krawędzi",
+        description_pl="Zakończ sezon z uwagą Kanału 7 Krawędź ≥ 20.",
+        reward_pl="Biom dostępny na piętrach 13-17: biurka, kamery na "
+                  "statywach, plakaty programów, kawa w dzbankach.",
+        eval_fn=lambda w, v: _has_attention(w, "kanal_7_krawedz", 20),
+    ),
+    "biome_swiatynia_konferansjera": UnlockDef(
+        key="biome_swiatynia_konferansjera", kind="biome",
+        label_pl="Świątynia Konferansjera",
+        description_pl="Pokonaj Konferansjera (anti_host_lite, "
+                       "piętra 16-18).",
+        reward_pl="Biom dostępny na piętrach 13-17: ołtarze, popiersia, "
+                  "mikrofony pozłacane.",
+        eval_fn=lambda w, v: _eval_achievement(
+            w, v, "rzeznia_kontrolowana"),
+    ),
+    "biome_lawowe_tunele": UnlockDef(
+        key="biome_lawowe_tunele", kind="biome",
+        label_pl="Lawowe Tunele",
+        description_pl="Dotrzyj na piętro 15.",
+        reward_pl="Biom dostępny na piętrach 13-17: magma, jaszczury, "
+                  "ognioznawcy z młotami.",
+        eval_fn=lambda w, v: _floor_reached(w, 15),
+    ),
 }
 
 
@@ -556,6 +636,12 @@ def unlocked_start_perks() -> List[UnlockDef]:
     """P29.37 — one-shot character-creation perks (Łapówka,
     Insiderskie info, Stara legitymacja, Łyżka Cudu)."""
     return _by_kind("start_perk")
+
+
+def unlocked_biomes() -> List[UnlockDef]:
+    """P29.42a — biomy piętra odblokowane przez run-history. Generator
+    czyta tę listę przy losowaniu biomu (przez floor_biomes.is_unlocked)."""
+    return _by_kind("biome")
 
 
 def catalog_summary() -> Dict[str, Dict]:
