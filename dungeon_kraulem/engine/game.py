@@ -2362,6 +2362,11 @@ class Game:
         if intent.intent == "apply_enhancement":
             self._attempt_apply_enhancement(intent); return
 
+        # P29.56 — eksperymentalny crafting: gracz miesza 3-5 materiałów
+        # bez znanej receptury, rzut INT vs DC decyduje. Crit = unique.
+        if intent.intent == "experiment":
+            self._attempt_experiment(intent); return
+
         # P29.23 — cooking + reading.
         if intent.intent == "cook":
             self._attempt_cook(intent); return
@@ -6191,6 +6196,11 @@ class Game:
     def _attempt_apply_enhancement(self, intent):
         from .handlers import inventory
         return inventory.attempt_apply_enhancement(self, intent)
+
+    def _attempt_experiment(self, intent):
+        """P29.56 — emergent crafting via raw material combination."""
+        from .handlers import experiment
+        return experiment.attempt_experiment(self, intent)
 
     # ── Prompt 07: memetic / belief-seed handler ─────────────────────────────
 

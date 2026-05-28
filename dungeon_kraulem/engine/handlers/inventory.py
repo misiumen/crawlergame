@@ -198,8 +198,16 @@ def attempt_apply_enhancement(game, intent) -> None:
     recipes = _cr.all_recipes()
     enh_key = (enhancement.state or {}).get("enhancement_key") or \
               enhancement.key
-    rec = recipes.get(enh_key) or {}
-    spec = rec.get("enhancement") or {}
+    # P29.56 — experimental crafting stamps the full spec directly on the
+    # item's state["enhancement_spec"] (because EXPERIMENTAL_RECIPES live
+    # in a separate file, not in crafting.all_recipes()). Prefer it when
+    # present, fall back to legacy recipe lookup.
+    rt_spec = (enhancement.state or {}).get("enhancement_spec")
+    if rt_spec:
+        spec = rt_spec
+    else:
+        rec = recipes.get(enh_key) or {}
+        spec = rec.get("enhancement") or {}
     applies_to = spec.get("applies_to_tags") or []
     effect = spec.get("effect") or ""
 

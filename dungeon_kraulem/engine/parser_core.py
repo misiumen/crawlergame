@@ -434,6 +434,25 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.9
         return intent
 
+    # ── P29.56 — Emergent crafting: experiment with N materials ────────────
+    # "eksperymentuj X, Y, Z" / "zmieszaj X i Y i Z" / "spróbuj X+Y+Z"
+    # Materiały rozdzielone przecinkiem, " i ", " oraz ", " z ", " + "
+    import re as _re_exp
+    exp_re = _re_exp.compile(
+        r"^(?:eksperymentuj|zmieszaj|spróbuj|sprobuj|łącz|lacz|combine|"
+        r"experiment|mix)\s+(.+)$")
+    exp_m = exp_re.match(folded)
+    if exp_m:
+        intent.intent = "experiment"
+        intent.verb = "eksperymentuj"
+        raw_body = exp_m.group(1).strip()
+        for sep in (" oraz ", " i ", " z ", " + "):
+            raw_body = raw_body.replace(sep, ",")
+        parts = [p.strip() for p in raw_body.split(",") if p.strip()]
+        intent.targets = parts
+        intent.confidence = 0.9
+        return intent
+
     # ── P29.10 — Open a sponsor drop pod (mid-floor gift) ──────────────────
     # "otwórz/rozbij/zgarnij pakiet" (sponsorski) — drop-pods are how
     # mid-floor sponsor gifts now arrive (was: queued for safehouse).

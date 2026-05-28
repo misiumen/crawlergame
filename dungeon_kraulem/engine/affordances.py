@@ -208,6 +208,12 @@ register(Affordance("craft",
     verbs_en=["craft","make","build","fashion","tape together"],
     stat="INT", base_dc=11, time_cost=TIME_CRAFT, class_affinity="crafting"))
 
+# P29.56 — Emergent crafting: kombinacja 3-5 materiałów bez znanej receptury.
+register(Affordance("experiment",
+    verbs_pl=["eksperymentuj","zmieszaj","spróbuj","sprobuj","łącz","lacz","mieszaj"],
+    verbs_en=["experiment","mix","combine","try"],
+    stat="INT", base_dc=10, time_cost=40, class_affinity="crafting"))
+
 register(Affordance("salvage",
     verbs_pl=["zdemontuj","odzyskaj","rozbierz","rozłóż","rozloz","rozkręć","rozkrec",
               "rozwal i weź","rozbij na części","odzyskuję części"],

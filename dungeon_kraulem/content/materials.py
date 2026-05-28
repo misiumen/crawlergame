@@ -102,6 +102,68 @@ MATERIALS: Dict[str, MaterialDef] = {m.key: m for m in [
     _m("crawler_badge",    "odznaka zawodnika", "crawler badge",   ("badge","sponsor","identity"),              "uncommon"),
     _m("contract_scrap",   "strzęp kontraktu",  "contract scrap",  ("paper","sponsor","legal","data"),          "uncommon"),
     _m("audience_token",   "żeton widowni",     "audience token",  ("sponsor","data","rare","social"),          "rare"),
+
+    # ── P29.56 — Volatile chemicals (krytyczne dla emergentnego craftingu) ──
+    _m("phosphor",         "fosfor",            "phosphor",        ("chemical","reactive","incendiary","powder"),     "uncommon"),
+    _m("mercury_drop",     "kropla rtęci",      "mercury drop",    ("chemical","metal","liquid","toxic","heavy"),     "rare"),
+    _m("sodium_chunk",     "bryłka sodu",       "sodium chunk",    ("chemical","reactive","metal","explosive"),       "rare"),
+    _m("bleach_sachet",    "saszetka wybielacza","bleach sachet",  ("chemical","acid","liquid","caustic"),            "common"),
+    _m("ether_vial",       "fiolka eteru",      "ether vial",      ("chemical","flammable","liquid","sleep"),         "uncommon"),
+    _m("salt_block",       "blok soli",         "salt block",      ("chemical","powder","binding","preservative"),    "common"),
+
+    # ── Bio-organic ──
+    _m("snake_oil",        "wężowy olej",       "snake oil",       ("chemical","liquid","slick","scam","medical"),    "uncommon"),
+    _m("glow_moss",        "świecący mech",     "glow moss",       ("organic","light","fungal","sparkle"),            "uncommon"),
+    _m("feather_quill",    "lotka pióra",       "feather quill",   ("organic","light","sharp","handle"),              "common"),
+    _m("eyeball_specimen", "okaz oka",          "eyeball specimen",("organic","weird","optical","sensor","slick"),    "rare"),
+
+    # ── Tech expansion ──
+    _m("spring_clip",      "klips sprężynowy",  "spring clip",     ("metal","mechanical","spring","binding"),         "common"),
+    _m("brass_casing",     "łuska mosiężna",    "brass casing",    ("metal","container","handle","sharp"),            "common"),
+    _m("fuse_strip",       "pasek bezpiecznika","fuse strip",      ("electrical","fragile","fuse","small"),           "common"),
+    _m("magnetic_strip",   "pasek magnetyczny", "magnetic strip",  ("metal","magnetic","binding"),                    "uncommon"),
+    _m("prism_glass",      "szkło pryzmatyczne","prism glass",     ("glass","optical","precise","sparkle"),           "rare"),
+    _m("laser_diode",      "dioda laserowa",    "laser diode",     ("electronic","optical","light","sharp","precise"),"rare"),
+
+    # ── Biome-locked: okopy_frontowe ──
+    _m("trench_mud",       "okopowa glina",     "trench mud",      ("organic","sticky","cloth","binding","biome:okopy_frontowe"),       "common"),
+    _m("casing_shell",     "łuska artyleryjska","casing shell",    ("metal","heavy","container","biome:okopy_frontowe"),                "uncommon"),
+    _m("gas_canister",     "kanister gazu",     "gas canister",    ("chemical","gas","container","explosive","biome:okopy_frontowe"),  "rare"),
+    _m("rusted_bayonet",   "zardzewiały bagnet","rusted bayonet",  ("metal","sharp","melee","handle","biome:okopy_frontowe"),           "uncommon"),
+
+    # ── Biome-locked: zoo_korporacyjne ──
+    _m("feed_pellet",      "karma w pelletach", "feed pellet",     ("organic","food","bait","biome:zoo_korporacyjne"),                  "common"),
+    _m("escape_collar",    "obroża ucieczkowa", "escape collar",   ("electronic","tracker","binding","biome:zoo_korporacyjne"),         "uncommon"),
+    _m("pheromone_vial",   "fiolka feromonów",  "pheromone vial",  ("chemical","organic","smell","bait","biome:zoo_korporacyjne"),      "rare"),
+    _m("plastic_mask",     "plastikowa maska",  "plastic mask",    ("plastic","face","disguise","biome:zoo_korporacyjne"),              "common"),
+
+    # ── Biome-locked: muzeum_spektakli ──
+    _m("film_reel",        "rolka taśmy filmowej","film reel",     ("plastic","flammable","data","biome:muzeum_spektakli"),             "uncommon"),
+    _m("plaster_cast",     "odlew gipsowy",     "plaster cast",    ("ceramic","fragile","heavy","biome:muzeum_spektakli"),              "common"),
+    _m("wax_idol",         "woskowa figurka",   "wax idol",        ("wax","flammable","sticky","biome:muzeum_spektakli"),               "uncommon"),
+    _m("archive_dust",     "archiwalny pył",    "archive dust",    ("powder","weird","data","biome:muzeum_spektakli"),                  "rare"),
+
+    # ── Biome-locked: bar_skurczybyk ──
+    _m("beer_yeast",       "drożdże piwne",     "beer yeast",      ("organic","fungal","flammable","biome:bar_skurczybyk"),             "common"),
+    _m("brass_tap",        "kran mosiężny",     "brass tap",       ("metal","valve","handle","biome:bar_skurczybyk"),                   "uncommon"),
+    _m("cocktail_pick",    "patyczek koktajlowy","cocktail pick",  ("wood","small","sharp","biome:bar_skurczybyk"),                     "common"),
+    _m("ashtray_tar",      "popielniczkowy tar","ashtray tar",     ("chemical","sticky","carcinogen","biome:bar_skurczybyk"),           "uncommon"),
+
+    # ── Biome-locked: neighborhood ──
+    _m("graffiti_can",     "puszka graffiti",   "graffiti can",    ("chemical","container","spray","biome:intake_industrial"),               "common"),
+    _m("pigeon_feather",   "gołębie pióro",     "pigeon feather",  ("organic","light","biome:intake_industrial"),                            "common"),
+    _m("brick_chunk",      "kawałek cegły",     "brick chunk",     ("ceramic","heavy","blunt","biome:intake_industrial"),                    "common"),
+    _m("subway_grime",     "metroowa sadza",    "subway grime",    ("powder","sticky","carcinogen","biome:intake_industrial"),               "uncommon"),
+
+    # ── Biome-locked: grzybica_bloom ──
+    _m("spore_capsule",    "kapsuła zarodników","spore capsule",   ("organic","fungal","powder","sparkle","biome:grzybica_bloom"),       "uncommon"),
+    _m("mycelium_braid",   "warkocz grzybni",   "mycelium braid",  ("organic","fungal","binding","biome:grzybica_bloom"),                "common"),
+    _m("luminous_cap",     "świecący kapelusz", "luminous cap",    ("organic","fungal","light","biome:grzybica_bloom"),                  "uncommon"),
+    _m("blackrot_paste",   "pasta czarnej zgnilizny","blackrot paste",("organic","fungal","toxic","sticky","biome:grzybica_bloom"),     "rare"),
+
+    # ── Biome-locked: intake_industrial (F1 boss biome) ──
+    _m("intake_rebar",     "intake'owy zbrojeniowy","intake rebar",("metal","heavy","handle","biome:intake_industrial"),                "common"),
+    _m("industrial_grease","przemysłowy smar",  "industrial grease",("chemical","slick","flammable","liquid","biome:intake_industrial"),"common"),
 ]}
 
 
