@@ -513,10 +513,9 @@ def _collect_inventory(world) -> List[JournalEntry]:
         tags = list(ent.tags or [])
         affs = list(ent.affordances or [])
         deployable = "trap" in tags or "deployable" in tags or "deploy" in affs
-        detail_lines = [
-            f"Stan: {condition}",
-            "Tagi: " + ", ".join(tags[:6]) if tags else "",
-        ]
+        # P29.39 — surowe tagi schowane (debug info). Sam stan + opcjonalne
+        # podpowiedzi „Można rozstawić" / „użyj" niżej wystarczą graczowi.
+        detail_lines = [f"Stan: {condition}"]
         if deployable:
             detail_lines.append("Można rozstawić. Przykład: rozstaw pułapkę przy drzwiach.")
         if "consumable" in tags or "medical" in tags:
@@ -588,11 +587,13 @@ def _collect_materials(world) -> List[JournalEntry]:
                 if tg in _MATERIAL_CATEGORIES:
                     cat = _MATERIAL_CATEGORIES[tg]; break
         cat = cat or "różne"
+        # P29.39 — surowe tagi schowane. Kategoria + ilość są jedyną
+        # informacją, której gracz potrzebuje w tym widoku.
         out.append(JournalEntry(
             title=f"{qty}× {name}",
             subtitle=cat,
             status=cat,
-            detail=f"Kategoria: {cat}\nIlość: {qty}\nTagi: " + ", ".join(tags[:6]),
+            detail=f"Kategoria: {cat}\nIlość: {qty}",
             sort_key=(cat, name.lower()),
             raw_ref=key,
         ))

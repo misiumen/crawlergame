@@ -364,13 +364,85 @@ def _resolve_entities(room, fragment: str) -> list:
             matches = filtered
 
     # Door fallback: target words pointing at exits.
+    # P29.39: dorzucone "przejscie" + path which matches an exit label
+    # directly. Bez tego "wyłam przejście do X" nie wracał z żadnym
+    # targetem, bo „przejście" nie było wcześniej traktowane jako
+    # słowo-drzwi, a target text był zbyt szczegółowy żeby trafić
+    # w nazwę entity w pokoju.
     door_words = ("drzwi", "door", "doors", "wyjscie", "wyjście",
-                  "exit", "brama", "wejscie", "wejście")
+                  "exit", "brama", "wejscie", "wejście",
+                  "przejscie", "przejście")
+    if not matches:
+        # Najpierw: dopasowanie do konkretnego labela wyjścia. Lepsze
+        # niż „pierwsze locked" — gracz pisze label, dostaje TEN
+        # exit, nie inny.
+        synth = _synth_door_for_exit_label(room, f)
+        if synth is not None:
+            matches.append(synth)
     if not matches and any(w in f for w in door_words):
         synth = _synth_door_entity_for(room)
         if synth is not None:
             matches.append(synth)
     return matches
+
+
+def _synth_door_for_exit_label(room, folded_target: str):
+    """Jeśli folded_target pasuje (zawiera lub jest częścią) któryś
+    label wyjścia w pokoju — buduje (lub reuse'uje) synth_door dla
+    TEGO wyjścia. Inaczej zwraca None.
+
+    Filter: pomijamy hidden exity (gracz ich nie widział). locked /
+    unlocked obie się łapią — handler decyduje co zrobić.
+    """
+    if room is None or not getattr(room, "exits", None) or not folded_target:
+        return None
+    for label, ed in (room.exits or {}).items():
+        if ed.get("hidden"):
+            continue
+        lf = fold(label)
+        if not lf:
+            continue
+        if lf == folded_target or lf in folded_target or folded_target in lf:
+            return _ensure_synth_door_for(room, label, ed)
+    return None
+
+
+def _ensure_synth_door_for(room, label: str, ed: dict):
+    """Zwraca synth_door entity przypisaną do konkretnego labela.
+    Reuse'uje istniejącą jeśli pasuje (state.label match), inaczej
+    tworzy nową. State.label trzymamy zsynchronizowany z labelem
+    wyjścia, żeby break / force odblokowywały TEN exit, nie pierwszy
+    z brzegu."""
+    if room is None:
+        return None
+    # Reuse: szukamy entity której state.label == label.
+    for e in room.entities:
+        if e.key == "_synth_door" and (e.state or {}).get("label") == label:
+            # Refresh locked tag żeby UI zobaczył aktualny stan.
+            locked = bool(ed.get("locked"))
+            tags = list(e.tags or [])
+            if locked and "locked" not in tags:
+                tags.append("locked")
+            elif not locked and "locked" in tags:
+                tags = [t for t in tags if t != "locked"]
+            e.tags = tags
+            return e
+    locked = bool(ed.get("locked"))
+    tags = ["door", "fixture", "metal", "salvageable"]
+    if locked:
+        tags.append("locked")
+    aff = ["inspect", "force", "lockpick", "break", "open", "close"]
+    door = Entity(
+        key="_synth_door", entity_type="door",
+        fallback_name=f"drzwi ({label})",
+        fallback_desc=("Zamknięte drzwi." if locked else "Drzwi pokoju."),
+        tags=tags, affordances=aff,
+        location_id=room.room_id,
+        portable=False,
+    )
+    door.state = {"label": label, "locked": locked}
+    room.entities.append(door)
+    return door
 
 
 def _synth_door_entity_for(room):

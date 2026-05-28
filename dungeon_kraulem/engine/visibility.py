@@ -84,8 +84,20 @@ def respect_known_key_on_spawn(world, ent) -> None:
     """Called by the floor generator when spawning entities. If the
     player has previously inspected another entity with the same
     `key`, this fresh spawn starts as `seen` (recognition) instead
-    of `unknown`."""
+    of `unknown`.
+
+    P29.39 — dorzucone: TRYWIALNE obiekty (codzienna sprzęt, meble,
+    skrzynki, automaty) startują jako `seen` z automatu. User słusznie
+    zauważył że marnowanie dwóch akcji `sprawdź` na ujawnienie że
+    „skrzynia to skrzynia" jest bezsensownym bloat'em. Fog-of-war
+    zostaje dla rzeczy podejrzanych: trap / hazard / hidden /
+    sponsor_secret / disguised / puzzle / monster / npc.
+    """
     if ent is None or world is None:
+        return
+    # Trivial promotion (działa nawet bez `ent.key`).
+    if get_state(ent) == STATE_UNKNOWN and _is_trivial_entity(ent):
+        ent.visibility_state = STATE_SEEN
         return
     if not ent.key:
         return
@@ -93,6 +105,39 @@ def respect_known_key_on_spawn(world, ent) -> None:
     if ent.key in keys:
         if get_state(ent) == STATE_UNKNOWN:
             ent.visibility_state = STATE_SEEN
+
+
+# Tagi, które oznaczają coś co MA być przykryte fog-of-war'em. Jeśli
+# entity ma którykolwiek z tych tagów, NIE jest „trywialna" — gracz
+# musi ją sprawdzić by ujawnić nazwę.
+_NON_TRIVIAL_TAGS = frozenset({
+    "trap", "hazard", "hidden", "sponsor_secret", "disguised",
+    "puzzle", "monster", "npc", "humanoid", "crawler", "drone",
+    "undead", "ghost", "beast", "boss", "miniboss",
+    "corpse",        # zwłoki są nietypowe — gracz nie wie kto leży
+    "sponsor_owned", # podejrzane: sponsor coś tu schował
+})
+
+
+# Tagi codziennego sprzętu — automatyczne `seen`.
+_TRIVIAL_TAGS = frozenset({
+    "container", "furniture", "decoration", "environment", "fixture",
+    "consumable", "food", "tool", "medical", "junk", "art",
+    "vending_loot", "salvageable", "metal", "wood", "glass",
+    "electrical", "plastic", "fabric",
+})
+
+
+def _is_trivial_entity(ent) -> bool:
+    """True jeśli entity jest „codzienna" — meble, skrzynki, automaty,
+    rzeczy w plecaku. Te promujemy do `seen` od razu, żeby fog-of-war
+    nie zżerał dwóch akcji na rzeczy oczywiste."""
+    if ent is None:
+        return False
+    tags = set(getattr(ent, "tags", None) or [])
+    if tags & _NON_TRIVIAL_TAGS:
+        return False
+    return bool(tags & _TRIVIAL_TAGS)
 
 
 # ── Display helpers ──────────────────────────────────────────────────────
@@ -176,11 +221,10 @@ def build_inspect_block(world, ent) -> list:
     lines.append(sep)
     lines.append(name)
 
-    # ── Common: tags
-    tags_visible = [t for t in (ent.tags or [])
-                    if ":" not in t and t not in ("floor_boss",)]
-    if tags_visible:
-        lines.append("Tagi: " + ", ".join(tags_visible[:6]))
+    # P29.39 — surowe tagi (container, wood, salvageable) były debug
+    # info wystawionym graczowi. Zamiast nich — krótka linia
+    # „Możesz spróbować:" z polskimi etykietami afordansów. Daje
+    # konkretną podpowiedź zamiast korpo-metadanych.
 
     # ── Type-specific blocks
     if etype == "monster":
@@ -270,8 +314,61 @@ def build_inspect_block(world, ent) -> list:
         elif state.get("locked"):
             lines.append("Stan: zamknięte")
 
+    # P29.39 — krótka linia z polskimi etykietami afordansów, jako
+    # konkretna podpowiedź zamiast surowych tagów. Pokazujemy max 4
+    # — żeby nie zalać gracza listą.
+    hints = _affordance_hints_pl(ent)
+    if hints:
+        lines.append("Możesz spróbować: " + ", ".join(hints[:4]) + ".")
+
     lines.append(sep)
     return lines
+
+
+# Mapowanie afordansów na polskie etykiety w trybie podpowiedzi
+# („wyłamać", „przeszukać") — INFINITIV, bo to lista możliwości, nie
+# rozkaz. UI dispatcher i tak zwykle przepisuje na konkretną komendę
+# z imperatywem.
+_AFFORDANCE_HINT_PL = {
+    "inspect":       "przyjrzeć się dokładniej",
+    "search":        "przeszukać",
+    "loot":          "zgarnąć co tam jest",
+    "open":          "otworzyć",
+    "close":         "zamknąć",
+    "force":         "wyłamać",
+    "lockpick":      "otworzyć wytrychem",
+    "hack":          "podpiąć się pod elektronikę",
+    "break":         "rozbić",
+    "attack":        "zaatakować",
+    "salvage":       "rozebrać na części",
+    "strip":         "obedrzeć z osprzętu",
+    "harvest":       "wyciągnąć surowiec",
+    "use":           "użyć",
+    "throw_at":      "rzucić w coś",
+    "push_into":     "zepchnąć",
+    "deploy":        "rozstawić",
+    "talk":          "pogadać",
+    "intimidate":    "zastraszyć",
+    "bribe":         "przekupić",
+    "lure":          "zwabić",
+    "butcher":       "zarżnąć i wyciąć mięso",
+}
+
+
+def _affordance_hints_pl(ent) -> list:
+    """Zwraca listę polskich opisów afordansów dla entity, w stylu
+    podpowiedzi. Filtrujemy `inspect` (skoro gracz już to robi)."""
+    if ent is None:
+        return []
+    affs = list(getattr(ent, "affordances", None) or [])
+    out = []
+    for a in affs:
+        if a == "inspect":
+            continue
+        pl = _AFFORDANCE_HINT_PL.get(a)
+        if pl and pl not in out:
+            out.append(pl)
+    return out
 
 
 def _sponsor_interest_for_tags(world, entity_tags: list) -> str:

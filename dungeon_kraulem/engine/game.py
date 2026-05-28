@@ -2275,6 +2275,14 @@ class Game:
         if intent.intent == "break":
             self._attempt_break(intent); return
 
+        # P29.39 — „wyłam X" handler. Brakowało dispatchu, więc UI
+        # sugerowało komendę a parser ją zwracał, ale validator
+        # szukał entity i nic nie znajdował. Teraz osobna ścieżka,
+        # która łapie locked exity (przez synth_door) i otwiera je
+        # STR-em.
+        if intent.intent == "force":
+            self._attempt_force(intent); return
+
         # Prompt 16: mass-action commands. Deterministic, no LLM. Each
         # handler iterates the room's visible entities and applies the
         # action to every valid target — accumulating time, noise,
@@ -3726,6 +3734,144 @@ class Game:
                 return
 
         # Affinity nudge for environment plays.
+        ch.affinity["environment"] = ch.affinity.get("environment", 0) + 1
+
+    # ── P29.39: force / wyłam — locked-exit handler ─────────────────────────
+
+    def _attempt_force(self, intent):
+        """„Wyłam X" — siłowe otwarcie zamkniętych drzwi (locked exit).
+        Validator (od P29.39) potrafi znaleźć synth_door dla podanego
+        labela. Tutaj robimy STR check vs DC 14 i, na sukces,
+        odblokowujemy konkretne wyjście (`room.exits[label]["locked"]
+        = False`).
+
+        Crit fail → uderzasz w futrynę zamiast w zamek, mała szkoda
+        na HP i bump threatu (hałas).
+        """
+        from .validation import validate as validate_action
+        from . import time_system as ts
+        from .utils_compat import roll_d20
+        from .dice_labels import format_check as _fc
+
+        v = validate_action(intent, self.world)
+        if not v.valid:
+            self.log(v.message() or "—", LOG_WARN)
+            if v.possible_interpretations:
+                self.log("  ? " + " | ".join(v.possible_interpretations),
+                         LOG_NORMAL)
+            self._stash_disambiguation_on_invalid(v, intent)
+            return
+
+        target = v.matched_entities[0] if v.matched_entities else None
+        if target is None:
+            self.log(t("feedback_no_target",
+                       fallback="Nie widzisz tu tego, czego "
+                                "szukasz."), LOG_WARN)
+            return
+
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            self.log("Nie jesteś nigdzie.", LOG_WARN); return
+
+        # Synth-door dla wyjścia: spróbuj odblokować po labelu.
+        is_synth = (target.key == "_synth_door")
+        st = target.state or {}
+        label = st.get("label") if is_synth else None
+        ed = (room.exits.get(label) if label else None)
+
+        # Czy to w ogóle locked? Jeśli nie — nie ma co wyłamywać.
+        if is_synth and ed is not None and not ed.get("locked"):
+            self.log(t("feedback_force_already_open",
+                       fallback=(f'„{label}" — nie zamknięte. '
+                                 f'Możesz po prostu wejść.')),
+                     LOG_WARN)
+            return
+        if not is_synth:
+            tags = set(target.tags or [])
+            if "locked" not in tags:
+                self.log(t("feedback_force_not_locked",
+                           fallback=(f'„{target.display_name()}" '
+                                     f'nie jest zamknięte na klucz '
+                                     f'— nic do wyłamywania.')),
+                         LOG_WARN)
+                return
+
+        # STR check vs DC 14 (base z affordance.force).
+        ch = self.world.character
+        raw = roll_d20()
+        mod = ch.stat_mod("STR")
+        total = raw + mod
+        dc = 14
+        # Lekkie modyfikatory dla synth_door: tagi z exit-template
+        # mogą zaostrzyć DC, ale na razie trzymamy bazę 14.
+        if   raw == 20:       level = "critical_success"
+        elif raw == 1:        level = "critical_failure"
+        elif total >= dc + 5: level = "critical_success"
+        elif total >= dc:     level = "success"
+        elif total >= dc - 3: level = "partial_success"
+        else:                 level = "failure"
+        self.log(_fc("force", "STR", raw, mod, total, dc, level),
+                 LOG_SYSTEM)
+
+        ts.advance(self.world, 10)
+
+        if level in ("critical_success", "success"):
+            # Odblokuj exit jeśli mamy label, albo zmień stan entity.
+            if label and ed is not None:
+                ed["locked"] = False
+                ed["fallback_hint"] = "Drzwi wyłamane — przejście wolne."
+            if is_synth:
+                target.tags = [tt for tt in (target.tags or [])
+                               if tt != "locked"]
+                target.state = {**st, "locked": False, "forced": True}
+            self.log(t("feedback_force_ok",
+                       fallback=("Stalowa futryna ustępuje z protestem "
+                                 "— przejście wolne.")),
+                     LOG_SUCCESS)
+            self._bump_threat(
+                2 if level == "critical_success" else 3,
+                source="force_door", room=room)
+            # Spektakl: widownia lubi, kiedy ktoś używa pleców
+            # zamiast łomu.
+            try:
+                from . import audience as _aud
+                _aud.change_audience(
+                    self.world,
+                    2 if level == "critical_success" else 1,
+                    source="force")
+                from . import sponsors as _sp
+                _sp.note_player_tag(self.world, "spectacle", weight=1)
+            except Exception:
+                pass
+        elif level == "partial_success":
+            # Pęknięta futryna — locked nadal, ale następna próba
+            # ma -2 do DC. Trzymamy na entity, nie na exit, bo
+            # exit dict nie ma miejsca na to.
+            if is_synth:
+                target.state = {**st, "damaged": True}
+            self.log(t("feedback_force_partial",
+                       fallback="Futryna pęka, ale zamek wciąż "
+                                "trzyma. Następnym razem pójdzie "
+                                "łatwiej."), LOG_WARN)
+            self._bump_threat(2, source="force_partial", room=room)
+        elif level == "failure":
+            self.log(t("feedback_force_fail",
+                       fallback="Naparzasz w futrynę. Boli. Drzwi "
+                                "ani drgnęły."), LOG_WARN)
+            self._bump_threat(1, source="force_fail", room=room)
+        else:   # critical_failure
+            self.log(t("feedback_force_critfail",
+                       fallback="Plecy strzeliły ci jak suchy patyk. "
+                                "Drzwi nawet nie zauważyły."),
+                     LOG_DANGER)
+            ch.take_damage(2)
+            self._bump_threat(3, source="force_critfail", room=room)
+            if self._check_player_dead("force_critfail",
+                                       "od własnego barku w futrynę"):
+                return
+
+        # Affinity: wyłom to brudna mechanika otoczenia.
         ch.affinity["environment"] = ch.affinity.get("environment", 0) + 1
 
     # ── Prompt 16: mass-action handlers ─────────────────────────────────────
