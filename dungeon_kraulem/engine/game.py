@@ -921,14 +921,20 @@ class Game:
                      LOG_WARN)
             return
         # Heal.
+        # P29.53g — rest tickuje 30 min (było 20). Dłużej = bardziej
+        # widoczne w zegarze top-baru, lepiej współgra z 14-dniowym
+        # deadlinem (1 piętro = ~20k minut, 30 min = 0.15% — wciąż
+        # tanio, ale user widzi że coś się stało).
         heal = max(1, ch.max_hp // 4)   # ~25% of max
         ch.heal(heal)
         ch.flags[day_key] = used + 1
-        ts.advance(self.world, 20)
-        self.log(t("feedback_rest_short_ok",
-                   fallback=f"Krótki odpoczynek. Odzyskujesz {heal} HP "
-                            f"(HP: {ch.hp}/{ch.max_hp}).",
-                   heal=heal, hp=ch.hp, max=ch.max_hp), LOG_SUCCESS)
+        ts.advance(self.world, 30)
+        # P29.53g — explicit time feedback w komunikacie.
+        from .time_system import format_clock
+        msg = (f"Krótki odpoczynek. Odzyskujesz {heal} HP "
+               f"({ch.hp}/{ch.max_hp}). Zegar: {format_clock(self.world)} "
+               f"(−30 min).")
+        self.log(msg, LOG_SUCCESS)
 
     def _attempt_rest_long(self):
         """P27.6 — long rest. Pełna regeneracja HP + reset most
