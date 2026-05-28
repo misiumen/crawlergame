@@ -902,6 +902,95 @@ MON = {
         floor_min=6, floor_max=6,
     ),
 
+    # ── P29.42b — FRONTOWE OKOPY (biom WWI, F3-8) ──────────────────────
+    # Sponsorzy dali piechocie dwa karabiny i kazali walczyć ze sobą o
+    # ratingi. Plakat na ścianie: WALCZ DOBRZE — TWOJA WIDOWNIA CIĘ
+    # KOCHA. Pod plakatem ktoś dopisał: WIDOWNIA NIE WIE JAK MASZ NA
+    # IMIĘ. Wszystkie potwory tu robią to, co robili w okopie — bardzo
+    # długo. Niektórzy nawet nie wiedzą, że już nie żyją.
+    "okopowy_grenadier": dict(
+        name_key="ent_okopowy_grenadier_n",
+        fallback_name="okopowy grenadier",
+        desc_key="ent_okopowy_grenadier_d",
+        fallback_desc="Maska gazowa, hełm w zaschniętym błocie, "
+                      "płaszcz bez guzików. Trzyma granat, jakby "
+                      "trzymał gorącą zupę. Nie pamięta, którą "
+                      "armią dowodzi.",
+        tags=["monster","humanoid","trenches","ranged","floor_min:3"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=13, max_hp=13, ac=12, attack_bonus=4, damage_dice="1d8",
+        damage_type="physical",
+        vulnerable_to=["fire"],
+        floor_min=3, floor_max=8,
+    ),
+    "lazarz_blotny": dict(
+        name_key="ent_lazarz_blotny_n",
+        fallback_name="błotny łazarz",
+        desc_key="ent_lazarz_blotny_d",
+        fallback_desc="Żołnierz, który utonął w okopie po kostki, "
+                      "potem po pas, potem przestał liczyć. Teraz "
+                      "wynurza się z błota co rano, ciągnie kogoś "
+                      "ze sobą wieczorem. Mokre dłonie. Cierpliwy.",
+        tags=["monster","undead","trenches","grappler","floor_min:3"],
+        affordances=["inspect","attack"],
+        hp=18, max_hp=18, ac=11, attack_bonus=3, damage_dice="1d6+2",
+        damage_type="physical",
+        resists=["physical","cold"],
+        vulnerable_to=["fire","electric"],
+        floor_min=4, floor_max=8,
+    ),
+    "sanitariuszka_propaganda": dict(
+        name_key="ent_sanitariuszka_propaganda_n",
+        fallback_name="sanitariuszka propagandowa",
+        desc_key="ent_sanitariuszka_propaganda_d",
+        fallback_desc="Biały fartuch w zaschniętych plamach, opaska "
+                      "z czerwonym kwadratem zamiast krzyża. Trzyma "
+                      "strzykawkę większą, niż ma prawo. Mówi do "
+                      "ciebie głosem matki, której nigdy nie miałeś.",
+        tags=["monster","humanoid","trenches","caster","social",
+              "floor_min:3"],
+        affordances=["inspect","attack","talk","bribe"],
+        hp=14, max_hp=14, ac=12, attack_bonus=3, damage_dice="1d6",
+        damage_type="acid",
+        vulnerable_to=["physical"],
+        floor_min=3, floor_max=8,
+    ),
+    "miniboss_sierzant_blachy": dict(
+        name_key="ent_miniboss_sierzant_blachy_n",
+        fallback_name="Sierżant Blacha",
+        desc_key="ent_miniboss_sierzant_blachy_d",
+        fallback_desc="Płyty nitowane do tułowia bezpośrednio. Hełm "
+                      "z rogami z innej epoki. Nie przemawia — wydaje "
+                      "rozkazy świstem przez dziurę w gardle. "
+                      "Posłuszny tylko sponsorowi, który zapłacił "
+                      "ostatni.",
+        tags=["monster","humanoid","trenches","miniboss","armored",
+              "floor_min:4"],
+        affordances=["inspect","attack","intimidate"],
+        hp=32, max_hp=32, ac=15, attack_bonus=5, damage_dice="2d6+2",
+        damage_type="physical",
+        resists=["physical","fire"],
+        vulnerable_to=["electric","acid"],
+        floor_min=4, floor_max=7,
+    ),
+    "boss_kapelmistrz_wojny": dict(
+        name_key="ent_boss_kapelmistrz_wojny_n",
+        fallback_name="Kapelmistrz Wojny",
+        desc_key="ent_boss_kapelmistrz_wojny_d",
+        fallback_desc="Frak z aksamitu, srebrna pałeczka, mikrofon "
+                      "okopowy zwisa z paska. Dyrygował orkiestrą "
+                      "obozową przez całą wojnę. Wciąż dyryguje. "
+                      "Twoja śmierć ma już zarezerwowaną tonację.",
+        tags=["monster","humanoid","trenches","floor_boss","boss",
+              "social","floor_min:5"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=46, max_hp=46, ac=14, attack_bonus=6, damage_dice="2d6+3",
+        damage_type="psychic",
+        resists=["psychic","physical"],
+        vulnerable_to=["fire","electric"],
+        floor_min=5, floor_max=8,
+    ),
+
     # ── P29.11 — DEEP FLOORS 7-18 ───────────────────────────────────────────
     # Four-band thematic split:
     #   7-9   UNDERGROUND        (zaplecze, kanały, opuszczone instalacje)

@@ -96,9 +96,15 @@ def test_available_biomes_skips_disabled():
     _rh.reset()
     f3 = available_biomes(3)
     keys = [b.key for b in f3]
-    # `okopy_frontowe` jest F3-8 ale enabled=False — pominięta.
-    assert "okopy_frontowe" not in keys
-    print(f"  disabled biomes są pomijane: OK")
+    # Bierzemy biom, który wciąż jest enabled=False (np. stacja_orbital).
+    # Gdy P29.42b doda mu pokoje, ten test trzeba będzie przepiąć na inny.
+    from ..content.data.floor_biomes import FLOOR_BIOMES
+    still_disabled = [k for k,b in FLOOR_BIOMES.items()
+                      if not b.enabled and b.floor_min <= 3 <= b.floor_max]
+    assert still_disabled, "wszystkie F3-biomy są enabled — usuń ten test"
+    for k in still_disabled:
+        assert k not in keys, f"{k} ma enabled=False, ale wpada do puli"
+    print(f"  disabled biomes są pomijane: OK ({len(still_disabled)})")
 
 
 def test_available_biomes_skips_locked_until_unlock():
@@ -274,6 +280,30 @@ def test_meta_progression_has_biome_unlocks():
     print(f"  meta_progression: {len(biome_unlocks)} biome unlocków: OK")
 
 
+def test_trenches_biome_has_content():
+    """P29.42b — Frontowe Okopy mają pokoje (3), potwory (5) i boss
+    template wpadający do generatora dla F3-8."""
+    from ..content.data.room_pool import ROOM_POOL
+    from ..content.data.entity_templates import MON
+    from ..content.data.floor_biomes import FLOOR_BIOMES
+
+    biome = FLOOR_BIOMES["okopy_frontowe"]
+    assert biome.enabled, "okopy_frontowe nie jest enabled"
+    rooms = [r for r in ROOM_POOL if "trenches" in r.get("tags", [])]
+    assert len(rooms) >= 3, f"za mało pokoi okopowych: {len(rooms)}"
+    # Boss + danger + loot — wszystkie role muszą się znaleźć.
+    roles = {r["role"] for r in rooms}
+    for need in ("danger", "loot", "boss"):
+        assert need in roles, f"brak pokoju z role={need}"
+    mons = [k for k, m in MON.items() if "trenches" in m.get("tags", [])]
+    assert len(mons) >= 4, f"za mało potworów okopowych: {len(mons)}"
+    # Musi być przynajmniej jeden floor_boss (Kapelmistrz).
+    bosses = [k for k in mons
+              if "floor_boss" in MON[k].get("tags", [])]
+    assert bosses, "brak floor_boss z trenches"
+    print(f"  Frontowe Okopy: {len(rooms)} pokoi, {len(mons)} potworów: OK")
+
+
 def test_unlocked_biomes_helper():
     _rh.reset()
     assert _mp.unlocked_biomes() == []
@@ -304,6 +334,7 @@ def main():
         test_generated_rooms_match_biome()
         test_encounter_filter_excludes_other_biomes()
         test_meta_progression_has_biome_unlocks()
+        test_trenches_biome_has_content()
         test_unlocked_biomes_helper()
     finally:
         _rh.reset()

@@ -84,7 +84,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         room_tag="trenches",
         sponsor_likes={"liga_brawurowa": 1},
         weight=2,
-        enabled=False,    # czeka na pokoje (P29.42b)
+        # P29.42b — pokoje + potwory napisane, biom aktywny.
     ),
 
     "muzeum_spektakli": FloorBiome(

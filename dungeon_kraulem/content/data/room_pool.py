@@ -923,6 +923,169 @@ ROOM_POOL = [
         "theme_sponsor_boost": {"kanal_7_krawedz": 2},
     },
 
+    # ── P29.42b — FRONTOWE OKOPY (biom WWI, F3-8) ────────────────────────
+    # Sponsorzy zorganizowali wojnę bez frontu i bez wroga. Walczą tu
+    # ludzie, którzy zapomnieli, kogo nienawidzą. Plakaty propagandowe
+    # są dwie warstwy głębokie — pod każdą leży inna armia, każda już
+    # nieaktualna. Liga Brawurowa lubi to piętro za jakość spektakli.
+    {
+        "template_id": "pool_linia_strzelecka",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "trenches", "ranged"],
+        "name_pool": ["Linia Strzelecka", "Okop Pierwszej Linii",
+                      "Stanowisko 7-B"],
+        "first_enter_pool": [
+            "Błoto sięga ci do kostek po dwóch krokach, a do kolan, "
+            "jak postoisz. Drewno ścian okopu wgryzło się w glinę. "
+            "Drabiny do góry, otwory strzelnicze, w jednym z nich "
+            "ktoś wystawia lufę. Powietrze pachnie prochem i kanapką, "
+            "którą ktoś zostawił na desce w ubiegłą zmianę. Plakat "
+            "propagandowy: WALCZ DOBRZE — TWOJA WIDOWNIA CIĘ KOCHA. "
+            "Pod plakatem ktoś dopisał ołówkiem: WIDOWNIA NIE WIE, "
+            "JAK MASZ NA IMIĘ.",
+            "Okop. Sześć metrów głęboki, dwa szeroki, długi w "
+            "obie strony tak, że nie widzisz końca. Na drabince "
+            "siedzi grenadier i je kanapkę z konserwą, jakby "
+            "nie zauważył, że wojna trwa. Z głośnika ktoś czyta "
+            "listę nazwisk, żadnego nie kończy.",
+        ],
+        "look_pool": [
+            "Drewno ścian, drabinki, otwory strzelnicze. Worki z "
+            "piaskiem ułożone od niechcenia. Skrzynia po amunicji "
+            "stoi otwarta — pusta. Albo prawie.",
+            "Błoto. Trochę krwi (cudza, twoja jeszcze nie). Drabinki, "
+            "z których kapie zaschnięte coś. Dziura w deskach, którą "
+            "ktoś próbował załatać kawałkiem afisza.",
+        ],
+        "search_pool": [
+            "Pod deską znajdujesz wciśnięty pamiętnik. Pierwsza "
+            "strona: „Mama. Wracam w czwartek.” Ostatnia: „Mama. "
+            "Czwartek to chyba dzisiaj.”",
+            "W worku z piaskiem wymacujesz coś metalowego — łuska "
+            "po pocisku, jeszcze ciepła. Ktoś tu strzelał w sufit "
+            "z nudów, jakieś dziesięć minut temu.",
+        ],
+        "public_hint_pool": [
+            "Świst pocisku gdzieś z lewa. Daleko, ale nie aż tak.",
+            "Ktoś nuci marsz okopowy. Bez słów, bo nie pamięta.",
+            "Z głośnika trzeszczy lista nazwisk. Twojego jeszcze nie.",
+        ],
+        "sensory_tags": ["mud","gunpowder","wet_wood","propaganda"],
+        "entity_seed_pools": {
+            "mon":  ["okopowy_grenadier", "sanitariuszka_propaganda"],
+            "env":  ["sponsor_camera", "loose_chain", "broken_barrel"],
+            "haz":  ["exposed_wiring"],
+            "item": ["maska_filtrujaca", "dirty_bandage"],
+        },
+        "exit_hints": ["dalej okopem", "boczny chodnik",
+                       "drabinka w górę"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
+        "floor_min": 3,
+        "floor_max": 8,
+        "theme_sponsor_boost": {"liga_brawurowa": 1},
+    },
+    {
+        "template_id": "pool_sklep_polowy",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "trenches"],
+        "name_pool": ["Sklep Polowy", "Magazyn Intendentury",
+                      "Składnica Drugiej Linii"],
+        "first_enter_pool": [
+            "Drewniana buda wkopana w błoto. Drzwi wiszą na jednym "
+            "zawiasie, jakby już rezygnowały. W środku półki — "
+            "puszki, opatrunki, papierosy w nielegalnej walucie. "
+            "Intendent leży na pulpicie, niby śpi. Sponsor zostawił "
+            "tu paczki, których nikt nie podpisał. „PROSIMY "
+            "RACJONOWAĆ” — pisze tabliczka. Nikt nie racjonował.",
+        ],
+        "look_pool": [
+            "Półki z konserwami w trzech językach. Beczka po wódce "
+            "(pusta). Stos opatrunków zapakowanych w gazety. Liczy "
+            "się ich więcej, niż żołnierzy w okopie obok.",
+            "Pulpit intendenta. Lampa naftowa kopci. Książka "
+            "rachunkowa otwarta — ostatnia pozycja: „kanapka, "
+            "podpis nieczytelny, dług niespłacony do śmierci.”",
+        ],
+        "search_pool": [
+            "Pod pulpitem znajdujesz manierkę — pełną, choć ciężką. "
+            "Etykieta starannie wyklejona, nazwa armii zamazana "
+            "ołówkiem. Pachnie wodą i czymś jeszcze.",
+            "W kącie puszki, dwie nadgryzione, jedna z czerwonym "
+            "stemplem „SPONSORSKI KONTRABAND — NIE DOTYKAĆ”. Pod "
+            "puszką ktoś zostawił dziesięć kredytów i wymówkę.",
+        ],
+        "public_hint_pool": [
+            "Skrzypienie drzwi. Lampa naftowa. Ktoś chrapie pod "
+            "pulpitem, regularnie, jakby na zmianę.",
+            "Cisza, którą sklep polowy ma tylko jak właśnie ktoś "
+            "wszedł i jeszcze nic nie ukradł.",
+        ],
+        "sensory_tags": ["wax","tin","kerosene","mud"],
+        "entity_seed_pools": {
+            "mon":  ["lazarz_blotny"],
+            "env":  ["broken_barrel", "bone_pile"],
+            "item": ["snack_bar", "coffee", "duct_tape",
+                     "maska_filtrujaca"],
+        },
+        "exit_hints": ["okopem dalej", "schody do bunkra"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+        "floor_max": 8,
+        "theme_sponsor_boost": {"liga_brawurowa": 1,
+                                 "bractwo_komornika": 1},
+    },
+    {
+        "template_id": "pool_bunkier_dowodzenia",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "trenches"],
+        "name_pool": ["Bunkier Dowodzenia",
+                      "Sztab Polowy 3-A",
+                      "Salon Kapelmistrza"],
+        "first_enter_pool": [
+            "Bunkier ma sufit niżej niż twoja głowa. Mapa na ścianie "
+            "pokazuje wojnę, której już nie ma. Krzyżyki na mapie "
+            "kreślone dwoma rękami naraz, jak ktoś miał za dużo "
+            "kawy i za mało strategii. Pośrodku stół, na stole "
+            "płyta gramofonowa kręci się bez igły. Przy stole "
+            "Kapelmistrz Wojny we fraku — pałeczka w prawej dłoni, "
+            "mikrofon okopowy w lewej. „Witaj. Spóźniłeś się na "
+            "uwerturę. Ale na finał — w sam raz.”",
+        ],
+        "look_pool": [
+            "Mapa wojny. Stół z gramofonem. Kapelmistrz. Drzwi "
+            "z napisem „WYJŚCIE — TYLKO PO OKLASKACH”.",
+            "Bunkier. Dwa wyjścia: jedno, którym wszedłeś, drugie "
+            "za plecami Kapelmistrza. Ten drugi jest mniejszy. "
+            "Symboliczny.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Pałeczka stuka rytmicznie o stół. Trzy uderzenia, "
+            "potem cisza, potem znowu.",
+            "Gramofon szumi. Bez muzyki, ale z intencją.",
+        ],
+        "sensory_tags": ["bunker","wax","baton","muffled"],
+        "entity_seed_pools": {
+            "mon": ["boss_kapelmistrz_wojny"],
+            "env": ["sponsor_camera", "broken_barrel"],
+        },
+        "exit_hints": ["wyjście piętra", "okopem z powrotem"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 5,
+        "floor_max": 8,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"liga_brawurowa": 2},
+    },
+
     # ── Boss / objective gate ───────────────────────────────────────────────
     {
         "template_id": "pool_relay_boss",
