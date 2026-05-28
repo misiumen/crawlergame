@@ -241,7 +241,7 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
         key="origin_drugi_cykl", kind="origin",
         label_pl="Drugi cykl",
         description_pl="Przetrwaj swój pierwszy sezon (zwycięstwo lub porażka).",
-        reward_pl="Zaczynasz z widownią +5 i blizną opowiadającą się sama.",
+        reward_pl="Zaczynasz z widownią +5 i blizną po poprzednim sezonie.",
         eval_fn=_eval_drugi_cykl,
     ),
     "origin_sponsorowany": UnlockDef(
@@ -335,14 +335,14 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
         key="origin_wieczny_stazysta", kind="origin",
         label_pl="Wieczny Stażysta",
         description_pl="Przetrwaj trzy sezony.",
-        reward_pl="Startujesz z credits ×2. Konferansjer nigdy nie "
-                  "zaoferuje ci klasy w tym runie (jesteś stażystą, "
+        reward_pl="Startujesz z kredytami ×2. Konferansjer nigdy nie "
+                  "zaoferuje ci klasy w tym sezonie (jesteś stażystą, "
                   "Syndykat ci nie ufa).",
         eval_fn=lambda w, v: _eval_total_runs(w, v, 3),
     ),
     "origin_sponsor_reject": UnlockDef(
         key="origin_sponsor_reject", kind="origin",
-        label_pl="Sponsor's Choice Reject",
+        label_pl="Niechciane Dziecko Sponsorów",
         description_pl="Zakończ sezon ze sponsorem na uwadze ≤ −5.",
         reward_pl="Każdy sponsor startuje z uwagą −5 (nielubiany), "
                   "ale jeden losowy ma cię za swojego (+10).",
@@ -362,7 +362,7 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
         label_pl="Dziedzic Kanału 7",
         description_pl="Osiągnij szczyt widowni 120 w jednym runie.",
         reward_pl="Startujesz z wbudowanym mikrofonem kierunkowym + "
-                  "dron-kamera leci za tobą (audience +1 co minutę "
+                  "dron-kamera leci za tobą (widownia +1 co minutę "
                   "w pierwszym dniu piętra 1).",
         eval_fn=lambda w, v: _eval_audience_peak(w, v, 120),
     ),
@@ -372,7 +372,7 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
         key="companion_suczka_recyklingu", kind="companion",
         label_pl="Suczka Recyklingu",
         description_pl="Zakończ sezon z uwagą Kultu Recyklingu ≥ 20.",
-        reward_pl="Trzy-nożna sunia, która scrappuje 1 losowy "
+        reward_pl="Trójnoga sunia, która zdziera 1 losowy "
                   "przedmiot z każdego trupa wroga w pokoju.",
         eval_fn=lambda w, v: _has_attention(w, "kult_recyklingu", 20),
     ),
@@ -382,7 +382,7 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
         description_pl="Zakończ sezon z uwagą Ministerstwa Pamięci "
                        "≥ 20.",
         reward_pl="Kot z legitymacją służbową. 1 raz na piętro "
-                  "cofa twój ostatni nieudany rzut (re-roll).",
+                  "cofa twój ostatni nieudany rzut (ponowne rzucenie).",
         eval_fn=lambda w, v: _has_attention(w, "ministerstwo_pamieci", 20),
     ),
     "companion_dron_sponsorski": UnlockDef(
@@ -390,8 +390,8 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
         label_pl="Dron Sponsorski",
         description_pl="Zakończ sezon z jakimś sponsorem ≥ 18 "
                        "(niemal pełna uwaga).",
-        reward_pl="Latająca kamera, audience ×1.5. Jeśli zdradzisz "
-                  "sponsora-właściciela, jego pody się rozwścieczają.",
+        reward_pl="Latająca kamera, widownia ×1.5. Jeśli zdradzisz "
+                  "sponsora-właściciela, jego drop-pody się rozwścieczają.",
         eval_fn=lambda w, v: _any_sponsor_at(w, 18),
     ),
 
@@ -427,7 +427,7 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
         label_pl="Klucz do Kantyny Sponsorów",
         description_pl="Zakończ sezon z 3+ sponsorami na ≥ 10 "
                        "uwagi jednocześnie.",
-        reward_pl="Otwiera ukryty pokój na piętrze 18 — credits + "
+        reward_pl="Otwiera ukryty pokój na piętrze 18 — kredyty + "
                   "apteczka + pełna butelka wody (rzecz święta).",
         eval_fn=_eval_three_sponsors_friendly,
     ),
