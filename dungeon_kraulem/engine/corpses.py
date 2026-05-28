@@ -143,6 +143,23 @@ def transform_to_corpse(world, entity, *, killer=None) -> Optional[Entity]:
         if new_tag not in tags:
             tags.append(new_tag)
     entity.tags = tags
+    # P29.57a — DCC canon: trup bossa = wyjście z piętra otwarte.
+    # Niezależnie od ścieżki śmierci (gracz, faction crossfire, własna
+    # pułapka, hazard, środowisko, sponsor-wars). Wcześniej hook żył
+    # tylko w Game's player-kill path → boss zabity inaczej = floor
+    # zablokowane. Przeniesienie tutaj realizuje wzorzec z DCC:
+    # "Wszystkie bossy zostawiają za sobą trwały łup i ich trupy
+    # zostają w Lochu" — exit unlock to KOLEKTYWNY skutek śmierci,
+    # nie nagroda za zabicie. Achievement + Boss Box wciąż siedzi
+    # w Game's path (DCC: "tylko zabijający dostają skrzynkę").
+    # set.add() idempotent więc dwa wywołania nie psują niczego.
+    try:
+        if "floor_boss" in tags or "final_boss" in tags:
+            if world is not None and getattr(world, "current_floor",
+                                             None) is not None:
+                world.current_floor.exits_unlocked.add("boss_defeated")
+    except (AttributeError, KeyError):
+        pass
     # Affordances flip to the corpse set. Some monsters had `talk` etc.
     # which obviously no longer apply.
     entity.affordances = list(CORPSE_AFFORDANCES)
