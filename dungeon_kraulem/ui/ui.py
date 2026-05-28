@@ -2780,7 +2780,16 @@ def draw_quick_strip(surf, world, x, y, w, h, layout=None, *,
             while line and f_b.size(line + "…")[0] > max_w:
                 line = line[:-1]
             line += "…"
-        text(surf, line, x + 4, cy, NORMAL_TEXT, L.font_small - 1)
+        # P29.43 — kolor rarity w quick-strip sidebar.
+        color = NORMAL_TEXT
+        try:
+            from ..engine import rarity as _rar
+            r = _rar.entity_rarity(ent)
+            if r != _rar.RARITY_COMMON:
+                color = _rar.rarity_color(r)
+        except Exception:
+            pass
+        text(surf, line, x + 4, cy, color, L.font_small - 1)
         if click_registry is not None:
             cmd = f"użyj {name}"
             def _use(c=cmd):

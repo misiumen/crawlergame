@@ -405,9 +405,19 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                         room.remove_entity(ent)
                     ent.location_id = f"inventory:player"
                     world.character.inventory_ids.append(ent.entity_id)
+                    # P29.43 — dorzuć klasę gdy niepospolity, gracz
+                    # od razu widzi że coś warte.
+                    name = ent.display_name()
+                    try:
+                        from . import rarity as _rar
+                        r = _rar.entity_rarity(ent)
+                        if r != _rar.RARITY_COMMON:
+                            name = f"{name} ({_rar.rarity_pl(r)})"
+                    except Exception:
+                        pass
                     lines.append(t("feedback_looted",
-                                   fallback=f"Zabierasz: {ent.display_name()}.",
-                                   name=ent.display_name()))
+                                   fallback=f"Zabierasz: {name}.",
+                                   name=name))
                 else:
                     # Prompt 22 bug fix — Path B: container (skrzynia,
                     # szafa, kupa gruzu). `przeszukaj` yields contents.
@@ -670,9 +680,18 @@ def _loot_container(world, room, container, lines) -> None:
                 ent = make_item(item_key, location_id=f"inventory:player")
                 world.register(ent)
                 world.character.inventory_ids.append(ent.entity_id)
+                # P29.43 — dorzuć klasę gdy niepospolity.
+                name = ent.display_name()
+                try:
+                    from . import rarity as _rar
+                    r = _rar.entity_rarity(ent)
+                    if r != _rar.RARITY_COMMON:
+                        name = f"{name} ({_rar.rarity_pl(r)})"
+                except Exception:
+                    pass
                 lines.append(t("feedback_container_yielded",
-                               fallback=f"W środku: {ent.display_name()}.",
-                               name=ent.display_name()))
+                               fallback=f"W środku: {name}.",
+                               name=name))
                 yielded = True
             container.state["loot"] = []
         except Exception:

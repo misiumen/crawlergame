@@ -263,6 +263,14 @@ def build_inspect_block(world, ent) -> list:
     elif etype == "item":
         # Wearable / weapon / consumable details
         state = ent.state or {}
+        # P29.43 — klasa (rarity) itemu w nagłówku, jeśli niepospolita.
+        try:
+            from . import rarity as _rar
+            r = _rar.entity_rarity(ent)
+            if r != _rar.RARITY_COMMON:
+                lines.append(f"Klasa: {_rar.rarity_pl(r)}")
+        except Exception:
+            pass
         ac_bonus = state.get("ac_bonus", 0)
         if ac_bonus:
             lines.append(f"+{ac_bonus} AC gdy założony")

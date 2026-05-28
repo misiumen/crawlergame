@@ -203,6 +203,56 @@ def test_inventory_journal_sets_title_color_per_rarity():
     print(f"  Ekwipunek: title_color per rarity (common + epic obecne): OK")
 
 
+def test_sponsor_gift_aliases_resolve_to_real_items():
+    """P29.43-sweep — sponsor gift_pool ma 36 itemów których
+    NIE BYŁO w ITEM_TEMPLATES (bandage, stimpak, antidote, ...).
+    Po sweep mapują się przez _ITEM_ALIASES do istniejących template'ów,
+    więc drop pod nie wystawia gołego entity bez tagów / affordances."""
+    from dungeon_kraulem.content.data.sponsors import SPONSORS
+    # Każdy item z gift_pool resolve'uje się do CZEGOŚ z tagami.
+    failures = []
+    for skey, sdata in SPONSORS.items():
+        for ikey in (sdata.get("gift_pool") or []):
+            ent = make_item(ikey, location_id="test")
+            if not ent.tags:
+                failures.append(f"{skey}:{ikey} → entity bez tagów")
+            if "loot" not in (ent.affordances or []):
+                failures.append(f"{skey}:{ikey} → brak affordance 'loot'")
+    assert not failures, f"sponsor gifts bez tagów/affordances: {failures[:5]}"
+    print("  sponsor gift_pool: 100% itemów dostaje tagi + loot affordance: OK")
+
+
+def test_alias_specific_examples():
+    """Konkretne aliasy: 'bandage' → dirty_bandage, 'stimpak' →
+    ostatnia_pigulka, 'lockpick' → lockpick_set."""
+    bandage = make_item("bandage", location_id="test")
+    assert "medical" in (bandage.tags or []), \
+        f"bandage alias nie zadziałał; tags={bandage.tags}"
+    pick = make_item("lockpick", location_id="test")
+    assert "lockpick" in (pick.tags or [])
+    blessed = make_item("blessed_amulet", location_id="test")
+    # blessed_amulet → amulet_szczescia (rare, museum biome)
+    assert "occult" in (blessed.tags or [])
+    assert blessed.state.get("rarity") == "rare"
+    print("  konkretne aliasy: bandage / lockpick / blessed_amulet: OK")
+
+
+def test_rarity_survives_save_load_round_trip():
+    """Rarity ląduje w entity.state przez make_item; state jest
+    serializowany do dict — sprawdzamy że po Entity.to_dict / from_dict
+    rarity pozostaje na miejscu."""
+    from ..engine.entity import Entity
+    ent = make_item("kombinezon_hazmat", location_id="inventory:player")
+    pre_rarity = (ent.state or {}).get("rarity")
+    d = ent.to_dict()
+    ent2 = Entity.from_dict(d)
+    post_rarity = (ent2.state or {}).get("rarity")
+    assert pre_rarity == "epic"
+    assert post_rarity == "epic"
+    assert _rar.entity_rarity(ent2) == "epic"
+    print("  rarity save/load round-trip: OK")
+
+
 def test_inventory_journal_sort_puts_rare_first():
     """sort_key powinien sortować rzadsze itemy NA GÓRĘ (rarity desc)."""
     from ..ui.journal import _collect_inventory
@@ -237,6 +287,9 @@ def main():
     test_some_items_have_biome_tags()
     test_make_item_stamps_rarity_on_state()
     test_make_item_does_not_clobber_equip_state()
+    test_sponsor_gift_aliases_resolve_to_real_items()
+    test_alias_specific_examples()
+    test_rarity_survives_save_load_round_trip()
     test_inventory_journal_sets_title_color_per_rarity()
     test_inventory_journal_sort_puts_rare_first()
     print("Prompt 29.43 rarity + biome tags smoke: OK")

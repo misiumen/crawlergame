@@ -2864,6 +2864,14 @@ class Game:
                 tags.append("niestabilne")
             if "trap" in (e.tags or []) or "deploy" in (e.affordances or []):
                 tags.append("[do rozstawienia]")
+            # P29.43 — rarity label tylko gdy niepospolity.
+            try:
+                from . import rarity as _rar
+                r = _rar.entity_rarity(e)
+                if r != _rar.RARITY_COMMON:
+                    tags.insert(0, _rar.rarity_pl(r))
+            except Exception:
+                pass
             suffix = f"  ({', '.join(tags)})" if tags else ""
             self.log(f"  • {e.display_name()}{suffix}", LOG_NORMAL)
         # Surface achievement count, but only if any are unlocked.

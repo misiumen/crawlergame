@@ -5,8 +5,71 @@ Domyślnie `common`. Powiązane: engine/rarity.py. Niektóre itemy mają
 też tagi biomów (zoo/forge/trenches/...) — generator lootu w
 biomowym piętrze będzie preferował items pasujące do biomu LUB
 neutralne (bez biome tagu).
+
+P29.43-sweep — `_ITEM_ALIASES` dict mapuje fantomowe item keys ze
+starszych konfiguracji (sponsor gift_pools: bandage, stimpak,
+antidote, ammo_box, lockpick, …) na istniejące templaty w
+ITEM_TEMPLATES. Bez tego mappingu drop pody dostawały make_item
+z pustym proto → gołe entity bez tagów + bez affordance „use".
+Alias zachowuje display_name canonical template'u (czyli „dirty
+bandage" zamiast surowego „bandage" jako placeholder).
 """
 from ..engine.entity import Entity, T_ITEM
+
+
+# ── P29.43-sweep: aliases dla starszych keys w gift_pools ────────────
+# Klucz → canonical key w ITEM_TEMPLATES. make_item używa aliasu
+# do lookup'u proto, ale entity zachowuje canonical key (bo i tak
+# żaden inny kod nie używa „bandage" jako stable id).
+_ITEM_ALIASES = {
+    # Medical / consumable
+    "bandage":             "dirty_bandage",
+    "stimpak":             "dirty_bandage",
+    "antidote":            "dirty_bandage",
+    "adrenaline":          "coffee",
+    "premium_painkiller":  "dirty_bandage",
+    "authorized_stim":     "dirty_bandage",
+    "rampage_stim":        "coffee",
+    "stim_wytrzymalosci":  "coffee",
+    "fungal_pill":         "dirty_bandage",
+    "morale_brew":         "coffee",
+    "polymer_balm":        "dirty_bandage",
+    "ration_pack":         "snack_bar",
+    "chem_reagent":        "battery",
+    # Weapons / armor
+    "weapon_part":         "cleaver_handle",
+    "kevlar_scrap":        "duct_tape",
+    "branded_armor":       "kamizelka_taktyczna",
+    "debt_collector_baton": "warden_baton",
+    "improvised_spear":    "cheap_knife",
+    "improvised_club":     "cleaver_handle",
+    "liga_helmet":         "helm_konstrukcyjny",
+    "weapon_poison_coat":  "battery",   # placeholder — broń/skrzynka chem
+    # Tools / utility
+    "lockpick":            "lockpick_set",
+    "jury_tool":           "improvised_lockpick",
+    "smoke_bottle":        "cracked_mug",
+    "fan_throwable":       "cracked_mug",
+    "camera_drone":        "broken_camera_lens",
+    "ammo_box":            "battery",
+    "rope_bundle":         "duct_tape",
+    "megafon_propaganda":  "dead_phone",
+    # Paper / data
+    "cash_voucher":        "planszetka_inspektora",
+    "forged_id":           "plastic_badge",
+    "propaganda_zine":     "notes_windykatora",
+    "blank_iou_pad":       "notes_windykatora",
+    "fence_loot":          "broken_camera_lens",
+    "scrap_bundle":        "duct_tape",
+    # Occult / unique
+    "blessed_amulet":      "amulet_szczescia",
+}
+
+
+def _resolve_template_key(key: str) -> str:
+    """Resolve alias do canonical key z ITEM_TEMPLATES. Brak aliasu —
+    zwraca oryginalny key. Used by make_item."""
+    return _ITEM_ALIASES.get(key, key)
 
 
 # Each item template: key -> dict of kwargs for Entity construction.
@@ -171,8 +234,19 @@ ITEM_TEMPLATES = {
 def make_item(key: str, location_id: str = "") -> Entity:
     """Build an item Entity. Prefers content/data/item_templates.py for
     richer fallback name/description/tags/affordances; falls back to the
-    legacy ITEM_TEMPLATES dict above if no content entry exists."""
+    legacy ITEM_TEMPLATES dict above if no content entry exists.
+
+    P29.43-sweep — gdy `key` nie ma w ITEM_TEMPLATES, sprawdzamy alias
+    (np. „bandage" → „dirty_bandage"). Bez tego sponsor drop pody
+    wystawiały gołe entity bez tagów / affordances.
+    """
     proto = ITEM_TEMPLATES.get(key, {})
+    if not proto:
+        canonical = _resolve_template_key(key)
+        if canonical != key:
+            proto = ITEM_TEMPLATES.get(canonical, {})
+            # Użyj canonical key w dalszej części (display_name z tabeli).
+            key = canonical
 
     # Pull richer fallback content if available (Prompt 1)
     fb_name = key.replace("_", " ")
