@@ -1155,15 +1155,15 @@ def draw_sidebar(surf, world, layout=None, *, click_registry=None):
     pygame.draw.line(surf, BORDER, (x + 14, cy), (x + w - 14, cy), 1)
     cy += 6
 
-    # In combat: target panel replaces quick-strip. Out of combat: strip.
-    if target_ent is not None:
-        _draw_enemy_panel(surf, world, target_ent, cs,
-                          x, cy, w, y + h - cy, L,
-                          click_registry=click_registry)
-    else:
-        draw_quick_strip(surf, world, x + 8, cy, w - 16,
-                         max(80, y + h - cy - 8),
-                         layout=L, click_registry=click_registry)
+    # P29.53b — usunięta duplikacja info wroga między sidebar a areną.
+    # Arena rysuje VATS silhouette + body zones po prawej (_draw_arena_vats_panel).
+    # Sidebar dotąd rysował ten sam panel jeszcze raz w combat-mode →
+    # gracz widział wszystko podwojone. Teraz sidebar trzyma się swojego
+    # zadania: paper-doll + quick-strip (statyczne info GRACZA).
+    # Info WROGA tylko w arenie.
+    draw_quick_strip(surf, world, x + 8, cy, w - 16,
+                     max(80, y + h - cy - 8),
+                     layout=L, click_registry=click_registry)
 
 
 def draw_left_sidebar(surf, world, layout=None, *,
