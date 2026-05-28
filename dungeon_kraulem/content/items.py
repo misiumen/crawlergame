@@ -228,6 +228,83 @@ ITEM_TEMPLATES = {
                             affordances=["inspect","loot","wear"],
                             equip_state={},
                             rarity="common"),
+
+    # ── P29.45 — Wysokie rarity. Epic-y (5) drop'ują się z bossów F9+
+    # i są lepsze niż wcześniejsze rzadkie. Legendary (6) są z final-
+    # bossów i miniboss-trifekt — przeznaczone jako run-defining loot.
+
+    # EPIC (slot:head)
+    "monoklokular_kuratora": dict(
+        tags=["slot:head","optic","museum","occult"], portable=True,
+        affordances=["inspect","loot","wear"],
+        equip_state={"perception_bonus": 2,
+                     "equip_resists":["psychic"]},
+        rarity="epic"),
+    "kombinezon_strażaka_korpo": dict(
+        tags=["slot:torso","hazmat","sponsor","fire"], portable=True,
+        affordances=["inspect","loot","wear"],
+        equip_state={"ac_bonus": 1,
+                     "equip_resists":["fire","acid"]},
+        rarity="epic"),
+    "buty_z_blachy_okopowej": dict(
+        tags=["slot:legs","armor","trenches"], portable=True,
+        affordances=["inspect","loot","wear"],
+        equip_state={"ac_bonus": 2,
+                     "on_equip_status":["loud_step"]},
+        rarity="epic"),
+    "lornetka_zwiadowcza": dict(
+        tags=["slot:accessory","optic","scout"], portable=True,
+        affordances=["inspect","loot","wear","use"],
+        equip_state={"perception_bonus": 1,
+                     "scout_range_bonus": 1},
+        rarity="epic"),
+    "miecz_okopowy_oficera": dict(
+        tags=["weapon","melee","sharp","trenches"], portable=True,
+        affordances=["inspect","attack","loot"],
+        equip_state={"weapon_dice": "1d10+2",
+                     "vs_tag_bonus": {"humanoid": 1}},
+        rarity="epic"),
+
+    # LEGENDARY — run-defining. Każdy ma wyraźny trade-off
+    # (DCC: niczego potężnego nie da się dostać za darmo).
+    "krawat_konferansjera": dict(
+        tags=["slot:accessory","sponsor","cursed"], portable=True,
+        affordances=["inspect","loot","wear"],
+        equip_state={"stat_bonus": {"all": 1},
+                     "audience_offset": -3,
+                     "konferansjer_hostile": True},
+        rarity="legendary"),
+    "stara_mapa_borant": dict(
+        tags=["map","paper","sponsor_loot","artifact"], portable=True,
+        affordances=["inspect","use","loot"],
+        equip_state={"map_reveal_scope": "floor_plus_adjacent"},
+        rarity="legendary"),
+    "mlot_kowalski_polorka": dict(
+        tags=["weapon","melee","blunt","forge","oversized"], portable=True,
+        affordances=["inspect","attack","loot","break"],
+        equip_state={"weapon_dice": "2d8+3",
+                     "breaks_doors": True,
+                     "on_equip_status":["encumbered"]},
+        rarity="legendary"),
+    "amulet_widza_pierwszego": dict(
+        tags=["slot:accessory","occult","artifact"], portable=True,
+        affordances=["inspect","loot","wear"],
+        equip_state={"low_audience_bonus": 5,
+                     "applies_below_audience": 10},
+        rarity="legendary"),
+    "garnitur_zarzadu": dict(
+        tags=["slot:torso","sponsor","disguise","syndicate"], portable=True,
+        affordances=["inspect","loot","wear"],
+        equip_state={"npc_treat_as_elite": True,
+                     "monster_initiative_penalty": 1,
+                     "audience_offset": -1},
+        rarity="legendary"),
+    "plaszcz_kartograf_dluznika": dict(
+        tags=["slot:back","cloth","artifact","map"], portable=True,
+        affordances=["inspect","loot","wear","use"],
+        equip_state={"reveal_on_floor_enter": True,
+                     "audience_offset": 1},
+        rarity="legendary"),
 }
 
 

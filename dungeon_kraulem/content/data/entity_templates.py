@@ -273,16 +273,150 @@ ENV = {
     ),
 }
 
-# Hazards (haz) - similar to env but always hostile
+# Hazards (haz) - similar to env but always hostile.
+# P29.45 — pula rozszerzona z 1 do 13. Każdy ma damage_type +
+# (opcjonalnie) biom-tag, żeby generator dopasował go do piętra.
 HAZ = {
     "acid_pool": dict(
         name_key="ent_acid_pool_n", fallback_name="kałuża kwasu",
         desc_key="ent_acid_pool_d",
-        fallback_desc="Zielonkawy płyn, który zjada metal cicho i z apetytem.",
+        fallback_desc="Zielonkawy płyn, który zjada metal cicho i z "
+                      "apetytem. Nikt go nie wylał — sam się zorganizował.",
         tags=["acid","liquid","hazardous"],
         affordances=["inspect","push_into","throw_at"],
-        # Prompt 21: push someone in → acid damage + corroded.
         damage_type="acid",
+    ),
+    "zwarcie_kablowe": dict(
+        name_key="ent_zwarcie_n", fallback_name="zwarcie kablowe",
+        desc_key="ent_zwarcie_d",
+        fallback_desc="Wiązka kabli wyrwana ze ściany, syczy i strzela "
+                      "iskrami w nierównych odstępach. Cierpliwie czeka, "
+                      "aż ktoś przejdzie przez kałużę obok.",
+        tags=["electric","spark","wire","hazardous"],
+        affordances=["inspect","push_into","throw_at","disable"],
+        damage_type="electric",
+    ),
+    "peknieta_rura_pary": dict(
+        name_key="ent_rura_pary_n",
+        fallback_name="pęknięta rura pary",
+        desc_key="ent_rura_pary_d",
+        fallback_desc="Rura wielkości twojego nadgarstka. Pęknięcie "
+                      "świszczy w jednej tonacji, jakby ktoś nucił. "
+                      "Para gotuje ścianę naprzeciwko od trzech tygodni.",
+        tags=["fire","steam","hazardous","steampunk_factory"],
+        affordances=["inspect","push_into","throw_at","seal"],
+        damage_type="fire",
+    ),
+    "drut_kolczasty": dict(
+        name_key="ent_drut_kolczasty_n",
+        fallback_name="zwój drutu kolczastego",
+        desc_key="ent_drut_kolczasty_d",
+        fallback_desc="Druty splątane w coś, co kiedyś było obroną "
+                      "obwodu. Teraz raczej ozdoba przemysłowa. "
+                      "Pamiętają smak kilku zmian.",
+        tags=["physical","sharp","trenches","hazardous"],
+        affordances=["inspect","push_into","cut","throw_at"],
+        damage_type="physical",
+    ),
+    "ulatniajacy_sie_gaz": dict(
+        name_key="ent_gaz_n",
+        fallback_name="ulatniający się gaz",
+        desc_key="ent_gaz_d",
+        fallback_desc="Powietrze ma kolor, którego powietrze mieć nie "
+                      "powinno. Sponsor zapomniał gdzie postawił "
+                      "butlę. Gaz nie zapomniał, gdzie chce iść.",
+        tags=["poison","gas","trenches","hazardous"],
+        affordances=["inspect","seal","throw_at"],
+        damage_type="acid",
+    ),
+    "stluczone_szklo": dict(
+        name_key="ent_szklo_n",
+        fallback_name="warstwa stłuczonego szkła",
+        desc_key="ent_szklo_d",
+        fallback_desc="Podłoga jak po długiej nocy. Każdy krok "
+                      "brzmi tak, jakby ktoś go już słyszał. Ślady "
+                      "kogoś, kto miał lepsze buty.",
+        tags=["sharp","glass","bar","hazardous"],
+        affordances=["inspect","push_into","sweep"],
+        damage_type="physical",
+    ),
+    "palaca_kaluza_alkoholu": dict(
+        name_key="ent_paljaca_kaluza_n",
+        fallback_name="paląca się kałuża",
+        desc_key="ent_paljaca_kaluza_d",
+        fallback_desc="Niski, niebieski płomień rozlał się po posadzce "
+                      "jak rozmowa, która nie powinna była się zacząć. "
+                      "Pachnie spirytusem i czyjąś winą.",
+        tags=["fire","liquid","bar","hazardous"],
+        affordances=["inspect","push_into","extinguish","throw_at"],
+        damage_type="fire",
+    ),
+    "zarodnikowy_wyrzut": dict(
+        name_key="ent_zarodnikowy_n",
+        fallback_name="wyrzut zarodników",
+        desc_key="ent_zarodnikowy_d",
+        fallback_desc="Worek pleśni wielkości głowy. Pulsuje w "
+                      "rytmie, który chyba próbuje cię zahipnotyzować. "
+                      "Otwiera się raz na minutę. Albo na ciebie.",
+        tags=["poison","spore","fungal","hazardous"],
+        affordances=["inspect","push_into","cut","throw_at"],
+        damage_type="acid",
+    ),
+    "lepka_grzybnia": dict(
+        name_key="ent_lepka_grzybnia_n",
+        fallback_name="lepka grzybnia",
+        desc_key="ent_lepka_grzybnia_d",
+        fallback_desc="Ściana z czymś, co ściana mieć nie powinna — "
+                      "śluz, włókna i ten zapach piwnicy babci. Łapie "
+                      "jak komornik, puszcza jak terapeuta.",
+        tags=["grapple","fungal","sticky","hazardous"],
+        affordances=["inspect","cut","burn"],
+        damage_type="physical",
+    ),
+    "pole_radiacji": dict(
+        name_key="ent_radiacja_n",
+        fallback_name="strefa skażenia",
+        desc_key="ent_radiacja_d",
+        fallback_desc="Licznik gdzieś tyka, ale nie ma licznika. "
+                      "Lampka nad drzwiami trzyma zielony, choć "
+                      "powietrze trzyma żółty. Cyfry na ścianie "
+                      "zmieniły kolor.",
+        tags=["radiation","reactor","invisible","hazardous"],
+        affordances=["inspect","throw_at"],
+        damage_type="acid",
+    ),
+    "kratka_pod_napieciem": dict(
+        name_key="ent_kratka_n",
+        fallback_name="kratka pod napięciem",
+        desc_key="ent_kratka_d",
+        fallback_desc="Metalowa krata w podłodze. Pod nią mokro. Pod "
+                      "tym kabel. Nad krata reklama: BEZPIECZEŃSTWO "
+                      "TO PODSTAWA NASZEGO PROGRAMU.",
+        tags=["electric","sewers","floor","hazardous"],
+        affordances=["inspect","push_into","disable"],
+        damage_type="electric",
+    ),
+    "miny_pulapki_kontraktowe": dict(
+        name_key="ent_kontraktowe_miny_n",
+        fallback_name="miny kontraktowe",
+        desc_key="ent_kontraktowe_miny_d",
+        fallback_desc="Tabliczka mówi: PRZECHODZENIE OZNACZA AKCEPTACJĘ "
+                      "REGULAMINU. Nie ma żadnej miny widocznej, ale "
+                      "ktoś zostawił bardzo wąskie ślady stóp.",
+        tags=["explosive","trenches","trap","hazardous"],
+        affordances=["inspect","disarm","throw_at"],
+        damage_type="fire",
+    ),
+    "zardzewiale_kolce": dict(
+        name_key="ent_kolce_n",
+        fallback_name="zardzewiałe kolce",
+        desc_key="ent_kolce_d",
+        fallback_desc="Pułapka strzelająca z podłogi. Wystaje już od "
+                      "miesięcy, nikt nie złożył. Sponsor nazwał ją: "
+                      "ATRAKCJA — ZAGADKA TYGODNIA.",
+        tags=["physical","sharp","trap","hazardous"],
+        affordances=["inspect","disarm","push_into"],
+        damage_type="physical",
     ),
 }
 
