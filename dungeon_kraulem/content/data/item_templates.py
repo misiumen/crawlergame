@@ -148,7 +148,7 @@ ITEM_TEMPLATES = {
         "type": "tool",
         "tags": ["keycard", "key", "plastic"],
         "fallback_name": "podejrzana karta dostępu",
-        "fallback_description": "Karta dostępu z nazwiskiem, którego nigdzie nie ma. Otwiera coś. Pytanie tylko gdzie i czyje.",
+        "fallback_description": "Plastikowa karta dostępu wystawiona na lewy papier. Otwiera jeden zamek elektroniczny — drzwi albo loker. Której kategorii, nie wiadomo, dopóki nie spróbujesz.",
         "affordances": ["inspect", "use", "loot"],
         "value": 5,
     },
