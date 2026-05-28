@@ -1554,6 +1554,1945 @@ ROOM_POOL = [
         "unique_per_floor": True,
         "theme_sponsor_boost": {"kanal_7_krawedz": 3},
     },
+
+    # ═══════════════════════════════════════════════════════════════════
+    # P29.42b — Pokoje per biom (głębsza zawartość)
+    # Per Q-fin (2026-05-28, user): „głębsze tylko istniejące" + intake.
+    # Boost: zoo / museum / bar / trenches +7 każdy. Intake +4.
+    # Tone: Dinniman — twardy, sponsorski sneer, fizyczne detale.
+    # Polish-only (Rule 1 z 11 Claudiego).
+    # ═══════════════════════════════════════════════════════════════════
+
+    # ── ZOO +7 ────────────────────────────────────────────────────────
+    {
+        "template_id": "pool_woliera_skrzydlatych",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "zoo", "animal", "vertical"],
+        "name_pool": ["Woliera Skrzydlatych", "Sektor Ptasi",
+                      "Klatka Sufitowa"],
+        "first_enter_pool": [
+            "Siatka pod sufitem zwisa miejscami przerwana. Ekspozycja "
+            "ptasia była zorganizowana w trzech piętrach żerdzi — dwa "
+            "piętra leżą rozbite na podłodze. Pióra dryfują w ciepłym "
+            "powietrzu. Nad tobą coś ostrzy dziób.",
+        ],
+        "look_pool": [
+            "Żerdzie. Karmnik wbity w ścianę gwoździami od dołu, jakby "
+            "ktoś próbował go zerwać siłą. Tabliczka „NIE STRASZYĆ — "
+            "PTAKI POD PRESJĄ SPONSORA”.",
+        ],
+        "search_pool": [
+            "W gnieździe znajdujesz nadgryzioną kartę pamięci kamery "
+            "sponsorskiej i kilka monet, które wyglądają jak żetony.",
+        ],
+        "public_hint_pool": [
+            "Skrzydła. Coś krzyczy z góry. Cienie szybkie i nierówne.",
+        ],
+        "sensory_tags": ["feathers", "draft", "high_pitched_sound"],
+        "entity_seed_pools": {
+            "mon":  ["bekajacy_paw"],
+            "env":  ["broken_cage", "loose_chain", "sponsor_camera"],
+            "item": ["snack_bar"],
+        },
+        "exit_hints": ["wschód", "zachód", "korytarz boczny"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"czarny_rynek_plus": 1},
+    },
+    {
+        "template_id": "pool_terrarium_gadow",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "zoo", "animal", "humid"],
+        "name_pool": ["Terrarium Gadów", "Sekcja Pełzających",
+                      "Mokra Klatka"],
+        "first_enter_pool": [
+            "Wilgoć od progu. Lampy podgrzewające bzyczą — większość "
+            "popsuta, jedna jeszcze świeci. Szkło terrariów popękane, "
+            "kilka rozbitych zupełnie. Pod nogami coś się przesuwa.",
+        ],
+        "look_pool": [
+            "Akwaria osuszone. Mech wyschnięty. W rogu wąż liczy "
+            "własne odcinki, jakby się nudził. Tabliczka „KARM RAZ "
+            "DZIENNIE — PALEC NIE WYSTARCZY”.",
+        ],
+        "search_pool": [
+            "Pod fałszywą skałą torebka z proszkiem, na której widnieje "
+            "tylko skrót „N-7”. Plus dwa lekko ciepłe jajka.",
+        ],
+        "public_hint_pool": [
+            "Wilgoć. Bzyczenie lampy. Sucha łuska po podłodze.",
+        ],
+        "sensory_tags": ["humid", "warm", "animal_smell"],
+        "entity_seed_pools": {
+            "mon":  ["mutant_szczur"],
+            "env":  ["broken_cage", "feeding_trough"],
+            "haz":  ["broken_glass"],
+            "item": ["dirty_bandage"],
+        },
+        "exit_hints": ["północ", "korytarz"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 3,
+        "weight": 4,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"czarny_rynek_plus": 1},
+    },
+    {
+        "template_id": "pool_kwarantanna_zoo",
+        "role": "danger",
+        "actual_type": "lore",
+        "tags": ["zoo", "lore", "medical"],
+        "name_pool": ["Kwarantanna Sektor C", "Izolatka Eksperymentu",
+                      "Boks Obserwacyjny"],
+        "first_enter_pool": [
+            "Plastikowa kurtyna przy wejściu, dwie warstwy. Za nią "
+            "biel — biel dawno zżarta przez plamy. Kuwety, kroplówki "
+            "do dawno wyschnięte. Dokumentacja przybita do ściany, "
+            "rogi spalone od papierosów.",
+        ],
+        "look_pool": [
+            "Stół opieki. Pas mocujący wciąż zapięty. Ekran "
+            "elektrokardiogramu pokazuje płaską linię od lat.",
+        ],
+        "search_pool": [
+            "Karta pacjenta: „Egzemplarz 11 — szczepiony dwa razy. "
+            "Reakcja: nadmierne mówienie. Dyspozycja: cisza.”",
+        ],
+        "public_hint_pool": [
+            "Zapach środka odkażającego. Po wszystkich tych latach.",
+        ],
+        "sensory_tags": ["sterile", "old_paper", "stale"],
+        "entity_seed_pools": {
+            "env":  ["medical_drawer", "torn_notebook"],
+            "item": ["bandage", "stimpak"],
+        },
+        "exit_hints": ["korytarz", "drzwi przesuwne"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_weterynarka_zoo",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "zoo", "medical"],
+        "name_pool": ["Gabinet Weterynarza", "Punkt Pierwszej Pomocy "
+                      "Zwierzęcej", "Apteczka Główna"],
+        "first_enter_pool": [
+            "Lekarska szafka rozwalona, lekarstwa walają się po "
+            "podłodze. Mikroskop przewrócony, soczewka rozbita. Stół "
+            "operacyjny jeszcze ze sznurkiem do mocowania ogona.",
+        ],
+        "look_pool": [
+            "Mnóstwo butelek, większość pęknięta. Strzykawki w pudełku "
+            "pewnie z kompletnym zestawem.",
+        ],
+        "search_pool": [
+            "Wsuwana szuflada okazuje się pełna — bandaże, dwa "
+            "stimpaki, fiolka czegoś bez etykiety. Plus 30 kredytów "
+            "w dolnej szufladzie.",
+        ],
+        "public_hint_pool": [
+            "Lekarska szafka. Zapach środka odkażającego.",
+        ],
+        "sensory_tags": ["sterile", "broken_glass", "chemical"],
+        "entity_seed_pools": {
+            "env":  ["medical_drawer", "broken_glass"],
+            "item": ["bandage", "stimpak", "dirty_bandage"],
+        },
+        "exit_hints": ["korytarz", "zaplecze"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 5,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"czarny_rynek_plus": 1},
+    },
+    {
+        "template_id": "pool_pokoj_trenera_zoo",
+        "role": "social",
+        "actual_type": "social",
+        "tags": ["social", "zoo", "rumor", "npc"],
+        "name_pool": ["Pokój Trenera", "Boks Personelu", "Pracownia "
+                      "Tresera"],
+        "first_enter_pool": [
+            "Małe biuro. Krzesło obrotowe, blat poplamiony kawą. "
+            "Kalendarz z poprzedniego sezonu, podpis: „PRZEŻYŁ”. "
+            "W rogu klatka transportowa. Pusta.",
+        ],
+        "look_pool": [
+            "Na ścianie zdjęcia: treser z białym tygrysem. Treser "
+            "z lampartem. Treser z pustą klatką. Treser sam.",
+        ],
+        "search_pool": [
+            "Notatnik tresera: „Sponsor mówi, że publiczność lubi "
+            "ryk. Ryk wymaga karmienia. Karmienie wymaga budżetu. "
+            "Budżet wymaga publiczności. Pętla.”",
+        ],
+        "public_hint_pool": [
+            "Cisza biurowa. Brzęczenie kalkulatora.",
+        ],
+        "sensory_tags": ["coffee", "paper", "stale"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "furniture_wood"],
+            "npc":  [("paranoid_mapper", "neutral")],
+            "item": ["snack_bar"],
+        },
+        "exit_hints": ["korytarz", "drzwi obrotowe"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_kanal_sprzatania_zoo",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "zoo", "hidden"],
+        "name_pool": ["Kanał Sprzątania", "Spust Sektorowy",
+                      "Tunel Serwisowy"],
+        "first_enter_pool": [
+            "Wąski, niski. Po ścianach plamy z dawnych wycieków. "
+            "Tunel którym wozili żywe i nieżywe. Sponsor pewnie "
+            "nigdy o tym nie pisał na ekranie.",
+        ],
+        "look_pool": [
+            "Hak na suficie. Zwinięta lina. Studnia w podłodze "
+            "z metalową kratką.",
+        ],
+        "search_pool": [
+            "Pod kratką stara, ale szczelnie zamknięta puszka. W "
+            "środku trzy stare karty dostępu i 50 kredytów w "
+            "papierowych banknotach.",
+        ],
+        "public_hint_pool": [
+            "Echo kapania.",
+        ],
+        "sensory_tags": ["damp", "rot", "metal"],
+        "entity_seed_pools": {
+            "env":  ["studzienka", "loose_chain"],
+            "item": ["credits_pile", "snack_bar"],
+        },
+        "exit_hints": ["góra", "drabina"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_loza_sponsora_zoo",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "zoo", "elite", "vip"],
+        "name_pool": ["Loża Sponsora", "Balkon VIP", "Sektor Premium"],
+        "first_enter_pool": [
+            "Loża nad areną. Pluszowe fotele, drewniana balustrada, "
+            "lornetka na trójnogu. Ślad krwi na dywanie prowadzi pod "
+            "fotel. Ktoś tu kiedyś oglądał show z bliska.",
+        ],
+        "look_pool": [
+            "Pełny widok na arenę z góry. Kieliszki na stoliku — "
+            "trzy puste, jeden napełniony i nietknięty.",
+        ],
+        "search_pool": [
+            "Pod fotelem koperta z napisem „PREMIA — NIE OTWIERAĆ "
+            "W TRAKCIE PROGRAMU”. Plus 80 kredytów.",
+        ],
+        "public_hint_pool": [
+            "Ciężki dywan tłumi kroki. Czuć perfumy i drogi alkohol.",
+        ],
+        "sensory_tags": ["luxury", "blood_dried", "wood_polish"],
+        "entity_seed_pools": {
+            "mon":  ["klatkowy_kot"],
+            "env":  ["sponsor_screen", "furniture_wood"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["schody w dół", "kotara"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"czarny_rynek_plus": 2},
+    },
+
+    # ── MUSEUM +7 ─────────────────────────────────────────────────────
+    {
+        "template_id": "pool_galeria_luster",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "museum", "psychic"],
+        "name_pool": ["Galeria Luster", "Sala Refleksji",
+                      "Korytarz Odbić"],
+        "first_enter_pool": [
+            "Lustra od podłogi do sufitu, po obu stronach, w "
+            "trzech rzędach. Twoje odbicie idzie z tobą — nie do "
+            "końca w tym samym tempie. Jedno z luster pęknięte "
+            "w spiralę. Reflektor nad lustrami świeci sponsorską "
+            "purpurą.",
+        ],
+        "look_pool": [
+            "Każde lustro odbija ciebie. Trzecie z prawej odbija "
+            "ciebie sprzed minuty. Czwarte z lewej — ciebie za "
+            "minutę. Nie patrz za długo.",
+        ],
+        "search_pool": [
+            "Pod pęknięciem znajdujesz wgnieconą wizytówkę i "
+            "kapsułę z czymś, co pulsuje delikatnie. Wizytówka: "
+            "„Konserwator Iluzji, prośba o ciszę.”",
+        ],
+        "public_hint_pool": [
+            "Pulsujące światło. Pięć ech kroków zamiast jednego.",
+        ],
+        "sensory_tags": ["bright", "echo", "stale"],
+        "entity_seed_pools": {
+            "mon":  ["mutant_szczur"],
+            "env":  ["sponsor_screen", "broken_glass"],
+            "item": ["snack_bar"],
+        },
+        "exit_hints": ["wschód", "korytarz boczny"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 5,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
+    },
+    {
+        "template_id": "pool_pracownia_konserwacji",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "museum", "tools"],
+        "name_pool": ["Pracownia Konserwacji", "Warsztat Restauracji",
+                      "Boks Kuratorski"],
+        "first_enter_pool": [
+            "Długie stoły z lampami warsztatowymi. Skalpele, pędzelki, "
+            "kleje. Po prawej szafa z chemikaliami — szyba popękana, "
+            "fiolki wciąż na półkach. Eksponat na stole — wciąż w "
+            "trakcie restauracji. Konserwator gdzie indziej, jego "
+            "pęseta jeszcze ciepła.",
+        ],
+        "look_pool": [
+            "Półprodukt rzeźby. Połowa pomalowana, połowa surowa. "
+            "Z boku zaschła kawa w styropianie i komputer wyłączony "
+            "w pośpiechu.",
+        ],
+        "search_pool": [
+            "Szuflada warsztatu pełna — pęseta, kleje, drobne narzędzia. "
+            "Plus dwa stimpaki w apteczce i 40 kredytów w portfelu.",
+        ],
+        "public_hint_pool": [
+            "Chemia i klej. Drobne ostre dźwięki — coś gdzieś jeszcze "
+            "pracuje na pół etatu.",
+        ],
+        "sensory_tags": ["chemical", "metal", "stale"],
+        "entity_seed_pools": {
+            "env":  ["medical_drawer", "torn_notebook", "broken_glass"],
+            "item": ["bandage", "stimpak", "credits_pile"],
+        },
+        "exit_hints": ["korytarz", "schody w górę"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 5,
+        "floor_min": 5,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
+    },
+    {
+        "template_id": "pool_biuro_kuratora_male",
+        "role": "social",
+        "actual_type": "social",
+        "tags": ["social", "museum", "rumor", "npc"],
+        "name_pool": ["Biuro Pomniejszego Kuratora",
+                      "Stanowisko Adiunkta", "Pokój Doktorancki"],
+        "first_enter_pool": [
+            "Biurko mahonowe, ale niżej. Półki uginają się od katalogów "
+            "z czarno-białych zdjęć. Adiunkt podnosi wzrok znad maszyny "
+            "do pisania — nie elektrycznej. „Pan kuratorem?” pyta.",
+        ],
+        "look_pool": [
+            "Sterty papierów posortowane chronologicznie. Notatka "
+            "przyklejona do lampy: „SEZONÓW BYŁO DUŻO. PUBLICZNOŚCI "
+            "MNIEJ.”",
+        ],
+        "search_pool": [
+            "W szufladzie z napisem „STARE PIŚMA” paczka monet — "
+            "20 kredytów, plus pożółknięta karta dostępu z napisem "
+            "„MAGAZYN OS”.",
+        ],
+        "public_hint_pool": [
+            "Stuk maszyny do pisania. Zapach kawy i naftaliny.",
+        ],
+        "sensory_tags": ["paper", "stale", "coffee"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "furniture_wood"],
+            "npc":  [("paranoid_mapper", "neutral")],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["korytarz", "drzwi"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 5,
+    },
+    {
+        "template_id": "pool_archiwum_piwniczne",
+        "role": "danger",
+        "actual_type": "lore",
+        "tags": ["museum", "lore", "underground"],
+        "name_pool": ["Archiwum Piwniczne", "Magazyn OS",
+                      "Sektor Wycofanych"],
+        "first_enter_pool": [
+            "Schodzisz w dół. Półki regałowe ciągną się w głąb, każda "
+            "z opisem dekady. Lampa nad nimi mruga raz na pięć sekund. "
+            "Na końcu rzędu coś usiadło na kartonie i czeka.",
+        ],
+        "look_pool": [
+            "Pudła z opisami sezonów. „1923 — UNIEWAŻNIONY”, „1957 — "
+            "PRZEZNACZONY DO USUNIĘCIA”, „2018 — NIE OTWIERAĆ”.",
+        ],
+        "search_pool": [
+            "W pudle „2018” wpisany na maszynie raport: „Sponsor "
+            "kupił dane wcześniej niż się stało. Ekipa odmówiła "
+            "dostawy. Ekipa przeszła na drugą stronę.”",
+        ],
+        "public_hint_pool": [
+            "Zimno. Sucho. Kurz nie osiada, tylko zawisa.",
+        ],
+        "sensory_tags": ["cold", "dry", "paper"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "broken_cage"],
+            "item": ["snack_bar"],
+        },
+        "exit_hints": ["schody", "głębsze regały"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 5,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 2},
+    },
+    {
+        "template_id": "pool_eksponat_zamkniety",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "museum", "fragile"],
+        "name_pool": ["Eksponat Zamknięty", "Sala Specjalna",
+                      "Boks z Tabliczką"],
+        "first_enter_pool": [
+            "Sala mała, zamknięta liną. Tabliczka: „CZASOWO "
+            "NIEDOSTĘPNE — KONSERWACJA W TOKU”. Lina przerwana. "
+            "Eksponat — drewniana figura w mundurze — patrzy "
+            "wprost na ciebie. Ekran sponsorski w rogu nic nie "
+            "pokazuje. Pierwszy raz w tej grze.",
+        ],
+        "look_pool": [
+            "Figura. Drewno spękane, mundur podarty. Ktoś dorysował "
+            "jej usta markerem. Usta się nie zgadzają z resztą "
+            "twarzy.",
+        ],
+        "search_pool": [
+            "Pod liną zwitek banknotów — 35 kredytów. Plus mała "
+            "kapsuła z napisem „NIE TYKAĆ JEŚLI MOŻLIWE”.",
+        ],
+        "public_hint_pool": [
+            "Ekran sponsorski wyłączony. Niespotykane.",
+        ],
+        "sensory_tags": ["stale", "wood", "ozone"],
+        "entity_seed_pools": {
+            "mon":  ["klatkowy_kot"],
+            "env":  ["sponsor_screen", "furniture_wood"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["lina obrotowa", "korytarz"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 5,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
+    },
+    {
+        "template_id": "pool_sala_darczyncow",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "museum", "elite", "vip"],
+        "name_pool": ["Sala Darczyńców", "Galeria Patronów",
+                      "Lista Honorowa"],
+        "first_enter_pool": [
+            "Ściana cała w plakietkach z nazwiskami. Pod nią marmurowy "
+            "blok. Na bloku ktoś siedzi po turecku, z lornetką "
+            "skierowaną na drzwi. Nie ruszył się, gdy wszedłeś. "
+            "Ruszy się teraz.",
+        ],
+        "look_pool": [
+            "Plakietki. Setki. Każdy darczyńca z roku, kwotą i krótkim "
+            "podziękowaniem. Czterech ostatnich — bez kwoty, tylko "
+            "podziękowanie: „ZA WSZYSTKO”.",
+        ],
+        "search_pool": [
+            "W szczelinie marmuru tekturka: „WPŁACA SIĘ NIE PIENIĄDZEM. "
+            "WPŁACA SIĘ CZASEM. CZAS LICZY KURATOR.”",
+        ],
+        "public_hint_pool": [
+            "Marmur. Cisza muzealna. Skrzypnięcie skóry buta.",
+        ],
+        "sensory_tags": ["stone", "stale", "luxury"],
+        "entity_seed_pools": {
+            "mon":  ["mutant_szczur"],
+            "env":  ["sponsor_screen", "furniture_wood"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["wyjście honorowe", "korytarz"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 5,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 2},
+    },
+    {
+        "template_id": "pool_biuro_rzeczy_znalezionych",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "museum", "hidden", "loot"],
+        "name_pool": ["Biuro Rzeczy Znalezionych", "Skrytka "
+                      "Zaginionych", "Kąt Zapomnianych"],
+        "first_enter_pool": [
+            "Drzwi z nieczytelnym napisem. W środku półka, na "
+            "półce karton z opisem „ZNALEZIONE W TYM ROKU — NIE "
+            "ZGŁASZANE”. Zawiera dużo. Zaskakująco dużo.",
+        ],
+        "look_pool": [
+            "Karton pełen. Klucze, portfele, ekwipunek. Każda rzecz "
+            "z metką: na której gracz zginął, w którym pokoju.",
+        ],
+        "search_pool": [
+            "Znajdujesz: stimpak, bandaż, 60 kredytów, oraz "
+            "klucz uniwersalny do magazynu OS.",
+        ],
+        "public_hint_pool": [
+            "Cisza biurowa. Zapach starego papieru.",
+        ],
+        "sensory_tags": ["stale", "paper", "metal"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook"],
+            "item": ["bandage", "stimpak", "credits_pile"],
+        },
+        "exit_hints": ["korytarz", "drzwi"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 5,
+    },
+
+    # ── BAR +7 ────────────────────────────────────────────────────────
+    {
+        "template_id": "pool_scena_karaoke",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "bar", "loud"],
+        "name_pool": ["Scena Karaoke", "Mała Estrada",
+                      "Sektor Mikrofonu"],
+        "first_enter_pool": [
+            "Małe podium, zasłona z frędzlami, mikrofon na stojaku. "
+            "Ekran wyświetla tekst — sponsorska piosenka o piwie. "
+            "Ktoś trzyma mikrofon, ale nie śpiewa. Patrzy. Mikrofon "
+            "skrzeczy.",
+        ],
+        "look_pool": [
+            "Lista przebojów na ścianie. Pierwsze miejsce: ten "
+            "sam tytuł od miesięcy. Pod nim drobnym drukiem: "
+            "„SPONSOR REKOMENDUJE”.",
+        ],
+        "search_pool": [
+            "Za zasłoną stary płaszcz z portfelem. W portfelu "
+            "20 kredytów i karta lojalnościowa „PIWO ZA KAŻDĄ "
+            "SZÓSTĄ ŚMIERĆ”.",
+        ],
+        "public_hint_pool": [
+            "Sprzężenie mikrofonu. Tekst piosenki na pętli.",
+        ],
+        "sensory_tags": ["loud", "stale", "smoke"],
+        "entity_seed_pools": {
+            "mon":  ["mutant_szczur"],
+            "env":  ["sponsor_screen", "furniture_wood"],
+            "item": ["snack_bar", "credits_pile"],
+        },
+        "exit_hints": ["sala główna", "zaplecze"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 6,
+        "theme_sponsor_boost": {"czarny_rynek_plus": 1},
+    },
+    {
+        "template_id": "pool_piwnica_baru",
+        "role": "danger",
+        "actual_type": "lore",
+        "tags": ["bar", "lore", "underground", "contraband"],
+        "name_pool": ["Piwnica pod Sceną", "Skład Płynów",
+                      "Tajny Magazyn"],
+        "first_enter_pool": [
+            "Schodzisz. Beczki, skrzynki, plamy. Zapach fermentacji "
+            "i czegoś bardziej osobistego. Ktoś tu spał — sienik "
+            "wciąż ciepły. Dwie skrzynki bez etykiet.",
+        ],
+        "look_pool": [
+            "Inwentarz przybity do beczki: „LEGALNE 30%, RESZTA — "
+            "INACZEJ”. Pod spodem podpis: „ZAWSZE ZAPLAĆ ZA NIENIE-"
+            "LEGALNE PIERWSZE”.",
+        ],
+        "search_pool": [
+            "W skrzynce bez etykiety: trzy fiolki z napisem „N-7”, "
+            "kilka monet (15 kredytów), i karteczka adresowa do "
+            "Czarnego Rynku.",
+        ],
+        "public_hint_pool": [
+            "Wilgoć z dołu. Zapach fermentacji.",
+        ],
+        "sensory_tags": ["damp", "fermented", "smoke"],
+        "entity_seed_pools": {
+            "env":  ["broken_barrel", "torn_notebook"],
+            "item": ["credits_pile", "stimpak"],
+        },
+        "exit_hints": ["schody w górę"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 1,
+        "weight": 3,
+        "floor_min": 6,
+        "theme_sponsor_boost": {"czarny_rynek_plus": 2},
+    },
+    {
+        "template_id": "pool_kuchnia_barowa",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "bar", "food"],
+        "name_pool": ["Kuchnia Barowa", "Smażalnia", "Boks "
+                      "Wydawkowy"],
+        "first_enter_pool": [
+            "Tłuszcz na podłodze, frytkownica gaśnie sykiem. Talerze "
+            "ułożone w stos, na wierzchu nóż wbity w drewno. Z piekarnika "
+            "wyciekło coś czarnego. Kucharz w środku swojego kąta — "
+            "ostry. Nie nóż. Wzrok.",
+        ],
+        "look_pool": [
+            "Lodówka otwarta, w środku pakiety mięs z różnych "
+            "źródeł. Tabliczka „WSZYSTKO ŚWIEŻE — ŹRÓDŁA "
+            "ZWERYFIKOWANE NIECO MNIEJ”.",
+        ],
+        "search_pool": [
+            "Pod fartuchem szefa: paczka soli, butelka z napisem "
+            "„CHRZAN STARY”, 25 kredytów w napiwkach.",
+        ],
+        "public_hint_pool": [
+            "Tłuszcz w powietrzu. Chrupie pod butami.",
+        ],
+        "sensory_tags": ["greasy", "smoke", "metal"],
+        "entity_seed_pools": {
+            "env":  ["medical_drawer", "broken_glass"],
+            "item": ["snack_bar", "credits_pile"],
+        },
+        "exit_hints": ["sala główna", "wyjście kuchenne"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 6,
+    },
+    {
+        "template_id": "pool_zaplecze_baru",
+        "role": "social",
+        "actual_type": "social",
+        "tags": ["social", "bar", "rumor", "npc"],
+        "name_pool": ["Zaplecze Baru", "Pokój Personelu",
+                      "Boks Kelnerski"],
+        "first_enter_pool": [
+            "Mały pokój z sofą rozłożoną na połowę. Termos z kawą, "
+            "popielniczka pełna. Kelner siedzi po turecku na sofie, "
+            "liczy napiwki. Liczy też ciebie.",
+        ],
+        "look_pool": [
+            "Plotek przyklejony do lustra: „PIWO Z BIBLIOTEKI MA "
+            "WIĘCEJ INFORMACJI NIŻ JEJ KATALOG”.",
+        ],
+        "search_pool": [
+            "W koszyku z brudnymi koszulkami portfel ze zdjęciem "
+            "i 30 kredytów. Plus karteczka z numerem do speluny "
+            "F8.",
+        ],
+        "public_hint_pool": [
+            "Cisza. Brzęczy lodówka z napojami.",
+        ],
+        "sensory_tags": ["smoke", "stale", "coffee"],
+        "entity_seed_pools": {
+            "env":  ["furniture_wood", "torn_notebook"],
+            "npc":  [("loot_goblin_crawler", "neutral")],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["sala główna", "wyjście służbowe"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 6,
+    },
+    {
+        "template_id": "pool_zaulek_baru",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "bar", "hidden", "alley"],
+        "name_pool": ["Boczny Zaułek", "Brama Tylna", "Cichy Kąt"],
+        "first_enter_pool": [
+            "Wąsko. Wysokie ściany, niebo skądś. Ktoś tu pali i "
+            "się nie martwi widownią. Pojemnik na śmieci pełny, "
+            "drugi z napisem „TYLKO PUSTE BUTELKI”. Trzeci "
+            "z napisem „TYLKO PEŁNE KONTRAKTY”.",
+        ],
+        "look_pool": [
+            "Niedopałek po niedopałku. Pod nogami ktoś wykreślił "
+            "kredą sześciokąt z napisem: „NIE ZADAWAJ PYTAŃ”.",
+        ],
+        "search_pool": [
+            "W pojemniku „TYLKO PEŁNE KONTRAKTY” koperta. "
+            "W kopercie: 50 kredytów i karta dostępu do speluny.",
+        ],
+        "public_hint_pool": [
+            "Echo. Daleki śmiech.",
+        ],
+        "sensory_tags": ["cold", "smoke", "urine"],
+        "entity_seed_pools": {
+            "env":  ["broken_barrel", "loose_chain"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["powrót do baru", "uliczka"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 6,
+    },
+    {
+        "template_id": "pool_toaleta_baru",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "bar", "hidden"],
+        "name_pool": ["Toaleta Barowa", "Łazienka — Stan Krytyczny",
+                      "Boks WC"],
+        "first_enter_pool": [
+            "Płytki popękane. Lustro nad umywalką stłuczone w "
+            "pajęczynę. Z trzech kabin dwie zamknięte, jedna "
+            "uchylona — w niej tylko ślad ucieczki przez okno. "
+            "Krany kapią różnie.",
+        ],
+        "look_pool": [
+            "Graffiti pokrywa każdą wolną powierzchnię. „SPONSOR "
+            "NIE WIDZI”, „TU WSZYSCY UCIEKAJĄ”, „F8 = TO PRAWDA”.",
+        ],
+        "search_pool": [
+            "Za spłuczką taśma, na taśmie zawinięta torebka. "
+            "W torebce 40 kredytów, dwie pigułki bez opisu, i "
+            "klucz do piwnicy.",
+        ],
+        "public_hint_pool": [
+            "Kapie. Wodociąg jęczy. Daleki śmiech zza ściany.",
+        ],
+        "sensory_tags": ["damp", "urine", "smoke"],
+        "entity_seed_pools": {
+            "env":  ["broken_glass", "studzienka"],
+            "item": ["credits_pile", "stimpak"],
+        },
+        "exit_hints": ["powrót", "okno"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 6,
+    },
+    {
+        "template_id": "pool_dziedziniec_baru",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "bar", "elite"],
+        "name_pool": ["Tylny Dziedziniec", "Brama Wewnętrzna",
+                      "Patio Bramne"],
+        "first_enter_pool": [
+            "Bruk, śmieci, pojemniki. Pod ścianą dwie postacie — "
+            "jedna stoi, jedna leży. Stojąca trzyma w ręku "
+            "wyłączony telefon. Leżąca trzyma w ręku coś, czego "
+            "nie chciałbyś być częścią.",
+        ],
+        "look_pool": [
+            "Lampka nad bramą. Mig-mig. W kącie skrzynki "
+            "z butelkami, większość pęknięta. Ktoś trenował na "
+            "nich rzut.",
+        ],
+        "search_pool": [
+            "Przy leżącej postaci portfel — 55 kredytów. "
+            "Plus bilet sezonowy do Czarnego Rynku.",
+        ],
+        "public_hint_pool": [
+            "Echo. Sponsorska reklama z głośnika ulicznego.",
+        ],
+        "sensory_tags": ["cold", "blood_fresh", "smoke"],
+        "entity_seed_pools": {
+            "mon":  ["klatkowy_kot"],
+            "env":  ["broken_barrel", "loose_chain"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["powrót do baru", "brama"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 6,
+        "theme_sponsor_boost": {"czarny_rynek_plus": 1},
+    },
+
+    # ── TRENCHES +7 ───────────────────────────────────────────────────
+    {
+        "template_id": "pool_posterunek_obserwacyjny",
+        "role": "danger",
+        "actual_type": "lore",
+        "tags": ["trenches", "lore", "observation"],
+        "name_pool": ["Posterunek Obserwacyjny", "Stanowisko "
+                      "Nasłuchu", "Wieżyczka Forward"],
+        "first_enter_pool": [
+            "Wąski rów z drabiną do góry. Na górze stanowisko "
+            "z workami piasku. Lornetka na statywie skierowana "
+            "w pole. W radio cisza, ale dioda mruga.",
+        ],
+        "look_pool": [
+            "Notatnik obserwatora. Wpisy co godzinę: „SPOKOJ”, "
+            "„SPOKOJ”, „SPOKOJ”, „RUCH”, „NIE PISAĆ DALEJ”.",
+        ],
+        "search_pool": [
+            "W skrzynce racje na trzy dni i radio polowe. Plus "
+            "tabliczka z mapy: „SEKTOR 7 — UNIKAĆ KIEDY MOŻLIWE”.",
+        ],
+        "public_hint_pool": [
+            "Wiatr przez worki piasku. Trzask radia.",
+        ],
+        "sensory_tags": ["cold", "wind", "metal"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "loose_chain"],
+            "item": ["snack_bar", "bandage"],
+        },
+        "exit_hints": ["drabina w dół", "rów boczny"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"liga_brawurowa": 1},
+    },
+    {
+        "template_id": "pool_punkt_medyczny_okop",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "trenches", "medical"],
+        "name_pool": ["Punkt Medyczny", "Sanitarka Polowa",
+                      "Stanowisko Medyczne"],
+        "first_enter_pool": [
+            "Worki piasku, brezent rozpięty nad ranionym. Ranionego "
+            "już nie ma. Medycyna polowa — szafka z lekami otwarta, "
+            "noszem przykryto coś, co stara się nie być widziane.",
+        ],
+        "look_pool": [
+            "Tabliczka: „TRIAGE — KOLOR ZIELONY: WRACA. KOLOR "
+            "CZERWONY: WIDZÓW WIĘCEJ. KOLOR CZARNY: PROGRAM "
+            "ZMIENIONY”.",
+        ],
+        "search_pool": [
+            "W skrzynce sanitarnej: dwa bandaże, trzy stimpaki, "
+            "fiolka morfiny, 30 kredytów w fartuchu sanitariusza.",
+        ],
+        "public_hint_pool": [
+            "Zapach krwi i środka odkażającego. Krople z kroplówki.",
+        ],
+        "sensory_tags": ["blood_fresh", "sterile", "cold"],
+        "entity_seed_pools": {
+            "env":  ["medical_drawer", "broken_cage"],
+            "item": ["bandage", "stimpak", "credits_pile"],
+        },
+        "exit_hints": ["rów główny", "tunel"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 5,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"liga_brawurowa": 1},
+    },
+    {
+        "template_id": "pool_bunkier_oficerski",
+        "role": "social",
+        "actual_type": "social",
+        "tags": ["social", "trenches", "rumor", "npc"],
+        "name_pool": ["Bunkier Oficerski", "Stanowisko Dowódcze",
+                      "Boks Sztabowy"],
+        "first_enter_pool": [
+            "Schody w dół, drzwi metalowe. Wnętrze z mapami "
+            "przybitymi do ściany. Oficer przy biurku, kreda "
+            "w dłoni, słuchawka radia trzymana ramieniem. „A pan "
+            "tu po co?” pyta, nie odwracając głowy.",
+        ],
+        "look_pool": [
+            "Mapy z czerwonymi i niebieskimi liniami. Niebieskie "
+            "prowadzą w nikąd. Czerwone otaczają coś z napisem "
+            "„CEL SPONSORA”.",
+        ],
+        "search_pool": [
+            "Na biurku planszetka z rozkazami: „NIE NACIERAĆ "
+            "PRZED PRZERWĄ REKLAMOWĄ”. Plus 35 kredytów w "
+            "rozkazówce „BUDŻET POLOWY”.",
+        ],
+        "public_hint_pool": [
+            "Kreda po tablicy. Trzask radia.",
+        ],
+        "sensory_tags": ["metal", "smoke", "stale"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "furniture_wood"],
+            "npc":  [("paranoid_mapper", "neutral")],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["schody w górę", "tunel komunikacyjny"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"liga_brawurowa": 1},
+    },
+    {
+        "template_id": "pool_skladnica_amunicji_okop",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "trenches", "explosive"],
+        "name_pool": ["Składnica Amunicji", "Sektor Granatów",
+                      "Boks Detonacyjny"],
+        "first_enter_pool": [
+            "Niska ziemianka. Skrzynki z amunicją ułożone w stosy, "
+            "tabliczki nieczytelne od pleśni. Ktoś tu zostawił "
+            "papierosa, papieros wciąż się tli. Ktoś inny tu "
+            "siedzi w głębi i się nie odzywa.",
+        ],
+        "look_pool": [
+            "Skrzynki. Numerowane. Każda z napisem „OSTROŻNIE — "
+            "ZA TRZASKI ODPOWIADA TY”.",
+        ],
+        "search_pool": [
+            "Skrzynka 7-B: dwa granaty dymne i 45 kredytów w "
+            "kopercie z pieczęcią Ligi Brawurowej.",
+        ],
+        "public_hint_pool": [
+            "Zapach prochu. Ostrożnie.",
+        ],
+        "sensory_tags": ["smoke", "metal", "cold"],
+        "entity_seed_pools": {
+            "mon":  ["mutant_szczur"],
+            "env":  ["broken_barrel", "loose_chain"],
+            "haz":  ["broken_glass"],
+            "item": ["credits_pile", "snack_bar"],
+        },
+        "exit_hints": ["rów", "schody w górę"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"liga_brawurowa": 1},
+    },
+    {
+        "template_id": "pool_gniazdo_snajperskie_okop",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "trenches", "elite",
+                 "ranged"],
+        "name_pool": ["Gniazdo Snajperskie", "Stanowisko "
+                      "Strzeleckie", "Boks Strzelca"],
+        "first_enter_pool": [
+            "Mała szczelina w worek piasku. Karabin na statywie, "
+            "luneta zaparowana. Strzelec w środku swojej pozycji "
+            "— skupiony, nie patrzy na ciebie. Patrzy w "
+            "konkretne miejsce w polu. Czeka.",
+        ],
+        "look_pool": [
+            "Listy celów na kartonie. Dwadzieścia pozycji, "
+            "siedemnaście wykreślone. Nazwisko strzelca u dołu.",
+        ],
+        "search_pool": [
+            "Pod karabinem skrzynka z amunicją premium, plus "
+            "60 kredytów premii za każdy wykreślony cel.",
+        ],
+        "public_hint_pool": [
+            "Cicho. Tylko oddech. Wiatr przez szczelinę.",
+        ],
+        "sensory_tags": ["cold", "wind", "metal"],
+        "entity_seed_pools": {
+            "mon":  ["mutant_szczur"],
+            "env":  ["sponsor_screen", "loose_chain"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["rów", "schody w dół"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"liga_brawurowa": 2},
+    },
+    {
+        "template_id": "pool_kanal_odplywowy_okop",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "trenches", "hidden", "damp"],
+        "name_pool": ["Kanał Odpływowy", "Rura Spustowa",
+                      "Tunel Wodny"],
+        "first_enter_pool": [
+            "Rura odpływowa, dość szeroka żeby przejść kucem. "
+            "Woda do kostek. Echo niesie wszystko, łącznie z "
+            "twoim oddechem. Pod łokciem coś metalowego.",
+        ],
+        "look_pool": [
+            "Rura przerdzewiała. Pęknięcia, woda kapie z sufitu. "
+            "Na ścianie ktoś wyrył: „STĄD MOŻNA WYJŚĆ — JEŚLI WIESZ”.",
+        ],
+        "search_pool": [
+            "W szczelinie ściany metalowa puszka. W środku "
+            "70 kredytów, kompas wojskowy, i mapa sektora "
+            "z zaznaczonymi „PRZEJŚCIAMI”.",
+        ],
+        "public_hint_pool": [
+            "Echo. Kropla. Powolne.",
+        ],
+        "sensory_tags": ["damp", "rot", "cold"],
+        "entity_seed_pools": {
+            "env":  ["studzienka", "loose_chain"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["powierzchnia", "głębiej w rurę"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_placowka_zaopatrzenia",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "trenches"],
+        "name_pool": ["Placówka Zaopatrzenia", "Stanowisko Logistyczne",
+                      "Boks Magazynowy"],
+        "first_enter_pool": [
+            "Skrzynki, beczki, worki. Logistyk z planszetką liczy "
+            "zapasy. Liczy w gorączce — sponsor wymaga, brakuje. "
+            "Ktoś w kącie waży opóźnienia.",
+        ],
+        "look_pool": [
+            "Tablica z manifestem dostaw. Ostatnia dostawa: "
+            "„SPÓŹNIONA — POWODY: NIE PISAĆ”.",
+        ],
+        "search_pool": [
+            "Pod kontuarem koperta z napisem „PREMIA ZA SZYBKOŚĆ”: "
+            "40 kredytów. Plus paczka racji.",
+        ],
+        "public_hint_pool": [
+            "Stuk planszetki. Echo skrzypiących butów.",
+        ],
+        "sensory_tags": ["dust", "metal", "stale"],
+        "entity_seed_pools": {
+            "mon":  ["klatkowy_kot"],
+            "env":  ["broken_barrel", "furniture_wood"],
+            "item": ["snack_bar", "credits_pile"],
+        },
+        "exit_hints": ["rów", "tunel zaopatrzeniowy"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"liga_brawurowa": 1},
+    },
+
+    # ── INTAKE +4 ─────────────────────────────────────────────────────
+    {
+        "template_id": "pool_intake_szatnia",
+        "role": "safe",
+        "actual_type": "safehouse",
+        "tags": ["safe", "safehouse", "intake"],
+        "safehouse_subtype": "lounge",
+        "name_pool": ["Szatnia Aklimatyzacyjna", "Boks "
+                      "Przygotowawczy", "Pokój Pierwszego Dnia"],
+        "first_enter_pool": [
+            "Szafki z numerami. Niektóre otwarte, niektóre "
+            "puste, jedna wyrwana z zawiasów. Ławka mokrym od "
+            "potu. Plakat: „WITAJ W SEZONIE — NIE PRZYJDZIESZ "
+            "TU PONOWNIE”.",
+        ],
+        "look_pool": [
+            "Szafka 7 wciąż czeka na właściciela. Szafka 11 z "
+            "tabliczką „NIEDOSTĘPNA — PROGRAM ZMIENIONY”.",
+        ],
+        "search_pool": [
+            "W otwartej szafce zostawione: bandaż, drobne "
+            "monety (10 kredytów), notes z jednym wpisem: "
+            "„NIE UFAJ APARATOM”.",
+        ],
+        "public_hint_pool": [
+            "Echo metalowych szafek. Świetlówka mruga.",
+        ],
+        "sensory_tags": ["sterile", "stale", "metal"],
+        "entity_seed_pools": {
+            "env":  ["furniture_wood", "torn_notebook"],
+            "item": ["bandage", "credits_pile"],
+        },
+        "exit_hints": ["korytarz", "drzwi obrotowe"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 1,
+        "floor_max": 2,
+    },
+    {
+        "template_id": "pool_intake_sala_powitalna",
+        "role": "danger",
+        "actual_type": "lore",
+        "tags": ["intake", "lore", "orientation"],
+        "name_pool": ["Sala Powitalna", "Audytorium "
+                      "Wstępne", "Boks Orientacyjny"],
+        "first_enter_pool": [
+            "Sala z rzędami plastikowych krzeseł. Większość pusta. "
+            "Ekran sponsorski wyświetla pętlę „WITAJ W LOCHU — "
+            "WIDZÓW MAMY MILIONY, A TY MASZ SZCZĘŚCIE”. Mikrofon "
+            "wyłączony.",
+        ],
+        "look_pool": [
+            "Krzesła. Numerki na oparciach. Na środkowym ktoś "
+            "wyrył pieczołowicie: „NIE WSTAWAJ KIEDY WOŁAJĄ — "
+            "WOŁAJĄ TYLKO RAZ”.",
+        ],
+        "search_pool": [
+            "Pod krzesłem 17 znaleziony pomięty pamflet: "
+            "„JAK PRZEŻYĆ PIERWSZE PIĘTRO — WSKAZÓWKI OD "
+            "WIDZÓW BYŁYCH ZAWODNIKÓW”.",
+        ],
+        "public_hint_pool": [
+            "Echo nagrania na pętli. Krzesła nie skrzypią.",
+        ],
+        "sensory_tags": ["bright", "stale", "echo"],
+        "entity_seed_pools": {
+            "env":  ["sponsor_screen", "torn_notebook"],
+            "item": ["snack_bar"],
+        },
+        "exit_hints": ["korytarz", "drzwi główne"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 1,
+        "floor_max": 2,
+    },
+    {
+        "template_id": "pool_intake_aleja_automatow",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "intake"],
+        "name_pool": ["Aleja Automatów", "Korytarz Sprzedażowy",
+                      "Sektor Automatów"],
+        "first_enter_pool": [
+            "Długi korytarz, automaty po obu stronach. Większość "
+            "działa, większość pusta. Ktoś próbował wybić szybę "
+            "automatu nr 4. Próbował zębami. Próbował niedawno.",
+        ],
+        "look_pool": [
+            "Automaty: kawa, batony, ostrza ratunkowe, świece "
+            "dymne. Ceny w kredytach. Wszystkie zawyżone.",
+        ],
+        "search_pool": [
+            "W zwrocie reszty automatu 7 zapomniana paczka: "
+            "15 kredytów i jeden snack.",
+        ],
+        "public_hint_pool": [
+            "Brzęczenie automatu. Coś chodzi po pleksi szybą.",
+        ],
+        "sensory_tags": ["bright", "stale", "metal"],
+        "entity_seed_pools": {
+            "mon":  ["mutant_szczur"],
+            "env":  ["vending_machine", "sponsor_screen"],
+            "item": ["snack_bar", "credits_pile"],
+        },
+        "exit_hints": ["korytarz", "skręt"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 1,
+        "floor_max": 2,
+    },
+    {
+        "template_id": "pool_intake_kabina_sanitarna",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "intake", "hidden"],
+        "name_pool": ["Kabina Sanitarna", "Boks Higieniczny",
+                      "Punkt Mycia"],
+        "first_enter_pool": [
+            "Jedna z tych kabin, w których nikt nigdy nie chce "
+            "zostać dłużej. Lustro zachlapane, kran kapie, "
+            "papier wisi smutno. W kącie ktoś przykleił karteczkę: "
+            "„WĄCHAJ — TO TWOJA WSKAZÓWKA”.",
+        ],
+        "look_pool": [
+            "Wszystko z plastiku. Wszystko popsute. Spłuczka "
+            "naprawiona drutem.",
+        ],
+        "search_pool": [
+            "Za spłuczką ukryta saszetka. W środku 25 kredytów, "
+            "fiolka antybiotyków, mała mapka sektora wstępnego.",
+        ],
+        "public_hint_pool": [
+            "Kapie. Wymownie.",
+        ],
+        "sensory_tags": ["damp", "urine", "sterile"],
+        "entity_seed_pools": {
+            "env":  ["medical_drawer", "broken_glass"],
+            "item": ["credits_pile", "stimpak"],
+        },
+        "exit_hints": ["korytarz", "drzwi obrotowe"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 1,
+        "weight": 3,
+        "floor_min": 1,
+        "floor_max": 2,
+    },
+
+    # ═══════════════════════════════════════════════════════════════════
+    # P29.42c — 4 biomy Tier-1: pokoje (5 per biome × 4 = 20)
+    # fabryka_pary / stacja_orbital / kuznia_polorkow / biblioteka_miejska
+    # ═══════════════════════════════════════════════════════════════════
+
+    # ── FABRYKA PARY — Sterling-9 ─────────────────────────────────────
+    {
+        "template_id": "pool_hala_kotlow",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "steampunk_factory", "fire"],
+        "name_pool": ["Hala Kotłów", "Sekcja Termiczna",
+                      "Boks Palenisk"],
+        "first_enter_pool": [
+            "Kotły wielkości autobusu. Trzy działają, jeden cieknie. "
+            "Manometry w czerwonej strefie, ale alarm dawno "
+            "wyłączono — sponsor zaoszczędził na obsłudze. Powietrze "
+            "drży od ciepła. Twoje buty miękną.",
+        ],
+        "look_pool": [
+            "Każdy kocioł z plakietką producenta — wszystkie inne. "
+            "Łopaty oparte o ścianę. Łopaty się zużywają. Łopatarze "
+            "się zużywają szybciej.",
+        ],
+        "search_pool": [
+            "Pod łopatą zapomniana torba narzędziowa — klucz "
+            "francuski, pęczek śrub, 25 kredytów premii za "
+            "przepracowaną zmianę.",
+        ],
+        "public_hint_pool": [
+            "Sapanie ognia. Stuk metalowych łopat o beton.",
+        ],
+        "sensory_tags": ["hot", "smoke", "metal"],
+        "entity_seed_pools": {
+            "mon":  ["konserwator_kotla", "smarownik_pasow"],
+            "env":  ["sponsor_screen", "broken_barrel"],
+            "haz":  ["broken_glass"],
+            "item": ["snack_bar", "credits_pile"],
+        },
+        "exit_hints": ["północ", "podest", "drabina"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"kult_recyklingu": 1},
+    },
+    {
+        "template_id": "pool_warsztat_smarowniczy",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "steampunk_factory", "tools"],
+        "name_pool": ["Warsztat Smarowniczy", "Boks Olejarski",
+                      "Magazyn Smarów"],
+        "first_enter_pool": [
+            "Beczki olejów po obu stronach. Część otwarta, część "
+            "wyciekła. Stół z narzędziami pełen — klucze, śruby, "
+            "noże do uszczelek. Pod stołem coś syczy, ale to nie "
+            "może być ważne. Nigdy nie jest.",
+        ],
+        "look_pool": [
+            "Inwentarz olejów wisi krzywo. Smar typ 7, smar typ 11, "
+            "smar typ „NIE PYTAĆ”. Wszystkie etykiety przybrudzone.",
+        ],
+        "search_pool": [
+            "Pod stołem skrzynka z dobrym sprzętem: dwa klucze, "
+            "rolka taśmy, fiolka smaru wysokotemperaturowego, "
+            "45 kredytów w kopercie z napisem „PRZESCIANE”.",
+        ],
+        "public_hint_pool": [
+            "Zapach oleju przemysłowego. Kapie gdzieś.",
+        ],
+        "sensory_tags": ["greasy", "metal", "smoke"],
+        "entity_seed_pools": {
+            "env":  ["broken_barrel", "medical_drawer"],
+            "item": ["credits_pile", "snack_bar"],
+        },
+        "exit_hints": ["hala główna", "magazyn"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"kult_recyklingu": 1},
+    },
+    {
+        "template_id": "pool_dyspozytornia_pary",
+        "role": "social",
+        "actual_type": "social",
+        "tags": ["social", "steampunk_factory", "rumor", "npc"],
+        "name_pool": ["Dyspozytornia", "Pokój Zmiany",
+                      "Sterownia Główna"],
+        "first_enter_pool": [
+            "Konsola pełna pokręteł. Na ścianie tablica zmian — "
+            "krzyżyki przy nieobecnych. Dyspozytor w fotelu, oczy "
+            "podkrążone, kubek kawy zimny od godzin. „A pan w "
+            "której zmianie?” pyta.",
+        ],
+        "look_pool": [
+            "Lista alarmów: 47 aktywnych. „IGNORUJ DO PRZERWY "
+            "REKLAMOWEJ” na pierwszej linii.",
+        ],
+        "search_pool": [
+            "W szufladzie dyspozytora rzut oka na rozkład: "
+            "30 kredytów w portfelu, klucz do magazynu olejów, "
+            "notes z kontaktami.",
+        ],
+        "public_hint_pool": [
+            "Stuk pokręteł. Sapanie ekspresu.",
+        ],
+        "sensory_tags": ["coffee", "stale", "metal"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "furniture_wood"],
+            "npc":  [("paranoid_mapper", "neutral")],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["hala", "korytarz służbowy"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_tunel_parowy",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "steampunk_factory", "hidden"],
+        "name_pool": ["Tunel Parowy", "Spust Termiczny",
+                      "Kanał Serwisowy"],
+        "first_enter_pool": [
+            "Wąsko. Wilgotno mimo ciepła. Para się tu skrapla "
+            "i kapie. Idziesz schylony. Na ścianie ktoś wydrapał: "
+            "„TYM PRZESZEDŁ FELIKS — ALE FELIKS BYŁ MNIEJSZY”.",
+        ],
+        "look_pool": [
+            "Rury z parą po obu stronach. Jedna pęknięta — para "
+            "wychodzi pionowo. Omijasz.",
+        ],
+        "search_pool": [
+            "W szczelinie ściany torba narzędziowa: śruby, "
+            "klucz nasadowy, 35 kredytów schowanych przez "
+            "kogoś, kto już tu nie wraca.",
+        ],
+        "public_hint_pool": [
+            "Syk pary. Bardziej blisko niż chciałbyś.",
+        ],
+        "sensory_tags": ["hot", "damp", "metal"],
+        "entity_seed_pools": {
+            "env":  ["loose_chain", "studzienka"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["powrót", "głębiej"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_fabryka_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "steampunk_factory"],
+        "name_pool": ["Sala Główna Palenisk", "Centrum Termiczne",
+                      "Sektor Główny Sterling"],
+        "first_enter_pool": [
+            "Olbrzymia hala. Centralne palenisko bije żarem. "
+            "Z trzech kominów wychodzi dym w trzech różnych "
+            "kolorach. Pośrodku — Palacz Sterling. Łopata wbita "
+            "w beton. Czeka, aż wejdziesz w jego cień.",
+        ],
+        "look_pool": [
+            "Palenisko. Trzy kominy. Z drugiej strony drzwi z "
+            "tabliczką „WYJŚCIE PIĘTRA — TYLKO PRZEZ PALACZA”.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Huk ognia. Sapanie powietrza wciąganego do paleniska.",
+        ],
+        "sensory_tags": ["hot", "smoke", "metal"],
+        "entity_seed_pools": {
+            "mon":  ["boss_palacz_sterling"],
+            "env":  ["sponsor_camera", "broken_barrel"],
+        },
+        "exit_hints": ["wyjście piętra", "wschód"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 5,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"kult_recyklingu": 2},
+    },
+
+    # ── STACJA ORBITAL-7 ──────────────────────────────────────────────
+    {
+        "template_id": "pool_modul_mieszkalny_orbital",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "orbital", "sterile"],
+        "name_pool": ["Moduł Mieszkalny A", "Kapsuła Turystyczna",
+                      "Boks Pasażerski"],
+        "first_enter_pool": [
+            "Krzesła zatrzaśnięte w fotelach, pasy zapięte. Pasy "
+            "trzymają nadal. Trzymają na sucho. Ekran kabinowy "
+            "wyświetla pętlę: „WITAMY NA POKŁADZIE — DZIĘKUJEMY "
+            "ZA WYBÓR ORBITAL-7”.",
+        ],
+        "look_pool": [
+            "Numery foteli na suficie. Po jednym foteliku "
+            "papierowy lunch — szpitalnie spłaszczony.",
+        ],
+        "search_pool": [
+            "W schowku nad fotelem 14 zapomniana saszetka "
+            "z 30 kredytami i kartą dostępu „GŁÓWNY DOK”.",
+        ],
+        "public_hint_pool": [
+            "Cisza ciśnieniowa. Mig-mig ekranu nawigacyjnego.",
+        ],
+        "sensory_tags": ["sterile", "cold", "metal"],
+        "entity_seed_pools": {
+            "mon":  ["pasazer_zaginiony", "technik_sluzy"],
+            "env":  ["sponsor_screen", "furniture_wood"],
+            "item": ["snack_bar", "credits_pile"],
+        },
+        "exit_hints": ["śluza", "korytarz"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"novachem_biotech": 1},
+    },
+    {
+        "template_id": "pool_magazyn_dokowy",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "orbital", "storage"],
+        "name_pool": ["Magazyn Dokowy", "Skład Cargo",
+                      "Boks Logistyczny"],
+        "first_enter_pool": [
+            "Kontenery cargo do sufitu. Większość pieczętowana, "
+            "kilka rozprutych. Wózek widłowy unieruchomiony na "
+            "środku — operator zapomniał zaciągnąć hamulec, ale "
+            "nie zapomniał uciec.",
+        ],
+        "look_pool": [
+            "Listy przewozowe na ścianie. Część z pieczęcią "
+            "„ZATWIERDZONE”, część z dopiskiem „STREFA SPONSORA”.",
+        ],
+        "search_pool": [
+            "W rozprutym kontenerze: dwa bandaże, stimpak, "
+            "puszka racji, 50 kredytów w kopercie cargo.",
+        ],
+        "public_hint_pool": [
+            "Echo metalu. Lampka awaryjna mruga.",
+        ],
+        "sensory_tags": ["sterile", "metal", "cold"],
+        "entity_seed_pools": {
+            "env":  ["broken_barrel", "medical_drawer"],
+            "item": ["bandage", "stimpak", "credits_pile"],
+        },
+        "exit_hints": ["śluza", "korytarz cargo"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_centrum_dowodzenia_orbital",
+        "role": "social",
+        "actual_type": "social",
+        "tags": ["social", "orbital", "rumor", "npc"],
+        "name_pool": ["Centrum Dowodzenia", "Mostek Stacji",
+                      "Sterownia Główna"],
+        "first_enter_pool": [
+            "Półokrągłe stanowiska z ekranami. Większość wyłączona. "
+            "Oficer dyżurny przy jednym z aktywnych — kawa, ciasto, "
+            "logo sponsora w lewym górnym rogu. „Pasażer?” pyta, "
+            "nie odwracając głowy.",
+        ],
+        "look_pool": [
+            "Mapa stacji z modułami w pięciu kolorach. Trzy "
+            "moduły wygaszone. Tabliczka: „NIE OTWIERAĆ MODUŁU C "
+            "BEZ ZGODY SPONSORA”.",
+        ],
+        "search_pool": [
+            "W szufladzie oficera: portfel z 40 kredytami, "
+            "uniwersalna karta dostępu, notatnik z listami "
+            "kontaktów planetarnych.",
+        ],
+        "public_hint_pool": [
+            "Stuk klawiatur. Cichy alarm w tle, ignorowany.",
+        ],
+        "sensory_tags": ["sterile", "coffee", "ozone"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "sponsor_screen"],
+            "npc":  [("paranoid_mapper", "neutral")],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["śluza", "korytarz służbowy"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_szyb_serwisowy_orbital",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "orbital", "hidden", "vertical"],
+        "name_pool": ["Szyb Serwisowy", "Tunel Techniczny",
+                      "Wąski Przejazd"],
+        "first_enter_pool": [
+            "Pionowy szyb z drabinką po jednej ścianie. Powietrze "
+            "tu jest własne — taśma z napisem „STREFA AWARYJNA”. "
+            "Każdy poziom ma kratę. Większość kraty już ktoś "
+            "ominął.",
+        ],
+        "look_pool": [
+            "Drabinka. Kable. Etykiety pokoi za kratą. „MODUŁ C — "
+            "ZATWIERDZONE PRZEZ SPONSORA” jest jedyną w czerwieni.",
+        ],
+        "search_pool": [
+            "Na podeście schowek z saszetką: 55 kredytów, "
+            "stimpak, karta techniczna do modułu C.",
+        ],
+        "public_hint_pool": [
+            "Brzęczy went. Drabinka się ugina.",
+        ],
+        "sensory_tags": ["metal", "cold", "ozone"],
+        "entity_seed_pools": {
+            "env":  ["loose_chain", "broken_barrel"],
+            "item": ["credits_pile", "stimpak"],
+        },
+        "exit_hints": ["góra", "dół"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_orbital_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "orbital"],
+        "name_pool": ["Główny Dok Stacji", "Sektor Próżni",
+                      "Sala Komandora"],
+        "first_enter_pool": [
+            "Okrągłe pomieszczenie ze szklaną kopułą. Za szybą — "
+            "próżnia, dalej planeta. Komandor Próżni stoi pośrodku, "
+            "trzyma dziennik stacji. Skafander bez przyłbicy. "
+            "Nie potrzebuje powietrza.",
+        ],
+        "look_pool": [
+            "Kopuła ze szkła ciśnieniowego. Pulpit z drugiej strony, "
+            "drzwi z tabliczką „WYJŚCIE PIĘTRA — PRZECHODZIĆ TYLKO "
+            "PO ZATWIERDZENIU DOWÓDCY”.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Cisza ciśnieniowa. Tylko twoje serce.",
+        ],
+        "sensory_tags": ["sterile", "cold", "ozone"],
+        "entity_seed_pools": {
+            "mon":  ["boss_komandor_proznii"],
+            "env":  ["sponsor_camera", "sponsor_screen"],
+        },
+        "exit_hints": ["wyjście piętra", "śluza ewakuacyjna"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 5,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"novachem_biotech": 2},
+    },
+
+    # ── KUŹNIA PÓŁORKÓW ───────────────────────────────────────────────
+    {
+        "template_id": "pool_hala_kowadel",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "forge", "fire", "loud"],
+        "name_pool": ["Hala Kowadeł", "Sekcja Trzech Młotów",
+                      "Boks Bicia"],
+        "first_enter_pool": [
+            "Trzy kowadła w rzędzie, każde w pracy. Półork przy "
+            "pierwszym uderzył metal, otarł pot, popatrzył na "
+            "ciebie. Drugi nawet nie podniósł wzroku. Trzeci "
+            "ciężej oddycha — ten skończy się pierwszy.",
+        ],
+        "look_pool": [
+            "Kowadła. Stojaki z młotami różnej wagi. Beczki z "
+            "wodą do hartowania — woda parująca, każda inna "
+            "barwa.",
+        ],
+        "search_pool": [
+            "Pod kowadłem trzecim: opaska cechowa, klucz do "
+            "magazynu metali, 35 kredytów w skórzanym mieszku.",
+        ],
+        "public_hint_pool": [
+            "Stuk młotów w rytm reklamy. Para z hartowania.",
+        ],
+        "sensory_tags": ["hot", "metal", "smoke"],
+        "entity_seed_pools": {
+            "mon":  ["podkowiarz_polork", "mlociarz_cechowy"],
+            "env":  ["broken_barrel", "loose_chain"],
+            "haz":  ["broken_glass"],
+            "item": ["snack_bar", "credits_pile"],
+        },
+        "exit_hints": ["zaplecze", "kuźnia główna"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"bractwo_komornika": 1},
+    },
+    {
+        "template_id": "pool_skladnica_metali",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "forge", "materials"],
+        "name_pool": ["Składnica Metali", "Magazyn Surowca",
+                      "Skład Półwyrobów"],
+        "first_enter_pool": [
+            "Pręty żelazne ułożone w piramidy. Sztaby brązu, "
+            "skrzynki z nitami. Każda skrzynka z tabliczką cechu. "
+            "Stary półork śpi w rogu, na worku z piaskiem. "
+            "Brzuch unosi się rytmicznie.",
+        ],
+        "look_pool": [
+            "Inwentarz metali wisi pieczołowicie. Brąz, żelazo, "
+            "stal nieoznaczona. Plus jedna skrzynka z napisem "
+            "„NIE OTWIERAĆ — PRÓBA SPONSORSKA”.",
+        ],
+        "search_pool": [
+            "W skrzynce „PRÓBA SPONSORSKA”: dwa pręty rzadkiego "
+            "metalu, klucz cechowy, 50 kredytów premii za "
+            "milczenie.",
+        ],
+        "public_hint_pool": [
+            "Chrapanie. Stuk wagi.",
+        ],
+        "sensory_tags": ["metal", "dust", "warm"],
+        "entity_seed_pools": {
+            "env":  ["broken_barrel", "loose_chain"],
+            "item": ["credits_pile", "snack_bar"],
+        },
+        "exit_hints": ["kuźnia", "zaplecze"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"bractwo_komornika": 1},
+    },
+    {
+        "template_id": "pool_szynkwas_cechowy",
+        "role": "social",
+        "actual_type": "social",
+        "tags": ["social", "forge", "rumor", "npc"],
+        "name_pool": ["Szynkwas Cechowy", "Karczma Półorków",
+                      "Sala Wieczornicy"],
+        "first_enter_pool": [
+            "Stoły długie, ławy z surowego drewna. Półorki piją "
+            "tu po szychcie — albo dwie szychty po sobie, czasem "
+            "trzy. Karczmarz wyciera kufel rękawem. Nieświeży "
+            "rękaw.",
+        ],
+        "look_pool": [
+            "Tablica z plotkami: „SPONSOR PŁACI ZA NITY — "
+            "ALE NIE ZA WĄTROBY”. Pod tablicą popielniczka pełna.",
+        ],
+        "search_pool": [
+            "Pod ławą portfel: 30 kredytów, kostka z cechowymi "
+            "znakami, papierek z adresem do magazynu rzeczy "
+            "niepotrzebnych.",
+        ],
+        "public_hint_pool": [
+            "Brzęk kufli. Półorkowy chichot.",
+        ],
+        "sensory_tags": ["smoke", "metal", "warm"],
+        "entity_seed_pools": {
+            "env":  ["furniture_wood", "broken_barrel"],
+            "npc":  [("loot_goblin_crawler", "neutral")],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["kuźnia", "wyjście tylne"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_studnia_hartownicza",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "forge", "hidden", "underground"],
+        "name_pool": ["Studnia Hartownicza", "Loch Kowala",
+                      "Studzienka Cechowa"],
+        "first_enter_pool": [
+            "Schodzisz po wykutych w skale stopniach. Studnia "
+            "z lodowatą wodą. Tu hartują największe ostrza. "
+            "Na dnie coś leży — być może klinga, być może "
+            "kowal, który nie wyszedł.",
+        ],
+        "look_pool": [
+            "Łańcuch zwisa z sufitu. Hak. Woda się świeci na "
+            "zielono w jednym miejscu.",
+        ],
+        "search_pool": [
+            "Na półce wykutej w ścianie schowek: 60 kredytów, "
+            "stimpak, klinga rzadkiej stali w pochwie.",
+        ],
+        "public_hint_pool": [
+            "Cisza. Tylko kapanie wody na metal.",
+        ],
+        "sensory_tags": ["cold", "damp", "metal"],
+        "entity_seed_pools": {
+            "env":  ["studzienka", "loose_chain"],
+            "item": ["credits_pile", "stimpak"],
+        },
+        "exit_hints": ["góra", "tunel boczny"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 3,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_kuznia_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "forge"],
+        "name_pool": ["Hala Wielkiego Młota", "Sala Tronowa Cechu",
+                      "Główne Kowadło"],
+        "first_enter_pool": [
+            "Okrągła sala. Pośrodku — kowadło wielkości stołu, "
+            "obok stojak z trzema młotami. Najlżejszy waży tyle, "
+            "co dwóch ludzi. Starszy Cechu stoi obok. Broda "
+            "wpleciona w opaskę. Drugi koniec opaski przybity "
+            "do ściany.",
+        ],
+        "look_pool": [
+            "Kowadło. Trzy młoty. Drzwi za starszym z tabliczką "
+            "„WYJŚCIE PIĘTRA — TYLKO PO OPŁACENIU CECHU”.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Stuk pojedynczych młotów. Echo cechowych pieśni.",
+        ],
+        "sensory_tags": ["hot", "metal", "smoke"],
+        "entity_seed_pools": {
+            "mon":  ["boss_starszy_cechu"],
+            "env":  ["broken_barrel", "loose_chain"],
+        },
+        "exit_hints": ["wyjście piętra", "zaplecze"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 5,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"bractwo_komornika": 2},
+    },
+
+    # ── BIBLIOTEKA MIEJSKA ────────────────────────────────────────────
+    {
+        "template_id": "pool_czytelnia_glowna",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "library", "quiet"],
+        "name_pool": ["Czytelnia Główna", "Sala Studyjna",
+                      "Boks Cichy"],
+        "first_enter_pool": [
+            "Stoły z zielonymi lampkami. Krzesła odsunięte, jakby "
+            "ktoś nagle wstał. Książki w połowie czytania, nadal "
+            "otwarte. Cisza tu nie jest cicha — ta cisza "
+            "obserwuje.",
+        ],
+        "look_pool": [
+            "Tabliczki z zasadami: „CISZA — KONSEKWENCJE NIEPISANE”, "
+            "„PALCEM PO STRONACH — NIE NA STRONACH”.",
+        ],
+        "search_pool": [
+            "Pod stołem ósmym zapomniana torba: 25 kredytów, "
+            "fiolka czegoś zielonego, kartka z hasłem do "
+            "magazynu „T”.",
+        ],
+        "public_hint_pool": [
+            "Szelest stron — sam z siebie. Skrzypnięcie regału.",
+        ],
+        "sensory_tags": ["stale", "paper", "quiet"],
+        "entity_seed_pools": {
+            "mon":  ["czytelnik_zaginiony", "indeksowy_robak"],
+            "env":  ["sponsor_screen", "torn_notebook"],
+            "item": ["snack_bar", "credits_pile"],
+        },
+        "exit_hints": ["regały", "katalogi", "wyjście"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 5,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
+    },
+    {
+        "template_id": "pool_katalogi_kartkowe",
+        "role": "loot",
+        "actual_type": "salvage",
+        "tags": ["loot", "salvage", "library", "paper"],
+        "name_pool": ["Katalogi Kartkowe", "Sala Indeksu",
+                      "Magazyn Fiszek"],
+        "first_enter_pool": [
+            "Drewniane szafki z setkami szufladek. Każda z literą "
+            "i zakresem. Kilka szuflad otwartych — fiszki "
+            "porozrzucane, jakby ktoś szukał konkretnego nazwiska. "
+            "Znalazł. Już go nie ma.",
+        ],
+        "look_pool": [
+            "Szafki. Etykiety: A-Cz, Cz-Hi, Hi-Lo, Lo-Pa, Pa-Sz, "
+            "Sz-Z. Szuflada „Z-Ż” brakuje.",
+        ],
+        "search_pool": [
+            "W szufladzie „Lo-Pa” schowane: 40 kredytów, "
+            "klucz biblioteczny, lista zakazanych autorów "
+            "(z odręcznym dopiskiem „I TY”).",
+        ],
+        "public_hint_pool": [
+            "Stuk drewna. Kurz dryfuje.",
+        ],
+        "sensory_tags": ["paper", "dust", "stale"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "furniture_wood"],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["czytelnia", "magazyn"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 1},
+    },
+    {
+        "template_id": "pool_pokoj_bibliotekarki",
+        "role": "social",
+        "actual_type": "social",
+        "tags": ["social", "library", "rumor", "npc"],
+        "name_pool": ["Pokój Bibliotekarki", "Biuro Działu",
+                      "Stanowisko Wypożyczeń"],
+        "first_enter_pool": [
+            "Małe biuro za ladą. Bibliotekarka z kokiem, okulary "
+            "na czubku nosa. Stempluje zwroty rytmicznie. Stempel "
+            "„PRZETERMINOWANE” brzmi inaczej niż „ZWRÓCONE”. "
+            "Obie pieczątki słyszysz dokładnie.",
+        ],
+        "look_pool": [
+            "Lista czytelników z karami. Niektóre kary w "
+            "kredytach, niektóre w czasie. Twoje nazwisko nie "
+            "tam, ale rubryka oczekuje.",
+        ],
+        "search_pool": [
+            "W szufladzie bibliotekarki: portfel z 35 kredytami, "
+            "uniwersalna karta do magazynów, lista książek "
+            "„DO PRZECZYTANIA POD GROŹBĄ”.",
+        ],
+        "public_hint_pool": [
+            "Stuk pieczątek. Szelest stron.",
+        ],
+        "sensory_tags": ["paper", "stale", "coffee"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook", "furniture_wood"],
+            "npc":  [("paranoid_mapper", "friendly")],
+            "item": ["credits_pile"],
+        },
+        "exit_hints": ["czytelnia", "magazyn"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 4,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_magazyn_t_biblioteczny",
+        "role": "secret",
+        "actual_type": "secret",
+        "tags": ["secret", "library", "hidden", "restricted"],
+        "name_pool": ["Magazyn T", "Skład Zakazany",
+                      "Sektor Specjalny"],
+        "first_enter_pool": [
+            "Drzwi metalowe z trzema kłódkami. Wewnątrz półki "
+            "z książkami w tekturowych pudłach. Każde pudło "
+            "z tabliczką: „NIE WYDAWAĆ”, „NIE WYDAWAĆ”, "
+            "„NIE WYDAWAĆ POD GROŹBĄ”.",
+        ],
+        "look_pool": [
+            "Pudła. Większość zakurzona. Jedno z dopiskiem "
+            "„WYDANE OSTATNIO” — pusto w środku.",
+        ],
+        "search_pool": [
+            "W pustym pudle ukryta torba: 70 kredytów, "
+            "stimpak, oprawiona książka bez tytułu "
+            "(stary podręcznik magiczny).",
+        ],
+        "public_hint_pool": [
+            "Cisza grobowa. Zapach naftaliny i papieru.",
+        ],
+        "sensory_tags": ["dust", "stale", "paper"],
+        "entity_seed_pools": {
+            "env":  ["torn_notebook"],
+            "item": ["credits_pile", "stimpak"],
+        },
+        "exit_hints": ["powrót", "ukryte drzwi"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 1,
+        "weight": 3,
+        "floor_min": 3,
+    },
+    {
+        "template_id": "pool_biblioteka_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "library"],
+        "name_pool": ["Sala Konserwatora", "Czytelnia Specjalna",
+                      "Sektor T-1"],
+        "first_enter_pool": [
+            "Wysoka sala z regałami do sufitu. Pośrodku biurko "
+            "kuratorskie. Konserwator Zbiorów Specjalnych "
+            "siedzi za nim, trzy pary okularów na łańcuszkach, "
+            "klucze rozłożone wachlarzem. „A jak się pan tu "
+            "dostał?” pyta, bez emocji.",
+        ],
+        "look_pool": [
+            "Regały. Biurko. Drzwi za biurkiem z tabliczką "
+            "„WYJŚCIE PIĘTRA — TYLKO PO ODDANIU KSIĄŻKI”.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Cisza biblioteczna. Tylko twoje kroki.",
+        ],
+        "sensory_tags": ["dust", "stale", "paper"],
+        "entity_seed_pools": {
+            "mon":  ["boss_konserwator_zbiorow"],
+            "env":  ["torn_notebook", "sponsor_camera"],
+        },
+        "exit_hints": ["wyjście piętra", "magazyn"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 1,
+        "floor_min": 5,
+        "unique_per_floor": True,
+        "theme_sponsor_boost": {"ministerstwo_pamieci": 2},
+    },
 ]
 
 

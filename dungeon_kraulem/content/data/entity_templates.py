@@ -1371,6 +1371,340 @@ MON = {
         vulnerable_to=["acid"],
         floor_min=18, floor_max=18,
     ),
+
+    # ═══════════════════════════════════════════════════════════════════
+    # P29.42c — Aktywacja 4 biomów Tier-1 (fabryka_pary / stacja_orbital
+    # / kuznia_polorkow / biblioteka_miejska). Każdy: 3 combat + 1
+    # miniboss + 1 floor_boss. Polish-only, Dinniman ton.
+    # ═══════════════════════════════════════════════════════════════════
+
+    # ── FABRYKA PARY „Sterling-9" (F3-8) ──────────────────────────────
+    "konserwator_kotla": dict(
+        name_key="ent_konserwator_kotla_n",
+        fallback_name="Konserwator Kotła",
+        desc_key="ent_konserwator_kotla_d",
+        fallback_desc="Kombinezon polany sadzą, gogle stopione "
+                      "w pół-uśmiech. Klucz nasadowy wielkości "
+                      "twojego przedramienia. Pracuje na trzy zmiany "
+                      "bo dwóch poprzednich już nie ma.",
+        tags=["monster","humanoid","steampunk_factory","floor_min:3"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=16, max_hp=16, ac=12, attack_bonus=4, damage_dice="1d8+1",
+        damage_type="physical",
+        resists=["fire"],
+        vulnerable_to=["cold","electric"],
+        floor_min=3, floor_max=8,
+    ),
+    "manometrowiec": dict(
+        name_key="ent_manometrowiec_n",
+        fallback_name="Manometrowiec",
+        desc_key="ent_manometrowiec_d",
+        fallback_desc="Człowiek? Zegar? Trzy ciśnieniomierze wrosły "
+                      "tam, gdzie powinna być twarz. Wskazówki drgają "
+                      "rytmicznie. Czerwona strefa, ciągle.",
+        tags=["monster","aberration","steampunk_factory","floor_min:3"],
+        affordances=["inspect","attack"],
+        hp=11, max_hp=11, ac=13, attack_bonus=3, damage_dice="1d6",
+        damage_type="fire",
+        immune_to=["fire"],
+        vulnerable_to=["cold","blunt"],
+        floor_min=3, floor_max=8,
+    ),
+    "smarownik_pasow": dict(
+        name_key="ent_smarownik_pasow_n",
+        fallback_name="Smarownik Pasów",
+        desc_key="ent_smarownik_pasow_d",
+        fallback_desc="Posmarowany od stóp do głów, śliski, szybki. "
+                      "W ręku konewka olejowa, w drugiej szmata na "
+                      "stałe wgnieciona w dłoń. Nigdy nie spadł "
+                      "z pasa transmisyjnego.",
+        tags=["monster","humanoid","steampunk_factory","fast",
+              "floor_min:3"],
+        affordances=["inspect","attack","sneak"],
+        hp=10, max_hp=10, ac=14, attack_bonus=4, damage_dice="1d4+2",
+        damage_type="physical",
+        vulnerable_to=["fire"],
+        floor_min=3, floor_max=8,
+    ),
+    "miniboss_brygadzista_kuzni": dict(
+        name_key="ent_miniboss_brygadzista_kuzni_n",
+        fallback_name="Brygadzista Sterling",
+        desc_key="ent_miniboss_brygadzista_kuzni_d",
+        fallback_desc="Hełm z rogami zaworów. Brzuch z mosiądzu, "
+                      "stuk-stuk z każdym oddechem. Trzyma rejestr "
+                      "godzin: twoje już zostały wpisane.",
+        tags=["monster","humanoid","steampunk_factory","miniboss",
+              "armored","floor_min:4"],
+        affordances=["inspect","attack","intimidate"],
+        hp=30, max_hp=30, ac=15, attack_bonus=5, damage_dice="2d6+2",
+        damage_type="fire",
+        resists=["fire","physical"],
+        vulnerable_to=["cold","electric"],
+        floor_min=4, floor_max=8,
+    ),
+    "boss_palacz_sterling": dict(
+        name_key="ent_boss_palacz_sterling_n",
+        fallback_name="Palacz Sterling",
+        desc_key="ent_boss_palacz_sterling_d",
+        fallback_desc="Trzy kominy wyrastają mu z pleców. Łopata "
+                      "wielkości człowieka, mosiężny manometr "
+                      "wszyty w czoło. Mówi parą, każde słowo "
+                      "parzy. Nie zna słowa „dość”.",
+        tags=["monster","humanoid","steampunk_factory","floor_boss",
+              "boss","floor_min:5"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=44, max_hp=44, ac=14, attack_bonus=6, damage_dice="2d6+3",
+        damage_type="fire",
+        resists=["fire","physical"],
+        vulnerable_to=["cold","electric"],
+        floor_min=5, floor_max=8,
+    ),
+
+    # ── STACJA ORBITAL-7 (F3-8) ───────────────────────────────────────
+    "technik_sluzy": dict(
+        name_key="ent_technik_sluzy_n",
+        fallback_name="Technik Śluzy",
+        desc_key="ent_technik_sluzy_d",
+        fallback_desc="Kombinezon ciśnieniowy, hełm bez przyłbicy. "
+                      "Nieduży klucz dynamometryczny w ręce. Z paska "
+                      "zwisa karta dostępu, wciąż zalaminowana w nic.",
+        tags=["monster","humanoid","orbital","corporate","floor_min:3"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=14, max_hp=14, ac=13, attack_bonus=4, damage_dice="1d6+1",
+        damage_type="physical",
+        immune_to=["poison"],
+        vulnerable_to=["electric"],
+        floor_min=3, floor_max=8,
+    ),
+    "drono_sprzatacz": dict(
+        name_key="ent_drono_sprzatacz_n",
+        fallback_name="Dron Sprzątający",
+        desc_key="ent_drono_sprzatacz_d",
+        fallback_desc="Kulisty, ze szczotkami zamiast kół, świeci "
+                      "lampką ostrzegawczą o niewłaściwej porze. "
+                      "Wycieczki edukacyjne dawno skończone — drona "
+                      "tego nikt nie odwołał.",
+        tags=["monster","construct","orbital","floor_min:3"],
+        affordances=["inspect","attack","sneak"],
+        hp=12, max_hp=12, ac=14, attack_bonus=3, damage_dice="1d4+1",
+        damage_type="electric",
+        immune_to=["poison"],
+        resists=["physical"],
+        vulnerable_to=["acid","fire"],
+        floor_min=3, floor_max=8,
+    ),
+    "pasazer_zaginiony": dict(
+        name_key="ent_pasazer_zaginiony_n",
+        fallback_name="Zaginiony Pasażer",
+        desc_key="ent_pasazer_zaginiony_d",
+        fallback_desc="Skafander turystyczny rozdarty na łokciu. "
+                      "Plakietka „WITAM — STACJA ORBITAL-7”. Próbuje "
+                      "podać ci ulotkę. Ulotka mokra.",
+        tags=["monster","undead","orbital","grappler","floor_min:3"],
+        affordances=["inspect","attack","talk"],
+        hp=15, max_hp=15, ac=11, attack_bonus=3, damage_dice="1d6+2",
+        damage_type="physical",
+        resists=["cold","physical"],
+        vulnerable_to=["fire","electric"],
+        floor_min=3, floor_max=8,
+    ),
+    "miniboss_kapitan_doku": dict(
+        name_key="ent_miniboss_kapitan_doku_n",
+        fallback_name="Kapitan Doku",
+        desc_key="ent_miniboss_kapitan_doku_d",
+        fallback_desc="Mundur galowy z odznakami z sezonów, których "
+                      "nie było. Pas z bronią ciśnieniową. Z hełmu "
+                      "wycieka coś, co kiedyś było powietrzem.",
+        tags=["monster","humanoid","orbital","miniboss","armored",
+              "floor_min:4"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=28, max_hp=28, ac=15, attack_bonus=5, damage_dice="2d6+1",
+        damage_type="cold",
+        resists=["cold","poison"],
+        vulnerable_to=["fire","electric"],
+        floor_min=4, floor_max=8,
+    ),
+    "boss_komandor_proznii": dict(
+        name_key="ent_boss_komandor_proznii_n",
+        fallback_name="Komandor Próżni",
+        desc_key="ent_boss_komandor_proznii_d",
+        fallback_desc="Kombinezon ciśnieniowy bez przyłbicy. Twarz "
+                      "tam jest, ale nie do końca. Trzyma dziennik "
+                      "stacji jak miecz. Każda strona to nazwisko "
+                      "kogoś, kto poszedł na spacer.",
+        tags=["monster","humanoid","orbital","floor_boss","boss",
+              "floor_min:5"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=42, max_hp=42, ac=14, attack_bonus=6, damage_dice="2d8+2",
+        damage_type="cold",
+        resists=["cold","physical","poison"],
+        vulnerable_to=["fire","electric"],
+        floor_min=5, floor_max=8,
+    ),
+
+    # ── KUŹNIA PÓŁORKÓW (F3-8) ────────────────────────────────────────
+    "podkowiarz_polork": dict(
+        name_key="ent_podkowiarz_polork_n",
+        fallback_name="Podkowiarz Półorków",
+        desc_key="ent_podkowiarz_polork_d",
+        fallback_desc="Przepasany skórą bydlęcą, młot w jednej dłoni, "
+                      "rozpalona podkowa w drugiej. Cech wymaga "
+                      "trzymania ognia w ręce — żeby pamiętać, "
+                      "kto tu rządzi.",
+        tags=["monster","humanoid","forge","floor_min:3"],
+        affordances=["inspect","attack","intimidate"],
+        hp=15, max_hp=15, ac=12, attack_bonus=4, damage_dice="1d8+2",
+        damage_type="fire",
+        resists=["fire","physical"],
+        vulnerable_to=["cold","acid"],
+        floor_min=3, floor_max=8,
+    ),
+    "wegielnik_kuzni": dict(
+        name_key="ent_wegielnik_kuzni_n",
+        fallback_name="Węgielnik",
+        desc_key="ent_wegielnik_kuzni_d",
+        fallback_desc="Cały w sadzy, oczy świecą czerwono. Niesie wór "
+                      "rozżarzonego węgla na plecach. Wystarczy "
+                      "rzucić — wór zrobi resztę.",
+        tags=["monster","humanoid","forge","ranged","floor_min:3"],
+        affordances=["inspect","attack","throw_at"],
+        hp=11, max_hp=11, ac=11, attack_bonus=3, damage_dice="1d6+1",
+        damage_type="fire",
+        resists=["fire"],
+        vulnerable_to=["cold","electric"],
+        floor_min=3, floor_max=8,
+    ),
+    "mlociarz_cechowy": dict(
+        name_key="ent_mlociarz_cechowy_n",
+        fallback_name="Młociarz Cechowy",
+        desc_key="ent_mlociarz_cechowy_d",
+        fallback_desc="Półork o kowalskich ramionach. Młot dwuręczny, "
+                      "fartuch z opaską cechu. Każde uderzenie liczone "
+                      "w rejestrze — sponsor zalicza za hałas.",
+        tags=["monster","humanoid","forge","floor_min:3"],
+        affordances=["inspect","attack","intimidate"],
+        hp=17, max_hp=17, ac=12, attack_bonus=5, damage_dice="2d4+2",
+        damage_type="physical",
+        resists=["physical"],
+        vulnerable_to=["electric","cold"],
+        floor_min=3, floor_max=8,
+    ),
+    "miniboss_majster_cechu": dict(
+        name_key="ent_miniboss_majster_cechu_n",
+        fallback_name="Majster Cechu",
+        desc_key="ent_miniboss_majster_cechu_d",
+        fallback_desc="Najstarszy półork w kuźni. Skóra spalona od "
+                      "iskier do koloru żelaza. Pierścień cechowy "
+                      "wrośnięty w palec. Każdy nowy uczeń pyta go "
+                      "o radę. Każdy potem milczy.",
+        tags=["monster","humanoid","forge","miniboss","armored",
+              "floor_min:4"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=32, max_hp=32, ac=15, attack_bonus=5, damage_dice="2d6+3",
+        damage_type="physical",
+        resists=["fire","physical"],
+        vulnerable_to=["cold","acid"],
+        floor_min=4, floor_max=8,
+    ),
+    "boss_starszy_cechu": dict(
+        name_key="ent_boss_starszy_cechu_n",
+        fallback_name="Starszy Cechu",
+        desc_key="ent_boss_starszy_cechu_d",
+        fallback_desc="Półork z brodą wplecioną w opaskę cechową. "
+                      "Trzy młoty u pasa, jeden cięższy od ciebie. "
+                      "Pamięta każde nazwisko ucznia, który "
+                      "nie dokończył terminowania.",
+        tags=["monster","humanoid","forge","floor_boss","boss",
+              "floor_min:5"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=46, max_hp=46, ac=15, attack_bonus=6, damage_dice="2d8+3",
+        damage_type="physical",
+        resists=["fire","physical"],
+        vulnerable_to=["cold","electric"],
+        floor_min=5, floor_max=8,
+    ),
+
+    # ── BIBLIOTEKA MIEJSKA (F3-8) ─────────────────────────────────────
+    "bibliotekarz_zlowieszczy": dict(
+        name_key="ent_bibliotekarz_zlowieszczy_n",
+        fallback_name="Złowieszczy Bibliotekarz",
+        desc_key="ent_bibliotekarz_zlowieszczy_d",
+        fallback_desc="Sweter zapinany pod brodę, okulary w cienkiej "
+                      "oprawce. Mówi szeptem, który niesie się "
+                      "wszędzie. Stempel „PRZETERMINOWANE” trzyma "
+                      "jak nóż.",
+        tags=["monster","humanoid","library","caster","floor_min:3"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=12, max_hp=12, ac=11, attack_bonus=3, damage_dice="1d6+1",
+        damage_type="psychic",
+        resists=["psychic"],
+        vulnerable_to=["fire","physical"],
+        floor_min=3, floor_max=8,
+    ),
+    "czytelnik_zaginiony": dict(
+        name_key="ent_czytelnik_zaginiony_n",
+        fallback_name="Zaginiony Czytelnik",
+        desc_key="ent_czytelnik_zaginiony_d",
+        fallback_desc="Książka wrosła mu w dłonie. Strona, którą "
+                      "czyta, jest pusta, ale on jej nie kończy. "
+                      "Ubranie z innej dekady. Spojrzenie z innej "
+                      "publikacji.",
+        tags=["monster","undead","library","floor_min:3"],
+        affordances=["inspect","attack"],
+        hp=14, max_hp=14, ac=10, attack_bonus=3, damage_dice="1d6+1",
+        damage_type="physical",
+        resists=["cold","physical"],
+        vulnerable_to=["fire","electric"],
+        floor_min=3, floor_max=8,
+    ),
+    "indeksowy_robak": dict(
+        name_key="ent_indeksowy_robak_n",
+        fallback_name="Indeksowy Robak",
+        desc_key="ent_indeksowy_robak_d",
+        fallback_desc="Robak z papierowymi skrzydłami. Wyjada strony "
+                      "od indeksu w głąb. Tam, gdzie przeszedł, "
+                      "książka ma puste rozdziały. I puste lata.",
+        tags=["monster","beast","library","small","floor_min:3"],
+        affordances=["inspect","attack","sneak"],
+        hp=7, max_hp=7, ac=14, attack_bonus=3, damage_dice="1d4",
+        damage_type="acid",
+        vulnerable_to=["fire","cold"],
+        floor_min=3, floor_max=8,
+    ),
+    "miniboss_archiwista_zakazany": dict(
+        name_key="ent_miniboss_archiwista_zakazany_n",
+        fallback_name="Archiwista Zakazany",
+        desc_key="ent_miniboss_archiwista_zakazany_d",
+        fallback_desc="Fartuch laboratoryjny, rękawiczki bawełniane. "
+                      "Klucz do magazynu „T” na łańcuszku. Wie, "
+                      "którą książką cię zabić — i którą trzeba ci "
+                      "pokazać, żebyś sam się zabił.",
+        tags=["monster","humanoid","library","miniboss","caster",
+              "floor_min:4"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=27, max_hp=27, ac=12, attack_bonus=4, damage_dice="2d6+1",
+        damage_type="psychic",
+        resists=["psychic","cold"],
+        vulnerable_to=["fire","physical"],
+        floor_min=4, floor_max=8,
+    ),
+    "boss_konserwator_zbiorow": dict(
+        name_key="ent_boss_konserwator_zbiorow_n",
+        fallback_name="Konserwator Zbiorów Specjalnych",
+        desc_key="ent_boss_konserwator_zbiorow_d",
+        fallback_desc="Trzy pary okularów, każda na innym dystansie. "
+                      "Klucze do magazynu „T”, „OS” i tego, którego "
+                      "nazwa się nie czyta. Mówi cytatami. "
+                      "Cudzymi.",
+        tags=["monster","humanoid","library","floor_boss","boss",
+              "caster","floor_min:5"],
+        affordances=["inspect","attack","talk","intimidate"],
+        hp=40, max_hp=40, ac=13, attack_bonus=6, damage_dice="2d8+2",
+        damage_type="psychic",
+        resists=["psychic","cold","physical"],
+        vulnerable_to=["fire","acid"],
+        floor_min=5, floor_max=8,
+    ),
 }
 
 

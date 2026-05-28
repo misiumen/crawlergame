@@ -164,6 +164,24 @@ MATERIALS: Dict[str, MaterialDef] = {m.key: m for m in [
     # ── Biome-locked: intake_industrial (F1 boss biome) ──
     _m("intake_rebar",     "intake'owy zbrojeniowy","intake rebar",("metal","heavy","handle","biome:intake_industrial"),                "common"),
     _m("industrial_grease","przemysłowy smar",  "industrial grease",("chemical","slick","flammable","liquid","biome:intake_industrial"),"common"),
+
+    # ── P29.42c — Biome-locked: 4 nowe biomy Tier-1 ──
+    # fabryka_pary / Sterling-9
+    _m("boiler_scale",     "kotłowa kamień",    "boiler scale",    ("ceramic","heavy","biome:fabryka_pary"),                            "common"),
+    _m("pressure_valve",   "zawór ciśnieniowy", "pressure valve",  ("metal","valve","biome:fabryka_pary"),                              "uncommon"),
+    _m("furnace_coal",     "węgiel kotłowy",    "furnace coal",    ("organic","flammable","fuel","biome:fabryka_pary"),                 "common"),
+    # stacja_orbital / Orbital-7
+    _m("pressure_seal",    "uszczelka ciśnienia","pressure seal",  ("rubber","binding","biome:stacja_orbital"),                         "common"),
+    _m("nav_chip",         "chip nawigacyjny",  "nav chip",        ("electronic","data","biome:stacja_orbital"),                        "uncommon"),
+    _m("cargo_strap",      "pas transportowy",  "cargo strap",     ("cloth","binding","heavy","biome:stacja_orbital"),                  "common"),
+    # kuznia_polorkow
+    _m("guild_iron",       "żelazo cechowe",    "guild iron",      ("metal","heavy","biome:kuznia_polorkow"),                           "uncommon"),
+    _m("polork_charcoal",  "półorkowy węgiel",  "polork charcoal", ("organic","flammable","fuel","biome:kuznia_polorkow"),              "common"),
+    _m("anvil_chip",       "odłamek kowadła",   "anvil chip",      ("metal","sharp","heavy","biome:kuznia_polorkow"),                   "common"),
+    # biblioteka_miejska
+    _m("forbidden_page",   "zakazana strona",   "forbidden page",  ("paper","data","weird","biome:biblioteka_miejska"),                 "uncommon"),
+    _m("library_seal",     "biblioteczna pieczęć","library seal",  ("wax","data","biome:biblioteka_miejska"),                           "common"),
+    _m("indexer_thread",   "indeksowa nić",     "indexer thread",  ("cloth","binding","biome:biblioteka_miejska"),                      "common"),
 ]}
 
 

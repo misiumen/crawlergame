@@ -146,10 +146,16 @@ def test_generator_assigns_biome_when_available():
     _rh.reset()
     w = WorldState()
     w.character = Character(name="t", background="janitor")
-    # F3 — w puli są zoo/museum/bar.
+    # F3 — w puli są wszystkie enabled biomy z floor_min<=3
+    # (zoo/museum/bar/trenches + P29.42c: fabryka_pary, stacja_orbital,
+    # kuznia_polorkow, biblioteka_miejska).
     f = generate_floor(w, floor_number=3, seed=7)
-    assert f.biome_key in ("zoo_korporacyjne", "muzeum_spektakli",
-                            "bar_skurczybyk")
+    from ..content.data.floor_biomes import available_biomes
+    valid_keys = {b.key for b in available_biomes(3, w)}
+    # Sanity: powinien mieć kilka opcji
+    assert len(valid_keys) >= 3, f"za mało biomów dla F3: {valid_keys}"
+    assert f.biome_key in valid_keys, (
+        f"biome {f.biome_key!r} nie z puli {valid_keys}")
     assert f.title_fallback.startswith("Piętro 3 — ")
     print(f"  generator F3 -> biome={f.biome_key} "
           f"title='{f.title_fallback}': OK")

@@ -418,6 +418,39 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         w_tags=["weapon", "ranged", "blunt", "one_handed"],
         rarity="uncommon", biome="intake_industrial"),
 
+    # P29.42c — biome-locked recipes dla 4 nowych biomów Tier-1.
+    _weapon("crafted_pipe_wrench_hammer", "klucz palacza",
+        "Klucz nasadowy + ołowiana nakładka + olej smarowniczy. "
+        "Cięży jak zmiana, parzy jak premia.",
+        tier=4, tags=[("metal", 2), ("heavy", 1), ("biome:fabryka_pary", 1)],
+        dice="1d8", dmg_type="fire",
+        w_tags=["weapon", "blunt", "melee", "two_handed"], rarity="rare",
+        biome="fabryka_pary", discipline="electronics"),
+
+    _weapon("crafted_pressure_lance", "lanca ciśnieniowa",
+        "Rura ciśnieniowa + zawór + spust. Wyrzuca powietrze szybciej "
+        "niż próżnia chce je z powrotem.",
+        tier=4, tags=[("metal", 1), ("electrical", 1), ("biome:stacja_orbital", 1)],
+        dice="1d6+2", dmg_type="cold",
+        w_tags=["weapon", "ranged", "one_handed"], rarity="rare",
+        biome="stacja_orbital", discipline="electronics"),
+
+    _weapon("crafted_guild_hammer", "młot cechowy",
+        "Drewniana rękojeść + obuch kuty na trzech kowadłach + "
+        "opaska z pieczęcią cechu. Bije rytmicznie.",
+        tier=4, tags=[("metal", 2), ("handle", 1), ("biome:kuznia_polorkow", 1)],
+        dice="2d6", dmg_type="physical",
+        w_tags=["weapon", "blunt", "melee", "two_handed"], rarity="rare",
+        biome="kuznia_polorkow"),
+
+    _weapon("crafted_marginalia_dagger", "marginalny sztylet",
+        "Oprawa książki + zaostrzony grzbiet + pasek ze skóry. "
+        "Tnie zdania, czasem zdaniem.",
+        tier=3, tags=[("paper", 1), ("sharp", 1), ("biome:biblioteka_miejska", 1)],
+        dice="1d4+1", dmg_type="psychic",
+        w_tags=["weapon", "sharp", "melee", "one_handed"], rarity="uncommon",
+        biome="biblioteka_miejska", discipline="bio"),
+
     # ── TRAPS (12) ────────────────────────────────────────────────────
 
     _trap("trap_acid_pit", "fosa kwasu",

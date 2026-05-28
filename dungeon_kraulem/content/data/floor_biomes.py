@@ -120,7 +120,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         room_tag="steampunk_factory",
         sponsor_likes={"kult_recyklingu": 1},
         weight=2,
-        enabled=False,
+        # P29.42c — aktywowany: 5 pokoi + 5 mobów.
     ),
 
     "stacja_orbital": FloorBiome(
@@ -132,7 +132,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         room_tag="orbital",
         sponsor_likes={"novachem_biotech": 1, "bog_polimerow": 1},
         weight=2,
-        enabled=False,
+        # P29.42c — aktywowany: 5 pokoi + 5 mobów.
     ),
 
     "kuznia_polorkow": FloorBiome(
@@ -144,7 +144,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         room_tag="forge",
         sponsor_likes={"bractwo_komornika": 1},
         weight=2,
-        enabled=False,
+        # P29.42c — aktywowany: 5 pokoi + 5 mobów.
     ),
 
     "biblioteka_miejska": FloorBiome(
@@ -156,7 +156,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         room_tag="library",
         sponsor_likes={"ministerstwo_pamieci": 1},
         weight=2,
-        enabled=False,
+        # P29.42c — aktywowany: 5 pokoi + 5 mobów.
     ),
 
     # ── Tier 2 — F3-8, meta unlocks ─────────────────────────────────
