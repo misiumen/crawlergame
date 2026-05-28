@@ -105,20 +105,22 @@ def test_display_name_gated_by_state():
 # ── sprawdź handler ──────────────────────────────────────────────────────
 
 def test_sprawdz_walks_state_machine():
+    """P29.47 — dwustopniowy state machine został spłaszczony do
+    jednego kroku. Pierwsza sprawdź daje pełną kartę od razu
+    (unknown → inspected). Druga już tylko re-printuje."""
     from ..engine.game import Game
     w, r = _mk_world()
     m = _add_monster(w, r, key="thug", hp=80)
     g = Game(screen=None); g.world = w; g.state = "play"
-    # Set the entity to be "Bandzior" so sprawdź can find it.
     m.fallback_name = "Bandzior"
-    # First sprawdź: unknown → seen.
+    # Single sprawdź: unknown → inspected (pełna karta od razu).
     g.submit_generated_command("sprawdź Bandzior")
-    assert _vis.get_state(m) == _vis.STATE_SEEN, \
-        f"first sprawdź should promote to seen; got {_vis.get_state(m)}"
-    # Second sprawdź: seen → inspected.
+    assert _vis.get_state(m) == _vis.STATE_INSPECTED, \
+        f"sprawdź powinno od razu dać inspected; got {_vis.get_state(m)}"
+    # Druga sprawdź: nadal inspected, no change.
     g.submit_generated_command("sprawdź Bandzior")
     assert _vis.get_state(m) == _vis.STATE_INSPECTED
-    print("  sprawdź walks unknown→seen→inspected: OK")
+    print("  sprawdź unknown→inspected w jednym kroku: OK")
 
 
 def test_sprawdz_costs_a_turn():

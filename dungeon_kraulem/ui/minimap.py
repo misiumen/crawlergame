@@ -415,13 +415,11 @@ def draw_minimap(surf, world, rect, layout, *,
                     pygame.draw.line(surf, BORDER,
                                      (cx_mid, cy + cell),
                                      (cx_mid, cy + cell + 2), 1)
-                elif (dx, dy) != (0, 0) and (abs(dx) + abs(dy)) <= 3:
-                    # Non-cardinal link — render as a short dim line
-                    # between cell centers. Only adjacent-ish (Manhattan
-                    # ≤3) to avoid criss-crossing the whole map.
-                    pygame.draw.line(surf, DIM_TEXT,
-                                     (cx_mid, cy_mid),
-                                     (tcx_mid, tcy_mid), 1)
+                # P29.47 — usunięte długie diagonalne łączniki między
+                # cell-centrami. Po dodaniu więcej pokoi w piętrze
+                # krzyż-krzyż linii zamulał minimapę. Cardinal nuby
+                # wystarczą żeby pokazać sąsiedztwo; non-cardinal
+                # exity i tak wymagają polecenia idź do <pokój>.
         # Click zone. Default: toggle a player-placed mark. When
         # `on_room_click` is given, defer the decision to the caller —
         # they may choose to move (adjacent + unlocked), preview a

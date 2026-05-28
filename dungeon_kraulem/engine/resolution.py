@@ -311,9 +311,16 @@ def _effects_for_level(level, aff_key, validation, world):
             #   * +5 audience (people like watching a hack)
             already_hacked = bool((primary.state or {}).get("hacked"))
             if already_hacked:
-                # Re-hacking a known-cracked terminal is a no-op — no
-                # double-dip, no spam.
+                # Re-hacking a known-cracked terminal: nadal coś daje,
+                # ale gracz dostaje jasny komunikat że już tu był.
                 effects.append({"type":"add_affinity","kind":"tech","amount":1})
+                effects.append({"type":"log_line",
+                                "category":"hack_already",
+                                "fallback": (
+                                    f"„{primary.display_name()}” już "
+                                    f"jest złamany. Sprawdzasz logi: "
+                                    f"twój własny ślad sprzed minuty. "
+                                    f"(+1 do tech.)")})
             else:
                 effects.append({"type":"change_object_state",
                                 "entity_id": primary.entity_id,
@@ -324,17 +331,17 @@ def _effects_for_level(level, aff_key, validation, world):
                 effects.append({"type":"sponsor_tag","tag":"tech_kill","weight":1})
                 effects.append({"type":"add_audience","amount":5,
                                 "source":"hack","tag":"tech_kill"})
-                # P28.5 — narrator line so the player SEES that the hack
-                # paid off. Goes through `log_line` consequence; falls
-                # back to a stock string when no template matches.
+                # P29.47 — konkretny feedback. Wcześniejszy „kilka
+                # kredytów" zostawiał gracza bez pojęcia ile dostał
+                # i co to zmienia. Teraz cyfry są na talerzu.
                 effects.append({"type":"log_line",
                                 "category":"hack_success",
                                 "fallback": (
-                                    f"„{primary.display_name()}” otwiera "
-                                    f"się z cichym pyknięciem. Skanujesz "
-                                    f"port serwisowy: kilka kredytów "
-                                    f"wpada na twoje konto, a sąsiednie "
-                                    f"drzwi klikają w stronę 'otwarte'.")})
+                                    f"„{primary.display_name()}” pęka "
+                                    f"z cichym pyknięciem. Z portu "
+                                    f"serwisowego skradzione +8 kr. "
+                                    f"Widownia: +5. Sąsiednie drzwi "
+                                    f"klikają w stronę „otwarte”.")})
         elif aff_key == "force" and primary is not None:
             effects.append({"type":"change_object_state","entity_id":primary.entity_id,
                             "state_update":{"broken_open":True}})

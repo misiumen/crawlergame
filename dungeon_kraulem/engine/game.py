@@ -2477,36 +2477,25 @@ class Game:
         # Successful validation also consumes the preresolved hint.
         self._preresolved_target_id = None
 
-        # P29.5 — `sprawdź X` is now a state-driven scout action with
-        # real mechanical cost (1 turn + noise bump). State machine:
-        #   unknown → seen  (partial info: shape + "look closer")
-        #   seen    → inspected (full stats card)
-        #   inspected → re-print, no state change
+        # P29.47 — `sprawdź X` daje pełną kartę OD RAZU. Dwustopniowy
+        # state machine (unknown → seen → inspected) okazał się bloat:
+        # gracz musiał wydać DWIE akcje żeby zobaczyć co to za skrzynia.
+        # Teraz pierwsza sprawdź już ujawnia wszystko.
         if intent.intent == "inspect" and v.matched_entities:
             ent = v.matched_entities[0]
             from . import visibility as _vis
-            # P29.12 — tutorial: explain the fog-of-war state machine
-            # the first time a player issues sprawdź.
             try:
                 from . import tutorial as _tut
                 _tut.try_show_tip(self.world, "fog_of_war")
             except Exception:
                 pass
-            state = _vis.get_state(ent)
-            if state == _vis.STATE_UNKNOWN:
-                _vis.mark_seen(ent)
-                shape = _vis.shape_for_unknown(ent)
-                self.log(f"Przyglądasz się. {shape.capitalize()} — "
-                         f"„{ent.display_name()}”. (następna sprawdź ujawni szczegóły)",
-                         LOG_NORMAL)
-            else:
-                # seen or inspected → emit full card and (if seen) promote
-                lines = _vis.build_inspect_block(self.world, ent)
-                _vis.mark_inspected(self.world, ent)
-                for ln in lines:
-                    self.log(ln, LOG_NORMAL)
-            # Time cost + noise — scouting takes a turn and slightly
-            # rouses the room (you're moving / poking).
+            # Promuj od razu seen → inspected (lub unknown → inspected
+            # w jednym kroku). build_inspect_block daje pełną kartę.
+            _vis.mark_inspected(self.world, ent)
+            lines = _vis.build_inspect_block(self.world, ent)
+            for ln in lines:
+                self.log(ln, LOG_NORMAL)
+            # Time cost + noise — scouting wciąż kosztuje turę.
             try:
                 if time_system is not None:
                     time_system.advance(self.world, 1)

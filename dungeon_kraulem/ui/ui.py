@@ -745,19 +745,11 @@ def draw_topbar(surf, world, layout=None, *, click_registry=None):
     # surfaces via entity threat_level on the combat arena cards
     # instead. See engine/threat.py.
 
-    # P29.30 — achievement count chip. Tiny "🏆 N/M" badge on the
-    # left of the topbar so the player sees their progress without
-    # opening the journal.
-    try:
-        from ..systems import achievements as _ach
-        cat = _ach.catalog()
-        unlocked = _ach.count_unlocked(world)
-        if cat:
-            badge = f"Osiągnięcia: {unlocked}/{len(cat)}"
-            b_img = font(L.font_small - 2).render(badge, True, SUCCESS)
-            surf.blit(b_img, (x + 16, y + 36))
-    except Exception:
-        pass
+    # P29.47 — usunięty „Osiągnięcia N/M" badge z top-baru. Wcześniej
+    # rysowany na (x+16, y+36) — dokładnie tam gdzie sponsor banner
+    # (x+12, y+32). Po 20 refaktoringach nadal kolidował. Teraz
+    # achievement count widać tylko w journal → Osiągnięcia (i tak
+    # gracz tam wchodzi sprawdzić co odblokował).
 
 
 def draw_room_panel(surf, world, layout=None, *, click_registry=None):
