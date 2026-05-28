@@ -946,6 +946,19 @@ def _place_encounters(f: FloorState, rng: random.Random, world=None):
                 for tg in (m.get("target_tags") or []):
                     belief_tags.add(tg)
 
+        # P29.42a-fix — hard gate biomu na encounters. Jeśli piętro
+        # ma wybrany biom, encounter musi mieć w tags `biome.room_tag`
+        # ALBO być neutralny (zero biome-tagów). Bez tego żołnierz
+        # WWI mógłby z niską wagą wpaść do biomu Zoo (i odwrotnie).
+        floor_biome_tag = None
+        if f.biome_key:
+            try:
+                from ..content.data.floor_biomes import get_biome
+                _b = get_biome(f.biome_key)
+                floor_biome_tag = _b.room_tag if _b is not None else None
+            except Exception:
+                pass
+
         scored = []
         for key, etmpl in pool.items():
             if etmpl.get("floor_min", 1) > f.floor_number:
@@ -957,6 +970,11 @@ def _place_encounters(f: FloorState, rng: random.Random, world=None):
             if fmax is not None and fmax < f.floor_number:
                 continue
             etags = set(etmpl.get("tags", []))
+            # P29.42a-fix — wyklucz encounter z OBCYM biomem.
+            if floor_biome_tag is not None:
+                conflicts = etags & _ALL_BIOME_TAGS
+                if conflicts and floor_biome_tag not in conflicts:
+                    continue
             overlap_obj    = len(etags & obj_tags)
             overlap_room   = len(etags & room_tags)
             overlap_belief = len(etags & belief_tags)

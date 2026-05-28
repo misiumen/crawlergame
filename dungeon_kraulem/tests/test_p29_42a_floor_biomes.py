@@ -187,6 +187,44 @@ def test_generator_floor_without_biome_pool_fallbacks_silently():
 
 # ── Pokoje pasują do biomu ──────────────────────────────────────────
 
+def test_encounter_filter_excludes_other_biomes():
+    """P29.42a-fix — pokój z biomem ZOO nie powinien dostać encountera
+    oznaczonego tagiem innego biomu (museum / bar / neighborhood).
+    Pokój może dostać encounter ZOO-tagged ALBO neutralny."""
+    from ..engine.floor_generator import generate_floor
+    from ..engine.world import WorldState
+    from ..engine.character import Character
+    from ..content.data.floor_biomes import FLOOR_BIOMES
+    OTHER_BIOME_TAGS = {b.room_tag for b in FLOOR_BIOMES.values()
+                       if b.room_tag and b.room_tag != "zoo"}
+    # Złap seed na ZOO.
+    f = None
+    for seed in range(1, 80):
+        w = WorldState()
+        w.character = Character(name="t", background="janitor")
+        f = generate_floor(w, floor_number=4, seed=seed)
+        if f.biome_key == "zoo_korporacyjne":
+            break
+    else:
+        raise AssertionError("nie znaleziono seedu z biome=ZOO")
+
+    # Sprawdź mobery we wszystkich pokojach: żaden tag nie może
+    # przynależeć do INNEGO biomu.
+    from ..content.data.entity_templates import MON
+    leaked = []
+    for r in f.rooms.values():
+        for ent in r.entities:
+            if ent.entity_type != "monster":
+                continue
+            mob_tpl = MON.get(ent.key, {})
+            mob_tags = set(mob_tpl.get("tags") or [])
+            conflicts = mob_tags & OTHER_BIOME_TAGS
+            if conflicts:
+                leaked.append((ent.key, conflicts))
+    assert not leaked, f"obcy biome leak na piętrze ZOO: {leaked}"
+    print(f"  F4-biome-ZOO: zero obcych moberów: OK")
+
+
 def test_generated_rooms_match_biome():
     """Pokoje wygenerowane na piętrze z biomem ZOO mają tag „zoo"
     LUB są neutralne (bez żadnego biome tagu)."""
@@ -264,6 +302,7 @@ def main():
         test_generator_different_biomes_across_seeds()
         test_generator_floor_without_biome_pool_fallbacks_silently()
         test_generated_rooms_match_biome()
+        test_encounter_filter_excludes_other_biomes()
         test_meta_progression_has_biome_unlocks()
         test_unlocked_biomes_helper()
     finally:
