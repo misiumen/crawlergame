@@ -130,7 +130,7 @@ ROOM_POOL = [
         "actual_type": "safehouse",
         "tags": ["safe", "safehouse", "trade", "contraband", "objective_path"],
         "safehouse_subtype": "black_market",
-        "name_pool": ["Bez Paragonu", "Gwarancja Martwa",
+        "name_pool": ["Bez Paragonu", "Spod Lady",
                       "Rynek Pod Zlewem", "Legalnie Prawie"],
         "first_enter_pool": [
             "Czarny rynek mieści się tam, gdzie mapa pokazuje ścianę. To dobry znak albo "

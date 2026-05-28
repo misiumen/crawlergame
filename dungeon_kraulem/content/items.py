@@ -92,6 +92,13 @@ ITEM_TEMPLATES = {
     "snack_bar":       dict(tags=["food","consumable"], portable=True,
                             affordances=["inspect","use","loot"],
                             rarity="common"),
+    # P29.59 — credits_pile był spawnowany przez room_pool jako
+    # entity_seed, ale brak template'u → display fallback do
+    # 'credits pile' (English). Polski fallback_name w
+    # content/data/item_templates.py.
+    "credits_pile":    dict(tags=["currency","loot"], portable=True,
+                            affordances=["inspect","pick_up","loot"],
+                            rarity="common"),
     "plastic_badge":   dict(tags=["badge","disguise"], portable=True,
                             affordances=["inspect","loot","use"],
                             rarity="common"),

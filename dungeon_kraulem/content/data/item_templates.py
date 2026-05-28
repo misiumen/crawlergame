@@ -102,6 +102,32 @@ ITEM_TEMPLATES = {
         "affordances": ["inspect", "use", "loot"],
         "value": 2,
     },
+    "credits_pile": {
+        "type": "loot",
+        "tags": ["currency", "loot"],
+        "fallback_name": "garść kredytów",
+        "fallback_description": "Pomięte banknoty + parę monet, ściągnięte gumką. Niczyje, dopóki ktoś nie zacznie się dopytywać.",
+        "affordances": ["inspect", "pick_up", "loot"],
+        "value": 0,
+    },
+    # P29.59 — klucze poprawne PL ale bez diakrytyk → display brakowało
+    # akcentów. Dorzucamy fallback_name z pełnymi polskimi znakami.
+    "amulet_szczescia": {
+        "type": "trinket",
+        "tags": ["amulet", "charm"],
+        "fallback_name": "amulet szczęścia",
+        "fallback_description": "Zawieszka z czterolistnej koniczyny zalanej żywicą. Sponsor twierdzi, że działa. Statystyki nic nie potwierdzają.",
+        "affordances": ["inspect", "loot", "use"],
+        "value": 2,
+    },
+    "maska_filtrujaca": {
+        "type": "wearable",
+        "tags": ["slot:head", "filter", "trenches"],
+        "fallback_name": "maska filtrująca",
+        "fallback_description": "Wojskowy filtr okopowy. Pasy ściskają policzki za mocno. Powietrze pachnie gumą i wczorajszą próbą.",
+        "affordances": ["inspect", "loot", "wear"],
+        "value": 4,
+    },
     "broken_camera_lens": {
         "type": "oddity",
         "tags": ["junk", "glass", "sponsor"],

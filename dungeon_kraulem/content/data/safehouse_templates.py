@@ -87,7 +87,7 @@ SAFEHOUSE_TEMPLATES = {
         "risks": ["overpriced","fake_goods","tracked_by_sponsor"],
         "rewards": ["contraband","keycard","rumor","illegal_goods"],
         "possible_clue_sources": ["npc_dialogue","corpse_note"],
-        "name_pool": ["Bez Paragonu", "Gwarancja Martwa", "Rynek Pod Zlewem", "Legalnie Prawie"],
+        "name_pool": ["Bez Paragonu", "Spod Lady", "Rynek Pod Zlewem", "Legalnie Prawie"],
         "entry_descriptions": [
             "Czarny rynek mieści się tam, gdzie mapa pokazuje ścianę. To dobry znak albo bardzo zły, zależnie od twojego budżetu.",
             "Na ladzie leżą rzeczy, które ktoś zgubił, sprzedał albo nadal próbuje odzyskać z zaświatów."
