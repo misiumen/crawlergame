@@ -2644,6 +2644,11 @@ class Game:
             from ..systems import achievements as _ach
             if cur_num == 1:
                 _ach.unlock(ch, "dno_jeszcze_dalej", world=self.world)
+                # P29.48 — pacifist F1: kills licznik = 0 przy zejściu.
+                # Brak ciał, brak problemu (sponsorzy pamiętają).
+                if int(ch.run_kills or 0) == 0:
+                    _ach.unlock(ch, "brak_zwlok_brak_problemu",
+                                world=self.world)
             if next_num >= 5:
                 _ach.unlock(ch, "piaty_set", world=self.world)
             if next_num >= 10:
@@ -5044,6 +5049,21 @@ class Game:
         cs.player_defend = max(cs.player_defend, 3)
         self.log(t("feedback_combat_defend",
                    fallback="Bronisz się. Kolejny cios zaboli mniej."), LOG_SUCCESS)
+        # P29.48 — track consecutive defends dla osiągnięcia
+        # „reklama_przerywa_walke" (5 rund obrony pod rząd).
+        prior = cs.last_action if hasattr(cs, "last_action") else ""
+        if prior == "defend":
+            cs.defend_streak = int(getattr(cs, "defend_streak", 0)) + 1
+        else:
+            cs.defend_streak = 1
+        if cs.defend_streak >= 5:
+            try:
+                from ..systems import achievements as _ach
+                _ach.unlock(self.world.character,
+                            "reklama_przerywa_walke",
+                            world=self.world)
+            except Exception:
+                pass
         cs.last_action = "defend"
         self._combat_after_player_action(cs)
 
