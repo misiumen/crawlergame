@@ -84,6 +84,10 @@ class JournalEntry:
     detail: str = ""          # extended description for the detail panel
     sort_key: Any = None
     raw_ref: Any = None
+    # P29.43 — opcjonalny kolor tytułu (RGB tuple). Ekwipunek wpina
+    # kolor rarity itemu. Renderer journala używa go zamiast domyślnego
+    # NORMAL_TEXT gdy ustawione. None = standardowy kolor.
+    title_color: Any = None
 
 
 @dataclass
@@ -520,13 +524,22 @@ def _collect_inventory(world) -> List[JournalEntry]:
             detail_lines.append("Można rozstawić. Przykład: rozstaw pułapkę przy drzwiach.")
         if "consumable" in tags or "medical" in tags:
             detail_lines.append("Przykład: użyj " + ent.display_name())
+        # P29.43 — rarity color + linia w detail. Item state.rarity
+        # ustawiony przez make_item (P29.43); fallback do common.
+        from ..engine import rarity as _rar
+        rarity = _rar.entity_rarity(ent)
+        color = _rar.rarity_color(rarity)
+        rarity_label = _rar.rarity_pl(rarity)
+        if rarity != _rar.RARITY_COMMON:
+            detail_lines.insert(0, f"Klasa: {rarity_label}")
         out.append(JournalEntry(
             title=ent.display_name(),
             subtitle=condition + ("  ·  [do rozstawienia]" if deployable else ""),
             status=condition,
             detail="\n".join(l for l in detail_lines if l),
-            sort_key=ent.display_name().lower(),
+            sort_key=(-_rar.rarity_order(rarity), ent.display_name().lower()),
             raw_ref=ent,
+            title_color=color,
         ))
     return out
 

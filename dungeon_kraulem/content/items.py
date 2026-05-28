@@ -1,52 +1,82 @@
-"""Item templates and helpers."""
+"""Item templates and helpers.
+
+P29.43 — Dodane pole `rarity` (common/uncommon/rare/epic/legendary).
+Domyślnie `common`. Powiązane: engine/rarity.py. Niektóre itemy mają
+też tagi biomów (zoo/forge/trenches/...) — generator lootu w
+biomowym piętrze będzie preferował items pasujące do biomu LUB
+neutralne (bez biome tagu).
+"""
 from ..engine.entity import Entity, T_ITEM
 
 
-# Each item template: key -> dict of kwargs for Entity construction
+# Each item template: key -> dict of kwargs for Entity construction.
+# Pola opcjonalne:
+#   rarity:  common|uncommon|rare|epic|legendary  (default: common)
+#   tags:    może zawierać tagi biomów (forge, trenches, zoo, ...)
 ITEM_TEMPLATES = {
     "cracked_mug":     dict(tags=["mug","throwable","fragile"], portable=True,
-                            affordances=["inspect","throw_at","loot"]),
+                            affordances=["inspect","throw_at","loot"],
+                            rarity="common"),
     "duct_tape":       dict(tags=["adhesive","craft_material"], portable=True,
-                            affordances=["inspect","use","loot"]),
+                            affordances=["inspect","use","loot"],
+                            rarity="common"),
     "cheap_knife":     dict(tags=["weapon","melee","sharp"], portable=True,
-                            affordances=["inspect","attack","loot"]),
+                            affordances=["inspect","attack","loot"],
+                            rarity="uncommon"),
     "dead_phone":      dict(tags=["electronics","junk"], portable=True,
-                            affordances=["inspect","loot"]),
+                            affordances=["inspect","loot"],
+                            rarity="common"),
     "snack_bar":       dict(tags=["food","consumable"], portable=True,
-                            affordances=["inspect","use","loot"]),
+                            affordances=["inspect","use","loot"],
+                            rarity="common"),
     "plastic_badge":   dict(tags=["badge","disguise"], portable=True,
-                            affordances=["inspect","loot","use"]),
+                            affordances=["inspect","loot","use"],
+                            rarity="common"),
     "dirty_bandage":   dict(tags=["medical","consumable"], portable=True,
-                            affordances=["inspect","use","loot"]),
+                            affordances=["inspect","use","loot"],
+                            rarity="common"),
     "flashlight":      dict(tags=["light","tool"], portable=True,
-                            affordances=["inspect","use","loot"]),
+                            affordances=["inspect","use","loot"],
+                            rarity="uncommon"),
     "broken_camera_lens": dict(tags=["junk","glass"], portable=True,
-                            affordances=["inspect","loot"]),
+                            affordances=["inspect","loot"],
+                            rarity="common"),
     "battery":         dict(tags=["electronics","craft_material"], portable=True,
-                            affordances=["inspect","loot","use"]),
+                            affordances=["inspect","loot","use"],
+                            rarity="common"),
     "coffee":          dict(tags=["food","consumable"], portable=True,
-                            affordances=["inspect","use","loot"]),
+                            affordances=["inspect","use","loot"],
+                            rarity="common"),
     "suspicious_keycard": dict(tags=["keycard","key"], portable=True,
-                            affordances=["inspect","loot","use"]),
+                            affordances=["inspect","loot","use"],
+                            rarity="uncommon"),
     "lockpick_set":    dict(tags=["lockpick","tool"], portable=True,
-                            affordances=["inspect","loot","use"]),
+                            affordances=["inspect","loot","use"],
+                            rarity="uncommon"),
     "improvised_lockpick": dict(tags=["lockpick","tool","junk"], portable=True,
-                            affordances=["inspect","loot","use"]),
+                            affordances=["inspect","loot","use"],
+                            rarity="common"),
     # P24.5 — map drops. Use-handler reveals adjacent unexplored rooms;
     # floor map reveals every room on the current floor.
     "map_fragment":    dict(tags=["map","paper","sponsor_loot"], portable=True,
-                            affordances=["inspect","use","loot"]),
-    "floor_map":       dict(tags=["map","paper","sponsor_loot","rare"], portable=True,
-                            affordances=["inspect","use","loot"]),
+                            affordances=["inspect","use","loot"],
+                            rarity="uncommon"),
+    "floor_map":       dict(tags=["map","paper","sponsor_loot"], portable=True,
+                            affordances=["inspect","use","loot"],
+                            rarity="rare"),
     # Misc trophies referenced by monster_salvage tables (P24).
     "warden_baton":     dict(tags=["weapon","melee","electric"], portable=True,
-                            affordances=["inspect","attack","loot"]),
+                            affordances=["inspect","attack","loot"],
+                            rarity="uncommon"),
     "cleaver_handle":   dict(tags=["weapon","melee","sharp","junk"], portable=True,
-                            affordances=["inspect","attack","loot"]),
+                            affordances=["inspect","attack","loot"],
+                            rarity="common"),
     "planszetka_inspektora": dict(tags=["paper","sponsor_loot","data"], portable=True,
-                            affordances=["inspect","loot","use"]),
+                            affordances=["inspect","loot","use"],
+                            rarity="uncommon"),
     "notes_windykatora": dict(tags=["paper","sponsor_loot","data"], portable=True,
-                            affordances=["inspect","loot","use"]),
+                            affordances=["inspect","loot","use"],
+                            rarity="uncommon"),
 
     # ── P25 — wearables. Each tagged with exactly ONE `slot:X`. The
     # `equip_state` field below is folded into `Entity.state` by
@@ -55,68 +85,86 @@ ITEM_TEMPLATES = {
     # HEAD (slot:head)
     "helm_konstrukcyjny": dict(tags=["slot:head","armor"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={"ac_bonus": 1}),
+                            equip_state={"ac_bonus": 1},
+                            rarity="uncommon"),
     "czapka_uszanka":     dict(tags=["slot:head","cloth"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={"equip_resists":["cold"]}),
-    "maska_filtrujaca":   dict(tags=["slot:head","filter"], portable=True,
+                            equip_state={"equip_resists":["cold"]},
+                            rarity="common"),
+    "maska_filtrujaca":   dict(tags=["slot:head","filter","trenches"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={"equip_resists":["poison"]}),
+                            equip_state={"equip_resists":["poison"]},
+                            rarity="rare"),
     "sponsor_kepi":       dict(tags=["slot:head","sponsor","badge"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
+                            equip_state={},
+                            rarity="common"),
 
     # TORSO (slot:torso)
     "kamizelka_taktyczna": dict(tags=["slot:torso","armor"], portable=True,
                             affordances=["inspect","loot","wear"],
                             equip_state={"ac_bonus": 2,
-                                         "equip_resists":["physical"]}),
-    "fartuch_laboratoryjny": dict(tags=["slot:torso","cloth","sponsor"], portable=True,
+                                         "equip_resists":["physical"]},
+                            rarity="rare"),
+    "fartuch_laboratoryjny": dict(tags=["slot:torso","cloth","sponsor","clone_farm"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={"equip_resists":["acid"]}),
+                            equip_state={"equip_resists":["acid"]},
+                            rarity="uncommon"),
     "kurtka_skorzana":    dict(tags=["slot:torso","leather"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={"ac_bonus": 1}),
-    "kombinezon_hazmat":  dict(tags=["slot:torso","hazmat"], portable=True,
+                            equip_state={"ac_bonus": 1},
+                            rarity="uncommon"),
+    "kombinezon_hazmat":  dict(tags=["slot:torso","hazmat","reactor"], portable=True,
                             affordances=["inspect","loot","wear"],
                             equip_state={"equip_resists":["acid","poison"],
-                                         "on_equip_status":["encumbered"]}),
+                                         "on_equip_status":["encumbered"]},
+                            rarity="epic"),
 
     # LEGS (slot:legs)
     "spodnie_robocze":    dict(tags=["slot:legs","cloth"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
+                            equip_state={},
+                            rarity="common"),
     "buty_taktyczne":     dict(tags=["slot:legs","boots","armor"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={"ac_bonus": 1}),
-    "kalosze":            dict(tags=["slot:legs","rubber","insulator"], portable=True,
+                            equip_state={"ac_bonus": 1},
+                            rarity="uncommon"),
+    "kalosze":            dict(tags=["slot:legs","rubber","insulator","sewers"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={"equip_resists":["electric"]}),
+                            equip_state={"equip_resists":["electric"]},
+                            rarity="uncommon"),
 
     # ACCESSORY (slot:accessory)
     "odznaka_zawodnika":  dict(tags=["slot:accessory","sponsor","badge"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
+                            equip_state={},
+                            rarity="common"),
     "zegarek_sponsora":   dict(tags=["slot:accessory","sponsor","timepiece"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
-    "amulet_szczescia":   dict(tags=["slot:accessory","occult"], portable=True,
+                            equip_state={},
+                            rarity="uncommon"),
+    "amulet_szczescia":   dict(tags=["slot:accessory","occult","museum"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
+                            equip_state={},
+                            rarity="rare"),
     "opaska_imienna":     dict(tags=["slot:accessory","cloth"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
+                            equip_state={},
+                            rarity="common"),
 
     # BACK (slot:back)
     "plecak_taktyczny":   dict(tags=["slot:back","gear"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
-    "pas_narzedziowy":    dict(tags=["slot:back","gear","craft_material"], portable=True,
+                            equip_state={},
+                            rarity="uncommon"),
+    "pas_narzedziowy":    dict(tags=["slot:back","gear","craft_material","forge"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
+                            equip_state={},
+                            rarity="uncommon"),
     "kabura_skorzana":    dict(tags=["slot:back","leather","gear"], portable=True,
                             affordances=["inspect","loot","wear"],
-                            equip_state={}),
+                            equip_state={},
+                            rarity="common"),
 }
 
 
@@ -161,4 +209,10 @@ def make_item(key: str, location_id: str = "") -> Entity:
     equip_state = proto.get("equip_state")
     if equip_state:
         ent.state = dict(equip_state)
+    # P29.43 — zapisujemy rarity na state, żeby UI mógł kolorować bez
+    # template lookup (i żeby save/load to przeniosło). Default common.
+    rarity = proto.get("rarity", "common")
+    if ent.state is None:
+        ent.state = {}
+    ent.state.setdefault("rarity", rarity)
     return ent

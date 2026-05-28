@@ -1726,9 +1726,15 @@ def draw_journal(surf, world, j_state, layout=None, *, click_registry=None):
                 while line and f_b.size(line + "…")[0] > max_w:
                     line = line[:-1]
                 line = line + "…"
-            img = f_b.render(line,
-                             True,
-                             BRIGHT_TEXT if is_sel else NORMAL_TEXT)
+            # P29.43 — rarity color dla items w panelu Ekwipunek.
+            # `e.title_color` jest ustawione przez _collect_inventory
+            # gdy item ma rarity != common. Inne taby zostawiają None
+            # → padamy do BRIGHT/NORMAL.
+            base_color = BRIGHT_TEXT if is_sel else NORMAL_TEXT
+            tc = getattr(e, "title_color", None)
+            if tc is not None and not is_sel:
+                base_color = tc
+            img = f_b.render(line, True, base_color)
             surf.blit(img, (content_x + 12, row_y + 2))
             # Status badge / subtitle on the right side of the row.
             badge = e.status or e.subtitle
