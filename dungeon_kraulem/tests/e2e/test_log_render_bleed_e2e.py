@@ -32,13 +32,17 @@ import pygame
 
 @pytest.fixture(autouse=True, scope="module")
 def _pygame_headless():
-    """Inicjalizuje pygame raz dla wszystkich testów w pliku."""
-    pygame.init()
-    pygame.display.init()
-    # Off-screen surface zamiast set_mode (set_mode wymaga windowed
-    # nawet w dummy driver).
+    """Inicjalizuje pygame raz dla wszystkich testów w pliku.
+    NIE robi pygame.quit() w teardown — inne testy w suite też
+    używają pygame (test_p29_3_loot_wheel, test_p29_6_log_render
+    itp.) i quit zabija ich state. Po prostu init bezpośrednio,
+    pozwól pytest cleanup naturalnie."""
+    if not pygame.get_init():
+        pygame.init()
+    if not pygame.display.get_init():
+        pygame.display.init()
     yield
-    pygame.quit()
+    # No pygame.quit() — leave global state intact for other test modules.
 
 
 # ── 1. Font metrics ──────────────────────────────────────────────────
