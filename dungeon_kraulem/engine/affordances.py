@@ -4,10 +4,13 @@ from typing import List, Dict, Optional
 
 
 # Time costs (minutes) — used by validator/resolution.
+# P29.53k — wartości podbite tak, żeby godzina gry nie wystarczała na
+# całe piętro. Deadline'y są nadal "łagodne" (5-14 dni), ale teraz
+# zegar realnie się rusza i widać presję.
 TIME_LOOK    = 1
-TIME_INSPECT = 5
+TIME_INSPECT = 8     # ↑ z 5: oględziny czegoś z bliska to nie spojrzenie
 TIME_SEARCH  = 30
-TIME_MOVE    = 10
+TIME_MOVE    = 15    # ↑ z 10: kraulerzy przeczołgują się przez gruz, nie sprintują
 TIME_LISTEN  = 5
 TIME_TALK    = 15
 TIME_FIGHT   = 5

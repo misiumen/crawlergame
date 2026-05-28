@@ -390,12 +390,6 @@ def is_corpse(entity) -> bool:
     return entity is not None and entity.entity_type == T_CORPSE
 
 
-def is_butchered(entity) -> bool:
-    if entity is None:
-        return False
-    return bool((entity.state or {}).get("butchered"))
-
-
 def is_edible(entity) -> bool:
     if not is_corpse(entity):
         return False

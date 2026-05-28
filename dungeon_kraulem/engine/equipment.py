@@ -96,15 +96,6 @@ SLOT_DEFS: Dict[str, SlotDef] = {
 }
 
 
-def is_wearable(entity) -> bool:
-    """True iff the entity carries any slot:* tag (i.e. it can land in
-    one of the 5 non-wield slots). Wield gates separately."""
-    if entity is None:
-        return False
-    return any(t.startswith("slot:")
-               for t in (getattr(entity, "tags", []) or []))
-
-
 def slot_for_entity(entity) -> Optional[str]:
     """Auto-detect which slot an entity targets. Returns the first
     matching slot key, or None if no slot:* tag is present. Falls back

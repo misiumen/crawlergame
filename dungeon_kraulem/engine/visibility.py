@@ -39,10 +39,6 @@ def is_unknown(ent) -> bool:
     return get_state(ent) == STATE_UNKNOWN
 
 
-def is_seen_or_better(ent) -> bool:
-    return get_state(ent) in (STATE_SEEN, STATE_INSPECTED)
-
-
 def is_inspected(ent) -> bool:
     return get_state(ent) == STATE_INSPECTED
 

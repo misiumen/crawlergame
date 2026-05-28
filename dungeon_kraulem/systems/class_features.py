@@ -119,21 +119,6 @@ def use_active(world) -> Tuple[bool, str]:
     return True, line
 
 
-def active_label(character) -> Optional[str]:
-    key = getattr(character, "class_key", None)
-    if not key:
-        return None
-    spec = CLASS_ACTIVES.get(key)
-    return spec[0] if spec else None
-
-
-def active_description(character) -> Optional[str]:
-    key = getattr(character, "class_key", None)
-    if not key:
-        return None
-    spec = CLASS_ACTIVES.get(key)
-    return spec[1] if spec else None
-
 
 # ── Handlers ─────────────────────────────────────────────────────────────
 

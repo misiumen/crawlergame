@@ -90,9 +90,36 @@ def band_label(band: str) -> str:
     return t(key, fallback=_BAND_LABEL_FALLBACK.get(band, band.upper()))
 
 
-def band_range(band: str) -> Tuple[int, int]:
-    """Return (lo, hi) inclusive range for a band, or (0,0) for unknown."""
-    return _BAND_RANGES.get(band, (0, 0))
+# P29.53p — audience-as-lever combat mods. Player nie wydaje
+# widowni jak waluty (user feedback), ale STAN widowni dynamicznie
+# wpływa na walkę: spektakl = lepsze rolls, nudy = gorzej. Wartości
+# małe (±1/±2) — żeby nie przebijały zwykłej taktyki.
+
+_BAND_COMBAT_MODS = {
+    BAND_COLD:    {"to_hit": -1, "audience_on_kill": 1},
+    BAND_WARMING: {"to_hit":  0, "audience_on_kill": 2},
+    BAND_HOT:     {"to_hit": +1, "audience_on_kill": 3},
+    BAND_VIRAL:   {"to_hit": +2, "audience_on_kill": 5},
+}
+
+
+def combat_mods_for_world(world) -> dict:
+    """Return player combat mods derived from current audience band.
+
+    Used by the attack roll in game.py and the kill bonus emitter.
+    Returns dict with:
+      to_hit              — flat add to player to-hit (negative in COLD)
+      audience_on_kill    — points added per enemy kill in this band
+      band                — debug/logging
+    """
+    if world is None or getattr(world, "character", None) is None:
+        return {"to_hit": 0, "audience_on_kill": 0, "band": BAND_COLD}
+    rating = int(getattr(world.character, "audience_rating", 0) or 0)
+    band = band_for(rating)
+    mods = dict(_BAND_COMBAT_MODS.get(band,
+                                      _BAND_COMBAT_MODS[BAND_COLD]))
+    mods["band"] = band
+    return mods
 
 
 def change_audience(world, delta: int, source: str = "",
@@ -241,18 +268,6 @@ def tick_decay(world, minutes_elapsed: int) -> None:
                 (over - decay_steps * _IDLE_DECAY_MINUTES_PER_TICK))
     else:
         setattr(world, "audience_idle_minutes", idle)
-
-
-def safehouse_rest_decay(world, hours: int) -> None:
-    """Steeper decay applied when the player rests in a safehouse. The
-    audience gets bored quickly when the show stops.
-
-    −2 per in-game hour of rest. Called by the rest handler in `game.py`
-    after the rest's time-cost has been booked.
-    """
-    if world is None or hours <= 0:
-        return
-    change_audience(world, -2 * int(hours), source="safehouse_rest")
 
 
 # ── Internal ───────────────────────────────────────────────────────────────

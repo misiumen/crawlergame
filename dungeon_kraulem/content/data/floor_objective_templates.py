@@ -54,7 +54,11 @@ FLOOR_OBJECTIVE_TEMPLATES = {
         "risks": ["theft_caught", "relationship_down", "alert_patrol"],
         "rewards": ["floor_exit", "trade_credits", "stealth_affinity"],
         "required_tags": ["objective_path"],
-        "floor_min": 1, "floor_max": 4,
+        # P29.53o — F1 nie może mieć keycard objective. User: "te karty
+        # nie działały, nie ma jak wchodzić w interakcje z drzwiami, nie
+        # widziałem bossa". F1 ma teraz pool_intake_boss (P29.46) +
+        # bypass_warden objective. Keycardy pojawiają się od F2.
+        "floor_min": 2, "floor_max": 4,
         "weight": 5,
     },
 

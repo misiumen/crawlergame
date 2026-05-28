@@ -242,15 +242,19 @@ def test_lure_into_trap():
     import random; random.seed(21)
     w, f, r, enemy = _mk_scene(behavior="berserker", hp=30, give_trap=True)
     g = Game(screen=None); g.world = w
-    cs = cmb.start_combat(r, w)
     pre_hp = enemy.hp
-    # CHA = 14 -> mod=+2; need raw+2 >= 11, ~75% chance per roll.
-    for _ in range(6):
-        g._handle_play_input("zwabiam go w pułapkę")
-        if (r.state.get("player_traps") or [{}])[0].get("triggered"):
-            break
+    # P29.53j — start_combat auto-triggers the first deployed trap on
+    # the first hostile, so damage and trap.triggered should land
+    # immediately. If somehow it didn't, fall back to manual lure.
+    cs = cmb.start_combat(r, w)
+    if not (r.state.get("player_traps") or [{}])[0].get("triggered"):
+        # CHA = 14 -> mod=+2; need raw+2 >= 11, ~75% chance per roll.
+        for _ in range(6):
+            g._handle_play_input("zwabiam go w pułapkę")
+            if (r.state.get("player_traps") or [{}])[0].get("triggered"):
+                break
     assert (r.state.get("player_traps") or [{}])[0].get("triggered") is True, \
-        "trap never triggered after multiple lure attempts"
+        "trap never triggered"
     assert enemy.hp < pre_hp, f"enemy HP didn't drop on trap"
     print(f"  lure-into-trap: OK (enemy {pre_hp}->{enemy.hp})")
 

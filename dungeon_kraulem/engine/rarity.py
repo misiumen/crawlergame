@@ -170,3 +170,37 @@ def entity_rarity(entity) -> str:
         return item_rarity(proto)
     except Exception:
         return RARITY_COMMON
+
+
+# ── Item key picking by rarity ────────────────────────────────────────
+
+
+def item_keys_by_rarity(rarity: str) -> List[str]:
+    """Wszystkie klucze z ITEM_TEMPLATES o danym rarity. Cache'owane
+    leniwie — drobny zapas wydajności. Używane przez sponsor gift
+    scaling i boon box dla osiągnięć (P29.53l)."""
+    try:
+        from ..content.items import ITEM_TEMPLATES
+    except Exception:
+        return []
+    out = []
+    for k, t in ITEM_TEMPLATES.items():
+        if item_rarity(t) == rarity:
+            out.append(k)
+    return out
+
+
+def pick_item_key_for_floor(rng, floor_num: int) -> str:
+    """Wylosuj rarity dla piętra, potem losowy item key z tej puli.
+    Zwraca "" jeśli pula pusta (powinno nie zdarzać się w prod)."""
+    rarity = pick_rarity_for_floor(rng, floor_num)
+    pool = item_keys_by_rarity(rarity)
+    # Cascade down: gdy nie ma itemów tej rarity, zejdź niżej.
+    idx = _RARITY_ORDER.get(rarity, 0)
+    while not pool and idx > 0:
+        idx -= 1
+        rarity = ALL_RARITIES[idx]
+        pool = item_keys_by_rarity(rarity)
+    if not pool:
+        return ""
+    return rng.choice(pool)

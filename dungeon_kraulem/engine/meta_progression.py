@@ -702,10 +702,6 @@ def unlocked_items() -> List[UnlockDef]:
     return _by_kind("item")
 
 
-def unlocked_classes() -> List[UnlockDef]:
-    return _by_kind("class")
-
-
 def unlocked_start_perks() -> List[UnlockDef]:
     """P29.37 — one-shot character-creation perks (Łapówka,
     Insiderskie info, Stara legitymacja, Łyżka Cudu)."""
@@ -736,3 +732,5 @@ def catalog_summary() -> Dict[str, Dict]:
             "unlocked": key in unlocked_set,
         }
     return out
+
+

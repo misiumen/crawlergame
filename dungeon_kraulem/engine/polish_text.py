@@ -125,13 +125,3 @@ def verb_stem_match(typed_folded: str, candidate_folded: str) -> bool:
     return typed_folded.startswith(stem[:stem_len])
 
 
-# ── Any-of helper (catalog scan) ──────────────────────────────────────────
-
-def best_verb_match(typed_raw: str, candidates: Iterable[str]) -> bool:
-    """True iff `typed_raw` matches any candidate after folding both
-    sides. Convenience for catalog scans."""
-    typed_f = fold(typed_raw)
-    for c in candidates:
-        if verb_stem_match(typed_f, fold(c)):
-            return True
-    return False

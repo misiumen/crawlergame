@@ -246,7 +246,45 @@ def start_combat(room, world, *, triggered_by: str = "player_attack") -> CombatS
             cs.bands[e.entity_id] = BAND_ENGAGED
     cs.last_action = triggered_by
     set_combat(room, cs)
+    # P29.53j — auto-trigger deployed traps when combat starts. Bez
+    # tego pułapki wymagały od gracza ręcznego `zwabić`, więc rozstawi-
+    # ane przed walką po prostu się ignorowało. Teraz pierwsza
+    # rozstawiona pułapka łapie pierwszego mob'a od razu na start runy 1.
+    try:
+        _trigger_deployed_trap_on_combat_start(room, world, cs, hostiles)
+    except Exception:
+        pass
     return cs
+
+
+def _trigger_deployed_trap_on_combat_start(room, world, cs, hostiles):
+    """Pierwsza nieaktywowana pułapka w pokoju łapie pierwszego
+    przeciwnika gdy walka się zaczyna. Pułapka oznaczona triggered=True.
+    Komunikat w world.log_msg."""
+    traps = (room.state or {}).get("player_traps") or []
+    untriggered = [tr for tr in traps if not tr.get("triggered")]
+    if not untriggered or not hostiles:
+        return
+    trap = untriggered[0]
+    victim = hostiles[0]
+    payload = trap.get("effect") or {}
+    dmg = int(payload.get("amount", 3))
+    victim.hp = max(0, victim.hp - dmg)
+    trap["triggered"] = True
+    trap_name = trap.get("name") or trap.get("recipe_key") or "pułapka"
+    nm = victim.fallback_name or victim.key or "wróg"
+    msg = (f"„{nm}” wpada na rozstawioną {trap_name}: −{dmg} HP. "
+           f"Pułapka się wyczerpała.")
+    try:
+        world.log_msg(msg, "success")
+    except Exception:
+        pass
+    # Bonus efekty zależne od typu pułapki.
+    payload_kind = payload.get("type", "")
+    if payload_kind == "damage_and_stun":
+        add_status(victim, STATUS_STUNNED, 2)
+    elif payload_kind == "knockdown":
+        add_status(victim, STATUS_PRONE, 2)
 
 
 def _inject_pending_hunters(room, world) -> None:
@@ -533,6 +571,15 @@ def _enemy_attack_damage(enemy, *, ranged: bool = False,
     # Statuses on the enemy itself reduce its output.
     if has_status(enemy, STATUS_BLINDED): dmg = max(1, dmg - 2)
     if has_status(enemy, STATUS_AFRAID):  dmg = max(1, dmg - 1)
+    # P29.53m — graduated body damage: damaged/crippled limbs
+    # subtract from the damage roll even if not yet broken. Broken
+    # parts route through STATUS_DISARMED handled at to-hit roll.
+    try:
+        from ..content.data import body_plans as _bp
+        mods = _bp.body_combat_mods(enemy)
+        dmg = max(1, dmg - int(mods.get("attack_dmg_delta", 0)))
+    except Exception:
+        pass
     return max(1, dmg)
 
 

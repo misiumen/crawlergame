@@ -58,8 +58,3 @@ def swallow(scope: str = ""):
             except Exception:
                 pass
         # Otherwise: silent, matching the pre-P29.32 contract.
-
-
-def is_debug() -> bool:
-    """True when DK_DEBUG=1. Useful for assert / log gating."""
-    return _DEBUG

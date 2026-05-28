@@ -200,3 +200,106 @@ def init_body_parts(entity) -> Dict[str, dict]:
 def zones_in_display_order(plan: Dict[str, dict]) -> List[Tuple[str, dict]]:
     """Return (zone_key, props) pairs sorted by `display_order`."""
     return sorted(plan.items(), key=lambda kv: kv[1].get("display_order", 99))
+
+
+# ── P29.53m — graduated severity ─────────────────────────────────────
+
+
+SEVERITY_INTACT   = "intact"
+SEVERITY_DAMAGED  = "damaged"
+SEVERITY_CRIPPLED = "crippled"
+SEVERITY_BROKEN   = "broken"
+
+SEVERITY_PL = {
+    SEVERITY_INTACT:   "sprawne",
+    SEVERITY_DAMAGED:  "uszkodzone",
+    SEVERITY_CRIPPLED: "okaleczone",
+    SEVERITY_BROKEN:   "złamane",
+}
+
+
+def part_severity(part: dict) -> str:
+    """Quantize a part's HP/max_hp ratio into a severity tier.
+    intact  ≥75%, damaged 25-75%, crippled 1-25%, broken 0."""
+    if not isinstance(part, dict):
+        return SEVERITY_INTACT
+    if part.get("broken"):
+        return SEVERITY_BROKEN
+    hp = int(part.get("hp", 0))
+    max_hp = max(1, int(part.get("max_hp", 1)))
+    if hp <= 0:
+        return SEVERITY_BROKEN
+    frac = hp / max_hp
+    if frac >= 0.75:
+        return SEVERITY_INTACT
+    if frac >= 0.25:
+        return SEVERITY_DAMAGED
+    return SEVERITY_CRIPPLED
+
+
+def _zone_role(zone_key: str) -> str:
+    """Classify a zone key into a role: arm, leg, head, torso, other.
+    Used to weight combat-mod penalties — arm damage hits attack
+    rolls, leg damage hits to-hit (slow approach), head/torso shifts
+    are reserved for vulnerability multipliers handled at zone level."""
+    k = zone_key.lower()
+    if "arm" in k or "hand" in k or "wing" in k:
+        return "arm"
+    if "leg" in k or "foot" in k or "propulsion" in k:
+        return "leg"
+    if "head" in k or "sensor" in k:
+        return "head"
+    if "torso" in k or "body" in k or "mass" in k:
+        return "torso"
+    return "other"
+
+
+def body_combat_mods(entity) -> dict:
+    """Sum graduated combat penalties for an entity based on its
+    body_parts state. Returns dict with:
+
+      attack_dmg_delta   — subtract from outgoing damage roll
+      attack_to_hit_delta — subtract from outgoing to-hit roll
+      speed_delta        — informational; combat doesn't use turn order
+                           yet but UI / approach logic can
+
+    Important: BROKEN parts are NOT counted here — those already
+    apply a hard `STATUS_DISARMED` / `STATUS_SLOWED` via the maim
+    pipeline. This helper covers the gap between intact and broken
+    (damaged + crippled) so partial damage still nudges combat.
+    """
+    bp = getattr(entity, "body_parts", None) or {}
+    if not isinstance(bp, dict) or not bp:
+        return {"attack_dmg_delta": 0,
+                "attack_to_hit_delta": 0,
+                "speed_delta": 0}
+    dmg = 0
+    to_hit = 0
+    speed = 0
+    for zone_key, part in bp.items():
+        sev = part_severity(part)
+        if sev in (SEVERITY_INTACT, SEVERITY_BROKEN):
+            continue
+        role = _zone_role(zone_key)
+        if role == "arm":
+            if sev == SEVERITY_DAMAGED:
+                dmg += 1
+            else:  # crippled
+                dmg += 2
+                to_hit += 1
+        elif role == "leg":
+            if sev == SEVERITY_DAMAGED:
+                speed += 1
+            else:  # crippled
+                speed += 2
+                to_hit += 1
+        elif role == "head":
+            if sev == SEVERITY_DAMAGED:
+                to_hit += 1
+            else:  # crippled — concussed
+                to_hit += 2
+                dmg += 1
+        # Torso/other: no flat mod (damage_mul on direct hits handles)
+    return {"attack_dmg_delta": dmg,
+            "attack_to_hit_delta": to_hit,
+            "speed_delta": speed}

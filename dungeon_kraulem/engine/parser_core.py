@@ -4,9 +4,9 @@ Turns free-text into an ActionIntent dict. Never decides success.
 """
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Any
 
-from .affordances import AFFORDANCE_CATALOG, find_affordance_by_verb, fold
+from .affordances import find_affordance_by_verb, fold
 from ..ui.lang import get_language
 
 

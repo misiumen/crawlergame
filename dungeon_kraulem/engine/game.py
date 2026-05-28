@@ -1,13 +1,12 @@
 """Game state machine for the revamp."""
 import pygame
 
-from ..config import (SCREEN_W, SCREEN_H, FPS, BASE_STATS, LOG_NORMAL, LOG_SYSTEM,
+from ..config import (BASE_STATS, LOG_NORMAL, LOG_SYSTEM,
                      LOG_WARN, LOG_SUCCESS, LOG_SYNDIC, LOG_DANGER)
 from ..ui.lang import t, get_language, set_language
 from .world import WorldState
 from .character import Character
 from .floor import FloorState
-from .room import RoomState
 from .procgen import build_floor_1
 from .parser_core import parse_with_optional_llm
 from .validation import validate
@@ -926,6 +925,12 @@ class Game:
         # deadlinem (1 piętro = ~20k minut, 30 min = 0.15% — wciąż
         # tanio, ale user widzi że coś się stało).
         heal = max(1, ch.max_hp // 4)   # ~25% of max
+        # P29.55 — double_rest trait (np. half_dead): mnoży heal ×2.
+        try:
+            from . import species_effects as _sp_fx
+            heal = int(round(heal * _sp_fx.rest_heal_mul(ch)))
+        except Exception:
+            pass
         ch.heal(heal)
         ch.flags[day_key] = used + 1
         ts.advance(self.world, 30)
@@ -2775,6 +2780,16 @@ class Game:
                     self.log(f"  • {name}: {sign}{val}", LOG_SYNDIC)
         except Exception:
             pass
+        # P29.53s — highlight reel: pokazujemy top 3 najlepsze momenty
+        # zakończonego piętra zanim zegar przeskoczy do nowego. Player
+        # widzi „co zrobiłeś dobrze" — drobny dopamine hit między
+        # piętrami.
+        try:
+            from ..systems import highlight_reel as _hr
+            for ln in _hr.emit_floor_end_montage(self.world):
+                self.log(ln, LOG_SUCCESS)
+        except Exception:
+            pass
         self.log(t("log_descend_intro",
                    fallback=f"Schodzisz na piętro {next_num}. Drzwi "
                             f"się zamykają za tobą. Loch nie pamięta "
@@ -2791,6 +2806,11 @@ class Game:
             audio.play_sfx("floor_descent")
         except Exception:
             pass
+        # P29.53k — carryover bonus: time pozostały na poprzednim
+        # piętrze + bonus 5 dni dorzucamy do nowej puli. Mechanika z
+        # książki DCC: szybkie zejście = bankujesz dni na trudniejsze
+        # piętra. Liczymy PRZED nadpisaniem current_floor.
+        leftover_min = max(0, int(f.deadline_remaining_minutes() or 0))
         # Build next floor.
         try:
             from .floor_generator import generate_floor
@@ -2801,6 +2821,27 @@ class Game:
             return
         self.world.current_floor = new_floor
         self.world.floor_number = next_num
+        # P29.53k — apply carryover. New floor's clock starts at 0 (set
+        # by generator), deadline_minute already = base_for_floor. Dodaj
+        # carryover + bonus. Komunikat w logu, żeby gracz widział że
+        # czas się skumulował.
+        try:
+            from ..config import (DEADLINE_CARRYOVER_BONUS_DAYS,
+                                  MINUTES_PER_DAY)
+            bonus_min = int(DEADLINE_CARRYOVER_BONUS_DAYS) * MINUTES_PER_DAY
+            total_extra = leftover_min + bonus_min
+            if total_extra > 0:
+                new_floor.deadline_minute = int(
+                    new_floor.deadline_minute or 0) + total_extra
+                lo_d = leftover_min // MINUTES_PER_DAY
+                lo_h = (leftover_min % MINUTES_PER_DAY) // 60
+                self.log(
+                    f"Bonus za zejście: +{DEADLINE_CARRYOVER_BONUS_DAYS}d "
+                    f"do deadline'u, plus carryover {lo_d}d {lo_h}h "
+                    f"z poprzedniego piętra.",
+                    LOG_SYSTEM)
+        except Exception:
+            pass
         # Reset some per-floor state.
         self.world.last_player_command = ""
         self.world.last_targeted_entity_id = None
@@ -2812,6 +2853,27 @@ class Game:
                 pet.location_room_id = new_floor.current_room_id
         except Exception:
             pass
+
+        # P29.53l — pełne HP po zejściu. Canon DCC: piętro się
+        # zamyka za tobą, ciało dostaje krótką regenerację (med-spray
+        # od showrunner'a, „bonus za przeżycie"). Bez tego gracz musi
+        # restować przed bossem F2 = nudne. HP reset usuwa też wszystkie
+        # statusy z czasów F-prev które przeniosłyby się głupio (np.
+        # bleeding/burning/poisoned). Disarmed/slowed (broken parts)
+        # zostają — to permanentny maim.
+        if ch is not None:
+            healed = ch.max_hp - ch.hp
+            if ch.conditions:
+                _transient = {"bleeding", "burning", "poisoned", "chilled",
+                              "stunned", "shocked", "afraid", "shaken",
+                              "blinded"}
+                ch.conditions = [c for c in ch.conditions
+                                 if c not in _transient]
+            ch.hp = ch.max_hp
+            if healed > 0:
+                self.log(f"Próg zejścia. Showrunner wysyła med-spray: "
+                         f"+{healed} HP ({ch.hp}/{ch.max_hp}).",
+                         LOG_SUCCESS)
 
         # P29.36 — species traits "on descent" hooks (biopsy drain,
         # companion bond drift). Emits a line per side-effect.
@@ -4741,6 +4803,16 @@ class Game:
                             pass
                     return
             # Player target path (default / fallback).
+            # P29.55 — precog_dodge (void): pierwszy hit/piętro
+            # automatycznie missuje. Consumed one-shot.
+            try:
+                from . import species_effects as _sp_fx
+                if _sp_fx.precog_dodge_consume(self.world):
+                    self.log(f"Przewidujesz cios. {name} chybia w "
+                             f"pustkę.", LOG_SUCCESS)
+                    return
+            except Exception:
+                pass
             if _cmb.has_status(ch, _cmb.STATUS_BEHIND_COVER) and \
                     cs.bands.get(ent.entity_id) == _cmb.BAND_AT_RANGE:
                 dmg = max(0, dmg - 2)
@@ -4759,6 +4831,19 @@ class Game:
                 self.log(f"{name} atakuje, ale nie robi krzywdy.", LOG_NORMAL)
                 return
             ch.take_damage(dmg)
+            # P29.55 — glassblood (bleeds_easy): 20% szansy na bleed
+            # gdy gracz dostaje HP loss. Doliczamy STATUS_BLEEDING
+            # tylko jeśli nie ma już bleed-immune.
+            try:
+                import random as _r_bleed
+                from . import species_effects as _sp_fx
+                if _sp_fx.bleed_on_hit_check(ch, _r_bleed):
+                    if not _sp_fx.status_blocked(ch, "bleeding"):
+                        _cmb.add_status(ch, _cmb.STATUS_BLEEDING, 3)
+                        self.log("Glassblood ranny — krwawisz.",
+                                 LOG_WARN)
+            except Exception:
+                pass
             # P34-SFX-1 (P27.5): player_hit hook (always); player_crit
             # variant when ≥50% max HP in one blow.
             try:
@@ -4961,6 +5046,33 @@ class Game:
         zone_part = target.body_parts.get(zone_key) or {}
         if zone_part.get("broken"):
             total += 1   # weakened zone, easier follow-up
+        # P29.53m — graduated penalties from player's own body damage.
+        # Damaged arm: −1 dmg. Crippled arm: −2 dmg, −1 to-hit. Damaged
+        # head: −1 to-hit. Doesn't double-dip with STATUS_DISARMED
+        # (broken parts) — that's handled separately above.
+        player_body_mods = _bp.body_combat_mods(ch)
+        total -= int(player_body_mods.get("attack_to_hit_delta", 0))
+        damage_bonus -= int(player_body_mods.get("attack_dmg_delta", 0))
+        # P29.53p — audience-as-lever: gorąca widownia "podkręca" gracza
+        # (+1 / +2 to-hit), zimna sprawia że gracz traci flow (−1).
+        # Małe wartości — bonusy nie zastąpią normalnej taktyki, tylko
+        # nagradzają utrzymywanie spektaklu.
+        try:
+            from . import audience as _aud
+            aud_mods = _aud.combat_mods_for_world(self.world)
+            total += int(aud_mods.get("to_hit", 0))
+        except Exception:
+            pass
+        # P29.55 — species: sun_sensitive penalty w jasnym pokoju
+        # (safehouse / studio). Half_dead: −2 to-hit gdy w bright.
+        try:
+            from . import species_effects as _sp_fx
+            room_for_species = (self.world.current_floor.current_room()
+                                if self.world.current_floor else None)
+            total += int(_sp_fx.to_hit_modifier(
+                ch, room=room_for_species))
+        except Exception:
+            pass
         crit = (raw == 20)
         # Prompt 21: shocked players fumble on 1-2 instead of just 1.
         shocked_fumble_floor = 2 if _cmb.has_status(ch, _cmb.STATUS_SHOCKED) else 1
@@ -5018,7 +5130,15 @@ class Game:
             # Roll dice.
             base = _roll_dice_spec(dmg_dice, _r)
             dmg = base + mod + damage_bonus
-            if crit: dmg *= 2
+            if crit:
+                dmg *= 2
+                # P29.55 — crit_amplifier trait (chimera): krytyki ×1.5
+                # NA TOP normalnego ×2, czyli effective ×3.
+                try:
+                    from . import species_effects as _sp_fx
+                    dmg = int(round(dmg * _sp_fx.outgoing_crit_mul(ch)))
+                except Exception:
+                    pass
             # Prompt 26a — scale damage by the zone's multiplier (head 1.5×,
             # limbs 0.8×, etc.).
             dmg = max(1, int(round(dmg * zone_dmg_mul)))
@@ -5057,6 +5177,18 @@ class Game:
                         audio.play_sfx("limb_broken")
                     except Exception:
                         pass
+            # P29.55 — ferromanta magnetic_disarm: 25% chance na
+            # ściągnięcie broni z metal-armed targetu po hicie.
+            try:
+                from . import species_effects as _sp_fx
+                if _sp_fx.magnetic_disarm_check(ch, target, _r):
+                    _cmb.add_status(target, _cmb.STATUS_DISARMED, 3)
+                    self.log(
+                        f"Twoje pole magnetyczne wyrywa broń z dłoni "
+                        f"„{target.display_name()}”.",
+                        LOG_SUCCESS)
+            except Exception:
+                pass
             # Decrement coating on a landed hit.
             if coating and coating.get("hits_remaining", 0) > 0:
                 coating["hits_remaining"] -= 1
@@ -5136,6 +5268,21 @@ class Game:
                         from . import sponsors as _sp
                         _sp.note_player_tag(self.world, "enemy_killed",
                                             weight=1)
+                    except Exception:
+                        pass
+                    # P29.53p — audience-as-lever: kill daje +N widowni
+                    # zależnie od bandu. HOT/VIRAL = +3/+5 (spektakl),
+                    # COLD = +1 (widownia nudzi się). Dynamicznie nagradza
+                    # za utrzymywanie show'u — gracz nie wydaje widowni,
+                    # ale jej STAN dynamizuje progresję.
+                    try:
+                        from . import audience as _aud
+                        kbonus = int(
+                            _aud.combat_mods_for_world(self.world)
+                            .get("audience_on_kill", 1))
+                        if kbonus > 0:
+                            _aud.change_audience(self.world, kbonus,
+                                                 source="kill_band_bonus")
                     except Exception:
                         pass
                     # P29.8 — bump kill counter for the run summary.
@@ -5488,6 +5635,16 @@ class Game:
                                 + ", ".join(c.display_name() for c in candidates[:4])),
                      LOG_WARN)
             return
+
+        # P29.55 — ferromanta (metal_only_traps): odmawia non-metal
+        # pułapek. Komunikat z trap_refused_log, item zostaje w EQ.
+        try:
+            from . import species_effects as _sp_fx
+            if _sp_fx.trap_deploy_refused(ch, item):
+                self.log(_sp_fx.trap_refused_log(ch), LOG_WARN)
+                return
+        except Exception:
+            pass
 
         # DEX check, but always at least partial — placing trap is mostly
         # about whether it triggers cleanly, not whether you can place it.

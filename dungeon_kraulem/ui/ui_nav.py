@@ -15,7 +15,7 @@ Public API:
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from .lang import t
 
@@ -28,6 +28,10 @@ GROUP_OBJECTS   = "objects"
 GROUP_ENTITIES  = "entities"
 GROUP_INVENTORY = "inventory"
 GROUP_CRAFTING  = "crafting"
+# P29.53n (#15) — dedykowana sekcja na food/drink/medical. Wyciąga je
+# z Ekwipunku do osobnego tabu „Konsumuj", żeby w walce / po walce
+# gracz odpalał kawę / opatrunek / baton bez przewijania 12 itemów.
+GROUP_CONSUME   = "consume"
 # Prompt 22 — safehouse services as their own tab so the player has
 # a discoverable surface for "talk to the receptionist / buy coffee /
 # rest" instead of typing a number from memory.
@@ -38,7 +42,8 @@ GROUP_PERSONEL  = "personel"
 GROUP_PET       = "pet"
 
 ALL_GROUPS = (GROUP_ACTIONS, GROUP_EXITS, GROUP_OBJECTS, GROUP_ENTITIES,
-              GROUP_PERSONEL, GROUP_PET, GROUP_INVENTORY, GROUP_CRAFTING)
+              GROUP_PERSONEL, GROUP_PET, GROUP_INVENTORY, GROUP_CONSUME,
+              GROUP_CRAFTING)
 
 
 @dataclass
@@ -138,6 +143,7 @@ _GROUP_LABEL_KEYS = {
     GROUP_PERSONEL:  ("ui_group_personel",  "Usługi"),
     GROUP_PET:       ("ui_group_pet",       "Zwierzę"),
     GROUP_INVENTORY: ("ui_group_inventory", "Ekwipunek"),
+    GROUP_CONSUME:   ("ui_group_consume",   "Konsumuj"),
     GROUP_CRAFTING:  ("ui_group_crafting",  "Crafting"),
 }
 
@@ -188,6 +194,7 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
     pet       = _pet_options(world)
     inv       = _inventory_options(world,
                                    focused=state.focused_subject(GROUP_INVENTORY))
+    consume   = _consume_options(world)
     crafting  = _crafting_options(world)
 
     layout = []
@@ -199,6 +206,7 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
         (GROUP_PERSONEL,  personel),
         (GROUP_PET,       pet),
         (GROUP_INVENTORY, inv),
+        (GROUP_CONSUME,   consume),
         (GROUP_CRAFTING,  crafting),
     ):
         if opts:
@@ -786,6 +794,43 @@ def _inventory_options(world, *,
     return _two_tier_route(flat, focused, group=GROUP_INVENTORY,
                            subject_label_fn=_object_subject_label,
                            world=world)
+
+
+_CONSUME_TAGS = {"food", "drink", "medical", "consumable"}
+
+
+def _consume_options(world) -> List[SelectableOption]:
+    """P29.53n — Konsumuj sekcja: tylko food/drink/medical/consumable z
+    EQ, każdy z dedykowanym verb (Zjedz/Wypij/Użyj) — gracz nie szuka
+    batona pod wearables. Sekcja znika gdy nic do skonsumowania."""
+    out: List[SelectableOption] = []
+    ch = getattr(world, "character", None)
+    if ch is None:
+        return out
+    for eid in (ch.inventory_ids or []):
+        ent = world.entities.get(eid)
+        if ent is None:
+            continue
+        tags = set(ent.tags or [])
+        if not (tags & _CONSUME_TAGS):
+            continue
+        name = ent.display_name()
+        # P29.53e — same verb mapping co Ekwipunek, ale sekcja jest
+        # pre-filtrowana. Medical: „Użyj" (handler routuje do consume).
+        if "food" in tags:
+            verb_label, verb_cmd = "Zjedz", "zjedz"
+        elif "drink" in tags:
+            verb_label, verb_cmd = "Wypij", "wypij"
+        else:
+            verb_label, verb_cmd = "Użyj", "użyj"
+        out.append(SelectableOption(
+            option_id=f"consume_{eid}",
+            label=f"{verb_label}: {name}",
+            command=f"{verb_cmd} {name}",
+            group=GROUP_CONSUME, target_id=eid,
+            action_type="use",
+        ))
+    return out
 
 
 def _flat_inventory_verbs(world) -> List[SelectableOption]:

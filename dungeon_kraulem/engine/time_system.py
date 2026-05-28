@@ -86,6 +86,33 @@ def advance(world, minutes: int):
         from . import species_effects as _sp
         _sp.on_idle_tick(world, minutes)
 
+    # P29.53q — random absurd ambient events. Tiny chance per tick,
+    # module owns the 60-minute cooldown internally. Adds Dinniman-
+    # flavor "the world keeps happening around you" without spamming.
+    with _swallow("absurd_events.maybe_fire"):
+        from . import absurd_events as _ae
+        _ae.maybe_fire(world)
+
+    # P29.53s Wave 4 — mid-floor decisions + hidden objectives. Each
+    # tick: cheap re-check of hidden objectives; rolls for a mid-floor
+    # beat if cooldown is up. Module owns its own cadence.
+    with _swallow("mid_floor_events.tick"):
+        from . import mid_floor_events as _mfe
+        _mfe.tick(world)
+
+    # P29.53s Wave 4 — per-biome gimmicks. Fires a short flavor
+    # event keyed to the current biome every ~45 minutes.
+    with _swallow("biome_gimmicks.tick"):
+        from . import biome_gimmicks as _bg
+        _bg.tick(world)
+
+    # P29.53s Wave 4 — titles re-evaluation. Cheap walk over rules,
+    # adds newly qualified titles to character.flags['titles']. Sticky
+    # for the run, no removal.
+    with _swallow("titles.recompute"):
+        from ..systems import titles as _ti
+        _ti.recompute(world)
+
     # Day-change event
     if f.day_number() != prev_day:
         world.log_msg(_day_change_line(f), "syndicate")

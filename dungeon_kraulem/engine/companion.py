@@ -242,10 +242,6 @@ def register_companion(world, companion: Companion) -> Companion:
     return companion
 
 
-def get_companion(world, companion_id: int) -> Optional[Companion]:
-    return (getattr(world, "companions", {}) or {}).get(int(companion_id))
-
-
 def player_companions(world) -> List[Companion]:
     """Return all companions owned by the player, in id-order."""
     char = getattr(world, "character", None)

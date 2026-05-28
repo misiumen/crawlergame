@@ -24,7 +24,7 @@ itself never raises on bad input — unknown keys are ignored silently and
 return False.
 """
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 
 @dataclass
@@ -633,6 +633,40 @@ def unlock(target, key: str, world=None) -> bool:
             # bez WorldState). Bez clamp'a — testy maja własne.
             cur = int(getattr(ch, "audience_rating", 0) or 0)
             ch.audience_rating = min(100, max(0, cur + bonus))
+    except Exception:
+        pass
+
+    # P29.53l — Boon Box: każde odblokowane osiągnięcie kolejkuje 1
+    # przedmiot do safehouse (przez `pending_sponsor_gifts`, ten sam
+    # pipeline co prezenty sponsorów). Rarity skalowane po
+    # floor_number; hidden achievements dostają lepszy roll (+1 do
+    # floor virtualnego). Player odbiera z safehouse — żeby nie
+    # mutować ekwipunku mid-action (psuło testy crafting + drop pod).
+    try:
+        if w is not None:
+            from ..engine import rarity as _rar
+            import random as _r
+            floor_num = int(getattr(w, "floor_number", 1) or 1)
+            if ad.hidden:
+                floor_num += 1
+            rng = _r.Random(hash((key, floor_num, len(
+                ch.unlocked_achievements or []))) & 0xFFFFFFFF)
+            item_key = _rar.pick_item_key_for_floor(rng, floor_num)
+            if item_key:
+                pending = getattr(w, "pending_sponsor_gifts", None)
+                if pending is None:
+                    w.pending_sponsor_gifts = []
+                    pending = w.pending_sponsor_gifts
+                pending.append({
+                    "sponsor_key": "showrunner",
+                    "item_key": item_key,
+                    "source": f"ach:{key}",
+                })
+                if hasattr(w, "log_msg"):
+                    nice = item_key.replace("_", " ")
+                    line = (f"Boon box od showrunner'a: „{nice}” "
+                            f"czeka w safehouse.")
+                    w.log_msg(line, "success")
     except Exception:
         pass
     return True

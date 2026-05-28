@@ -468,6 +468,21 @@ def _fire_intervention(world, sponsor_key: str, kind: str,
         item = rng.choice(pool)
         payload["item_key"] = item
         _queue_safehouse_gift(world, sponsor_key, item)
+        # P29.53l (#7) — scaling: na piętrach 4+ paczka dorzuca DRUGI
+        # przedmiot wylosowany po rarity z `engine.rarity`. Wcześniej
+        # pula sponsora była flat — F1 i F12 dawały te same opatrunki.
+        # Teraz głębiej = lepszy loot, ale baseline gift_pool nadal
+        # daje sponsor-flavor (Dr Crucible = leki, Liga = bronie etc).
+        try:
+            floor_num = int(getattr(world, "floor_number", 1) or 1)
+            if floor_num >= 4:
+                from . import rarity as _rar
+                bonus_key = _rar.pick_item_key_for_floor(rng, floor_num)
+                if bonus_key and bonus_key != item:
+                    payload["bonus_item_key"] = bonus_key
+                    _queue_safehouse_gift(world, sponsor_key, bonus_key)
+        except Exception:
+            pass
         _log_sponsor_line(world, sponsor_key, f"sponsor_gift_{sponsor_key}",
                           default_pl=f"{_name_pl(sdata)}: paczka czeka w safehouse "
                                      f"({item}).")

@@ -117,9 +117,9 @@ def _build_handmade_floor_1(world) -> FloorState:
     for label, ed in start.exits.items():
         f.known_room_ids.add(ed.get("target",""))
 
-    # Deadline (14 days from cfg)
-    from ..config import MINUTES_PER_DAY, FLOOR1_DEADLINE_DAYS
-    f.deadline_minute = MINUTES_PER_DAY * FLOOR1_DEADLINE_DAYS
+    # Deadline — P29.53k per-floor table.
+    from ..config import deadline_minutes_for_floor
+    f.deadline_minute = deadline_minutes_for_floor(f.floor_number or 1)
 
     return f
 

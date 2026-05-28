@@ -30,6 +30,27 @@ LOCALES_DIR = "dungeon_kraulem/ui/locales"
 MINUTES_PER_DAY = 24 * 60
 FLOOR1_DEADLINE_DAYS = 14
 
+# P29.53k — DCC canon: each floor has its own deadline + carryover
+# bonus on descend. Book pattern: F1 jest "łagodne" (14d intro),
+# kolejne piętra coraz krótsze (5-10d), a zejście dorzuca 5d.
+# Tak gracz może bankować czas — jeśli skończył poprzednie piętro
+# szybko, dostaje fory na następnym.
+DEADLINE_DAYS_BY_FLOOR = {
+    1: 14, 2: 10, 3: 10, 4: 8, 5: 8, 6: 7, 7: 7, 8: 6, 9: 6,
+    10: 5, 11: 5, 12: 5, 13: 5, 14: 5, 15: 5, 16: 5, 17: 5, 18: 5,
+}
+DEADLINE_DAYS_DEFAULT = 5
+DEADLINE_CARRYOVER_BONUS_DAYS = 5
+
+
+def deadline_minutes_for_floor(floor_number: int) -> int:
+    """Return total deadline window (in minutes) for the given floor's
+    base. Carryover from a previous floor is handled separately by
+    Game._descend_or_win."""
+    days = DEADLINE_DAYS_BY_FLOOR.get(int(floor_number),
+                                      DEADLINE_DAYS_DEFAULT)
+    return int(days) * MINUTES_PER_DAY
+
 # Floor generation
 USE_HANDMADE_FLOOR_1 = False    # if True, load the 15-room vertical slice instead
 FLOOR_GEN_MAX_RETRIES = 8        # retries when validation fails

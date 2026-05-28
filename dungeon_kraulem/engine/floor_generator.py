@@ -266,9 +266,9 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
         if ed.get("target"):
             f.known_room_ids.add(ed["target"])
 
-    # Deadline
-    from ..config import MINUTES_PER_DAY, FLOOR1_DEADLINE_DAYS
-    f.deadline_minute = MINUTES_PER_DAY * FLOOR1_DEADLINE_DAYS
+    # Deadline — P29.53k per-floor table + carryover bonus.
+    from ..config import deadline_minutes_for_floor
+    f.deadline_minute = deadline_minutes_for_floor(f.floor_number)
     return f
 
 
@@ -696,7 +696,28 @@ def _fallback_template(role: str) -> Dict:
 def _pick_objective(f: FloorState, arch: Dict, rng: random.Random):
     preferred = arch.get("preferred_objectives", [])
     available = cl.all_floor_objectives()
-    candidates = [k for k in preferred if k in available] or list(available.keys())
+    # P29.53o — respect floor_min/floor_max bounds. Bez tego F1 mógł
+    # dostać objective z floor_min=5 (puste rooms, brak content) albo
+    # find_keycard z którego user się wkurzał. Teraz: tylko objective
+    # które wyraźnie pasują do f.floor_number.
+    fn = int(f.floor_number or 1)
+
+    def _in_bounds(key: str) -> bool:
+        obj = available.get(key) or {}
+        lo = int(obj.get("floor_min", 1))
+        hi = int(obj.get("floor_max", 99))
+        return lo <= fn <= hi
+
+    preferred_in_bounds = [k for k in preferred
+                           if k in available and _in_bounds(k)]
+    all_in_bounds = [k for k in available.keys() if _in_bounds(k)]
+    candidates = preferred_in_bounds or all_in_bounds
+    if not candidates:
+        # Fallback do `bypass_warden` jeśli istnieje (zawsze ma
+        # pool_intake_boss/floor_boss do pokonania).
+        candidates = (["bypass_warden"]
+                      if "bypass_warden" in available else
+                      list(available.keys()))
     if not candidates:
         f.objective_key = ""; return
     key = rng.choice(candidates)
@@ -1237,27 +1258,3 @@ def _ensure_required_tags(f: FloorState, rng: random.Random):
     })
 
 
-# ── Summary for debug printing ───────────────────────────────────────────────
-
-def floor_summary(floor: FloorState) -> Dict:
-    archetype = ""
-    for ev in floor.active_events:
-        if ev.get("kind") == "gen_archetype":
-            archetype = ev["args"].get("archetype", "")
-            break
-    safehouses = [r.room_id for r in floor.rooms.values() if r.safehouse_subtype]
-    secrets   = [r.room_id for r in floor.rooms.values() if r.actual_type == "secret"]
-    locked_exits = sum(1 for r in floor.rooms.values()
-                       for ed in r.exits.values() if ed.get("locked"))
-    return {
-        "rooms":         len(floor.rooms),
-        "archetype":     archetype,
-        "theme":         floor.theme_fallback,
-        "safehouses":    safehouses,
-        "secret_rooms":  secrets,
-        "objective":     floor.objective_key,
-        "objective_title": floor.objective_title_fallback,
-        "solution_paths": list(floor.objective_solution_paths),
-        "locked_exits":  locked_exits,
-        "validation":    validate_floor(floor),
-    }
