@@ -6832,10 +6832,12 @@ class Game:
         # both text and nav modes. Works on empty AND non-empty input
         # because they don't conflict with typing. Page step is 6 entries,
         # which is roughly one screenful at default resolutions.
+        # P29.50 (#147) — clamp do REALNEGO overflow zamiast len(log)-1.
+        # Wcześniej PgUp przy krótkim logu jeździł w pustkę (page-flip),
+        # zamiast się zatrzymać kiedy nie ma już co odsłaniać.
         if key == pygame.K_PAGEUP and not self.journal_state.open:
             self.log_scroll = min(self.log_scroll + 6,
-                                  max(0, len(self.world.log) - 1)
-                                  if self.world else 0)
+                                  self._log_max_scroll())
             self._suppress_textinput = True
             return
         if key == pygame.K_PAGEDOWN and not self.journal_state.open:
@@ -7537,10 +7539,29 @@ class Game:
         step = 3
         if dy > 0:
             self.log_scroll = min(self.log_scroll + step * dy,
-                                  max(0, len(self.world.log) - 1)
-                                  if self.world else 0)
+                                  self._log_max_scroll())
         else:
             self.log_scroll = max(0, self.log_scroll + step * dy)
+
+    def _log_max_scroll(self) -> int:
+        """P29.50 (#147) — max scroll = ile WPISÓW jest poza ekranem
+        nad widoczną listą. Bez tego clampa PgUp jeździł w pustkę
+        (page-flip) zamiast się zatrzymać kiedy nie ma już nic
+        nad widocznym oknem."""
+        if self.world is None:
+            return 0
+        L = getattr(self, "_layout", None)
+        if L is None:
+            return 0
+        # Aproksymacja available_rows wzięta z draw_log_and_input.
+        try:
+            _lx, _ly, _lw, lh = L.log_rect
+            line_h = max(20, int(L.font_small) + 8)
+            avail = max(1, (lh - 22) // line_h)
+        except Exception:
+            return 0
+        total = len(self.world.log or [])
+        return max(0, total - avail)
 
     def _drain_ui_inputs(self):
         """Pick up side-channel signals that UI click handlers wrote to

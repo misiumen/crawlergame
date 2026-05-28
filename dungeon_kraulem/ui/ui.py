@@ -1234,10 +1234,14 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
     lx, ly, lw, lh = L.log_rect
     panel(surf, (lx, ly, lw, lh), bg=LOG_BG)
     header_label = t("log_broadcast", fallback="DZIENNIK")
-    if scroll and scroll > 0:
-        # Prompt 23.5 (backlog #1): when the player has scrolled away from
-        # the newest entry, surface that state in the header so they don't
-        # think the log is frozen / broken.
+    # P29.50 (#147) — indicator pokazuje się TYLKO przy realnym
+    # overflow (więcej wpisów niż mieści się w oknie). Wcześniej
+    # nawet przy krótkim logu PgUp generowało scroll>0 i header
+    # mówił o ukrytych wpisach, których nie było.
+    _line_h_est = max(20, int(L.font_small) + 8)
+    _avail = max(1, (lh - 22) // _line_h_est)
+    _has_overflow = len(log) > _avail
+    if scroll and scroll > 0 and _has_overflow:
         header_label = (header_label + "  ↑ -" + str(int(scroll))
                         + " (PgDn aby wrócić)")
     text(surf, header_label,

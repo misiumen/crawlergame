@@ -539,7 +539,8 @@ def _flat_object_verbs(world, room) -> List[SelectableOption]:
                 group=GROUP_OBJECTS, target_id=e.entity_id,
                 action_type="loot",
             ))
-        elif is_container:
+        elif is_container and not state.get("depleted") \
+                          and not state.get("searched"):
             out.append(SelectableOption(
                 option_id=f"loot_{e.entity_id}",
                 label=f"Przeszukaj: {name}",
@@ -568,7 +569,12 @@ def _flat_object_verbs(world, room) -> List[SelectableOption]:
         # Użyj that produced zero feedback — pure noise.
         USE_TAGS = {"consumable","wearable","wield","interface","tool",
                     "powered","button","switch","controllable"}
-        if "use" in affs and (set(tags) & USE_TAGS):
+        # P29.50 (#148) — vending_machine + jednorazowe `use`-able obiekty
+        # znikają po wykorzystaniu. State flagi ustawione przez handlery
+        # (np. vending_used, hacked dla terminala który wymaga use po
+        # hack'u). Generic `used` flag jako fallback.
+        use_exhausted = bool(state.get("used") or state.get("vending_used"))
+        if "use" in affs and (set(tags) & USE_TAGS) and not use_exhausted:
             out.append(SelectableOption(
                 option_id=f"use_{e.entity_id}",
                 label=f"Użyj: {name}",
@@ -579,11 +585,15 @@ def _flat_object_verbs(world, room) -> List[SelectableOption]:
         # Prompt 22 bug fix 9: Zhakuj requires both `hack` affordance
         # AND an actual interface tag. A sealed crate has no interface
         # to hack. Electronic / digital / networked entities qualify.
+        # P29.50 (#148) — ukryj `zhakuj` jeśli state.hacked. Wcześniej
+        # gracz mógł re-hackować w nieskończoność (każda kolejna próba
+        # to nadmiarowy log + brak nowego efektu).
         HACK_TAGS = {"electrical","electronic","digital","interface",
                      "terminal","computer","network","camera","sensor",
                      "robot","drone","machine","ai","construct",
                      "door_electronic"}
-        if "hack" in affs and (set(tags) & HACK_TAGS):
+        if ("hack" in affs and (set(tags) & HACK_TAGS)
+                and not state.get("hacked")):
             out.append(SelectableOption(
                 option_id=f"hack_{e.entity_id}",
                 label=f"Zhakuj: {name}",

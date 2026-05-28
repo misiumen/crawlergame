@@ -345,22 +345,88 @@ def music_menu() -> List[float]:
 
 
 def music_explore() -> List[float]:
-    """12s ambient drone + scattered pings. Bass A1 + occasional E5
-    'distant ping' — keeps the dungeon feeling alive but tense."""
-    dur = 12.0
-    drone = _scale(_sine(55.0, dur), 0.20)
-    drone = _mix(drone, _scale(_sine(82.4, dur), 0.10))  # E2 fifth
-    pad = _silence(dur)
-    ping_times = [1.2, 4.0, 6.5, 9.8]
-    for t in ping_times:
+    """P29.50 (#151) — rozszerzony 16s loop: ambient drone + walking
+    bassline w A-minor + półambientowa melodia + kick na 1 i 3.
+    Wcześniej było 'pikanie w tle' (drone + 4 pingi). Teraz to
+    realna industrialna pętla z rytmem i harmonią.
+
+    Skala: A natural minor (A, B, C, D, E, F, G).
+    Tempo: 60 BPM (1 sekunda = 1 ćwierćnuta), 16 taktów × 4 = 64
+    ćwierćnuty? Nie — 16s / 4 = 4 takty po 4 ćwierćnuty.
+
+    Layout:
+      • Bassline: A1 → C2 → G1 → E1 (po 4 sek każdy, walking down).
+      • Drum: kick na każdy 1 i 3, lekki hi-hat na 2 i 4.
+      • Synth pad: stała tercja A3+C4 jako warstwa.
+      • Melodia: 8-nutowy motyw (E4 G4 A4 G4 / E4 C4 D4 E4) na
+        co czwarty takt.
+    """
+    dur = 16.0
+
+    # ── Bass: 4 nuty po 4 sek, square z lekkim detune. ──────────────
+    bass_freqs = [55.0, 65.41, 49.0, 41.20]  # A1, C2, G1, E1
+    bass: List[float] = []
+    for f in bass_freqs:
+        x = _square(f, 4.0, duty=0.5)
+        # Lekki "punch" envelope: krótki attack, długie sustain.
+        env: List[float] = []
+        n = len(x)
+        attack = int(n * 0.02)
+        for i in range(attack):
+            env.append(i / attack)
+        for i in range(n - attack):
+            env.append(1.0 - (i / max(1, n - attack)) * 0.3)
+        bass.extend(_scale(_apply_env(x, env), 0.25))
+
+    # ── Pad: stała tercja A3 (220) + C4 (261.63) — minorowa kotwica. ──
+    pad_a = _scale(_sine(220.0, dur), 0.08)
+    pad_c = _scale(_sine(261.63, dur), 0.06)
+
+    # ── Drum: kick (low thump) co 2 sek, hat (noise) na off-beats. ──
+    drum = _silence(dur)
+    kick_times = [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0]
+    for t in kick_times:
         idx = int(t * SR)
-        ping = _scale(_sine(659.25, 0.30), 0.16)
-        ping = _apply_env(ping, _env_ad(len(ping), 0.05, 0.95))
-        for i, s in enumerate(ping):
-            if idx + i < len(pad):
-                pad[idx + i] += s
-    mix = _mix(drone, pad)
-    return _seamless_loop(_scale(mix, 0.6))
+        # Kick: 100Hz sine z bardzo szybkim pitch drop + envelope.
+        kdur = 0.18
+        kick = _glide(110.0, 60.0, kdur, shape="sine")
+        kick = _apply_env(kick, _env_ad(len(kick), 0.01, 0.99))
+        for i, s in enumerate(_scale(kick, 0.55)):
+            if idx + i < len(drum):
+                drum[idx + i] += s
+    hat_times = [1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0]
+    for t in hat_times:
+        idx = int(t * SR)
+        hat = _noise(0.04, seed=int(t * 100))
+        hat = _lowpass(hat, 6000.0)
+        hat = _apply_env(hat, _env_ad(len(hat), 0.01, 0.99))
+        for i, s in enumerate(_scale(hat, 0.10)):
+            if idx + i < len(drum):
+                drum[idx + i] += s
+
+    # ── Melodia: 8 nut na 4. takt (sekunda 12-16). ───────────────────
+    mel = _silence(dur)
+    # E4=329.63, G4=392, A4=440, C4=261.63, D4=293.66.
+    mel_notes = [
+        (12.0, 329.63, 0.45),  # E4
+        (12.5, 392.00, 0.45),  # G4
+        (13.0, 440.00, 0.90),  # A4 (sustain)
+        (14.0, 392.00, 0.45),  # G4
+        (14.5, 329.63, 0.45),  # E4
+        (15.0, 261.63, 0.30),  # C4
+        (15.4, 293.66, 0.30),  # D4
+        (15.7, 329.63, 0.30),  # E4
+    ]
+    for t, f, d in mel_notes:
+        idx = int(t * SR)
+        tone = _square(f, d, duty=0.3)
+        tone = _apply_env(tone, _env_ad(len(tone), 0.05, 0.95))
+        for i, s in enumerate(_scale(tone, 0.16)):
+            if idx + i < len(mel):
+                mel[idx + i] += s
+
+    mix = _mix(bass, pad_a, pad_c, drum, mel)
+    return _seamless_loop(_scale(mix, 0.55))
 
 
 def music_victory() -> List[float]:
