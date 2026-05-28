@@ -902,6 +902,40 @@ MON = {
         floor_min=6, floor_max=6,
     ),
 
+    # ── P29.44 — Uniwersalne minibossy (bez biom-tagu) ─────────────────
+    # Floater'y do puli minibossów. Nie mają biome-tagu, więc pasują
+    # do każdego piętra. Każdy dropuje kawałek mapy po śmierci
+    # (hook w game.py: _drop_miniboss_map_fragment).
+    "miniboss_kartograf_dluznik": dict(
+        name_key="ent_miniboss_kartograf_n",
+        fallback_name="Kartograf-Dłużnik",
+        desc_key="ent_miniboss_kartograf_d",
+        fallback_desc="Płaszcz z naszywkami siedmiu Syndykatów, "
+                      "każda kolejna mniej oficjalna. Pod płaszczem "
+                      "owinięty mapami, jakby trzymały go w pionie. "
+                      "Sprzedaje kierunki temu, kto przeżyje rozmowę.",
+        tags=["monster","humanoid","miniboss","floor_min:3"],
+        affordances=["inspect","attack","talk","bribe"],
+        hp=24, max_hp=24, ac=13, attack_bonus=4, damage_dice="1d8+2",
+        damage_type="physical",
+        floor_min=3, floor_max=12,
+    ),
+    "miniboss_egzekutor_widowni": dict(
+        name_key="ent_miniboss_egzekutor_widowni_n",
+        fallback_name="Egzekutor Widowni",
+        desc_key="ent_miniboss_egzekutor_widowni_d",
+        fallback_desc="Pas zegarków na każdym przegubie — każdy bije "
+                      "tę samą godzinę. Pracuje na premii od tempa "
+                      "Twojej śmierci. Wie, ile masz minut. Liczy.",
+        tags=["monster","humanoid","miniboss","floor_min:6"],
+        affordances=["inspect","attack","intimidate"],
+        hp=34, max_hp=34, ac=14, attack_bonus=6, damage_dice="2d6+2",
+        damage_type="physical",
+        resists=["psychic"],
+        vulnerable_to=["fire"],
+        floor_min=6, floor_max=18,
+    ),
+
     # ── P29.42b — FRONTOWE OKOPY (biom WWI, F3-8) ──────────────────────
     # Sponsorzy dali piechocie dwa karabiny i kazali walczyć ze sobą o
     # ratingi. Plakat na ścianie: WALCZ DOBRZE — TWOJA WIDOWNIA CIĘ

@@ -40,6 +40,37 @@ _NUMS = {
 }
 
 
+# P29.44 — standalone helper, żeby unit-testy mogły testować drop bez
+# tworzenia całego Game'a (Game potrzebuje pygame screen).
+def drop_miniboss_map(world, room, dead_target, floor_num: int):
+    """Po zabiciu minibossa spawnuje map_fragment (F1-9) lub 50%
+    floor_map (F10+) w pokoju zwłok. Zwraca utworzony Entity albo
+    None przy błędzie."""
+    import random as _r
+    seed = getattr(world, "random_seed", None) or 0
+    # Stabilny deterministic: salt o entity_id zwłok, żeby seed
+    # generatora pięter nie powodował zawsze tego samego dropu.
+    salt = int(getattr(dead_target, "entity_id", 0) or 0)
+    rng = _r.Random(seed * 1009 + salt * 31 + 7)
+    item_key = "map_fragment"
+    if floor_num >= 10 and rng.random() < 0.5:
+        item_key = "floor_map"
+    try:
+        from ..content.items import make_item
+    except Exception:
+        return None
+    try:
+        it = make_item(item_key, location_id=room.room_id)
+    except Exception:
+        return None
+    try:
+        world.register(it)
+    except Exception:
+        pass
+    room.entities.append(it)
+    return it
+
+
 class Game:
     def __init__(self, screen):
         self.screen = screen
@@ -4941,8 +4972,17 @@ class Game:
                 # next rebuild.
                 try:
                     from . import corpses as _cp
+                    _tags_pre = list(target.tags or [])
                     _cp.transform_to_corpse(self.world, target,
                                             killer=self.world.character)
+                    # P29.44 — minibossy dropią kawałek mapy. Sprawdzamy
+                    # tagi PRZED transformacją (corpse-tagi dodają się
+                    # idempotentnie, ale na wszelki wypadek snapshot).
+                    if "miniboss" in _tags_pre:
+                        try:
+                            self._drop_miniboss_map_fragment(target)
+                        except Exception:
+                            pass
                     # Tag-bus event: enemy_killed. Sponsor reactions, P28
                     # title tracking, and P31 vendetta hook into this.
                     try:
@@ -7010,6 +7050,31 @@ class Game:
         from ..ui import ui_nav
         prev = getattr(self, "nav_state", None)
         self.nav_state = ui_nav.build_play_options(self.world, prev_state=prev)
+
+    # ── P29.44: Miniboss kill → drop map fragment ────────────────────
+
+    def _drop_miniboss_map_fragment(self, dead_target) -> None:
+        """Po zabiciu minibossa upuść kawałek mapy obok zwłok.
+
+        Delegacja do `drop_miniboss_map` (standalone), żeby unit-testy
+        nie musiały tworzyć całego Game'a.
+        """
+        floor = self.world.current_floor
+        if floor is None:
+            return
+        room = floor.current_room()
+        if room is None:
+            return
+        it = drop_miniboss_map(self.world, room, dead_target,
+                               floor.floor_number or 1)
+        if it is None:
+            return
+        nm = "kawałek mapy" if it.key == "map_fragment" \
+             else "pełna mapa piętra"
+        dead_name = getattr(dead_target, "fallback_name", "") or "miniboss"
+        msg = (f"Z kieszeni „{dead_name}” wypada coś pożytecznego: "
+               f"{nm}. Ktoś tu wcześniej zaglądał.")
+        self.log(msg, LOG_SUCCESS)
 
     # ── P24.5: Map item consumption ───────────────────────────────────
 

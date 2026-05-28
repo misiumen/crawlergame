@@ -236,6 +236,11 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
     # (and, when belief seeds exist on the world, by their target_tags too).
     _place_encounters(f, rng, world=world)
 
+    # P29.44 — minibossy. 2-3 dodatkowych elite mobów per piętro,
+    # umieszczonych w danger / loot roomach (poza głównym bossem).
+    # Każdy dropuje map_fragment po śmierci (hook w game.py).
+    _place_minibosses(f, rng, world=world)
+
     # P29.22 — celebrity NPC placement. Roll ~25% per floor for one
     # named cameo from content/data/celebrities.py. Without this hook,
     # the celebrity catalog was content rot. Keeps things gated by
@@ -1003,6 +1008,106 @@ def _place_encounters(f: FloorState, rng: random.Random, world=None):
                 for tg in actual_overlap:
                     if tg not in room.state["encounter_belief_tags"]:
                         room.state["encounter_belief_tags"].append(tg)
+
+
+# ── P29.44 — Miniboss placement ──────────────────────────────────────────────
+
+def _miniboss_count_for_floor(floor_num: int) -> int:
+    """Ile minibossów per piętro. F1-2: 0 (intake). F3-8: 2. F9-12: 3.
+    F13-17: 3. F18: 4 (finałowe). Skala rośnie razem z trudnością."""
+    if floor_num < 3:
+        return 0
+    if floor_num <= 8:
+        return 2
+    if floor_num <= 12:
+        return 3
+    if floor_num < 18:
+        return 3
+    return 4
+
+
+def _available_minibosses(floor_num: int, biome_room_tag) -> list:
+    """Klucze potworów z tagiem `miniboss` valid dla danego piętra +
+    biomu. Biome filter analogiczny do encounter — miniboss musi
+    mieć biom-tag piętra ALBO być neutralny (zero biom-tagów)."""
+    from ..content.data.entity_templates import MON
+    out = []
+    for key, tpl in MON.items():
+        tags = tpl.get("tags") or []
+        if "miniboss" not in tags:
+            continue
+        fmin = tpl.get("floor_min", 1)
+        fmax = tpl.get("floor_max", 99)
+        if floor_num < fmin or floor_num > fmax:
+            continue
+        if biome_room_tag is not None:
+            conflicts = set(tags) & _ALL_BIOME_TAGS
+            if conflicts and biome_room_tag not in conflicts:
+                continue
+        out.append(key)
+    return out
+
+
+def _place_minibosses(f: FloorState, rng: random.Random, world=None):
+    """Wpina N minibossów (zależne od floor_num) w danger / loot
+    roomy poza głównym bossem. Każdy miniboss jest osobnym mobem,
+    nie częścią encountera. Pełni rolę elite spawnu z gwarantowanym
+    dropem mapy.
+
+    Pomija piętra bez puli minibossów (np. F1-2)."""
+    n = _miniboss_count_for_floor(f.floor_number or 1)
+    if n <= 0:
+        return
+
+    # Biome filter (jak w _place_encounters).
+    biome_tag = None
+    if f.biome_key:
+        try:
+            from ..content.data.floor_biomes import get_biome
+            _b = get_biome(f.biome_key)
+            biome_tag = _b.room_tag if _b is not None else None
+        except Exception:
+            pass
+
+    pool = _available_minibosses(f.floor_number or 1, biome_tag)
+    if not pool:
+        return
+
+    # Kandydaci na pokoje: combat + salvage. RoomState nie ma już
+    # `role`, ale actual_type="boss" jest osobne — automatycznie
+    # wykluczone, bo nie ma go w whitelistcie.
+    candidates = [r for r in f.rooms.values()
+                  if r.actual_type in ("combat", "salvage")]
+    if not candidates:
+        return
+    rng.shuffle(candidates)
+    chosen = candidates[:n]
+
+    for room in chosen:
+        mkey = rng.choice(pool)
+        ent = _entity_from_table_mon(mkey, room.room_id,
+                                     f.floor_number or 1)
+        if ent is None:
+            continue
+        # Defensywnie — visibility (jak w _instantiate_rooms).
+        try:
+            from . import visibility as _vis
+            _vis.respect_known_key_on_spawn(world, ent)
+        except Exception:
+            pass
+        room.entities.append(ent)
+        if world is not None:
+            world.register(ent)
+
+
+def _entity_from_table_mon(mkey: str, room_id: str, floor_num: int):
+    """Wygodny helper: instancjonuje potwora z MON tak, jak robi to
+    _entity_from_table, ale bez przepychania `kind`-routera."""
+    from ..content.data.entity_templates import MON
+    tpl = MON.get(mkey)
+    if not tpl:
+        return None
+    return _entity_from_table(MON, mkey, room_id, T_MONSTER)
 
 
 # ── P29.22 — Celebrity NPC placement ─────────────────────────────────────────
