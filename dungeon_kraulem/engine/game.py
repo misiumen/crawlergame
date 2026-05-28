@@ -3025,20 +3025,30 @@ class Game:
             self.log(r, LOG_NORMAL)
 
     def _show_craft_help(self):
-        from ..content.crafting import all_recipes, improvised_categories
+        # P29.51 — wycięte raw template_id (morale_brew, trap, sharp...)
+        # z widoku. Wcześniej leciało jak debug-log: surowe klucze
+        # snake_case przed polskim opisem. Teraz tylko polski.
+        from ..content.crafting import (all_recipes, improvised_categories,
+                                        tag_pl, category_pl)
         self.log(t("ui_craft_help_h", fallback="Crafting:"), LOG_SYSTEM)
         self.log("  Znane przepisy:", LOG_NORMAL)
         for k, v in all_recipes().items():
+            name = v.get("name_pl", "?")
             aliases = ", ".join((v.get("aliases_pl") or [])[:3])
             extra = f"  [tak nazwiesz: {aliases}]" if aliases else ""
-            self.log(f"    {k}  ({v.get('name_pl','?')}){extra}", LOG_NORMAL)
+            self.log(f"    • {name}{extra}", LOG_NORMAL)
         self.log("  Improwizowane kategorie:", LOG_NORMAL)
         for k, v in improvised_categories().items():
-            tagsets = " | ".join("+".join(s) for s in v.get("required_tag_sets", []))
-            self.log(f"    {k}  → wymaga {tagsets}", LOG_NORMAL)
-        self.log("  Przykłady: 'zrób pułapkę z kabli i baterii', 'skleć broń ze szkła i drewna'.", LOG_NORMAL)
-        # Gap 5: nudge towards deploy
-        self.log("  Po skrafceniu pułapki: 'rozstaw pułapkę' albo 'podłóż pułapkę'.", LOG_NORMAL)
+            tagsets_pl = []
+            for tag_group in v.get("required_tag_sets", []):
+                tagsets_pl.append("+".join(tag_pl(t) for t in tag_group))
+            tagsets_str = " | ".join(tagsets_pl)
+            self.log(f"    • {category_pl(k)}  → wymaga: {tagsets_str}",
+                     LOG_NORMAL)
+        self.log("  Przykłady: 'zrób pułapkę z kabli i baterii', "
+                 "'skleć broń ze szkła i drewna'.", LOG_NORMAL)
+        self.log("  Po skrafceniu pułapki: 'rozstaw pułapkę' albo "
+                 "'podłóż pułapkę'.", LOG_NORMAL)
 
     def _show_trap_help(self):
         """Gap 5: list player's deployable items + sample commands."""

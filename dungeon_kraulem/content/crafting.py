@@ -231,6 +231,45 @@ _IMPROVISED_LABELS = {
     "disguise":    "improwizowane przebranie",
 }
 
+# P29.51 — polskie etykiety tagów materiałów dla craft-help'u.
+# Wcześniej UI wyświetlał raw klucze (sharp/wire/heavy/...). Każdy
+# nowy tag wymaga dopisania tutaj — alternatywnie fallback zwraca
+# raw klucz, więc system nie crashuje przy nieznanym wpisie.
+_MATERIAL_TAG_PL = {
+    # struktura
+    "wire":       "drut",
+    "binding":    "wiązanie",
+    "sharp":      "ostre",
+    "heavy":      "ciężkie",
+    "handle":     "rękojeść",
+    "metal":      "metal",
+    "small":      "drobne",
+    "precise":    "precyzyjne",
+    "cloth":      "tkanina",
+    # elektrycznie / zapalające / dymne
+    "electrical": "elektryczne",
+    "noise":      "hałas",
+    "thrown":     "do rzucania",
+    "light":      "światło",
+    "smell":      "zapach",
+    # przebrania / sponsor
+    "badge":      "odznaka",
+    "sponsor":    "sponsorskie",
+    "uniform":    "mundur",
+}
+
+
+def tag_pl(tag_key: str) -> str:
+    """Polski etykieta tagu materiału. Fallback do oryginalnego klucza
+    (nie crashuje na nieznanych, ale staje się widoczny w UI jako sygnał
+    że trzeba dopisać do _MATERIAL_TAG_PL)."""
+    return _MATERIAL_TAG_PL.get(tag_key, tag_key)
+
+
+def category_pl(category_key: str) -> str:
+    """Polski label dla improvised category."""
+    return _IMPROVISED_LABELS.get(category_key, category_key)
+
 
 # ── Result-item factory ─────────────────────────────────────────────────────
 
