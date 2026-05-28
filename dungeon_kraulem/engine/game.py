@@ -466,6 +466,18 @@ class Game:
             except Exception:
                 pass
 
+        # P29.52 — starting recipes per background. Większość klas zna
+        # 2 podstawowe (improvised_bandage + improvised_knife). Klasy
+        # rzemieślnicze (mechanic/cook/paramedic/soldier) — więcej.
+        # Reszta przepisów (25+) wymaga znalezienia recipe_note w
+        # lochu albo odblokowania przez sponsora.
+        try:
+            from ..content import crafting as _cr
+            self.world.character.known_recipes = \
+                _cr.starting_recipes_for(background)
+        except Exception:
+            pass
+
         # Prompt 19 — pet-owner background gets a random companion. The
         # pet is registered BEFORE Floor 1 is built so its location_room_id
         # gets set to the start room (which doesn't exist yet); we patch
@@ -2513,6 +2525,10 @@ class Game:
             if ent.key == "vending_machine" and \
                     not (ent.state or {}).get("vending_used"):
                 self._attempt_vending_use(ent); return
+            # P29.52 — recipe note: uczy przepisu i znika z plecaka.
+            recipe_key = (ent.state or {}).get("recipe_key")
+            if recipe_key and "recipe" in (ent.tags or []):
+                self._consume_recipe_note(ent, recipe_key); return
 
         # P29.41 — talk dialog tree intercept. Jeśli NPC ma na
         # stanie pole `dialogue_tree_key`, otwieramy STATE_DIALOG
@@ -3025,19 +3041,37 @@ class Game:
             self.log(r, LOG_NORMAL)
 
     def _show_craft_help(self):
-        # P29.51 — wycięte raw template_id (morale_brew, trap, sharp...)
-        # z widoku. Wcześniej leciało jak debug-log: surowe klucze
-        # snake_case przed polskim opisem. Teraz tylko polski.
+        # P29.52 — filtrowanie przez character.known_recipes. Wcześniej
+        # gracz widział WSZYSTKIE 29 przepisów na start. Teraz tylko
+        # te które jego klasa zna + odnalezione w lochu.
         from ..content.crafting import (all_recipes, improvised_categories,
-                                        tag_pl, category_pl)
+                                        tag_pl, category_pl,
+                                        known_recipes_iter)
+        all_recs = all_recipes()
+        known = set(known_recipes_iter(self.world.character))
         self.log(t("ui_craft_help_h", fallback="Crafting:"), LOG_SYSTEM)
-        self.log("  Znane przepisy:", LOG_NORMAL)
-        for k, v in all_recipes().items():
-            name = v.get("name_pl", "?")
-            aliases = ", ".join((v.get("aliases_pl") or [])[:3])
-            extra = f"  [tak nazwiesz: {aliases}]" if aliases else ""
-            self.log(f"    • {name}{extra}", LOG_NORMAL)
-        self.log("  Improwizowane kategorie:", LOG_NORMAL)
+        if known:
+            self.log("  Znane przepisy:", LOG_NORMAL)
+            for k in known:
+                v = all_recs.get(k)
+                if v is None:
+                    continue
+                name = v.get("name_pl", "?")
+                aliases = ", ".join((v.get("aliases_pl") or [])[:3])
+                extra = f"  [tak nazwiesz: {aliases}]" if aliases else ""
+                self.log(f"    • {name}{extra}", LOG_NORMAL)
+            # Hint o nieznanych przepisach:
+            unknown_count = len(all_recs) - len(known)
+            if unknown_count > 0:
+                self.log(f"  (Jest {unknown_count} przepisów których "
+                         f"jeszcze nie znasz — szukaj notatek, "
+                         f"podręczników i schematów w lochu.)",
+                         LOG_NORMAL)
+        else:
+            self.log("  Nie znasz żadnych przepisów. Improwizuj — "
+                     "albo poszukaj notatek w lochu.", LOG_NORMAL)
+        self.log("  Improwizowane kategorie (działają BEZ przepisu, "
+                 "z dostępnych materiałów):", LOG_NORMAL)
         for k, v in improvised_categories().items():
             tagsets_pl = []
             for tag_group in v.get("required_tag_sets", []):
@@ -7167,7 +7201,32 @@ class Game:
             f"Sponsorzy są zadowoleni. Przesuń się dalej.”",
             LOG_SUCCESS)
 
-    # ── P29.44: Miniboss kill → drop map fragment ────────────────────
+    # ── P29.52: Recipe note → learn recipe ───────────────────────────
+
+    def _consume_recipe_note(self, note_ent, recipe_key: str) -> None:
+        """Po `użyj recipe_note_X` postać uczy się przepisu, notatka
+        znika z plecaka (jednorazowa). Jeśli postać już zna przepis —
+        notatka nadal się zużywa, ale gracz dostaje informację."""
+        from ..content import crafting as _cr
+        from ..content.data.recipe_templates import RECIPES
+        ch = self.world.character
+        new = _cr.teach_recipe(ch, recipe_key)
+        # Zużyj notatkę — usuwamy z inventory.
+        try:
+            ch.inventory_ids.remove(note_ent.entity_id)
+        except (ValueError, AttributeError):
+            pass
+        rec = RECIPES.get(recipe_key) or {}
+        recipe_name = rec.get("name_pl", recipe_key)
+        if new:
+            msg = (f"Przeglądasz notatkę. Schemat „{recipe_name}” "
+                   f"trafia ci pod powieki — zapamiętasz to bez "
+                   f"czytania jeszcze raz.")
+            self.log(msg, LOG_SUCCESS)
+        else:
+            msg = (f"Znowu „{recipe_name}”. Już to znałeś — notatka "
+                   f"i tak rozsypała się w palcach.")
+            self.log(msg, LOG_NORMAL)
 
     def _drop_miniboss_map_fragment(self, dead_target) -> None:
         """Po zabiciu minibossa upuść kawałek mapy obok zwłok.

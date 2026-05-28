@@ -89,6 +89,14 @@ def try_known_recipe(character, recipe_key: str, room=None) -> Dict:
         return _invalid("unknown_recipe",
                         f"Nie znasz takiego przepisu: „{recipe_key}”.")
 
+    # P29.52 — sprawdź czy postać zna ten przepis. Sponsorskie
+    # przepisy z requires_sponsor_unlock idą inną ścieżką (poniżej).
+    if not rec.get("requires_sponsor_unlock") and \
+            not knows_recipe(character, recipe_key):
+        return _invalid("recipe_not_known",
+                        f"Nie znasz tego przepisu — znajdź notatkę, "
+                        f"poproś sponsora albo improwizuj.")
+
     # P29.14 — sponsor-branded recipes require an attention-unlock flag.
     # Set by engine/sponsors.py:_check_gift_thresholds when attention
     # crosses +5 (mid-tier, between "seen you" and "first gift").
@@ -269,6 +277,69 @@ def tag_pl(tag_key: str) -> str:
 def category_pl(category_key: str) -> str:
     """Polski label dla improvised category."""
     return _IMPROVISED_LABELS.get(category_key, category_key)
+
+
+# ── P29.52 — Starting recipes per background ────────────────────────
+#
+# Większość klas zaczyna z 2 podstawowymi przepisami (opatrunek + nóż),
+# klasy „rzemieślnicze" (mechanic/cook/paramedic/soldier) z większą
+# pulą — ale wciąż nie 25+. Reszta wymaga znalezienia recipe_note
+# w lochu lub odblokowania przez sponsora.
+
+_UNIVERSAL_RECIPES = ("improvised_bandage", "improvised_knife")
+
+_STARTING_RECIPES = {
+    "office_worker":      _UNIVERSAL_RECIPES,
+    "mechanic":           _UNIVERSAL_RECIPES + (
+        "shock_trap", "improvised_taser", "tripwire", "armor_patch"),
+    "nurse":              _UNIVERSAL_RECIPES + ("armor_padding",),
+    "cook":               _UNIVERSAL_RECIPES + (
+        "cooked_meat", "morale_brew", "bait_bundle"),
+    "security_guard":     _UNIVERSAL_RECIPES + (
+        "improvised_club", "tripwire"),
+    "courier":            _UNIVERSAL_RECIPES,
+    "student":            _UNIVERSAL_RECIPES + ("improvised_chembottle",),
+    "streamer":           _UNIVERSAL_RECIPES,
+    "soldier":            _UNIVERSAL_RECIPES + (
+        "improvised_spear", "improvised_club",
+        "fire_trap_recipe", "weapon_grip_tape"),
+    "unemployed_hustler": _UNIVERSAL_RECIPES + ("shiv",),
+    "janitor":            _UNIVERSAL_RECIPES,
+    "paramedic":          _UNIVERSAL_RECIPES + (
+        "armor_padding", "armor_acid_lining"),
+    "opiekun_zwierzaka":  _UNIVERSAL_RECIPES + ("bait_bundle",),
+}
+
+
+def starting_recipes_for(background: str) -> list:
+    """Lista przepisów które postać zna na start. Nieznane background
+    → tylko uniwersalne."""
+    return list(_STARTING_RECIPES.get(background, _UNIVERSAL_RECIPES))
+
+
+def known_recipes_iter(character) -> list:
+    """Wszystkie przepisy znane postaci. Defensywnie zwraca listę
+    nawet jak character.known_recipes nie ma jeszcze (legacy save)."""
+    return list(getattr(character, "known_recipes", []) or [])
+
+
+def knows_recipe(character, recipe_key: str) -> bool:
+    return recipe_key in known_recipes_iter(character)
+
+
+def teach_recipe(character, recipe_key: str) -> bool:
+    """Dodaj przepis do known_recipes. Zwraca True jeśli to nowy
+    przepis (wcześniej nieznany). Idempotent: powtórnie ten sam =
+    False, brak duplikatów."""
+    if character is None or not recipe_key:
+        return False
+    if not hasattr(character, "known_recipes") or \
+            character.known_recipes is None:
+        character.known_recipes = []
+    if recipe_key in character.known_recipes:
+        return False
+    character.known_recipes.append(recipe_key)
+    return True
 
 
 # ── Result-item factory ─────────────────────────────────────────────────────

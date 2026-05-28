@@ -229,6 +229,61 @@ ITEM_TEMPLATES = {
                             equip_state={},
                             rarity="common"),
 
+    # ── P29.52 — Recipe notes. Każdy ma state.recipe_key wskazujący
+    # przepis do nauczenia przy `użyj`. Discovery system: gracz znajduje
+    # je w pokojach typu workshop / library, dostaje od sponsora lub
+    # kupuje na czarnym rynku.
+    "recipe_note_shock_trap": dict(
+        tags=["paper","recipe","tech"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "shock_trap"},
+        rarity="uncommon"),
+    "recipe_note_smoke_bottle": dict(
+        tags=["paper","recipe","chemistry"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "smoke_bottle"},
+        rarity="uncommon"),
+    "recipe_note_fire_trap": dict(
+        tags=["paper","recipe","fire"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "fire_trap_recipe"},
+        rarity="rare"),
+    "recipe_note_morale_brew": dict(
+        tags=["paper","recipe","cooking"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "morale_brew"},
+        rarity="common"),
+    "recipe_note_acid_flask": dict(
+        tags=["paper","recipe","chemistry"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "acid_flask_recipe"},
+        rarity="rare"),
+    "recipe_note_poison_dart": dict(
+        tags=["paper","recipe","chemistry"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "poison_dart_recipe"},
+        rarity="rare"),
+    "recipe_note_garrote": dict(
+        tags=["paper","recipe","stealth"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "improvised_garrote"},
+        rarity="uncommon"),
+    "recipe_note_taser": dict(
+        tags=["paper","recipe","tech"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "improvised_taser"},
+        rarity="uncommon"),
+    "recipe_note_chembottle": dict(
+        tags=["paper","recipe","chemistry"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "improvised_chembottle"},
+        rarity="uncommon"),
+    "recipe_note_silencer": dict(
+        tags=["paper","recipe","tech"], portable=True,
+        affordances=["inspect","loot","use","read"],
+        equip_state={"recipe_key": "weapon_silencer"},
+        rarity="rare"),
+
     # ── P29.45 — Wysokie rarity. Epic-y (5) drop'ują się z bossów F9+
     # i są lepsze niż wcześniejsze rzadkie. Legendary (6) są z final-
     # bossów i miniboss-trifekt — przeznaczone jako run-defining loot.

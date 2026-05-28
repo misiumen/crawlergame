@@ -77,6 +77,14 @@ class Character:
     # Achievements
     unlocked_achievements: List[str] = field(default_factory=list)
 
+    # P29.52 — przepisy znane postaci. Wcześniej crafting był
+    # all-or-nothing: każda postać znała 25+ przepisów na start.
+    # Teraz background daje 2-6 przepisów, reszta wymaga znalezienia
+    # `recipe_note_*` w lochu (lub odblokowania przez sponsora).
+    # Improvise (try_improvise) NIE wymaga znajomości — to alternatywna
+    # ścieżka kraftu z dostępnych materiałów.
+    known_recipes: List[str] = field(default_factory=list)
+
     # Journal: dict room_id -> [notes]
     journal: Dict[str, List[str]] = field(default_factory=dict)
 
@@ -192,6 +200,7 @@ class Character:
             "materials": dict(self.materials),
             "credits": self.credits, "audience_rating": self.audience_rating,
             "unlocked_achievements": list(self.unlocked_achievements),
+            "known_recipes":         list(self.known_recipes),
             "journal": {k: list(v) for k, v in self.journal.items()},
             "relationships": dict(self.relationships),
             "flags": dict(self.flags),
@@ -227,6 +236,7 @@ class Character:
         c.worn_slots = {k: int(v) for k, v in ws.items()}
         c.materials = dict(d.get("materials", {}))
         c.unlocked_achievements = list(d.get("unlocked_achievements", []))
+        c.known_recipes          = list(d.get("known_recipes", []))
         c.journal = {k: list(v) for k, v in d.get("journal", {}).items()}
         c.relationships = dict(d.get("relationships", {}))
         c.flags = dict(d.get("flags", {}))
