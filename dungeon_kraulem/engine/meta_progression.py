@@ -478,6 +478,80 @@ UNLOCK_CATALOG: Dict[str, UnlockDef] = {
         eval_fn=lambda w, v: _eval_achievement(w, v, "anty_host_warknal"),
     ),
 
+    # ── P29.49 — meta-unlocki gated na nowych achievementach ────────
+    "item_apteczka_kompletna": UnlockDef(
+        key="item_apteczka_kompletna", kind="item",
+        label_pl="Apteczka Kompletna",
+        description_pl="Zbierz przedmioty każdej klasy rzadkości w "
+                       "jednym sezonie (osiągnięcie cala_paleta).",
+        reward_pl="Startujesz z apteczką polową — używaj raz na piętro, "
+                  "leczy 50% max HP, koszt 0 kr.",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "cala_paleta"),
+    ),
+    "perk_rzemieslnik_terminala": UnlockDef(
+        key="perk_rzemieslnik_terminala", kind="start_perk",
+        label_pl="Rzemieślnik terminala",
+        description_pl="Zhakuj 5 terminali w jednym sezonie "
+                       "(osiągnięcie kompletny_hacker).",
+        reward_pl="Startujesz z 2 elektronikami + lockpick_set. "
+                  "Pierwszy hack na sezon = darmowy.",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "kompletny_hacker"),
+    ),
+    "perk_okopowy_weteran": UnlockDef(
+        key="perk_okopowy_weteran", kind="start_perk",
+        label_pl="Okopowy weteran",
+        description_pl="Skończ piętro we Frontowych Okopach "
+                       "(osiągnięcie okopowiec).",
+        reward_pl="Maska filtrująca i kombinezon startowy. "
+                  "Odporność na gaz okopowy.",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "okopowiec"),
+    ),
+    "perk_handlarz_pakietow": UnlockDef(
+        key="perk_handlarz_pakietow", kind="start_perk",
+        label_pl="Handlarz Pakietów",
+        description_pl="Zabij 3 minibossów w jednym piętrze "
+                       "(osiągnięcie klepacz_minibossow).",
+        reward_pl="Każdy zabity miniboss dropuje +1 dodatkową paczkę "
+                  "(materiały + małe szanse na rzadki item).",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "klepacz_minibossow"),
+    ),
+    "perk_taneczne_nogi": UnlockDef(
+        key="perk_taneczne_nogi", kind="start_perk",
+        label_pl="Taneczne nogi",
+        description_pl="Przejdź piętro nie wpadając w żaden hazard "
+                       "(osiągnięcie taneczny_krok).",
+        reward_pl="Pierwsza interakcja z hazardem w runie jest "
+                  "automatycznym sukcesem (unik / disable).",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "taneczny_krok"),
+    ),
+    "perk_dzikus_z_arena": UnlockDef(
+        key="perk_dzikus_z_arena", kind="start_perk",
+        label_pl="Dzikus z areny",
+        description_pl="Przejdź piętro bez zbroi (osiągnięcie "
+                       "bez_zbroi_bez_smutku).",
+        reward_pl="+10 max HP + +1 do testów STR gdy brak zbroi "
+                  "w slot:torso. Klimat: blizny zamiast naszywek.",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "bez_zbroi_bez_smutku"),
+    ),
+    "perk_skapy_jak_widz": UnlockDef(
+        key="perk_skapy_jak_widz", kind="start_perk",
+        label_pl="Skąpy jak widz",
+        description_pl="Przejdź piętro nie wydając kredytów "
+                       "(osiągnięcie nadzwyczajne_oszczednosci).",
+        reward_pl="Startujesz z +50 kredytami i 20% rabatem na "
+                  "wszystko w safehouse'ach.",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "nadzwyczajne_oszczednosci"),
+    ),
+    "perk_kolekcjoner": UnlockDef(
+        key="perk_kolekcjoner", kind="start_perk",
+        label_pl="Kolekcjoner",
+        description_pl="Znajdź legendarny przedmiot "
+                       "(osiągnięcie widzialem_legende).",
+        reward_pl="Pierwszy legendarny przedmiot na sezon dropuje "
+                  "10 pięter wcześniej niż normalnie.",
+        eval_fn=lambda w, v: _eval_achievement(w, v, "widzialem_legende"),
+    ),
+
     # ────────── P29.42a — Biome unlocks ───────────────────────────────
     # Każdy z tych biomów ląduje w puli generatora dla piętra po
     # spełnieniu warunku. Reward_pl mówi GDZIE biom się pojawi.

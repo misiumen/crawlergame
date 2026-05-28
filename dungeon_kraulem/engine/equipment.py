@@ -231,6 +231,18 @@ def equip(world, character, entity, slot: str) -> Tuple[bool, Optional[int], str
     # Hooks: on_equip_status conditions, equip-time effects (future
     # encumbrance, etc.).
     _apply_equip_hooks(world, character, entity, equip=True)
+    # P29.49 — flagujemy „założono coś co liczy się jako zbroja"
+    # dla osiągnięcia „bez_zbroi_bez_smutku". Liczy się TYLKO
+    # `slot:torso` ze ze sztuką pancerza/skóry/hazmat. Sponsor_kepi
+    # nie liczy się jako zbroja.
+    try:
+        tags = set(entity.tags or [])
+        is_armor = (slot == "torso" and
+                    bool(tags & {"armor","hazmat","leather"}))
+        if is_armor and character.flags is not None:
+            character.flags["armor_equipped_this_floor"] = True
+    except Exception:
+        pass
     return True, prev_id, ""
 
 

@@ -334,6 +334,14 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
             tag = eff.get("tag", "")
             if tag:
                 _sp.note_player_tag(world, tag, weight=int(eff.get("weight", 1)))
+                # P29.49 — environmental kill achievement.
+                if tag == "env_kill":
+                    try:
+                        from ..systems import achievements as _ach
+                        _ach.unlock(world.character,
+                                    "czystka_srodowiska", world=world)
+                    except Exception:
+                        pass
             _sp.maybe_intervene(world)
 
         elif kind == "sponsor_attention":
@@ -371,6 +379,14 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
         elif kind == "spend_credits":
             amt = int(eff.get("amount", 0))
             world.character.credits = max(0, world.character.credits - amt)
+            # P29.49 — tracker dla „nadzwyczajne_oszczednosci".
+            if amt > 0:
+                try:
+                    n = int(world.character.flags.get(
+                        "floor_credits_spent", 0) or 0)
+                    world.character.flags["floor_credits_spent"] = n + amt
+                except Exception:
+                    pass
 
         elif kind == "add_credits":
             world.character.credits += int(eff.get("amount", 0))
@@ -408,16 +424,44 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                     # P29.43 — dorzuć klasę gdy niepospolity, gracz
                     # od razu widzi że coś warte.
                     name = ent.display_name()
+                    item_rarity = None
                     try:
                         from . import rarity as _rar
-                        r = _rar.entity_rarity(ent)
-                        if r != _rar.RARITY_COMMON:
-                            name = f"{name} ({_rar.rarity_pl(r)})"
+                        item_rarity = _rar.entity_rarity(ent)
+                        if item_rarity != _rar.RARITY_COMMON:
+                            name = f"{name} ({_rar.rarity_pl(item_rarity)})"
                     except Exception:
                         pass
                     lines.append(t("feedback_looted",
                                    fallback=f"Zabierasz: {name}.",
                                    name=name))
+                    # P29.49 — achievements for rarity tracking. Tracker
+                    # przez character.flags["picked_rarities_run"]
+                    # (lista uniq rarity-keys). + counter epic_run.
+                    try:
+                        from ..systems import achievements as _ach
+                        from . import rarity as _rar2
+                        ch_ = world.character
+                        if item_rarity == _rar2.RARITY_LEGENDARY:
+                            _ach.unlock(ch_, "widzialem_legende",
+                                        world=world)
+                        if item_rarity == _rar2.RARITY_EPIC:
+                            n = int(ch_.flags.get("epic_picked_run", 0) or 0)
+                            ch_.flags["epic_picked_run"] = n + 1
+                            if n + 1 >= 3:
+                                _ach.unlock(ch_, "niezwykly_zbieracz",
+                                            world=world)
+                        if item_rarity is not None:
+                            picked = set(ch_.flags.get(
+                                "picked_rarities_run", []) or [])
+                            picked.add(item_rarity)
+                            ch_.flags["picked_rarities_run"] = sorted(picked)
+                            # Full palette: 5 rarities at once.
+                            if len(picked) >= 5:
+                                _ach.unlock(ch_, "cala_paleta",
+                                            world=world)
+                    except Exception:
+                        pass
                 else:
                     # Prompt 22 bug fix — Path B: container (skrzynia,
                     # szafa, kupa gruzu). `przeszukaj` yields contents.

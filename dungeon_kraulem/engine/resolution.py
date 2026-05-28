@@ -342,6 +342,18 @@ def _effects_for_level(level, aff_key, validation, world):
                                     f"serwisowego skradzione +8 kr. "
                                     f"Widownia: +5. Sąsiednie drzwi "
                                     f"klikają w stronę „otwarte”.")})
+                # P29.49 — counter hacker w runie (5 → kompletny_hacker).
+                ch__ = getattr(world, "character", None)
+                if ch__ is not None:
+                    n = int(ch__.flags.get("hacks_run", 0) or 0) + 1
+                    ch__.flags["hacks_run"] = n
+                    if n >= 5:
+                        try:
+                            from ..systems import achievements as _ach2
+                            _ach2.unlock(ch__, "kompletny_hacker",
+                                         world=world)
+                        except Exception:
+                            pass
         elif aff_key == "force" and primary is not None:
             effects.append({"type":"change_object_state","entity_id":primary.entity_id,
                             "state_update":{"broken_open":True}})

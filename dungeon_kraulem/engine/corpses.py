@@ -259,6 +259,14 @@ def butcher(world, corpse: Entity, character,
     # it from the action bar. We keep entity_type=corpse so inspect
     # still works.
     st["butchered"] = True
+    # P29.49 — counter „kazdy_ma_imie": wszystkie ciała na piętrze
+    # wypatroszone. Tracker w character.flags.
+    try:
+        if character is not None and getattr(character, "flags", None) is not None:
+            n = int(character.flags.get("floor_butchered", 0) or 0)
+            character.flags["floor_butchered"] = n + 1
+    except Exception:
+        pass
     st["stripped"]  = True
     corpse.state = st
     # Drop the salvage affordance so the action bar can stop offering

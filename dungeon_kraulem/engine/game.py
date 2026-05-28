@@ -2645,7 +2645,6 @@ class Game:
             if cur_num == 1:
                 _ach.unlock(ch, "dno_jeszcze_dalej", world=self.world)
                 # P29.48 — pacifist F1: kills licznik = 0 przy zejściu.
-                # Brak ciał, brak problemu (sponsorzy pamiętają).
                 if int(ch.run_kills or 0) == 0:
                     _ach.unlock(ch, "brak_zwlok_brak_problemu",
                                 world=self.world)
@@ -2653,6 +2652,53 @@ class Game:
                 _ach.unlock(ch, "piaty_set", world=self.world)
             if next_num >= 10:
                 _ach.unlock(ch, "dziesiate_pietro", world=self.world)
+            # P29.49 — biome-completion achievements. Sprawdzamy
+            # biom UKOŃCZONEGO piętra (cur_num, nie next_num).
+            biome_key = getattr(f, "biome_key", "") or ""
+            _biome_to_ach = {
+                "zoo_korporacyjne": "zoofobia_skonczona",
+                "muzeum_spektakli": "archiwista",
+                "bar_skurczybyk":   "karaoke_killer",
+                "okopy_frontowe":   "okopowiec",
+            }
+            if biome_key in _biome_to_ach:
+                _ach.unlock(ch, _biome_to_ach[biome_key],
+                            world=self.world)
+            # Globtroter: 5 różnych biomów w jednym runie. Tracker
+            # w flagach: visited_biomes_run = lista kluczy.
+            visited = ch.flags.get("visited_biomes_run", []) or []
+            if biome_key and biome_key not in visited:
+                visited = list(visited) + [biome_key]
+                ch.flags["visited_biomes_run"] = visited
+            if len(visited) >= 5:
+                _ach.unlock(ch, "globtroter", world=self.world)
+            # Pomocnicze flagi per-floor które resetujemy przy zejściu.
+            # Sprawdzamy PRZED resetem:
+            if not int(ch.flags.get("floor_credits_spent", 0) or 0):
+                _ach.unlock(ch, "nadzwyczajne_oszczednosci",
+                            world=self.world)
+            if int(ch.flags.get("floor_minibosses_killed", 0) or 0) >= 3:
+                _ach.unlock(ch, "klepacz_minibossow",
+                            world=self.world)
+            if not int(ch.flags.get("floor_hazard_hits", 0) or 0):
+                _ach.unlock(ch, "taneczny_krok", world=self.world)
+            # No-armor floor: jeśli flag „armor_equipped_this_floor"
+            # nie był ustawiony, gracz przeszedł bez zbroi.
+            if not bool(ch.flags.get("armor_equipped_this_floor", False)):
+                _ach.unlock(ch, "bez_zbroi_bez_smutku",
+                            world=self.world)
+            # Butchered every corpse — wymaga że floor_kills > 0
+            # i floor_kills == floor_butchered.
+            fk = int(ch.flags.get("floor_kills", 0) or 0)
+            fb = int(ch.flags.get("floor_butchered", 0) or 0)
+            if fk > 0 and fk == fb:
+                _ach.unlock(ch, "kazdy_ma_imie", world=self.world)
+            # Reset per-floor flag's po sprawdzeniu.
+            for k in ("floor_credits_spent","floor_minibosses_killed",
+                      "floor_hazard_hits","armor_equipped_this_floor",
+                      "floor_kills","floor_butchered"):
+                ch.flags[k] = 0 if k != "armor_equipped_this_floor" \
+                                else False
         except Exception:
             pass
         # P29.20 — companion chatter on floor descent.
@@ -4977,6 +5023,22 @@ class Game:
                             self._drop_miniboss_map_fragment(target)
                         except Exception:
                             pass
+                        # P29.49 — counter dla „klepacz_minibossow".
+                        try:
+                            ch_ = self.world.character
+                            n = int(ch_.flags.get(
+                                "floor_minibosses_killed", 0) or 0)
+                            ch_.flags["floor_minibosses_killed"] = n + 1
+                        except Exception:
+                            pass
+                    # P29.49 — counter floor_kills (achievement
+                    # „kazdy_ma_imie" sprawdza floor_kills==floor_butchered).
+                    try:
+                        ch_ = self.world.character
+                        n = int(ch_.flags.get("floor_kills", 0) or 0)
+                        ch_.flags["floor_kills"] = n + 1
+                    except Exception:
+                        pass
                     # P29.46 — CRITICAL FIX: ubicie floor_boss odblokowuje
                     # wyjście z piętra. Bez tego hook'a floor.exits_unlocked
                     # nigdy nie był ustawiany przez kod produkcyjny i

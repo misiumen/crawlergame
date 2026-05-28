@@ -406,6 +406,140 @@ _add(AchievementDef(
 ))
 
 
+# ── P29.49 — biom / rarity / styl achievementy ────────────────────────────
+
+# Biomy.
+_add(AchievementDef(
+    key="globtroter",
+    fallback_name_pl="Globtroter",
+    fallback_name_en="Globetrotter",
+    fallback_description_pl="Pięć różnych biomów w jednym sezonie. Loch jest większy niż mówią w reklamie.",
+    fallback_description_en="Five different biomes in one season. The dungeon is bigger than the ad says.",
+    category="exploration",
+))
+_add(AchievementDef(
+    key="okopowiec",
+    fallback_name_pl="Okopowiec",
+    fallback_name_en="Trencher",
+    fallback_description_pl="Skończyłeś piętro we Frontowych Okopach. Plakat propagandowy nadal nie pamięta twojego imienia.",
+    fallback_description_en="Cleared a Trenches floor. The propaganda poster still doesn't know your name.",
+    category="exploration",
+))
+_add(AchievementDef(
+    key="zoofobia_skonczona",
+    fallback_name_pl="Zoofobia skończona",
+    fallback_name_en="Zoophobia Resolved",
+    fallback_description_pl="Wyszedłeś żywy z Zoo Korporacyjnego. Pawi nigdy ci nie zapomną.",
+    fallback_description_en="Walked out of Corporate Zoo alive. The peacocks won't forget.",
+    category="exploration",
+))
+_add(AchievementDef(
+    key="archiwista",
+    fallback_name_pl="Archiwista",
+    fallback_name_en="Archivist",
+    fallback_description_pl="Skończyłeś piętro w Muzeum Spektakli. Kurator ma teraz dwa palce mniej.",
+    fallback_description_en="Cleared a Museum floor. The curator has two fewer fingers.",
+    category="exploration",
+))
+_add(AchievementDef(
+    key="karaoke_killer",
+    fallback_name_pl="Karaoke killer",
+    fallback_name_en="Karaoke Killer",
+    fallback_description_pl="Skończyłeś piętro w Barze U Skurczybyka. Mikrofon pamięta ciszę po twoim wyjściu.",
+    fallback_description_en="Cleared a Skurczybyk Bar floor. The mic remembers the silence after.",
+    category="exploration",
+))
+
+# Rarity / loot.
+_add(AchievementDef(
+    key="widzialem_legende",
+    fallback_name_pl="Widziałem legendę",
+    fallback_name_en="Saw a Legend",
+    fallback_description_pl="Pierwszy legendarny przedmiot w plecaku. Kontrakt na sprzedaż jest na ostatniej stronie pamiętnika.",
+    fallback_description_en="First legendary in the pack. The sale contract is on the last page of the diary.",
+    category="loot",
+))
+_add(AchievementDef(
+    key="cala_paleta",
+    fallback_name_pl="Cała paleta",
+    fallback_name_en="Full Palette",
+    fallback_description_pl="W jednym runie miałeś jednocześnie przedmiot z każdej klasy rzadkości. Plecak waży jak twoja przyszłość.",
+    fallback_description_en="One run, one item of every rarity class at once. The pack weighs like your future.",
+    category="loot",
+    hidden=True,
+))
+_add(AchievementDef(
+    key="niezwykly_zbieracz",
+    fallback_name_pl="Niezwykły zbieracz",
+    fallback_name_en="Unusual Collector",
+    fallback_description_pl="Trzy przedmioty epickie w jednym runie. Sponsor pyta o nazwę firmy.",
+    fallback_description_en="Three epic items in one run. The sponsor asks about your firm name.",
+    category="loot",
+))
+
+# Minibosy / hazardy.
+_add(AchievementDef(
+    key="klepacz_minibossow",
+    fallback_name_pl="Klepacz minibossów",
+    fallback_name_en="Miniboss Pounder",
+    fallback_description_pl="Trzech minibossów w jednym piętrze. Mapa już sama się składa.",
+    fallback_description_en="Three minibosses on one floor. The map folds itself.",
+    category="combat",
+))
+_add(AchievementDef(
+    key="czystka_srodowiska",
+    fallback_name_pl="Czystka środowiska",
+    fallback_name_en="Environmental Sweep",
+    fallback_description_pl="Zabiłeś coś używając hazardu. Sponsor klaszcze — nie jego budżet, nie jego problem.",
+    fallback_description_en="Killed something with a hazard. Sponsor claps — not his budget, not his problem.",
+    category="combat",
+))
+_add(AchievementDef(
+    key="taneczny_krok",
+    fallback_name_pl="Taneczny krok",
+    fallback_name_en="Dancer's Step",
+    fallback_description_pl="Cale piętro bez wejścia w hazard. Konferansjer woli inne reportaże.",
+    fallback_description_en="Whole floor without stepping into a hazard. The Host prefers other reports.",
+    category="exploration",
+    hidden=True,
+))
+
+# Styl gry.
+_add(AchievementDef(
+    key="kompletny_hacker",
+    fallback_name_pl="Kompletny hacker",
+    fallback_name_en="Complete Hacker",
+    fallback_description_pl="Pięć terminali zhakowanych w jednym sezonie. System cię nie lubi, ale zna.",
+    fallback_description_en="Five terminals hacked in one season. The system doesn't like you but knows you.",
+    category="tech",
+))
+_add(AchievementDef(
+    key="bez_zbroi_bez_smutku",
+    fallback_name_pl="Bez zbroi bez smutku",
+    fallback_name_en="No Armor No Sorrow",
+    fallback_description_pl="Skończyłeś piętro bez założonej zbroi. Twoje blizny mają imiona.",
+    fallback_description_en="Cleared a floor wearing no armor. Your scars have names.",
+    category="survival",
+    hidden=True,
+))
+_add(AchievementDef(
+    key="nadzwyczajne_oszczednosci",
+    fallback_name_pl="Nadzwyczajne oszczędności",
+    fallback_name_en="Extraordinary Frugality",
+    fallback_description_pl="Skończyłeś piętro nie wydając ani jednego kredytu. Sponsor nie wie czy płakać czy się złościć.",
+    fallback_description_en="Cleared a floor without spending a credit. Sponsor doesn't know whether to cry or be angry.",
+    category="survival",
+))
+_add(AchievementDef(
+    key="kazdy_ma_imie",
+    fallback_name_pl="Każdy ma imię",
+    fallback_name_en="Everyone Has a Name",
+    fallback_description_pl="Wypatroszyłeś każde ciało które po sobie zostawiłeś przez całe piętro. Inspektor sponsorski jest pod wrażeniem (lub w szoku).",
+    fallback_description_en="Butchered every corpse you left across one floor. The sponsor inspector is impressed (or shocked).",
+    category="harvest",
+))
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def catalog() -> Dict[str, AchievementDef]:
@@ -464,6 +598,14 @@ def unlock(target, key: str, world=None) -> bool:
         return False
     ch.unlocked_achievements.append(key)
 
+    # P29.49 — natychmiastowy bonus widowni przy każdym unlocku.
+    # Wcześniej osiągnięcia były pure flavor (tytuł + linia logu).
+    # Teraz każde daje +5 do audience_rating ZARAZ — gracz czuje
+    # że niestandardowe zachowanie się opłaca. Hidden achievements
+    # dają +10 (rzadsze, większa nagroda). Override przez
+    # ad.reward["audience"] jeśli ktoś chce custom.
+    bonus = int(ad.reward.get("audience", 10 if ad.hidden else 5))
+
     # Best-effort log line — only if a world reference is reachable.
     w = world
     if w is None and hasattr(target, "log_msg"):
@@ -473,11 +615,26 @@ def unlock(target, key: str, world=None) -> bool:
             from ..ui.lang import t
             name = t(ad.name_key, fallback=ad.fallback_name_pl or key)
             line = t("achievement_unlocked",
-                     fallback=f"Osiągnięcie odblokowane: {name}.",
-                     name=name)
+                     fallback=f"Osiągnięcie odblokowane: {name}. "
+                              f"(+{bonus} widowni)",
+                     name=name, bonus=bonus)
             w.log_msg(line, "success")
         except Exception:
             pass
+    # Dodaj bonus widowni. Routujemy przez audience.change_audience,
+    # żeby honorować clamp 0-100 + decay + band crossing hooki —
+    # to jedyne miejsce gdzie poprawnie to robi się.
+    try:
+        if w is not None:
+            from ..engine import audience as _aud
+            _aud.change_audience(w, bonus, source=f"ach:{key}")
+        else:
+            # Fallback: bezpośrednio na character (np. unit testy
+            # bez WorldState). Bez clamp'a — testy maja własne.
+            cur = int(getattr(ch, "audience_rating", 0) or 0)
+            ch.audience_rating = min(100, max(0, cur + bonus))
+    except Exception:
+        pass
     return True
 
 
