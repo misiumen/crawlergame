@@ -658,14 +658,14 @@ def unlock(target, key: str, world=None) -> bool:
                     w.pending_sponsor_gifts = []
                     pending = w.pending_sponsor_gifts
                 pending.append({
-                    "sponsor_key": "showrunner",
+                    "sponsor_key": "rezyser",
                     "item_key": item_key,
                     "source": f"ach:{key}",
                 })
                 if hasattr(w, "log_msg"):
                     nice = item_key.replace("_", " ")
-                    line = (f"Boon box od showrunner'a: „{nice}” "
-                            f"czeka w safehouse.")
+                    line = (f'Premia Reżysera: „{nice}” '
+                            f'czeka w safehouse.')
                     w.log_msg(line, "success")
     except Exception:
         pass

@@ -800,10 +800,11 @@ def _consume_pending_gifts(world, room, lines) -> None:
     pending = list(getattr(world, "pending_sponsor_gifts", None) or [])
     if not pending:
         return
-    from ..content.items import make_item
+    from ..content.items import ITEM_TEMPLATES
     from ..content.data.sponsors import get_sponsor
     from ..ui.lang import t
     from . import rarity as _rar
+    from .handlers.boxes import make_box
     delivered: list = []
     leftover: list = []
     for entry in pending:
@@ -813,21 +814,10 @@ def _consume_pending_gifts(world, room, lines) -> None:
         if not item_key:
             continue
         try:
-            ent = make_item(item_key, location_id=room.room_id)
-            world.register(ent)
-            room.entities.append(ent)
-            name = (ent.display_name() if hasattr(ent, "display_name")
-                    else getattr(ent, "fallback_name", item_key)
-                    or item_key)
-            rar = _rar.entity_rarity(ent)
-            rar_pl = _rar.rarity_pl(rar)
-            # P29.53r (#10) — multi-line dramatyczny reveal zamiast
-            # jednej linii. User: "paczki mają fatalny loot, w 3
-            # paczkach miałem antidote" — loot jest fixed P29.53l, ale
-            # MOMENT otwarcia powinien czuć się jak moment. Trzy linie:
-            # 1) drop pod / opakowanie (kto i jak dostarczył)
-            # 2) reveal itemu z rarity badge
-            # 3) catchphrase sponsora / boon-box flavor
+            # P29.57b — zamiast spawn gotowego itemu w pokoju, tworzymy
+            # SKRZYNKĘ entity w EQ gracza. Gracz otworzy ją manualnie
+            # w tabie „Skrzynki". User feedback: skrzynki nigdy nie
+            # miały się same otwierać. Vampire-Survivors style.
             sdata = get_sponsor(sponsor_key) if sponsor_key else None
             sponsor_name = ""
             tagline = ""
@@ -837,25 +827,27 @@ def _consume_pending_gifts(world, room, lines) -> None:
                                                     sponsor_key))
                 tagline = t(sdata.get("tagline_key", ""),
                             fallback=sdata.get("tagline_fallback", ""))
-            # Boon box od achievementu (source="ach:<key>") — flavor
-            # showrunner'a zamiast sponsora.
+            # Box source per origin:
+            #   ach:* → Premia Reżysera
+            #   sponsor → Paczka Sponsorska
             is_boon = source.startswith("ach:")
-            if is_boon:
-                lines.append("Drone-kurier showrunner'a zrzuca pakiet "
-                             "z białym hologramem „BOON BOX”.")
-            elif sponsor_name:
-                lines.append(f"Drop-pod {sponsor_name}. Lakowana pieczęć. "
-                             f"Pęka z sykiem.")
-            else:
-                lines.append("Anonimowy pakiet leży na ladzie. Bez "
-                             "nadawcy. Bez ostrzeżenia.")
-            # Linia 2 — reveal z rarity.
-            lines.append(f"   → „{name}” ({rar_pl}).")
-            # Linia 3 — catchphrase / podsumowanie.
-            if is_boon:
-                lines.append("Showrunner mruga ci kamerą i znika.")
-            elif tagline:
-                lines.append(f"   {sponsor_name}: „{tagline}”")
+            box_source = "rezyser" if is_boon else "sponsor"
+            box_source_name = sponsor_name or (
+                "Reżyser" if is_boon else "Anonimowy sponsor")
+            # Rarity z item template (lub fallback common)
+            proto = ITEM_TEMPLATES.get(item_key, {})
+            rarity = _rar.item_rarity(proto) if proto else "common"
+            box_contents = [{"item_key": item_key, "qty": 1}]
+            make_box(world,
+                     source=box_source,
+                     source_name=box_source_name,
+                     contents=box_contents,
+                     rarity=rarity,
+                     sponsor_tagline=tagline)
+            # Cichy log — skrzynka czeka, gracz otworzy gdy chce.
+            lines.append(f'Nowa skrzynka czeka w plecaku '
+                         f'({box_source_name}). Otwórz w tabie '
+                         f'„Skrzynki”.')
             delivered.append(entry)
         except Exception:
             # Unknown item_key — keep it on the queue so future code can

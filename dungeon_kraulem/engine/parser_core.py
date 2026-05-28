@@ -453,6 +453,24 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.9
         return intent
 
+    # ── P29.57b — Open a box (skrzynka) — dedykowany intent ────────────────
+    # "otwórz skrzynkę X" / "otwórz <nazwa>" gdy slowo "skrzynka" / "skrzynkę"
+    # / "premia" w komendzie. Plus aliasy: paczka widowni / paczkę bossa.
+    import re as _re_box
+    box_re = _re_box.compile(
+        r"^(?:otwórz|otworz|rozpakuj|odbierz)\s+"
+        r"(?:skrzynkę|skrzynke|skrzynka|premię|premie|paczkę|paczke|paczka)"
+        r"(?:\s+(.+))?$")
+    box_m = box_re.match(folded)
+    if box_m:
+        intent.intent = "open_box"
+        intent.verb = "otwórz"
+        target_name = (box_m.group(1) or "").strip()
+        if target_name:
+            intent.targets.append(_strip_articles(target_name))
+        intent.confidence = 0.94
+        return intent
+
     # ── P29.10 — Open a sponsor drop pod (mid-floor gift) ──────────────────
     # "otwórz/rozbij/zgarnij pakiet" (sponsorski) — drop-pods are how
     # mid-floor sponsor gifts now arrive (was: queued for safehouse).

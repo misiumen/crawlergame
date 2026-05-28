@@ -214,6 +214,12 @@ register(Affordance("experiment",
     verbs_en=["experiment","mix","combine","try"],
     stat="INT", base_dc=10, time_cost=40, class_affinity="crafting"))
 
+# P29.57b — Otwieranie skrzynek (VS-style box system).
+register(Affordance("open_box",
+    verbs_pl=["otwórz","otworz","rozpakuj","odbierz"],
+    verbs_en=["open","unbox","claim"],
+    time_cost=1))
+
 register(Affordance("salvage",
     verbs_pl=["zdemontuj","odzyskaj","rozbierz","rozłóż","rozloz","rozkręć","rozkrec",
               "rozwal i weź","rozbij na części","odzyskuję części"],

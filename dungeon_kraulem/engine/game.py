@@ -2367,6 +2367,10 @@ class Game:
         if intent.intent == "experiment":
             self._attempt_experiment(intent); return
 
+        # P29.57b — otwórz skrzynkę: VS-style box system, reveal Dinniman
+        if intent.intent == "open_box":
+            self._attempt_open_box(intent); return
+
         # P29.23 — cooking + reading.
         if intent.intent == "cook":
             self._attempt_cook(intent); return
@@ -6201,6 +6205,11 @@ class Game:
         """P29.56 — emergent crafting via raw material combination."""
         from .handlers import experiment
         return experiment.attempt_experiment(self, intent)
+
+    def _attempt_open_box(self, intent):
+        """P29.57b — otwórz skrzynkę (VS-style box reveal)."""
+        from .handlers import boxes
+        return boxes.attempt_open_box(self, intent)
 
     # ── Prompt 07: memetic / belief-seed handler ─────────────────────────────
 

@@ -32,6 +32,10 @@ GROUP_CRAFTING  = "crafting"
 # z Ekwipunku do osobnego tabu „Konsumuj", żeby w walce / po walce
 # gracz odpalał kawę / opatrunek / baton bez przewijania 12 itemów.
 GROUP_CONSUME   = "consume"
+# P29.57b — dedykowana sekcja na skrzynki (VS-style box system).
+# Wszystkie drop pipeline'y (sponsor / boss / mob / widownia / drop-pod /
+# reżyser) produkują skrzynki które trafiają tutaj. Manualne otwieranie.
+GROUP_BOXES     = "boxes"
 # Prompt 22 — safehouse services as their own tab so the player has
 # a discoverable surface for "talk to the receptionist / buy coffee /
 # rest" instead of typing a number from memory.
@@ -43,7 +47,7 @@ GROUP_PET       = "pet"
 
 ALL_GROUPS = (GROUP_ACTIONS, GROUP_EXITS, GROUP_OBJECTS, GROUP_ENTITIES,
               GROUP_PERSONEL, GROUP_PET, GROUP_INVENTORY, GROUP_CONSUME,
-              GROUP_CRAFTING)
+              GROUP_BOXES, GROUP_CRAFTING)
 
 
 @dataclass
@@ -144,6 +148,7 @@ _GROUP_LABEL_KEYS = {
     GROUP_PET:       ("ui_group_pet",       "Zwierzę"),
     GROUP_INVENTORY: ("ui_group_inventory", "Ekwipunek"),
     GROUP_CONSUME:   ("ui_group_consume",   "Konsumuj"),
+    GROUP_BOXES:     ("ui_group_boxes",     "Skrzynki"),
     GROUP_CRAFTING:  ("ui_group_crafting",  "Crafting"),
 }
 
@@ -195,6 +200,7 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
     inv       = _inventory_options(world,
                                    focused=state.focused_subject(GROUP_INVENTORY))
     consume   = _consume_options(world)
+    boxes     = _box_options(world)
     crafting  = _crafting_options(world)
 
     layout = []
@@ -207,6 +213,7 @@ def build_play_options(world, prev_state: Optional["UISelectionState"] = None) -
         (GROUP_PET,       pet),
         (GROUP_INVENTORY, inv),
         (GROUP_CONSUME,   consume),
+        (GROUP_BOXES,     boxes),
         (GROUP_CRAFTING,  crafting),
     ):
         if opts:
@@ -799,6 +806,32 @@ def _inventory_options(world, *,
 _CONSUME_TAGS = {"food", "drink", "medical", "consumable"}
 
 
+def _box_options(world) -> List[SelectableOption]:
+    """P29.57b — Skrzynki tab: nieotwarte skrzynki w EQ.
+    Każda dostaje action 'Otwórz: <nazwa>'. Tab znika gdy zero
+    nieotwartych. Otwierane manualnie (NIGDY nie auto-open)."""
+    out: List[SelectableOption] = []
+    ch = getattr(world, "character", None)
+    if ch is None:
+        return out
+    for eid in (ch.inventory_ids or []):
+        ent = world.entities.get(eid)
+        if ent is None:
+            continue
+        tags = set(ent.tags or [])
+        if "box" not in tags or "unopened" not in tags:
+            continue
+        name = ent.display_name()
+        out.append(SelectableOption(
+            option_id=f"box_open_{eid}",
+            label=f"Otwórz: {name}",
+            command=f"otwórz skrzynkę {name}",
+            group=GROUP_BOXES, target_id=eid,
+            action_type="open_box",
+        ))
+    return out
+
+
 def _consume_options(world) -> List[SelectableOption]:
     """P29.53n — Konsumuj sekcja: tylko food/drink/medical/consumable z
     EQ, każdy z dedykowanym verb (Zjedz/Wypij/Użyj) — gracz nie szuka
@@ -839,6 +872,10 @@ def _flat_inventory_verbs(world) -> List[SelectableOption]:
     for eid in (ch.inventory_ids or [])[:12]:   # cap visible to 12
         ent = world.entities.get(eid)
         if ent is None: continue
+        # P29.57b — skrzynki (tag "box") mają własny tab Skrzynki.
+        # Nie pokazuj ich w Ekwipunek żeby nie duplikować.
+        if "box" in (ent.tags or []):
+            continue
         name = ent.display_name()
         tags = set(ent.tags or [])
         affs = ent.affordances or []

@@ -41,7 +41,8 @@ def test_achievement_unlock_queues_boon_box():
                 if g.get("source", "").startswith("ach:")]
     assert len(boon_box) == 1, (
         f"expected 1 boon box for {key!r}, got {boon_box!r}")
-    assert boon_box[0]["sponsor_key"] == "showrunner"
+    # P29.57b: sponsor_key dla boon box przemianowany na „rezyser".
+    assert boon_box[0]["sponsor_key"] == "rezyser"
     assert boon_box[0]["item_key"]
 
 

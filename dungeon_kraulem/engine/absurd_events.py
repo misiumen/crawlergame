@@ -52,7 +52,7 @@ ABSURD_EVENTS = [
 
     {"key":"showrunner_unmuted",
      "line_pl":"Z głośnika dochodzi: „...nie, mówiłem PIES, nie PISK, "
-               "kurwa.” — i cisza. Showrunner zapomniał się wyłączyć.",
+               "kurwa.” — i cisza. Reżyser zapomniał się wyłączyć.",
      "tone":"syndicate",
      "effect":{"audience": 2}},
 
