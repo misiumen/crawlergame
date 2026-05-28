@@ -89,6 +89,13 @@ register(Affordance("rest_long",
 
 # ── Object/entity affordances ─────────────────────────────────────────────────
 
+# P29.53d — drop verb (z plecaka na podłogę). Inwentarz zapełniał się
+# bez sposobu na opróżnienie poza zużyciem/założeniem.
+register(Affordance("drop",
+    verbs_pl=["wyrzuć","wyrzuc","upuść","upusc","porzuć","porzuc","zostaw"],
+    verbs_en=["drop","discard","leave"],
+    time_cost=0))
+
 register(Affordance("push_into",
     verbs_pl=["wepchnij","pchnij","popchnij"],
     verbs_en=["push","shove","push into"],

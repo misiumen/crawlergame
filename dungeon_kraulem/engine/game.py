@@ -2529,6 +2529,19 @@ class Game:
             recipe_key = (ent.state or {}).get("recipe_key")
             if recipe_key and "recipe" in (ent.tags or []):
                 self._consume_recipe_note(ent, recipe_key); return
+            # P29.53c — keycard / key: otwiera zamknięte wyjście w
+            # bieżącym pokoju. Bez tego gracz miał klucz dostępu w
+            # plecaku i NIE WIEDZIAŁ jak go użyć na drzwi.
+            tags = ent.tags or []
+            if "key" in tags or "keycard" in tags:
+                self._attempt_use_key(ent); return
+
+        # P29.53d — drop verb: wyrzuca item z plecaka na podłogę.
+        # Bez tego plecak rósł w nieskończoność bez sposobu na
+        # opróżnienie poza zużyciem / założeniem.
+        if intent.intent == "drop" and v.matched_entities:
+            ent = v.matched_entities[0]
+            self._attempt_drop(ent); return
 
         # P29.41 — talk dialog tree intercept. Jeśli NPC ma na
         # stanie pole `dialogue_tree_key`, otwieramy STATE_DIALOG
@@ -7200,6 +7213,72 @@ class Game:
             f"{boss_pl}. Z głośnika trzask: „Wyjście odblokowane. "
             f"Sponsorzy są zadowoleni. Przesuń się dalej.”",
             LOG_SUCCESS)
+
+    # ── P29.53d: Drop → wyrzuca item z plecaka na podłogę ───────────
+
+    def _attempt_drop(self, ent) -> None:
+        """Wyrzuca item z plecaka do bieżącego pokoju. Equipped /
+        wielded items wymagają najpierw take_off / sheathe."""
+        ch = self.world.character
+        floor = self.world.current_floor
+        room = floor.current_room() if floor else None
+        if room is None:
+            return
+        eid = ent.entity_id
+        nm = ent.display_name()
+        # Zablokuj jeśli item jest aktualnie wielniety lub założony.
+        if ch.wielded_main_id == eid or ch.wielded_offhand_id == eid:
+            msg = (f"„{nm}” trzymasz w ręku. "
+                   f"Najpierw `schowaj` żeby wyjąć z dłoni.")
+            self.log(msg, LOG_WARN)
+            return
+        if eid in (ch.worn_slots or {}).values():
+            msg = f"„{nm}” masz na sobie. Najpierw `zdejmij`."
+            self.log(msg, LOG_WARN)
+            return
+        # Czy item w inwentarzu?
+        if eid not in ch.inventory_ids:
+            self.log("Nie masz tego w plecaku.", LOG_WARN)
+            return
+        # Przerzuć do pokoju.
+        ch.inventory_ids.remove(eid)
+        ent.location_id = room.room_id
+        room.entities.append(ent)
+        msg = f"Wyrzucasz: „{nm}”. Leży teraz na podłodze."
+        self.log(msg, LOG_NORMAL)
+
+    # ── P29.53c: Key → unlock door ───────────────────────────────────
+
+    def _attempt_use_key(self, key_ent) -> None:
+        """Klucz/keycard w plecaku → odblokowuje najbliższe zamknięte
+        wyjście w bieżącym pokoju. Pierwsze zamknięte exit łapie klucz."""
+        floor = self.world.current_floor
+        if floor is None:
+            return
+        room = floor.current_room()
+        if room is None:
+            return
+        # Znajdź pierwsze zamknięte (nie ukryte) wyjście.
+        locked_label = None
+        for label, ed in (room.exits or {}).items():
+            if ed.get("locked") and not ed.get("hidden"):
+                locked_label = label
+                break
+        if locked_label is None:
+            self.log("Nie ma tu nic, na czym klucz mógłby zadziałać.",
+                     LOG_WARN)
+            return
+        # Odblokuj.
+        room.exits[locked_label]["locked"] = False
+        key_name = key_ent.display_name() if hasattr(key_ent, "display_name") \
+                   else "klucz"
+        msg = (f"Przykładasz „{key_name}” do czytnika. Zamek pyka. "
+               f"Wyjście „{locked_label}” odblokowane.")
+        self.log(msg, LOG_SUCCESS)
+        # Niektóre keycard'y są jednorazowe (np. suspicious_keycard).
+        # Zostawiamy w plecaku — gracz może uznać że to flavor item.
+        # Jeśli kiedyś dodamy multi-use vs single-use distinction,
+        # tu jest miejsce żeby je usuwać przez ch.inventory_ids.remove.
 
     # ── P29.52: Recipe note → learn recipe ───────────────────────────
 
