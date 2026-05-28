@@ -731,27 +731,33 @@ def _personel_options(world, room) -> List[SelectableOption]:
     # Polish-only labels per service action_key. The safehouse menu
     # already uses these strings via numeric-pick locale lookups; here
     # we re-render them in human form for the action bar.
+    # P29.53i — ceny obniżone + opis efektu w labelu. Wcześniej gracz
+    # widział tylko cenę („Opatrunek (20 kr)") i nie wiedział co dostaje.
+    # Teraz każda opcja mówi co robi konkretnie.
     SERVICE_LABEL_PL = {
-        "coffee":  ("Kawa (5 kr)",              "kawa"),
-        "food":    ("Coś do jedzenia (12 kr)",  "jedzenie"),
-        "chat":    ("Pogadaj z obsługą",        "pogadaj"),
-        "wash":    ("Umyj się",                 "umyj się"),
-        "hide":    ("Schowaj się tu",           "ukryj się"),
-        "mirror":  ("Spójrz w lustro",          "spójrz w lustro"),
-        "drink":   ("Drink (8 kr)",             "drink"),
-        "schmooze":("Powiedz coś ciepłego",     "rozmowa"),
-        "heal":    ("Opatrunek (20 kr)",        "opatrunek"),
-        "cure":    ("Lek (30 kr)",              "lek"),
-        "full":    ("Pełna kuracja (60 kr)",    "pełna kuracja"),
-        "buy":     ("Kup coś",                  "kup"),
-        "sell":    ("Sprzedaj",                 "sprzedaj"),
-        "info":    ("Kup informację (15 kr)",   "informacja"),
-        "ad":      ("Włącz reklamę sponsora",   "reklama"),
-        "intel":   ("Zamów raport (10 kr)",     "raport"),
-        "read":    ("Czytaj ogłoszenia",        "ogłoszenia"),
-        "rest_short": ("Krótki odpoczynek",     "odpocznij"),
-        "rumor":   ("Posłuchaj plotek",         "plotki"),
-        "rest":    ("Odpocznij",                "odpocznij"),
+        "coffee":  ("Kawa (3 kr, +5% HP, czyści zmęczenie)",  "kawa"),
+        "food":    ("Posiłek (8 kr, +15% HP, sycenie)",       "jedzenie"),
+        "chat":    ("Pogadaj z obsługą (plotki, rumours)",    "pogadaj"),
+        "wash":    ("Umyj się (czyści brud, +1 audience)",    "umyj się"),
+        "hide":    ("Ukryj się (resetuje threat w pokoju)",   "ukryj się"),
+        "mirror":  ("Spójrz w lustro (efekt zależny od stanu)","spójrz w lustro"),
+        "drink":   ("Drink (5 kr, +3% HP, dobry humor)",      "drink"),
+        "schmooze":("Powiedz coś ciepłego (relationship +1)", "rozmowa"),
+        "heal":    ("Opatrunek (15 kr, +30% HP, czyści krwawienie)",
+                    "opatrunek"),
+        "cure":    ("Lek (20 kr, czyści truciznę/chorobę)",   "lek"),
+        "full":    ("Pełna kuracja (40 kr, 100% HP + statusy)", "pełna kuracja"),
+        "buy":     ("Kup coś (sklep — losowy stock)",         "kup"),
+        "sell":    ("Sprzedaj (50% wartości za itemy)",       "sprzedaj"),
+        "info":    ("Kup informację (10 kr, plotka o piętrze)",
+                    "informacja"),
+        "ad":      ("Włącz reklamę sponsora (+5 audience)",   "reklama"),
+        "intel":   ("Raport (8 kr, info o sąsiednich pokojach)",
+                    "raport"),
+        "read":    ("Ogłoszenia (lokalne newsy, dziwactwa)",  "ogłoszenia"),
+        "rest_short": ("Krótki odpoczynek (30 min, +25% HP)", "odpocznij"),
+        "rumor":   ("Plotki (od bywalców)",                   "plotki"),
+        "rest":    ("Odpocznij (jak krótki odpoczynek)",      "odpocznij"),
     }
 
     svc_list = _services(subtype) or []
