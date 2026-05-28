@@ -1749,6 +1749,30 @@ class Game:
 
     # ── P29.41: dialog tree handlers ──────────────────────────────────────
 
+    def _guess_dialogue_tree(self, entity) -> str:
+        """P29.59 — heurystyka mapująca tagi entity → tree_key, gdy
+        entity NIE ma explicit `state.dialogue_tree_key`. Cel: każdy
+        NPC z affordance „talk" dostaje JAKIEŚ drzewko zamiast
+        legacy skill check. Kolejność od bardziej specyficznych do
+        ogólniejszych.
+        """
+        tags = entity.tags or []
+        # Mini-bossy + bossy Ligi Brawurowej (F2)
+        if "faction:liga" in tags:
+            return "liga_brawurowa_grunt"
+        # Strażnik Bramy (F1 floor boss intake)
+        if "intake" in tags and "floor_boss" in tags:
+            return "intake_warden"
+        # Generic random crawler (T_CRAWLER) — fallback dla
+        # losowo spawnowanych zawodników bez tożsamości.
+        try:
+            from .entity import T_CRAWLER
+            if entity.entity_type == T_CRAWLER:
+                return "default_crawler"
+        except Exception:
+            pass
+        return ""
+
     def _open_dialogue(self, npc_entity, tree_key: str) -> None:
         """Otwórz rozmowę z NPC. Uruchamia drzewko, ustawia
         self.dialogue_state i przełącza state na STATE_DIALOG."""
@@ -2586,11 +2610,15 @@ class Game:
 
         # P29.41 — talk dialog tree intercept. Jeśli NPC ma na
         # stanie pole `dialogue_tree_key`, otwieramy STATE_DIALOG
-        # z odpowiednim drzewkiem. Inaczej fallthrough do
-        # starego skill-check'a (legacy social).
+        # z odpowiednim drzewkiem. P29.59 — gdy brak explicit key,
+        # zgadujemy z tagów entity (faction:liga → liga_brawurowa,
+        # intake+floor_boss → intake_warden, default crawler →
+        # default_crawler). Dopiero potem fallthrough do legacy.
         if intent.intent == "talk" and v.matched_entities:
             target = v.matched_entities[0]
             tree_key = (target.state or {}).get("dialogue_tree_key")
+            if not tree_key:
+                tree_key = self._guess_dialogue_tree(target)
             if tree_key:
                 self._open_dialogue(target, tree_key)
                 return
