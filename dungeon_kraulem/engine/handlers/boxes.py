@@ -216,14 +216,23 @@ def attempt_open_box(game, intent) -> None:
                 pass
             continue
         # Normal item
+        last_made_item = None
         for _ in range(qty):
             try:
                 it = make_item(item_key, location_id="inventory:player")
                 game.world.register(it)
                 ch.inventory_ids.append(it.entity_id)
+                last_made_item = it
             except Exception:
                 continue
-        nice = item_key.replace("_", " ")
+        # P29.59 — display name z faktycznie utworzonego item entity
+        # (które konsultuje item_templates fallback_name), nie surowy
+        # key. Bez tego box reveal pokazywał ang. „snack bar" / „dead
+        # phone" zamiast „baton energetyczny" / „martwy telefon".
+        if last_made_item is not None and last_made_item.fallback_name:
+            nice = last_made_item.fallback_name
+        else:
+            nice = item_key.replace("_", " ")
         if qty > 1:
             spawned_names.append(f'„{nice}” ×{qty}')
         else:

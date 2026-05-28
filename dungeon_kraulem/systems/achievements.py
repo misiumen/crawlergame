@@ -663,7 +663,17 @@ def unlock(target, key: str, world=None) -> bool:
                     "source": f"ach:{key}",
                 })
                 if hasattr(w, "log_msg"):
+                    # P29.59 — display name z item_templates fallback_name
+                    # (PL), nie surowy key (który dawał ang. „snack bar",
+                    # „dead phone" w premii reżysera).
                     nice = item_key.replace("_", " ")
+                    try:
+                        from ..content import content_loader
+                        c_tmpl = content_loader.item_template(item_key)
+                        if c_tmpl and c_tmpl.get("fallback_name"):
+                            nice = c_tmpl["fallback_name"]
+                    except Exception:
+                        pass
                     line = (f'Premia Reżysera: „{nice}” '
                             f'czeka w safehouse.')
                     w.log_msg(line, "success")
