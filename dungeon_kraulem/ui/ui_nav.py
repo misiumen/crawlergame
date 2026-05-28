@@ -822,10 +822,28 @@ def _flat_inventory_verbs(world) -> List[SelectableOption]:
                 group=GROUP_INVENTORY, target_id=eid,
                 action_type="wield",
             ))
+        # P29.53e — verb mapping per kategoria itemu. Wcześniej KAŻDY
+        # item dostawał „Użyj: X" — dla batona, kawy, opatrunku, mapy,
+        # klucza. Decision-noise: gracz nie wiedział co `użyj baton`
+        # zrobi (nic). Verb teraz pasuje do natury rzeczy:
+        #   food            → Zjedz (parser: zjedz / skonsumuj)
+        #   drink           → Wypij (parser: wypij / skonsumuj)
+        #   paper + recipe  → Przeczytaj (parser: czytaj / przeczytaj)
+        #   Pozostałe       → Użyj (fallback)
+        # Medical / map / key zostają „Użyj" — istniejące handlery
+        # już obsługują tę ścieżkę przez `użyj`.
+        verb_label = "Użyj"
+        verb_cmd = "użyj"
+        if "food" in tags:
+            verb_label = "Zjedz"; verb_cmd = "zjedz"
+        elif "drink" in tags:
+            verb_label = "Wypij"; verb_cmd = "wypij"
+        elif "paper" in tags and "recipe" in tags:
+            verb_label = "Przeczytaj"; verb_cmd = "przeczytaj"
         out.append(SelectableOption(
             option_id=f"inv_use_{eid}",
-            label=f"Użyj: {name}",
-            command=f"użyj {name}",
+            label=f"{verb_label}: {name}",
+            command=f"{verb_cmd} {name}",
             group=GROUP_INVENTORY, target_id=eid,
             action_type="use",
         ))
