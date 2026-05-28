@@ -2535,6 +2535,23 @@ class Game:
             tags = ent.tags or []
             if "key" in tags or "keycard" in tags:
                 self._attempt_use_key(ent); return
+            # P29.53f — food/drink/medical: routuj do consume zamiast
+            # do generycznego `use` resolvera (który nic nie robił).
+            # Zachowuje kompat ze starym verb'em `użyj baton` plus
+            # mouse-click w panel z verb mapping (P29.53e).
+            if ("food" in tags or "drink" in tags or
+                    "consumable" in tags or "medical" in tags or
+                    ent.key in self._CONSUMABLE_EFFECTS):
+                # Wstrzykuj target jako dispay name żeby _attempt_consume
+                # mogło znaleźć w inventory.
+                from .parser_core import ActionIntent
+                consume_intent = ActionIntent(
+                    intent="consume",
+                    verb="skonsumuj",
+                    targets=[ent.display_name()],
+                    normalized_text=f"skonsumuj {ent.display_name()}",
+                )
+                self._attempt_consume(consume_intent); return
 
         # P29.53d — drop verb: wyrzuca item z plecaka na podłogę.
         # Bez tego plecak rósł w nieskończoność bez sposobu na
