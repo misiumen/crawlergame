@@ -203,13 +203,13 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
     # ── COATINGS: 6 typów damage × 2 wariacje (base + amped) ──────────
 
     _coating("weapon_acid_coat", "olej żrący",
-             "Wyciek z butelki bleach'a + chłonny materiał. Rdzewieje "
+             "Wyciek z butelki wybielacza + chłonny materiał. Rdzewieje "
              "wszystko czego dotknie.",
              tier=3, tags=[("acid", 1), ("absorbent", 1), ("liquid", 1)],
              dmg_type="acid", hits=4, extra=1),
 
     _coating("weapon_acid_coat_amped", "smoła trawiąca",
-             "Wybielacz + tar + rdza. Pulsuje. Dwa razy gorzej niż "
+             "Wybielacz + smoła + rdza. Pulsuje. Dwa razy gorzej niż "
              "zwykły olej żrący.",
              tier=4, tags=[("acid", 1), ("sticky", 1), ("metal", 1), ("hazard", 1)],
              dmg_type="acid", hits=6, extra=2, rarity="rare"),
@@ -220,7 +220,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
              dmg_type="fire", hits=4, extra=1, fumble="ignite_self"),
 
     _coating("weapon_fire_coat_amped", "napalm rzemieślniczy",
-             "Żel + paliwo + tar. Lepi się i pali aż do dna.",
+             "Żel + paliwo + smoła. Lepi się i pali aż do dna.",
              tier=4, tags=[("flammable", 2), ("sticky", 1), ("incendiary", 1)],
              dmg_type="fire", hits=6, extra=2, rarity="rare", fumble="ignite_self"),
 
@@ -253,7 +253,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
              dmg_type="psychic", hits=3, extra=2, rarity="rare", discipline="alchemy"),
 
     _coating("weapon_void_jadwiga", "powłoka pustki",
-             "Czarne szkło + osad pustki + tar. Cios znika i wraca "
+             "Czarne szkło + osad pustki + smoła. Cios znika i wraca "
              "z innej strony.",
              tier=4, tags=[("weird", 2), ("sticky", 1), ("sharp", 1)],
              dmg_type="psychic", hits=4, extra=3, rarity="epic", discipline="alchemy",
@@ -325,7 +325,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         w_tags=["weapon", "sharp", "melee", "one_handed", "incendiary"], rarity="rare"),
 
     _weapon("crafted_acid_dagger", "kwasowy sztylet",
-        "Ostrze maczane w bleach'u. Pamięta każdą krew którą widziało.",
+        "Ostrze maczane w wybielaczu. Pamięta każdą krew którą widziało.",
         tier=4, tags=[("metal", 1), ("sharp", 1), ("acid", 1), ("handle", 1)],
         dice="1d6+1", dmg_type="acid",
         w_tags=["weapon", "sharp", "melee", "one_handed"], rarity="rare"),
@@ -350,7 +350,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         w_tags=["weapon", "melee", "one_handed", "psychic"], rarity="epic",
         discipline="alchemy"),
 
-    _weapon("crafted_chemspray_pistol", "pistolet chem-spray",
+    _weapon("crafted_chemspray_pistol", "pistolet chemikalia-spray",
         "Pusta puszka graffiti + rura + zapalniczka. Strzela mgłą.",
         tier=4, tags=[("container", 1), ("spray", 1), ("chemical", 1), ("metal", 1)],
         dice="1d6", dmg_type="acid",
@@ -421,7 +421,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
     # ── TRAPS (12) ────────────────────────────────────────────────────
 
     _trap("trap_acid_pit", "fosa kwasu",
-        "Kanister + bleach + cloth. Otwiera się pod stopą wroga.",
+        "Kanister + wybielacz + płótno. Otwiera się pod stopą wroga.",
         tier=4, tags=[("acid", 2), ("container", 1), ("binding", 1)],
         payload={"type": "damage_and_status", "damage": 6, "damage_type": "acid",
                  "status": "corroded", "duration": 8, "extra_tags": ["acid"]}),
@@ -447,13 +447,13 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
                  "status": "chilled", "duration": 3, "extra_tags": ["cold"]}),
 
     _trap("trap_glue_net", "siatka kleju",
-        "Cloth + tar + chemia. Łapie i unieruchamia.",
+        "Płótno + smoła + chemia. Łapie i unieruchamia.",
         tier=3, tags=[("cloth", 1), ("sticky", 2)],
         payload={"type": "damage_and_status", "damage": 1, "damage_type": "physical",
                  "status": "grappled", "duration": 4, "extra_tags": ["restraint"]}),
 
     _trap("trap_pheromone_lure", "wabik feromonowy",
-        "Fiolka + cloth + bait. Przyciąga inne moby ze sąsiednich pokoi.",
+        "Fiolka + płótno + bait. Przyciąga inne moby ze sąsiednich pokoi.",
         tier=4, tags=[("smell", 1), ("bait", 1), ("organic", 1), ("biome:zoo_korporacyjne", 1)],
         payload={"type": "lure_extra_mob", "duration": 0, "extra_tags": ["lure"]},
         biome="zoo_korporacyjne", rarity="rare"),
@@ -473,21 +473,21 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         biome="muzeum_spektakli", rarity="rare", aud=5),
 
     _trap("trap_drunk_glasses", "rozsypane szklanki",
-        "Kosz szklanek + tar + tap. Rozsypuje się.",
+        "Kosz szklanek + smoła + tap. Rozsypuje się.",
         tier=3, tags=[("glass", 1), ("sticky", 1), ("biome:bar_skurczybyk", 1)],
         payload={"type": "damage_and_status", "damage": 3, "damage_type": "physical",
                  "status": "bleeding", "duration": 4, "extra_tags": ["sharp"]},
         biome="bar_skurczybyk"),
 
     _trap("trap_pigeon_swarm", "rój gołębi",
-        "Karma + feromon + brick. Gołębie zaatakują pierwszego wroga.",
+        "Karma + feromon + cegła. Gołębie zaatakują pierwszego wroga.",
         tier=4, tags=[("organic", 2), ("bait", 1), ("biome:intake_industrial", 1)],
         payload={"type": "damage_and_status", "damage": 3, "damage_type": "physical",
                  "status": "blinded", "duration": 2, "extra_tags": ["swarm"]},
         biome="intake_industrial", rarity="rare"),
 
     _trap("trap_spring_caltrops", "sprężynowe gwoździe",
-        "Spring + nails + metal. Strzelają na trafionego.",
+        "Sprężyna + gwoździe + metal. Strzelają na trafionego.",
         tier=3, tags=[("metal", 2), ("spring", 1), ("sharp", 1)],
         payload={"type": "damage_and_status", "damage": 4, "damage_type": "physical",
                  "status": "slowed", "duration": 3, "extra_tags": ["sharp"]}),
@@ -502,19 +502,19 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
     # ── THROWABLES (10) ───────────────────────────────────────────────
 
     _throwable("throwable_acid_flask_mk2", "ulepszona fiolka żrąca",
-        "Bleach + acid + glass. Splash + corroded.",
+        "Wybielacz + kwas + szkło. Bryzga i rdzewieje co dotknie.",
         tier=3, tags=[("acid", 2), ("glass", 1)],
         payload={"type": "aoe", "damage": 5, "damage_type": "acid",
                  "status": "corroded", "radius": 1, "extra_tags": ["acid"]}),
 
     _throwable("throwable_smoke_blackout", "dym pełnej ciemności",
-        "Phosphor + cloth + chemical. Cały pokój blind.",
+        "Fosfor + płótno + chemical. Cały pokój blind.",
         tier=4, tags=[("powder", 1), ("flammable", 1), ("cloth", 1), ("reactive", 1)],
         payload={"type": "room_blind", "duration": 4, "extra_tags": ["smoke"]},
         rarity="rare"),
 
     _throwable("throwable_frost_grenade", "granat mrozu",
-        "Chłodziwo + container + spring. AOE chilled.",
+        "Chłodziwo + container + sprężyna. AOE chilled.",
         tier=4, tags=[("cold", 1), ("container", 1), ("spring", 1), ("liquid", 1)],
         payload={"type": "aoe", "damage": 3, "damage_type": "cold",
                  "status": "chilled", "radius": 1, "extra_tags": ["cold"]}),
@@ -541,26 +541,26 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         rarity="rare", fumble="explode_self"),
 
     _throwable("throwable_glue_bomb", "klejowa bomba",
-        "Tar + cloth + binder. Wszyscy w pokoju grappled.",
+        "Smoła + płótno + spoiwo. Wszyscy w pokoju grappled.",
         tier=3, tags=[("sticky", 2), ("cloth", 1)],
         payload={"type": "room_status", "status": "grappled", "duration": 3,
                  "extra_tags": ["restraint"]}),
 
     _throwable("throwable_distraction_firecracker", "petarda odwracająca",
-        "Sód + papier + cloth. Świni cały threat zegar.",
+        "Sód + papier + płótno. Świni cały threat zegar.",
         tier=3, tags=[("reactive", 1), ("paper", 1), ("flammable", 1)],
         payload={"type": "threat_reset", "audience_gain": 3,
                  "extra_tags": ["spectacle"]}),
 
     _throwable("throwable_gas_canister_lob", "rzut gazem",
-        "Kanister gazu + spring. Splash kwaśny + cough.",
+        "Kanister gazu + sprężyna. Bryzga kwasem, dusi kaszlem.",
         tier=4, tags=[("gas", 1), ("container", 1), ("hazard", 1), ("biome:okopy_frontowe", 1)],
         payload={"type": "aoe", "damage": 4, "damage_type": "acid",
                  "status": "poisoned", "radius": 2, "extra_tags": ["gas", "biome:okopy_frontowe"]},
         biome="okopy_frontowe", rarity="rare"),
 
     _throwable("throwable_pheromone_grenade", "granat feromonowy",
-        "Fiolka feromonów + spring + cloth. Wciąga moby z sąsiednich pokoi.",
+        "Fiolka feromonów + sprężyna + płótno. Wciąga moby z sąsiednich pokoi.",
         tier=4, tags=[("smell", 1), ("organic", 1), ("spring", 1), ("biome:zoo_korporacyjne", 1)],
         payload={"type": "lure_extra_mob", "duration": 0,
                  "extra_tags": ["lure", "biome:zoo_korporacyjne"]},
@@ -574,19 +574,19 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         perm={"ac_bonus": 2, "tag_add": "reinforced"}),
 
     _armor("armor_acid_lining_mk2", "wzmocnione wyłożenie kwasoodporne",
-        "Guma + rubber + chemical. Imuno na acid statusy.",
+        "Guma + guma + chemical. Imuno na acid statusy.",
         tier=4, tags=[("rubber", 2), ("chemical", 1), ("insulator", 1)],
         perm={"ac_bonus": 1, "tag_add": "acid_proof", "status_immune": "corroded"},
         rarity="rare"),
 
     _armor("armor_insulated_jacket", "izolowana kurtka",
-        "Rubber + leather + wire mesh. Imuno na shock.",
+        "Guma + skóra + drut mesh. Imuno na shock.",
         tier=4, tags=[("rubber", 1), ("leather", 1), ("insulator", 1), ("wire", 1)],
         perm={"ac_bonus": 1, "tag_add": "insulated", "status_immune": "shocked"},
         rarity="rare", discipline="electronics"),
 
     _armor("armor_fire_resistant_robe", "ognioodporna szata",
-        "Salt + cloth + glina. Splash fire reduced 50%.",
+        "Sól + płótno + glina. Tłumi płomień o połowę.",
         tier=4, tags=[("preservative", 1), ("cloth", 2), ("powder", 1)],
         perm={"ac_bonus": 1, "tag_add": "fire_resistant", "resist": "fire"}),
 
@@ -596,7 +596,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         perm={"tag_add": "sponsored", "audience_mul": 1.1}, rarity="rare", aud=4),
 
     _armor("armor_void_cloak", "płaszcz z osadu pustki",
-        "Osad pustki + wax idol + cloth. 25% szans na auto-evade vs ranged.",
+        "Osad pustki + wosk figurka + płótno. 25% szans na auto-evade vs ranged.",
         tier=5, tags=[("weird", 1), ("wax", 1), ("cloth", 2)],
         perm={"tag_add": "void_cloaked", "ranged_evade_pct": 25},
         rarity="epic", discipline="alchemy", aud=4),
@@ -608,7 +608,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         biome="okopy_frontowe"),
 
     _armor("armor_bar_apron", "barmański fartuch",
-        "Cloth + tar + brass. Splash drink reduce.",
+        "Płótno + smoła + mosiądz. Pryska drinkami, ale zostaje suchy.",
         tier=3, tags=[("cloth", 1), ("sticky", 1), ("biome:bar_skurczybyk", 1)],
         perm={"ac_bonus": 1, "tag_add": "drinkproof"},
         biome="bar_skurczybyk"),
@@ -626,17 +626,17 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         heal=4),
 
     _food("food_synth_protein_bar", "syntetyczny baton białkowy",
-        "Pellet + tar + cloth wrapper. Smakuje obrzydliwie. Działa.",
+        "Karma + smoła + płótno wrapper. Smakuje obrzydliwie. Działa.",
         tier=3, tags=[("food", 1), ("sticky", 1), ("cloth", 1)],
         heal=6, buff="energy_burst", aud=2),
 
     _food("food_mushroom_stew", "gulasz grzybowy",
-        "Glow moss + fungal fiber + sól + olej. +1 audience na dłuższy czas.",
+        "Glow moss + fungal włókno + sól + olej. +1 audience na dłuższy czas.",
         tier=4, tags=[("fungal", 2), ("organic", 1), ("preservative", 1)],
         heal=4, buff="audience_streamer", rarity="uncommon", aud=3),
 
     _food("food_anomaly_truffle", "anomalny trufla",
-        "Anomalny pył + grzyb + tar. Może dać +1 do INT na piętro.",
+        "Anomalny pył + grzyb + smoła. Może dać +1 do INT na piętro.",
         tier=4, tags=[("weird", 1), ("fungal", 1), ("sticky", 1), ("powder", 1)],
         heal=2, buff="int_boost", rarity="rare", discipline="alchemy", aud=4),
 
@@ -651,45 +651,45 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         heal=5, biome="intake_industrial"),
 
     _food("food_zoo_critter_skewer", "zoo-szaszłyk",
-        "Pellet + krew + drewno + ogień. Smakuje jak menedżer.",
+        "Karma + krew + drewno + ogień. Smakuje jak menedżer.",
         tier=4, tags=[("organic", 2), ("flammable", 1), ("biome:zoo_korporacyjne", 1)],
         heal=6, buff="warmed_up", biome="zoo_korporacyjne", rarity="uncommon"),
 
     # ── MEDICAL (8) ──────────────────────────────────────────────────
 
     _medical("med_clean_bandage", "czysty opatrunek",
-        "Alkohol + cloth + tape. Zatrzymuje krwawienie.",
+        "Alkohol + płótno + taśma. Zatrzymuje krwawienie.",
         tier=3, tags=[("medical", 1), ("cloth", 1), ("binding", 1)],
         heal=8, cures=("bleeding",)),
 
     _medical("med_antitoxin_kit", "zestaw antytoksyn",
-        "Disinfectant + acid + organic. Imuno trucizn na turę.",
+        "Środek odkażający + kwas + organika. Imuno trucizn na turę.",
         tier=4, tags=[("medical", 1), ("chemical", 1), ("organic", 1)],
         heal=4, cures=("poisoned", "corroded"), rarity="rare"),
 
     _medical("med_warming_balm", "balsam rozgrzewający",
-        "Alcohol + chłodziwo (odwrotnie) + tłuszcz. Curuje chilled.",
+        "Alkohol + chłodziwo (odwrotnie) + tłuszcz. Curuje chilled.",
         tier=3, tags=[("medical", 1), ("chemical", 1), ("liquid", 1)],
         heal=3, cures=("chilled",)),
 
     _medical("med_burn_salve", "maść na oparzenia",
-        "Olej + cloth + woda. Curuje burning + ból.",
+        "Olej + płótno + woda. Curuje burning + ból.",
         tier=3, tags=[("medical", 1), ("slick", 1), ("absorbent", 1)],
         heal=4, cures=("burning",)),
 
     _medical("med_emergency_stim", "awaryjny stim",
-        "Battery + chem + needle. Wskakuje na 1 HP zamiast 0.",
+        "Bateria + chemikalia + igła. Wskakuje na 1 HP zamiast 0.",
         tier=4, tags=[("medical", 1), ("power", 1), ("reactive", 1)],
         heal=12, buff_status="prevent_death", rarity="rare",
         discipline="electronics"),
 
     _medical("med_shock_paddle", "doraźny defibrylator",
-        "Cewka + ogniwo + drut + skóra. Resuscytuje (heal +20 jeśli HP<10).",
+        "Cewka + ogniwo + drut + skóra. Resuscytuje (leczy +20 jeśli HP<10).",
         tier=5, tags=[("electrical", 2), ("medical", 1), ("power", 1)],
         heal=20, cures=("shocked",), rarity="epic", discipline="electronics"),
 
     _medical("med_field_painkiller", "polowy lek bólu",
-        "Phosphor + cloth + organic. Curuje wounded.",
+        "Fosfor + płótno + organika. Koi ból ran.",
         tier=3, tags=[("medical", 1), ("powder", 1), ("cloth", 1)],
         heal=2, cures=("wounded", "afraid")),
 
@@ -702,7 +702,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
     # ── TOOLS (8) ────────────────────────────────────────────────────
 
     _tool("tool_advanced_lockpick", "wytrychy pierwszej kategorii",
-        "Spring + cienki metal + olej. +5 do hack/lock checków.",
+        "Sprężyna + cienki metal + olej. +5 do hack/lock checków.",
         tier=3, tags=[("metal", 1), ("spring", 1), ("slick", 1)],
         tool_kind="lockpick", rarity="uncommon"),
 
@@ -717,17 +717,17 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         tool_kind="scout_drone", rarity="rare"),
 
     _tool("tool_field_kit", "polowy zestaw narzędzi",
-        "Tape + screws + leather + wire. +1 do crafting przez 1 piętro.",
+        "Taśma + śrubki + skóra + drut. Daje +1 do craftingu przez piętro.",
         tier=4, tags=[("metal", 1), ("binding", 2), ("leather", 1)],
         tool_kind="craft_bonus", discipline="tinker"),
 
     _tool("tool_decoder_ring", "pierścień dekoderski",
-        "Chip + soczewka + brass. Odczytuje sponsor data.",
+        "Chip + soczewka + mosiądz. Odczytuje sponsor data.",
         tier=4, tags=[("electronic", 1), ("optical", 1), ("data", 1)],
         tool_kind="decoder", rarity="rare"),
 
     _tool("tool_makeshift_radio", "doraźne radio",
-        "Wire + battery + spring + screen. Słyszysz sąsiednie pokoje.",
+        "Drut + bateria + sprężyna + screen. Słyszysz sąsiednie pokoje.",
         tier=4, tags=[("electrical", 1), ("electronic", 1), ("power", 1)],
         tool_kind="radio", rarity="uncommon"),
 
@@ -737,19 +737,19 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         tool_kind="boss_locator", biome="zoo_korporacyjne", rarity="epic"),
 
     _tool("tool_archive_lens", "soczewka archiwalna",
-        "Prism + film + screen. Pokazuje historię pokoju.",
+        "Prism + taśma filmowa + screen. Pokazuje historię pokoju.",
         tier=4, tags=[("optical", 2), ("data", 1), ("biome:muzeum_spektakli", 1)],
         tool_kind="history_lens", biome="muzeum_spektakli", rarity="rare"),
 
     # ── BIOME bonus content (już rozproszone wyżej, +3 dodatkowe) ─────
 
     _coating("weapon_okopy_acid_mud", "okopowa glina kwasowa",
-        "Trench mud + acid + cloth. Rdzewieje stal w okopach.",
+        "Trench mud + acid + płótno. Rdzewieje stal w okopach.",
         tier=3, tags=[("biome:okopy_frontowe", 1), ("acid", 1), ("cloth", 1)],
         dmg_type="acid", hits=4, extra=2, biome="okopy_frontowe", rarity="uncommon", aud=3),
 
     _throwable("throwable_zoo_collar_bomb", "obrożowa bomba",
-        "Escape collar + battery + spring. Wybucha na metal-armed mobach.",
+        "Escape obroża + bateria + sprężyna. Wybucha na metal-armed mobach.",
         tier=4, tags=[("electronic", 1), ("magnetic", 1), ("biome:zoo_korporacyjne", 1)],
         payload={"type": "aoe", "damage": 8, "damage_type": "electric",
                  "radius": 1, "extra_tags": ["explosive"]},
@@ -766,13 +766,13 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
 
     _coating("weapon_spore_coat", "powłoka zarodnikowa",
         "Kapsuła zarodników + warkocz grzybni + olej. Każdy cios "
-        "rozprasza spore.",
+        "rozprasza zarodniki.",
         tier=3, tags=[("biome:grzybica_bloom", 1), ("fungal", 1), ("slick", 1)],
         dmg_type="poison", hits=5, extra=1, biome="grzybica_bloom",
         discipline="bio", aud=3),
 
     _throwable("throwable_spore_bomb", "bomba zarodnikowa",
-        "Spore + capsule + spring. Cały pokój zatruty na 3 tury.",
+        "Zarodniki + kapsuła + sprężyna. Cały pokój zatruty na 3 tury.",
         tier=4, tags=[("biome:grzybica_bloom", 1), ("fungal", 1), ("powder", 1), ("spring", 1)],
         payload={"type": "room_status", "status": "poisoned", "duration": 3,
                  "extra_tags": ["fungal"]},
@@ -784,7 +784,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         heal=5, buff="low_light_buff", biome="grzybica_bloom", rarity="rare"),
 
     _medical("med_blackrot_antitoxin", "antytoksyna z czarnej zgnilizny",
-        "Blackrot + alkohol + cloth. Curuje poisoned + corroded jednocześnie.",
+        "Blackrot + alkohol + płótno. Curuje poisoned + corroded jednocześnie.",
         tier=3, tags=[("biome:grzybica_bloom", 1), ("medical", 1), ("organic", 1)],
         heal=6, cures=("poisoned", "corroded"),
         biome="grzybica_bloom", rarity="rare"),
@@ -792,20 +792,20 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
     # ── BIOME: intake_industrial (3 unikalne recepty) ─────────────────
 
     _weapon("crafted_intake_pipe_mace", "intake'owa rura uderzeniowa",
-        "Intake rebar + smar + skórzany chwyt. Brzęczy przy każdym ciosie.",
+        "Intake zbrojenie + smar + skórzany chwyt. Brzęczy przy każdym ciosie.",
         tier=3, tags=[("biome:intake_industrial", 1), ("metal", 1), ("handle", 1)],
         dice="1d8", dmg_type="physical",
         w_tags=["weapon", "blunt", "melee", "two_handed"],
         biome="intake_industrial", rarity="uncommon"),
 
     _coating("weapon_grease_slick", "smar industrialny",
-        "Smar + cloth + binding. Cios w nogi = prone wroga.",
+        "Smar + płótno + binding. Cios w nogi = prone wroga.",
         tier=3, tags=[("biome:intake_industrial", 1), ("slick", 1), ("binding", 1)],
         dmg_type="physical", hits=3, extra=0, biome="intake_industrial",
         discipline="mechanics"),
 
     _trap("trap_intake_oil_slick", "rozlany smar",
-        "Smar przemysłowy + cloth + plastic. Cały pokój prone.",
+        "Smar przemysłowy + płótno + plastik. Cały pokój prone.",
         tier=3, tags=[("biome:intake_industrial", 1), ("slick", 1), ("cloth", 1)],
         payload={"type": "damage_and_status", "damage": 1, "damage_type": "physical",
                  "status": "prone", "duration": 3, "extra_tags": ["slip"]},
@@ -814,7 +814,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
     # ── Extra fillers (5) — bez biome ──────────────────────────────────
 
     _throwable("throwable_smoke_screen", "zasłona dymna",
-        "Fosfor + cloth + container. Pokój za zasłoną.",
+        "Fosfor + płótno + container. Pokój za zasłoną.",
         tier=3, tags=[("powder", 1), ("flammable", 1), ("container", 1)],
         payload={"type": "room_blind", "duration": 2, "extra_tags": ["smoke"]}),
 
@@ -835,14 +835,14 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         rarity="uncommon"),
 
     _medical("med_quickseal_foam", "piana szybkozasklepiająca",
-        "Fosfor + cloth + chemical. Heal 6 + curuje bleeding + wounded.",
+        "Fosfor + płótno + chemical. Leczy 6 + curuje bleeding + wounded.",
         tier=3, tags=[("powder", 1), ("absorbent", 1), ("reactive", 1)],
         heal=6, cures=("bleeding", "wounded")),
 
     # ── SPONSOR-BRANDED specialties (6) ───────────────────────────────
 
     _medical("med_nova_chem_xpack", "NovaChem X-pack",
-        "Disinfectant + reagent + chem + organic. Curuje all + audience +5.",
+        "Środek odkażający + odczynnik + chemikalia + organika. Kuruje wszystko + audience +5.",
         tier=4, tags=[("medical", 2), ("chemical", 1), ("organic", 1)],
         heal=15, cures=("bleeding", "poisoned", "burning", "corroded"),
         rarity="rare", aud=5),
@@ -855,25 +855,25 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
         rarity="rare", aud=4),
 
     _tool("tool_kanal7_microphone_mk2", "ulepszony mikrofon Kanału 7",
-        "Sensor + circuit + wire + chip. Audience x1.25 na każdej rozmowie.",
+        "Sensor + circuit + drut + chip. Audience x1.25 na każdej rozmowie.",
         tier=4, tags=[("electronic", 2), ("data", 1), ("sponsor", 1)],
         tool_kind="audience_amp", rarity="rare", aud=4),
 
     _trap("trap_czarny_rynek_snare", "sidła Czarnego Rynku",
-        "Tape + wire + bone + spring. Grapple + +1 credit per turn trapped.",
+        "Taśma + drut + kość + sprężyna. Grapple + +1 credit per turn trapped.",
         tier=3, tags=[("binding", 1), ("spring", 1), ("bone", 1)],
         payload={"type": "damage_and_status", "damage": 2, "damage_type": "physical",
                  "status": "grappled", "duration": 4, "extra_tags": ["sponsor"]},
         rarity="uncommon"),
 
     _armor("armor_sponsor_vest_amped", "ulepszona kamizelka sponsorska",
-        "Vest + sponsor logo + chip + camera. Audience x1.15 floor-wide.",
+        "Kamizelka + sponsor logo + chip + camera. Audience x1.15 floor-wide.",
         tier=5, tags=[("cloth", 1), ("sponsor", 2), ("electronic", 1)],
         perm={"ac_bonus": 1, "audience_mul": 1.15, "tag_add": "sponsored_amp"},
         rarity="epic", aud=6),
 
     _throwable("throwable_propaganda_zine", "propagandowy zin",
-        "Paper + ink + sponsor + chemical. Audience +10 splash + afraid.",
+        "Papier + atrament + logo sponsora + chemikalia. Widownia +10 i strach w pokoju.",
         tier=4, tags=[("paper", 1), ("sponsor", 1), ("chemical", 1), ("powder", 1)],
         payload={"type": "room_status", "status": "afraid", "duration": 2,
                  "audience_gain": 10, "extra_tags": ["spectacle"]},

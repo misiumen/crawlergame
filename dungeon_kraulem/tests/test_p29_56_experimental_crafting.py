@@ -27,15 +27,53 @@ def test_catalog_keys_unique():
 
 
 def test_catalog_polish_only():
-    """No raw English in name/desc."""
-    suspect = {"the", "with", "you", "your", "this", "and"}
+    """STRICT Polish-only check.
+
+    Polish-only jest niezłamywalną zasadą projektu (patrz feedback memory).
+    Ten test łapie WSZYSTKIE typowe angielskie słowa-materiały i pomocnicze
+    słowa, które mogłyby wsiąść do desc_pl/name_pl po refactorze albo
+    bulk-replace. Każde nowe naruszenie = fail przed commitem.
+    """
+    import re as _re
+    suspect = {
+        # English connectors that absolutely don't belong
+        "the", "with", "you", "your", "this", "and", "or", "for", "from",
+        "to", "of", "an", "a", "is", "are", "was", "were", "be", "can",
+        "will", "have", "has", "had",
+        # Material name leaks (commonly slipped through)
+        "battery", "wire", "tape", "screws", "spring", "cloth", "chem",
+        "spore", "tar", "brick", "glass", "rubber", "leather", "bone",
+        "bomb", "heal", "heals", "cure", "cures", "phosphor", "sodium",
+        "salt", "bleach", "rebar", "grease", "collar", "feed", "pellet",
+        "film", "vest", "disinfectant", "wax", "idol", "fiber", "needle",
+        "capsule", "plastic", "organic",
+        # Effect / mechanic word leaks
+        "splash", "cough", "reduce", "reduced", "blood", "fume", "fumes",
+        "damage", "armor", "weapon", "attack",
+    }
+    # Polish-only exceptions: niektóre wyrazy są loanwordami które po
+    # polsku przyjęły się (snake_case key + display equivalent).
+    # NIE dodawaj tu nowych "wyjątków" lekkomyślnie — preferuj polskie
+    # tłumaczenie.
+    polish_exceptions = {
+        "metal", "stone", "fire", "water", "acid", "poison", "logo",
+        "sponsor",  # zapożyczone, używane po polsku
+    }
+    suspect = suspect - polish_exceptions
+    word_re = _re.compile(r"[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]+")
+    failures = []
     for r in _exp.EXPERIMENTAL_RECIPES:
         for fld in ("name_pl", "desc_pl"):
-            words = (r[fld] or "").lower().split()
-            bad = [w.strip(".,!?'\"„”():") for w in words
-                   if w.strip(".,!?'\"„”():") in suspect]
-            assert not bad, (
-                f"{r['key']}.{fld} ma angielskie słowa: {bad}")
+            text = (r.get(fld) or "")
+            for token in word_re.findall(text.lower()):
+                if token in suspect:
+                    snippet = text[:60]
+                    failures.append(
+                        f"{r['key']}.{fld}: '{token}' w „{snippet}…”")
+                    break
+    assert not failures, (
+        f"Polish-only naruszenia ({len(failures)}):\n  "
+        + "\n  ".join(failures[:15]))
 
 
 def test_catalog_tiers_valid():
