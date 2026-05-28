@@ -160,6 +160,25 @@ def transform_to_corpse(world, entity, *, killer=None) -> Optional[Entity]:
                 world.current_floor.exits_unlocked.add("boss_defeated")
     except (AttributeError, KeyError):
         pass
+    # P29.57e — Wiercimajster codex: capture „died_elsewhere" gdy boss
+    # z rangą padł NIE z ręki gracza (trapy / faction crossfire /
+    # hazardy / sponsor wars). Player-kill ma swój hook w game.py
+    # (record_boss_kill), tutaj tylko nie-player path.
+    try:
+        if any(isinstance(t, str) and t.startswith("boss_rank:")
+               for t in tags):
+            player_ch = getattr(world, "character", None) \
+                if world is not None else None
+            if killer is not player_ch:
+                from . import run_history as _rh
+                floor_num = 1
+                if world is not None and getattr(world, "current_floor",
+                                                  None) is not None:
+                    floor_num = int(getattr(world.current_floor,
+                                            "floor_number", 1) or 1)
+                _rh.record_boss_died_elsewhere(entity, floor_num)
+    except (AttributeError, KeyError, ImportError, OSError):
+        pass
     # Affordances flip to the corpse set. Some monsters had `talk` etc.
     # which obviously no longer apply.
     entity.affordances = list(CORPSE_AFFORDANCES)

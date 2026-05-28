@@ -471,6 +471,24 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.94
         return intent
 
+    # ── P29.57e — Wiercimajster: codex bossów ─────────────────────────────
+    # „wezwij trenera" / „porozmawiaj z wiercimajstrem" / „kodeks bossów"
+    # → intent consult_codex. Gated do safehouse'u w handlerze.
+    import re as _re_wier
+    wier_re = _re_wier.compile(
+        r"^(?:wezwij|wezwac|wezwę|porozmawiaj|rozmawiaj|"
+        r"otworz|otwórz|przejrzyj|sprawdz|sprawdź|pokaz|pokaż)"
+        r"\s+(?:z\s+)?"
+        r"(?:trenera|wiercimajstra|wiercimajstrem|kodeks|kodeksu)"
+        r"(?:\s+(?:bossow|bossów))?$"
+        r"|^kodeks(?:\s+(?:bossow|bossów))?$"
+        r"|^wiercimajster$|^trener$")
+    if wier_re.match(folded):
+        intent.intent = "consult_codex"
+        intent.verb = "wezwij"
+        intent.confidence = 0.95
+        return intent
+
     # ── P29.10 — Open a sponsor drop pod (mid-floor gift) ──────────────────
     # "otwórz/rozbij/zgarnij pakiet" (sponsorski) — drop-pods are how
     # mid-floor sponsor gifts now arrive (was: queued for safehouse).

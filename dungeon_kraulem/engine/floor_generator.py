@@ -212,8 +212,19 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
         "args": {"archetype": archetype_key},
     })
 
-    # Step 3: pick room count
-    room_count = rng.randint(arch["min_rooms"], arch["max_rooms"])
+    # Step 3: pick room count.
+    # P29.58: progresywne floor sizing — F1 ~20, F18 ~100-120. Stara
+    # ścieżka (arch["min_rooms"]/max_rooms = 12-20) była stała
+    # niezależnie od piętra. Per Q-fin-3 (2026-05-28): DCC-faithful
+    # rozmiary, krzywa F1 intake → F18 brutalne.
+    from .floor_sizing import floor_size_for_floor
+    _floor_min, _floor_max = floor_size_for_floor(floor_number)
+    # Archetype może opcjonalnie skalować w obie strony (np. „narrow"
+    # = 0.8x rozmiaru). Default 1.0 = bez modyfikacji.
+    _arch_scale = float(arch.get("room_count_scale", 1.0))
+    _scaled_min = max(2, int(_floor_min * _arch_scale))
+    _scaled_max = max(_scaled_min + 2, int(_floor_max * _arch_scale))
+    room_count = rng.randint(_scaled_min, _scaled_max)
 
     # Step 4: build the connected graph
     graph = _build_graph(arch, room_count, rng)
@@ -236,9 +247,14 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
     # (and, when belief seeds exist on the world, by their target_tags too).
     _place_encounters(f, rng, world=world)
 
-    # P29.44 — minibossy. 2-3 dodatkowych elite mobów per piętro,
-    # umieszczonych w danger / loot roomach (poza głównym bossem).
-    # Każdy dropuje map_fragment po śmierci (hook w game.py).
+    # P29.57c — taguje istniejącego floor_boss (instantiated z room
+    # template w _instantiate_rooms) rangą `boss_pietra`. Drop logic
+    # + audience bonus + exit unlock zależą od tej rangi.
+    _tag_floor_boss_rank(f)
+
+    # P29.57c — mini bossy. Count = `boss_count_for_floor(rooms) - 1`,
+    # każdy z LOSOWĄ rangą z MINI_RANKS. Bez floor cap (Q-fin-1).
+    # Drop: Skrzynka odpowiedniej rangi (Etap D).
     _place_minibosses(f, rng, world=world)
 
     # P29.22 — celebrity NPC placement. Roll ~25% per floor for one
@@ -1031,20 +1047,12 @@ def _place_encounters(f: FloorState, rng: random.Random, world=None):
                         room.state["encounter_belief_tags"].append(tg)
 
 
-# ── P29.44 — Miniboss placement ──────────────────────────────────────────────
-
-def _miniboss_count_for_floor(floor_num: int) -> int:
-    """Ile minibossów per piętro. F1-2: 0 (intake). F3-8: 2. F9-12: 3.
-    F13-17: 3. F18: 4 (finałowe). Skala rośnie razem z trudnością."""
-    if floor_num < 3:
-        return 0
-    if floor_num <= 8:
-        return 2
-    if floor_num <= 12:
-        return 3
-    if floor_num < 18:
-        return 3
-    return 4
+# ── P29.57c — Boss placement (6-tier rank system) ───────────────────────────
+#
+# Per piętro: 1× boss piętra (główny, Niebiańska skrzynka) + N× mini bossy
+# z różnych rang. Count = max(2, rooms // 5). Mini boss rang losowany
+# OSOBNO per boss (no floor cap, Q-fin-1 user 2026-05-28). Działa zarówno
+# na obecnych 12-20 pokojach jak i przyszłych 80-120 (P29.58 Etap F).
 
 
 def _available_minibosses(floor_num: int, biome_room_tag) -> list:
@@ -1069,14 +1077,41 @@ def _available_minibosses(floor_num: int, biome_room_tag) -> list:
     return out
 
 
-def _place_minibosses(f: FloorState, rng: random.Random, world=None):
-    """Wpina N minibossów (zależne od floor_num) w danger / loot
-    roomy poza głównym bossem. Każdy miniboss jest osobnym mobem,
-    nie częścią encountera. Pełni rolę elite spawnu z gwarantowanym
-    dropem mapy.
+def _tag_floor_boss_rank(f: FloorState):
+    """Per P29.57c: floor_boss (placed via room template w
+    _instantiate_rooms) dostaje tag `boss_rank:boss_pietra`. Tag napędza
+    drop logic (Niebiańska skrzynka, Etap D) + audience bonus (Etap D) +
+    exit unlock (już działa po tag `floor_boss`).
 
-    Pomija piętra bez puli minibossów (np. F1-2)."""
-    n = _miniboss_count_for_floor(f.floor_number or 1)
+    Bezpieczne wobec piętrów bez bossa (jeśli pula room templates
+    nie dostarczyła) — silently skip."""
+    from . import boss_ranks as _br
+    tag = _br.rank_tag(_br.RANK_BOSS_PIETRA)
+    for room in f.rooms.values():
+        if room.actual_type != "boss":
+            continue
+        for ent in room.entities:
+            tags = ent.tags or []
+            if "floor_boss" not in tags and "final_boss" not in tags:
+                continue
+            if not any(t.startswith("boss_rank:") for t in tags):
+                ent.tags = list(tags) + [tag]
+
+
+def _place_minibosses(f: FloorState, rng: random.Random, world=None):
+    """P29.57c — wpina (boss_count - 1) mini bossów w combat / salvage
+    roomy, każdego z LOSOWĄ rangą z MINI_RANKS (lokalny / dzielnicowy /
+    miejski / regionalny / krajowy). Boss piętra to osobny entity
+    (placed via _instantiate_rooms z room template) — tu tylko mini.
+
+    Count: `boss_count_for_floor(len(rooms)) - 1`, czyli min 1 mini boss
+    zawsze (nawet F1-2 dostaje minimum 1 elite spawn). Bez floor cap
+    rangi — F1 może legalnie dostać miejskiego mini-bossa per Rule 3
+    (wolność gracza, decyduje czy walczyć / uciekać / sprzymierzyć).
+
+    Każdy mini boss dropuje Skrzynkę swojej rangi po śmierci (Etap D)."""
+    from . import boss_ranks as _br
+    n = _br.mini_boss_count_for_floor(len(f.rooms))
     if n <= 0:
         return
 
@@ -1094,9 +1129,8 @@ def _place_minibosses(f: FloorState, rng: random.Random, world=None):
     if not pool:
         return
 
-    # Kandydaci na pokoje: combat + salvage. RoomState nie ma już
-    # `role`, ale actual_type="boss" jest osobne — automatycznie
-    # wykluczone, bo nie ma go w whitelistcie.
+    # Kandydaci: combat + salvage. actual_type="boss" automatycznie
+    # wykluczone (tam siedzi boss piętra).
     candidates = [r for r in f.rooms.values()
                   if r.actual_type in ("combat", "salvage")]
     if not candidates:
@@ -1110,6 +1144,9 @@ def _place_minibosses(f: FloorState, rng: random.Random, world=None):
                                      f.floor_number or 1)
         if ent is None:
             continue
+        # Per-boss random rank (Q-fin-1: bez floor cap).
+        rank = rng.choice(_br.MINI_RANKS)
+        ent.tags = (ent.tags or []) + [_br.rank_tag(rank)]
         # Defensywnie — visibility (jak w _instantiate_rooms).
         try:
             from . import visibility as _vis

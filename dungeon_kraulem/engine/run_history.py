@@ -177,3 +177,100 @@ def reset() -> None:
             os.remove(HISTORY_FILE)
         except OSError:
             pass
+
+
+# ── P29.57e — Boss codex (persistent między runami) ─────────────────
+#
+# Wiercimajster trener w safehouse czyta z tego słownika. Każdy boss
+# którego gracz spotkał / zabił / któremu uciekł zostaje tu zapisany.
+# Klucz = entity.key (stabilny przez templates). Wartość:
+#   {
+#     "name": "Pyskaty Bandzior",
+#     "rank": "miejski",
+#     "hp_max": 60, "ac": 14,
+#     "vulnerable_to": ["acid", "fire"],
+#     "damage_type": "electric",
+#     "fates": {"killed": 3, "escaped": 1, "died_elsewhere": 0},
+#     "last_seen_floor": 5,
+#   }
+#
+# DCC „next run knowledge" — gracz buduje codex przez sezony.
+
+
+def _codex_entry_from_entity(ent, floor_num: int) -> Dict[str, Any]:
+    """Snapshot relevantnych pól bossa do codexu (Polish-only names)."""
+    from . import boss_ranks as _br
+    return {
+        "name": getattr(ent, "fallback_name", "") or "",
+        "rank": _br.rank_from_entity(ent),
+        "hp_max": int(getattr(ent, "max_hp", 0) or 0),
+        "ac": int(getattr(ent, "ac", 10) or 10),
+        "damage_dice": getattr(ent, "damage_dice", "") or "",
+        "damage_type": getattr(ent, "damage_type", "") or "",
+        "vulnerable_to": list(getattr(ent, "vulnerable_to", None) or []),
+        "fates": {"killed": 0, "escaped": 0, "died_elsewhere": 0},
+        "last_seen_floor": int(floor_num or 1),
+    }
+
+
+def _record_boss_fate(ent, floor_num: int, fate: str
+                      ) -> Optional[Dict[str, Any]]:
+    """Wewnętrzne — updateuje codex.boss[key] o nowy fate.
+    Stabilne wobec brakującego entity / nieistniejącej rangi."""
+    if ent is None:
+        return None
+    key = getattr(ent, "key", "") or ""
+    if not key:
+        return None
+    payload = _load_raw()
+    codex = payload["meta"].setdefault("boss_codex", {})
+    entry = codex.get(key) or _codex_entry_from_entity(ent, floor_num)
+    fates = entry.setdefault("fates",
+                             {"killed": 0, "escaped": 0,
+                              "died_elsewhere": 0})
+    if fate not in fates:
+        fates[fate] = 0
+    fates[fate] = int(fates[fate]) + 1
+    entry["last_seen_floor"] = int(floor_num or 1)
+    # Refresh stats — jeśli boss został rebalansowany w content patch,
+    # ostatnia obserwacja wygrywa.
+    fresh = _codex_entry_from_entity(ent, floor_num)
+    for fld in ("name", "rank", "hp_max", "ac",
+                "damage_dice", "damage_type", "vulnerable_to"):
+        if fresh.get(fld):
+            entry[fld] = fresh[fld]
+    codex[key] = entry
+    payload["meta"]["boss_codex"] = codex
+    if _save_raw(payload):
+        return entry
+    return None
+
+
+def record_boss_kill(ent, floor_num: int) -> Optional[Dict[str, Any]]:
+    """Player zabił bossa — dorzuca +1 do fates.killed."""
+    return _record_boss_fate(ent, floor_num, "killed")
+
+
+def record_boss_escape(ent, floor_num: int) -> Optional[Dict[str, Any]]:
+    """Gracz zszedł piętro bez zabicia bossa (escape przez exit
+    unlocked inną drogą) — +1 do fates.escaped."""
+    return _record_boss_fate(ent, floor_num, "escaped")
+
+
+def record_boss_died_elsewhere(ent, floor_num: int
+                                ) -> Optional[Dict[str, Any]]:
+    """Boss zginął od trapów / hazardów / faction crossfire — +1
+    do died_elsewhere. Skrzynka NIE dropuje (DCC canon), ale codex
+    notuje."""
+    return _record_boss_fate(ent, floor_num, "died_elsewhere")
+
+
+def boss_codex() -> Dict[str, Dict[str, Any]]:
+    """Zwraca pełen codex (key → entry). Pusty dict gdy nikt
+    jeszcze nie został zapisany."""
+    return dict(_load_raw()["meta"].get("boss_codex", {}) or {})
+
+
+def boss_codex_entry(boss_key: str) -> Optional[Dict[str, Any]]:
+    """Wyszukuje entry po entity key. None gdy nieznany."""
+    return boss_codex().get(boss_key)

@@ -67,24 +67,31 @@ def _minibosses_on_floor(floor):
 
 
 def test_miniboss_count_scaling():
-    """Skalowanie zgodne z _miniboss_count_for_floor."""
-    assert _fg._miniboss_count_for_floor(1) == 0
-    assert _fg._miniboss_count_for_floor(2) == 0
-    assert _fg._miniboss_count_for_floor(3) == 2
-    assert _fg._miniboss_count_for_floor(8) == 2
-    assert _fg._miniboss_count_for_floor(9) == 3
-    assert _fg._miniboss_count_for_floor(12) == 3
-    assert _fg._miniboss_count_for_floor(15) == 3
-    assert _fg._miniboss_count_for_floor(18) == 4
-    print("  count scaling: 0/0/2/2/3/3/3/4: OK")
+    """P29.57c: count = boss_count_for_floor(rooms) - 1, gdzie total =
+    max(2, rooms // 5). Min 1 mini boss zawsze (nawet na małych F1-2)."""
+    from ..engine import boss_ranks as _br
+    assert _br.boss_count_for_floor(5)   == 2   # min 2 total
+    assert _br.boss_count_for_floor(10)  == 2
+    assert _br.boss_count_for_floor(15)  == 3
+    assert _br.boss_count_for_floor(50)  == 10
+    assert _br.boss_count_for_floor(100) == 20
+    assert _br.mini_boss_count_for_floor(5)   == 1
+    assert _br.mini_boss_count_for_floor(15)  == 2
+    assert _br.mini_boss_count_for_floor(50)  == 9
+    print("  count scaling (rooms→bossy): OK")
 
 
-def test_low_floors_get_no_minibosses():
+def test_low_floors_still_get_minibosses():
+    """P29.57c: F1-2 NIE są już intake-only — dostają min 1 mini boss
+    (boss piętra zostaje, plus 1 mini = total 2 per design)."""
     _, f1 = _generate_floor(1)
     _, f2 = _generate_floor(2)
-    assert _minibosses_on_floor(f1) == []
-    assert _minibosses_on_floor(f2) == []
-    print("  F1-2 (intake) bez minibossów: OK")
+    # Min 1 mini boss na F1, F2 (formula → max(2,_) - 1 = ≥1)
+    assert len(_minibosses_on_floor(f1)) >= 1, \
+        f"F1 nie ma mini bossa: {_minibosses_on_floor(f1)}"
+    assert len(_minibosses_on_floor(f2)) >= 1, \
+        f"F2 nie ma mini bossa: {_minibosses_on_floor(f2)}"
+    print("  F1-2 ma min 1 mini bossa (P29.57c): OK")
 
 
 def test_mid_floor_gets_minibosses():

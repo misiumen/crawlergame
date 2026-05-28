@@ -2371,6 +2371,10 @@ class Game:
         if intent.intent == "open_box":
             self._attempt_open_box(intent); return
 
+        # P29.57e — Wiercimajster: trener-NPC + codex bossów (safehouse-only)
+        if intent.intent == "consult_codex":
+            self._attempt_consult_codex(intent); return
+
         # P29.23 — cooking + reading.
         if intent.intent == "cook":
             self._attempt_cook(intent); return
@@ -2820,6 +2824,26 @@ class Game:
         # książki DCC: szybkie zejście = bankujesz dni na trudniejsze
         # piętra. Liczymy PRZED nadpisaniem current_floor.
         leftover_min = max(0, int(f.deadline_remaining_minutes() or 0))
+        # P29.57e — Wiercimajster codex: bossy żywe na piętrze które
+        # gracz teraz opuszcza = ucieczka (escape). Notujemy w codexie
+        # między runami, żeby gracz wiedział „pominąłem tego krajowego
+        # bossa" przy kolejnym podejściu. Robione PRZED generate_floor,
+        # bo current_floor zostanie nadpisany.
+        try:
+            from . import run_history as _rh_e
+            from .entity import T_CORPSE
+            cur_floor_num = int(f.floor_number or 1)
+            for room in f.rooms.values():
+                for ent in room.entities:
+                    if ent.entity_type == T_CORPSE:
+                        continue
+                    tags = ent.tags or []
+                    if any(isinstance(t, str)
+                           and t.startswith("boss_rank:")
+                           for t in tags):
+                        _rh_e.record_boss_escape(ent, cur_floor_num)
+        except Exception:
+            pass
         # Build next floor.
         try:
             from .floor_generator import generate_floor
@@ -5252,6 +5276,49 @@ class Game:
                             ch_.flags["floor_minibosses_killed"] = n + 1
                         except Exception:
                             pass
+                    # P29.57d — Boss Box drop per rank. Każdy boss z
+                    # tagiem `boss_rank:*` produkuje Skrzynkę odpowiedniej
+                    # rangi w EQ gracza (DCC canon: zabójca dostaje łup).
+                    # Plus bonus widowni zgodnie z rangą.
+                    try:
+                        _had_rank = any(
+                            isinstance(t, str)
+                            and t.startswith("boss_rank:")
+                            for t in _tags_pre)
+                        if _had_rank:
+                            # Trzymamy snapshot tagów na bossie — corpse
+                            # transform mógł je przepiąć, ale drop_boss_box
+                            # czyta z entity, więc dorzucamy stare tagi
+                            # z powrotem jeśli zostały zgubione.
+                            for _t in _tags_pre:
+                                if (isinstance(_t, str)
+                                        and _t.startswith("boss_rank:")
+                                        and _t not in (target.tags or [])):
+                                    target.tags = (target.tags or []) + [_t]
+                            from .handlers import boss_box as _bbx
+                            _bbx.drop_boss_box(self.world, target,
+                                               killer=self.world.character)
+                            _bonus = _bbx.audience_bonus_for_dead_boss(target)
+                            if _bonus > 0:
+                                try:
+                                    from . import audience as _aud2
+                                    _aud2.change_audience(
+                                        self.world, _bonus,
+                                        source="boss_kill_rank")
+                                except Exception:
+                                    pass
+                            # P29.57e — Wiercimajster codex: zapisz kill
+                            # do persistent history (między runami).
+                            try:
+                                from . import run_history as _rh2
+                                _fn = int(getattr(
+                                    self.world.current_floor,
+                                    "floor_number", 1) or 1)
+                                _rh2.record_boss_kill(target, _fn)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
                     # P29.49 — counter floor_kills (achievement
                     # „kazdy_ma_imie" sprawdza floor_kills==floor_butchered).
                     try:
@@ -6205,6 +6272,11 @@ class Game:
         """P29.56 — emergent crafting via raw material combination."""
         from .handlers import experiment
         return experiment.attempt_experiment(self, intent)
+
+    def _attempt_consult_codex(self, intent):
+        """P29.57e — Wiercimajster codex (delegate)."""
+        from .handlers import wiercimajster as _wm
+        return _wm.attempt_consult_codex(self, intent)
 
     def _attempt_open_box(self, intent):
         """P29.57b — otwórz skrzynkę (VS-style box reveal)."""
