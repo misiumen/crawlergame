@@ -327,7 +327,8 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
             # all fire from one place.
             from . import audience as _aud
             from . import sponsors as _sp
-            _aud.change_audience(world, int(eff.get("amount", 0)),
+            _delta = int(eff.get("amount", 0))
+            _aud.change_audience(world, _delta,
                                  source=str(eff.get("source", "effect")))
             # Tag routing — many "audience" effects also signal a tag the
             # sponsors care about (e.g. spectacle, env_kill). Optional.
@@ -342,7 +343,9 @@ def apply(effects: List[Dict[str, Any]], world, time_system=None) -> List[str]:
                                     "czystka_srodowiska", world=world)
                     except Exception:
                         pass
-            _sp.maybe_intervene(world)
+            # P29.53h — przekazuj delta do maybe_intervene żeby gift
+            # nie odpalał się przy delta <= 0 (porażki, neutralne).
+            _sp.maybe_intervene(world, trigger_delta=_delta)
 
         elif kind == "sponsor_attention":
             # Prompt 18: direct attention bump for a specific sponsor.

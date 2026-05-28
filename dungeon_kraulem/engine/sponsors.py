@@ -371,7 +371,8 @@ def _cooldown_ok(world, sponsor_key: str) -> bool:
     return (_now_minute(world) - last) >= cd
 
 
-def maybe_intervene(world, rng: Optional[random.Random] = None) -> Optional[InterventionRecord]:
+def maybe_intervene(world, rng: Optional[random.Random] = None,
+                    trigger_delta: Optional[int] = None) -> Optional[InterventionRecord]:
     """Try to fire an intervention from the most-engaged sponsor. Returns
     the record fired, or `None`. Call after audience changes and after
     band crossings.
@@ -386,6 +387,10 @@ def maybe_intervene(world, rng: Optional[random.Random] = None) -> Optional[Inte
       - Per-sponsor cooldown gates re-firing.
       - The sponsor with the largest |attention| wins; ties broken by
         floor-primary first, then by sponsor catalog order.
+      - P29.53h: GIFTs require trigger_delta > 0 (positive spectacle).
+        Sponsorzy NIE dropią paczek po porażkach (zgłoszenie #8 z
+        playthrough). Hunter / heckle dalej fire'ują na wszystko —
+        to są reakcje negatywne lub neutralne, fine na fails.
     """
     if world is None or getattr(world, "character", None) is None:
         return None
@@ -427,6 +432,20 @@ def maybe_intervene(world, rng: Optional[random.Random] = None) -> Optional[Inte
             elif band == _aud.BAND_HOT:
                 kind = INT_HECKLE   # warming-like fallback
             # In VIRAL we skip the heckle fallback to keep the band loud.
+
+        # P29.53h — gate gift'ów przez znak audience delta. Gift wymaga
+        # POZYTYWNEGO spectacle. Bez tego sponsorzy dropią paczki po
+        # porażkach (zgłoszenie #8: kryt. porażka rozmowy → NovaChem
+        # podrzucał antidote, co nie miało sensu).
+        # trigger_delta=None oznacza „caller nie ma info" — wtedy
+        # zachowujemy stare zachowanie (gift dozwolony).
+        if kind == INT_GIFT and trigger_delta is not None \
+                and trigger_delta <= 0:
+            # Spróbuj heckle jako fallback w HOT bandzie (nudge, nie reward).
+            if band == _aud.BAND_HOT:
+                kind = INT_HECKLE
+            else:
+                kind = None
 
         if kind is None:
             continue
