@@ -179,11 +179,11 @@ def change_audience(world, delta: int, source: str = "",
 
     if emit_log and hasattr(world, "log"):
         sign = "+" if delta > 0 else ""
-        # P28.8: route through log_msg so the P28.6 dedupe collapses
-        # repeated "Widownia +2" entries into "Widownia +2 (×N)". This
-        # was THE source of the visible bleed bug — direct .append
-        # bypassed dedupe and the entries piled up adjacent to each
-        # other in the log.
+        # P28.8 (preserved): route przez log_msg żeby dedupe collapse'ował
+        # powtarzające się "Widownia +2" w "Widownia +2 (×N)". Reakcja
+        # widowni JEST istotnym sygnałem dla gracza — pokazuje czy akcja
+        # spodobała się publiczności. Sparkline w top-barze nie zastępuje
+        # konkretnego komunikatu w logu.
         if hasattr(world, "log_msg"):
             world.log_msg(f"Widownia {sign}{delta}", "system")
         else:

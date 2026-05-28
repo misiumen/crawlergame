@@ -7626,7 +7626,8 @@ class Game:
         try:
             _lx, _ly, _lw, lh = L.log_rect
             line_h = max(20, int(L.font_small) + 8)
-            avail = max(1, (lh - 22) // line_h)
+            # P29.53 — uwzględnij 2px breathing room per row.
+            avail = max(1, (lh - 22) // (line_h + 2))
         except Exception:
             return 0
         total = len(self.world.log or [])

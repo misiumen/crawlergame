@@ -1239,7 +1239,8 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
     # nawet przy krótkim logu PgUp generowało scroll>0 i header
     # mówił o ukrytych wpisach, których nie było.
     _line_h_est = max(20, int(L.font_small) + 8)
-    _avail = max(1, (lh - 22) // _line_h_est)
+    # P29.53 — +2 breathing room (zgodne z render loop).
+    _avail = max(1, (lh - 22) // (_line_h_est + 2))
     _has_overflow = len(log) > _avail
     if scroll and scroll > 0 and _has_overflow:
         header_label = (header_label + "  ↑ -" + str(int(scroll))
@@ -1247,15 +1248,18 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
     text(surf, header_label,
          lx + 10, ly + 4, ACCENT, L.font_small, True)
     f = font(L.font_small)
-    # P29.6: previously +5 padding; user kept seeing overlap. Now we
-    # explicitly base line_h on ascent+descent+ogonek-margin. Polish
-    # diacritics (Ę, Ą) carry ogonek tails that pygame's get_height()
-    # under-reports by 1-2 px depending on font hinting. +8 padding
-    # leaves room for them PLUS for the avatar-circle radius which
-    # spans line_h//2 from cy + line_h//2. Worst case at small fonts:
-    # font.height ~14 + 8 = 22 px, circle r = max(7, 10) = 10, diameter
-    # 20 fits with 2 px breathing room.
-    line_h = max(20, f.get_height() + 8)
+    # P29.53 — pygame's font.get_height() UNDER-REPORTS pełną wysokość
+    # rendered glyphów na niektórych fontach (Consolas/Windows): nie
+    # obejmuje descender'ów (j, p, g, ą, ę-ogonek). Pierwszych ~14
+    # commitów (P26-P29) próbowało łatać poprzez różne +N padding.
+    # Wszystkie kończyły się tym że gracz wciąż widział overlap.
+    #
+    # Fix: użyj `get_linesize()` — pygame'owy „proper baseline-to-
+    # baseline distance" który UWZGLĘDNIA descenders + line gap.
+    # To jest API zaprojektowane specjalnie do tego, czego my robimy.
+    # Plus +6 padding dla bezpieczeństwa diakrytyków PL (Ą, Ę z
+    # ogonkiem leżącym 2-3px pod descenderem standardowym).
+    line_h = max(24, f.get_linesize() + 6)
     max_w = lw - 24
 
     # Prompt 22 bug fix: previously the log render picked the LAST N
@@ -1282,7 +1286,8 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
     sponsor_gutter_w = max(7, line_h // 2 - 1) * 2 + 6   # matches render
     if scroll < 0:
         scroll = 0
-    available_rows = max(1, (lh - 22) // line_h)
+    # P29.53 — line_h+2 spacing zgodne z render loop (2px breathing room).
+    available_rows = max(1, (lh - 22) // (line_h + 2))
     skipped_entries = 0
     for entry in reversed(log):
         if skipped_entries < scroll:
@@ -1351,7 +1356,12 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
                                cy_av - ai.get_height() // 2))
         img = f.render(line_text, True, col)
         surf.blit(img, (lx + 12 + gutter_w, cy))
-        cy += line_h
+        # P29.53 — 2px breathing room po każdym wpisie. Defense
+        # in depth dla overlap'ów, nawet jeśli line_h policzone
+        # zgodnie z font metrics, nadmiarowe 2px gwarantuje że
+        # diakrytyki/akcenty PL (Ę,Ą,Ó) nigdy nie wejdą w sąsiedni
+        # wiersz.
+        cy += line_h + 2
 
     # Input
     ix, iy, iw, ih = L.input_rect
