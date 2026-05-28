@@ -1086,6 +1086,51 @@ ROOM_POOL = [
         "theme_sponsor_boost": {"liga_brawurowa": 2},
     },
 
+    # ── P29.46 — Boss F1. Bez tego F1 nie miał killowalnego bossa
+    # i exits_unlocked nigdy się nie ustawiał — gracz utknął na
+    # pierwszym piętrze. Bug znaleziony w playthrough.
+    {
+        "template_id": "pool_intake_boss",
+        "role": "boss",
+        "actual_type": "boss",
+        "tags": ["dangerous", "boss", "objective", "intake"],
+        "name_pool": ["Punkt Aklimatyzacji", "Recepcja Lochu 1A",
+                      "Bramka Wejściowa"],
+        "first_enter_pool": [
+            "Pomieszczenie z pojedynczą lampą i biurkiem. Za biurkiem "
+            "siedzi Strażnik Aklimatyzacji — pierwszy mundur, jaki "
+            "tu zobaczysz. Mówi spokojnie: „Witaj w programie. "
+            "Twoja autoryzacja zejścia kosztuje dwie minuty życia. "
+            "Czyli moją, jeśli pójdzie pechowo.”",
+            "Mała sala recepcyjna. Plakat sponsorski: TWOJA KARIERA "
+            "ZACZYNA SIĘ TUTAJ. Pod plakatem — Strażnik z paralizatorem "
+            "i bardzo dobrym dressingiem.",
+        ],
+        "look_pool": [
+            "Biurko z formularzami. Strażnik. Drzwi za jego plecami "
+            "to wyjście z piętra. Nie ma klucza — jest tylko on.",
+            "Lampa nad biurkiem mruga. Strażnik nie. Plakat: ZEJŚCIE "
+            "DZIESIĘĆ KROKÓW DALEJ.",
+        ],
+        "search_pool": [],
+        "public_hint_pool": [
+            "Strażnik klika długopisem rytmicznie. Bardzo długo.",
+            "Z głośnika nad biurkiem cicha muzyka kantorska.",
+        ],
+        "sensory_tags": ["sterile","fluorescent","sponsor_ads"],
+        "entity_seed_pools": {
+            "mon": ["intake_warden"],
+            "env": ["sponsor_camera","sponsor_screen"],
+        },
+        "exit_hints": ["wyjście piętra", "schody w dół"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 2,
+        "weight": 5,
+        "floor_min": 1,
+        "floor_max": 1,
+        "unique_per_floor": True,
+    },
+
     # ── Boss / objective gate ───────────────────────────────────────────────
     {
         "template_id": "pool_relay_boss",

@@ -4983,6 +4983,17 @@ class Game:
                             self._drop_miniboss_map_fragment(target)
                         except Exception:
                             pass
+                    # P29.46 — CRITICAL FIX: ubicie floor_boss odblokowuje
+                    # wyjście z piętra. Bez tego hook'a floor.exits_unlocked
+                    # nigdy nie był ustawiany przez kod produkcyjny i
+                    # gracz nie mógł zejść w dół. Bug pokrywał wszystkie
+                    # 18 pięter — odkryty podczas playthrough.
+                    if ("floor_boss" in _tags_pre
+                            or "final_boss" in _tags_pre):
+                        try:
+                            self._unlock_floor_exits(reason="boss_defeated")
+                        except Exception:
+                            pass
                     # Tag-bus event: enemy_killed. Sponsor reactions, P28
                     # title tracking, and P31 vendetta hook into this.
                     try:
@@ -7050,6 +7061,28 @@ class Game:
         from ..ui import ui_nav
         prev = getattr(self, "nav_state", None)
         self.nav_state = ui_nav.build_play_options(self.world, prev_state=prev)
+
+    # ── P29.46: Floor exit unlock ────────────────────────────────────
+
+    def _unlock_floor_exits(self, reason: str = "boss_defeated") -> None:
+        """Odblokuj wyjście z piętra. Wywoływane po ubiciu floor_boss /
+        final_boss. Bez tego floor.exits_unlocked NIGDY nie był
+        ustawiany przez kod produkcyjny — wyjście z piętra zawsze
+        było zamknięte. Klasyk."""
+        floor = self.world.current_floor
+        if floor is None:
+            return
+        if reason in floor.exits_unlocked:
+            return
+        floor.exits_unlocked.add(reason)
+        # Komunikat dla gracza — w stylu Dinnimana, krótko:
+        boss_pl = "Boss padł"
+        if reason == "final_boss_defeated":
+            boss_pl = "Finałowy boss padł"
+        self.log(
+            f"{boss_pl}. Z głośnika trzask: „Wyjście odblokowane. "
+            f"Sponsorzy są zadowoleni. Przesuń się dalej.”",
+            LOG_SUCCESS)
 
     # ── P29.44: Miniboss kill → drop map fragment ────────────────────
 

@@ -1036,6 +1036,27 @@ MON = {
         floor_min=6, floor_max=6,
     ),
 
+    # ── P29.46 — F1 boss (intake). Bez tego F1 nie miał killowalnego
+    # bossa → exits_unlocked nigdy nie ustawiany na F1, gracz utknął
+    # na pierwszym piętrze na zawsze. Bug znaleziony w playthrough.
+    "intake_warden": dict(
+        name_key="ent_intake_warden_n",
+        fallback_name="Strażnik Aklimatyzacji",
+        desc_key="ent_intake_warden_d",
+        fallback_desc="Pierwszy mundur, jaki zobaczysz w lochu. "
+                      "Sponsorska opaska na ramieniu, paralizator za "
+                      "pasem, niedopalony papieros w kąciku ust. "
+                      "Pracuje na zmianie od zawsze. Nie pamięta, "
+                      "kto go zatrudnił.",
+        tags=["monster","humanoid","intake","floor_boss",
+              "floor_min:1"],
+        affordances=["inspect","attack","talk","intimidate","bribe"],
+        hp=55, max_hp=55, ac=12, attack_bonus=4, damage_dice="1d8+2",
+        damage_type="electric",
+        vulnerable_to=["acid","fire"],
+        floor_min=1, floor_max=1,
+    ),
+
     # ── P29.44 — Uniwersalne minibossy (bez biom-tagu) ─────────────────
     # Floater'y do puli minibossów. Nie mają biome-tagu, więc pasują
     # do każdego piętra. Każdy dropuje kawałek mapy po śmierci
