@@ -72,6 +72,61 @@ _PROP_ALIASES = {
     "metal":      "metal",   # ten sam po obu stronach
 }
 
+# P29.65 — INFERENCJA właściwości z istniejących tagów contentu. Cały
+# bestiariusz (141 szablonów) reaguje na silnik BEZ ręcznego tagowania
+# każdego wpisu — jeden tag może implikować kilka właściwości
+# (robot = metal + przewodzące). Mapowania celowo wąskie, żeby NIE było
+# „wszystko płonie": tylko jednoznaczne materiały.
+_TAG_INFERENCE = {
+    # metal (kwas → korozja)
+    "armored":    ("metal",),
+    "machine":    ("metal", "przewodzące"),
+    "mechanical": ("metal",),
+    "robot":      ("metal", "przewodzące"),
+    "drone":      ("metal", "przewodzące"),
+    "construct":  ("metal",),
+    "scrap":      ("metal",),
+    "terminal":   ("metal", "przewodzące"),
+    # przewodzące (prąd → porażenie)
+    "electronic": ("przewodzące",),
+    "electrical": ("przewodzące",),
+    "electric":   ("przewodzące",),
+    "wire":       ("przewodzące",),
+    "spark":      ("przewodzące",),
+    # łatwopalne (ogień → pożar)
+    "wood":       ("łatwopalne",),
+    "fungal":     ("łatwopalne",),
+    "gas":        ("łatwopalne",),
+    "plastic":    ("łatwopalne",),
+    "paper":      ("łatwopalne",),
+    "cloth":      ("łatwopalne",),
+    "oil":        ("łatwopalne",),
+    "grease":     ("łatwopalne",),
+    # kruche (uderzenie → roztrzaskanie)
+    "ceramic":    ("kruche",),
+    # mokre (mróz → zamrożenie)
+    "liquid":     ("mokre",),
+    "water":      ("mokre",),
+    "slime":      ("mokre",),
+}
+
+# Tagi, które czynią encję ŹRÓDŁEM żywiołu (aktywna energia — hazard /
+# nasączony przedmiot). Pasywny „wire"/„metal" NIE jest źródłem.
+_ELEMENT_TAG_SOURCE = {
+    "electric":   "prąd",
+    "electrical": "prąd",
+    "spark":      "prąd",
+    "fire":       "ogień",
+    "flame":      "ogień",
+    "burning":    "ogień",
+    "acid":       "kwas",
+    "caustic":    "kwas",
+    "frost":      "mróz",
+    "ice":        "mróz",
+    "cold":       "mróz",
+    "cryo":       "mróz",
+}
+
 
 # ── Wynik interakcji ────────────────────────────────────────────────
 
@@ -161,6 +216,11 @@ def source_elements(source) -> Set[str]:
     if tagset & _IMPACT_TAGS:
         out.add("uderzenie")
     out |= (tagset & _PL_ELEMENTS)
+    # P29.65 — żywioł z tagów aktywnej energii (hazard/nasączony przedmiot).
+    for t in tagset:
+        el = _ELEMENT_TAG_SOURCE.get(t)
+        if el:
+            out.add(el)
     return out
 
 
@@ -174,6 +234,9 @@ def target_matter_props(target) -> Set[str]:
             out.add(t)
         elif t in _PROP_ALIASES:
             out.add(_PROP_ALIASES[t])
+        # P29.65 — inferencja z tagów contentu (jeden tag → kilka props).
+        for p in _TAG_INFERENCE.get(t, ()):
+            out.add(p)
     return out
 
 
