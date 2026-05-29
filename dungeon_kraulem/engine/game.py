@@ -7338,7 +7338,9 @@ class Game:
                     self.cc["step"] = "species"
             return
 
-        if self.state == STATE_PLAY:
+        if self.state == STATE_PLAY or self.state == STATE_ARENA_PLAY:
+            # P29.60 — arena play używa tego samego keydown routera
+            # (typing/Enter/Backspace/strzałki) co normalna gra.
             return self._handle_play_keydown(ev, key, digit, shift_held, ctrl_held)
 
         if self.state == STATE_CLASS_OFFER:
@@ -8335,7 +8337,8 @@ class Game:
         if self._suppress_textinput:
             self._suppress_textinput = False
             return
-        if self.state == STATE_PLAY:
+        if self.state == STATE_PLAY or self.state == STATE_ARENA_PLAY:
+            # P29.60 — arena play przyjmuje tekst tak samo jak gra.
             # In nav mode, typing letters is suppressed — only hotkeys
             # routed through handle_keydown should fire.
             if self.input_mode == "nav":

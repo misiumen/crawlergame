@@ -120,6 +120,38 @@ def test_push_into_nonelement_no_systemic():
     assert ok is False, "brak celu/źródła → systemic nie powinien łapać"
 
 
+# ── Input: arena przyjmuje tekst z terminala (bug user 2026-05-29) ──
+
+
+class _StubTextEvent:
+    def __init__(self, text):
+        self.text = text
+
+
+def test_arena_play_accepts_typed_text():
+    """Repro buga: w arenie nie dało się nic pisać w terminalu.
+    handle_textinput musi dopisywać znaki w STATE_ARENA_PLAY."""
+    game, _room = _start_trap_arena()
+    game.input_mode = "text"
+    game.input_text = ""
+    for ch in "wepchnij":
+        game.handle_textinput(_StubTextEvent(ch))
+    assert game.input_text == "wepchnij", (
+        f"arena nie przyjmuje tekstu: input_text={game.input_text!r}")
+
+
+def test_arena_play_typed_command_dispatches():
+    """Pełen tor: wpisz komendę znak po znaku + submit → log rośnie."""
+    game, _room = _start_trap_arena()
+    game.input_mode = "text"
+    game.input_text = ""
+    for ch in "rozejrzyj się":
+        game.handle_textinput(_StubTextEvent(ch))
+    pre = len(game.world.log)
+    game.submit_input()
+    assert len(game.world.log) > pre, "komenda nie dodała nic do logu"
+
+
 # ── Render smoke nadal OK po wpięciu ───────────────────────────────
 
 
