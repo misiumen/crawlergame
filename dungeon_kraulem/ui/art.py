@@ -103,7 +103,9 @@ _ARCHETYPE_TAGS = (
     ("robot",      {"robot", "drone", "machine", "construct", "ai"}),
     ("undead",     {"undead", "zombie", "ghost", "skeleton"}),
     ("aberration", {"aberration", "weird", "anomaly", "mutant", "eldritch"}),
-    ("beast",      {"beast", "animal", "vermin", "pack"}),
+    ("beast",      {"beast", "animal", "vermin", "pack", "robactwo",
+                    "rat", "rodent", "insect", "spider", "pajęczak",
+                    "biting", "critter"}),
     ("blob",       {"blob", "ooze", "slime", "amorphous"}),
     ("humanoid",   {"humanoid", "human", "corporate", "cult", "guard"}),
 )
