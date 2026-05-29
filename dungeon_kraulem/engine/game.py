@@ -4667,12 +4667,14 @@ class Game:
             self.log("ISTOTY:", LOG_NORMAL)
             for e in beings:
                 self.log(f"  • {e.display_name()}", LOG_NORMAL)
+        observed: list = []   # (nazwa, [obserwacje]) — dla podszeptu percepcji
         if env:
             any_section = True
             self.log("ŚRODOWISKO:", LOG_NORMAL)
             for e in env:
                 obs = _sys.salient_observations(e)
                 if obs:
+                    observed.append((e.display_name(), obs))
                     self.log(f"  • {e.display_name()} — {'; '.join(obs)}",
                              LOG_SUCCESS)
                 else:
@@ -4688,6 +4690,19 @@ class Game:
         if not any_section:
             self.log("  Pusto. Goła podłoga i twój własny oddech.",
                      LOG_NORMAL)
+        # P29.64b — głos bohatera: monolog per origin + podszept percepcji
+        # (spostrzegawczy dostaje konkretną wskazówkę; reszta — przeczucie).
+        try:
+            from . import voice as _voice
+            ch = self.world.character
+            line = _voice.monologue(ch, "examine")
+            if line:
+                self.log(f"  „{line}”", LOG_SYSTEM)
+            hint = _voice.perception_hint(ch, observed)
+            if hint:
+                self.log(f"  ({hint})", LOG_SYSTEM)
+        except Exception:
+            pass
 
     def _attempt_mass_search(self, intent):
         """Search every visible container/corpse/drawer/shelf in the room."""
