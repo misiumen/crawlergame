@@ -2259,6 +2259,15 @@ class Game:
         if cs_pre is not None:
             if self._combat_route(intent, cs_pre):
                 return
+        # P29.61 — systemowy łańcuch POZA walką. Wepchnij/zwab/rzuć
+        # wroga w hazard działa niezależnie od tego, czy walka formalnie
+        # trwa (immersive sim). W walce obsługuje to combat router
+        # powyżej; tu łapiemy gdy walka nieaktywna, zanim generic
+        # pipeline odmówi „nie odpowiada na takie działanie".
+        if (intent.intent in ("push_into", "throw_at", "lure")
+                and getattr(intent, "destination", None)):
+            if self._try_systemic_chain(intent, None):
+                return
         if intent.intent == "unknown":
             # During combat the "unknown" path is already handled above;
             # if we got here combat wasn't active or didn't consume it.
@@ -2746,7 +2755,31 @@ class Game:
         self.world.log_msg(
             world.current_floor.current_room().fallback_first_enter,
             "normal")
+        self._arena_begin_combat()
         return True
+
+    def _arena_begin_combat(self) -> None:
+        """P29.61 — arena to combat sandbox: jeśli w pokoju są wrogowie,
+        od razu odpalamy walkę (HUD/VATS aktywne, wróg kontruje na
+        systemowe interakcje). Bez tego gracz stoi poza walką i część
+        mechanik nie działa."""
+        try:
+            from . import combat as _cmb
+            from .entity import T_MONSTER, T_CRAWLER
+            room = self.world.current_floor.current_room()
+            if room is None:
+                return
+            has_hostile = any(
+                e.entity_type in (T_MONSTER, T_CRAWLER) and e.is_alive()
+                for e in room.entities)
+            if has_hostile and _cmb.get_combat(room) is None:
+                cs = _cmb.start_combat(room, self.world,
+                                       triggered_by="arena_start")
+                self.log(t("feedback_combat_start",
+                           fallback="Walka się zaczyna."), LOG_WARN)
+                self._run_enemy_turn(cs)
+        except Exception:
+            pass
 
     def _check_arena_end(self) -> None:
         """Po każdym command dispatch w arena_mode sprawdza win/loss
@@ -5777,7 +5810,6 @@ class Game:
             return False
         for ln in res.lines:
             self.log(ln, LOG_SUCCESS)
-        cs.last_action = f"systemic:{res.effect}"
         # Sprawdź czy cel padł od interakcji.
         if not target.is_alive():
             try:
@@ -5787,7 +5819,10 @@ class Game:
             except Exception:
                 pass
             self.log(f"„{target.display_name()}” pada.", LOG_SUCCESS)
-        self._combat_after_player_action(cs)
+        # Tura wroga / hooki combat tylko gdy walka aktywna.
+        if cs is not None:
+            cs.last_action = f"systemic:{res.effect}"
+            self._combat_after_player_action(cs)
         return True
 
     def _combat_use_environment(self, intent, cs) -> bool:

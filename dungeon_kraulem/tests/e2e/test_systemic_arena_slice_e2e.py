@@ -120,6 +120,38 @@ def test_push_into_nonelement_no_systemic():
     assert ok is False, "brak celu/źródła → systemic nie powinien łapać"
 
 
+# ── Pełna ścieżka: wpisana komenda push działa poza/w walce ─────────
+
+
+def test_full_typed_push_into_hazard_works():
+    """Repro buga user: 'popchnij szczura w kwas' przez parser →
+    systemic odpala (nie 'nie odpowiada na takie działanie')."""
+    game, room = _start_trap_arena()
+    rat = _find(room, "Szczur")
+    assert rat is not None
+    pre_hp = rat.hp
+
+    game.input_mode = "text"
+    game.input_text = "popchnij szczur w kałużę kwasu"
+    game.submit_input()
+
+    joined = "\n".join(t for t, _ in game.world.log)
+    assert "nie odpowiada na takie działanie" not in joined, (
+        f"systemic nie złapał push poza/w walce:\n{joined}")
+    # Szczur powinien oberwać (synergii brak — bazowe obrażenia kwasu).
+    assert rat.hp < pre_hp or not rat.is_alive(), (
+        f"szczur nie oberwał od kwasu: hp={rat.hp}/{pre_hp}")
+
+
+def test_arena_auto_starts_combat():
+    """Arena to combat sandbox — walka startuje od wejścia."""
+    from ...engine import combat as _cmb
+    game, room = _start_trap_arena()
+    cs = _cmb.get_combat(room)
+    assert cs is not None and cs.active, (
+        "arena powinna auto-startować walkę")
+
+
 # ── Input: arena przyjmuje tekst z terminala (bug user 2026-05-29) ──
 
 
