@@ -174,6 +174,20 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
     from ..content.data.floor_biomes import (
         available_biomes, FloorBiome)
     biome_candidates = available_biomes(floor_number, world=world)
+    # P29.73 — zakaz tego SAMEGO biomu dwa piętra z rzędu. `world.
+    # current_floor` przy zejściu to jeszcze piętro opuszczane (nadpisywane
+    # PO generate_floor) → jego biom = poprzedni. Odfiltruj, o ile zostaje
+    # inny kandydat (inaczej jeden biom w puli = zostaje).
+    prev_biome = ""
+    try:
+        _prev = getattr(world, "current_floor", None)
+        prev_biome = (getattr(_prev, "biome_key", "") or "") if _prev else ""
+    except Exception:
+        prev_biome = ""
+    if prev_biome and len(biome_candidates) > 1:
+        _filtered = [b for b in biome_candidates if b.key != prev_biome]
+        if _filtered:
+            biome_candidates = _filtered
     biome: Optional[FloorBiome] = None
     if biome_candidates:
         weights = [max(1, int(b.weight)) for b in biome_candidates]

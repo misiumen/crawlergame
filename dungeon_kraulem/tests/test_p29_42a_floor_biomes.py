@@ -86,8 +86,12 @@ def test_available_biomes_filters_by_floor_range():
     assert "intake_industrial" in [b.key for b in f1]
     assert "zoo_korporacyjne" in [b.key for b in f3]
     assert "grzybica_bloom" in [b.key for b in f10]
-    # Zoo NIE może wpaść na piętro 1.
-    assert "zoo_korporacyjne" not in [b.key for b in f1]
+    # P29.73 — Tier-1 biomy dostępne JUŻ od F1 (różnorodność od startu;
+    # user: piętra mają być losowe, nie F1=F2=intake).
+    assert "zoo_korporacyjne" in [b.key for b in f1]
+    assert len(f1) > 1, "F1 musi mieć pulę >1 biomu"
+    # Głębokie biomy (grzybica floor_min=10) wciąż NIE na F1.
+    assert "grzybica_bloom" not in [b.key for b in f1]
     print(f"  available F1: {len(f1)}; F3: {len(f3)}; F10: {len(f10)}: OK")
 
 

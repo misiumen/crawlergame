@@ -61,14 +61,14 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         # do tytułowania piętra.
     ),
 
-    # ── Tier 1 — F3-8, starting unlocked ─────────────────────────────
+    # ── Tier 1 — F1-8, starting unlocked (P29.73: od F1 dla różnorodności)
 
     "zoo_korporacyjne": FloorBiome(
         key="zoo_korporacyjne",
         name_pl="Zoo Korporacyjne",
         theme_pl="Klatki, futro, krzyk pawia. Korporacja Borant "
                  "zostawiła tu kiedyś menażerię.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="zoo",
         sponsor_likes={"czarny_rynek_plus": 1},
         weight=2,
@@ -80,7 +80,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl="Frontowe Okopy",
         theme_pl="Błoto po kolana, druty kolczaste, drewno wgryzione "
                  "w ziemię. Plakaty propagandowe nieczytelnych armii.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="trenches",
         sponsor_likes={"liga_brawurowa": 1},
         weight=2,
@@ -92,7 +92,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl="Muzeum Spektakli",
         theme_pl="Gabloty, marmurowa podłoga, kuratorzy w mundurach. "
                  "Eksponaty z ostatniego sezonu.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="museum",
         sponsor_likes={"ministerstwo_pamieci": 1},
         weight=2,
@@ -104,7 +104,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl='Bar „U Skurczybyka"',
         theme_pl="Neon mruga, butelki, scena karaoke, piwnica pod sceną. "
                  "Lokal lokalny do bólu.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="bar",
         sponsor_likes={"czarny_rynek_plus": 1},
         weight=2,
@@ -116,7 +116,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl='Fabryka Pary „Sterling-9"',
         theme_pl="Kotły wielkości autobusu, manometry w czerwonej "
                  "strefie, pas transmisyjny ciągnie coś bez końca.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="steampunk_factory",
         sponsor_likes={"kult_recyklingu": 1},
         weight=2,
@@ -128,7 +128,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl="Stacja Orbital-7",
         theme_pl="Okrągłe śluzy syczą, próżnia za grubą szybą, "
                  "sterylne kafelki, grawitacja niestabilna.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="orbital",
         sponsor_likes={"novachem_biotech": 1, "bog_polimerow": 1},
         weight=2,
@@ -140,7 +140,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl="Kuźnia Półorków",
         theme_pl="Trzy kowadła bite naraz, węgiel zasypia oczy, młoty "
                  "walą rytmem reklamy, kowale w cechowych opaskach.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="forge",
         sponsor_likes={"bractwo_komornika": 1},
         weight=2,
@@ -152,7 +152,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl="Biblioteka Miejska",
         theme_pl="Regały do sufitu, mikrofilmy, lampki czytelnicze, "
                  "kurz pamięci, archiwista w fartuchu.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="library",
         sponsor_likes={"ministerstwo_pamieci": 1},
         weight=2,
@@ -166,7 +166,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl="Obóz Gobliński",
         theme_pl="Palisady z drewna i blachy, ogniska, jamy z workami "
                  "po cemencie. Gobliny krzyczą bez kontekstu.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="goblin_camp",
         weight=2,
         starting_unlocked=False,
@@ -179,7 +179,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl="Sieć Kanalizacyjna",
         theme_pl="Rury, smród, kałuże gęste jak budyń, szczury "
                  "wielkości terierów.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="sewers",
         sponsor_likes={"kult_recyklingu": 1},
         weight=2,
@@ -193,7 +193,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
         name_pl="Tunel Karnawałowy",
         theme_pl="Luna park po nocy, klauni-manekiny, słodki smród "
                  "waty cukrowej, muzyka karuzeli wolniejsza o jeden ton.",
-        floor_min=3, floor_max=8,
+        floor_min=1, floor_max=8,
         room_tag="carnival",
         weight=2,
         starting_unlocked=False,
