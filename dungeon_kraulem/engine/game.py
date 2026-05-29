@@ -5961,6 +5961,11 @@ class Game:
         ac_before = int(getattr(target, "ac", 0) or 0)
         res = _sys.apply_environmental(self.world, verb, source, target)
         if not res.matched:
+            # P29.66 — materia nie zadziałała → spróbuj PSYCHIKI (lęk/
+            # odraza/pragnienie). „Rzuć szczura w bossa, który boi się
+            # robactwa" → panika. Tożsamość źródła ∩ psyche celu.
+            res = _sys.resolve_psyche(self.world, verb, source, target)
+        if not res.matched:
             return False
         for ln in res.lines:
             self.log(ln, LOG_SUCCESS)

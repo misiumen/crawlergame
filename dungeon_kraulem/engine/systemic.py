@@ -579,3 +579,106 @@ def spread_fire(world, room) -> List[str]:
                 return [f"Ogień przeskakuje na {_display(tgt)} — "
                         f"zajmuje się."]
     return []
+
+
+# ── PSYCHIKA (P29.66) — reguły umysłu, nie materii ──────────────────
+#
+# Sygnaturowy mechanizm immersive sim: „boss boi się pająków" =
+# `lęk:pajęczak` na bossie + istota/przedmiot z tożsamością `pajęczak` +
+# JEDNA generyczna reguła. Piszesz raz, działa dla wszystkiego, co ktoś
+# komuś rzuci/pokaże. Absurd emerguje sam, bez LLM i scriptu.
+#
+# Psyche to UKRYTA właściwość celu (tag z prefiksem, np. `lęk:robactwo`).
+# Tożsamość ŹRÓDŁA to jego zwykłe tagi (czym JEST: robactwo, ogień, gad).
+# Match tożsamości źródła ∩ psyche celu → efekt umysłowy.
+#
+# Prefiksy psyche (PL, internal):
+#   lęk:<X>        — czego się boi  → przerażenie (panika, traci tury)
+#   odraza:<X>     — co go brzydzi  → cofnięcie (wzdryga się, odsuwa)
+#   pragnienie:<X> — czego pożąda   → rozproszenie (rzuca się ku temu)
+
+
+_PSYCHE_PREFIXES = ("lęk", "odraza", "pragnienie")
+
+# (prefix psyche, klucz efektu, profil trwały, szablon logu PL)
+_PSYCHE_EFFECT = {
+    "przerażenie": {
+        "status": "przerażony", "stun": 0.8, "turns": 3,
+        "line": "{cel} wpada w panikę — kuli się, zasłania, traci głowę.",
+    },
+    "cofnięcie": {
+        "status": "cofnięty", "slow": True, "turns": 2,
+        "line": "{cel} wzdryga się z obrzydzeniem i odsuwa, byle dalej.",
+    },
+    "rozproszenie": {
+        "status": "rozproszony", "slow": True, "turns": 2,
+        "line": "{cel} traci cię z oczu — rzuca się ku temu, czego pożąda.",
+    },
+}
+
+# Kolejność = priorytet (strach > odraza > pragnienie).
+_PSYCHE_RULES = (
+    ("lęk", "przerażenie"),
+    ("odraza", "cofnięcie"),
+    ("pragnienie", "rozproszenie"),
+)
+
+
+def target_psyche(target, prefix: str) -> Set[str]:
+    """Zbiór wartości psyche celu dla danego prefiksu (np. lęk:robactwo
+    → {'robactwo'})."""
+    out: Set[str] = set()
+    pre = prefix + ":"
+    for t in (getattr(target, "tags", None) or []):
+        if isinstance(t, str) and t.startswith(pre):
+            v = t[len(pre):].strip()
+            if v:
+                out.add(v)
+    return out
+
+
+def has_psyche(target) -> bool:
+    """Czy cel ma jakąkolwiek deklarację psyche (lęk/odraza/pragnienie)."""
+    for t in (getattr(target, "tags", None) or []):
+        if isinstance(t, str) and any(
+                t.startswith(p + ":") for p in _PSYCHE_PREFIXES):
+            return True
+    return False
+
+
+def _source_identity(source) -> Set[str]:
+    """Czym źródło JEST — jego zwykłe tagi (bez prefiksów psyche)."""
+    return {t for t in (getattr(source, "tags", None) or [])
+            if isinstance(t, str) and ":" not in t}
+
+
+def _apply_psyche(target, effect_key: str) -> Interaction:
+    prof = _PSYCHE_EFFECT[effect_key]
+    st = target.state if target.state is not None else {}
+    statuses = st.setdefault("systemic_statuses", [])
+    if prof["status"] not in statuses:
+        statuses.append(prof["status"])
+    if prof.get("stun"):
+        st["systemic_stun_chance"] = float(prof["stun"])
+    if prof.get("slow"):
+        st["systemic_slow"] = True
+    st["systemic_turns"] = int(prof["turns"])
+    target.state = st
+    return Interaction(matched=True, effect=effect_key,
+                       lines=[prof["line"].format(cel=_display(target))])
+
+
+def resolve_psyche(world, verb: str, source, target) -> Interaction:
+    """Reguła umysłu: tożsamość źródła ∩ psyche celu → efekt. Czasownik
+    (rzuć / pokaż / podrzuć) jest już zawężony przez router łańcucha;
+    o efekcie decyduje, KTÓRA psyche celu trafiona."""
+    if source is None or target is None:
+        return Interaction(matched=False)
+    ident = _source_identity(source)
+    if not ident:
+        return Interaction(matched=False)
+    for prefix, effect_key in _PSYCHE_RULES:
+        psyche = target_psyche(target, prefix)
+        if psyche and (ident & psyche):
+            return _apply_psyche(target, effect_key)
+    return Interaction(matched=False)

@@ -481,7 +481,9 @@ MON = {
         name_key="ent_tunnel_runt_n", fallback_name="Tunelowy Szczurek",
         desc_key="ent_tunnel_runt_d",
         fallback_desc="Niski, mokry, bardzo zły. Chrupie dłoń jeśli mu pozwolisz.",
-        tags=["monster","small","biting","flammable"],
+        # P29.66 — tożsamość „robactwo": można nim CISNĄĆ w kogoś, kto się
+        # robactwa boi/brzydzi (reguła psychiki).
+        tags=["monster","small","biting","flammable","robactwo"],
         affordances=["inspect","attack","intimidate","lure","sneak"],
         hp=8, max_hp=8, ac=11, attack_bonus=3, damage_dice="1d4+1",
         # Prompt 21: small + furry = vulnerable to fire AND cold.
@@ -518,7 +520,10 @@ MON = {
         name_key="ent_biotech_inspector_n", fallback_name="Inspektor NovaChem",
         desc_key="ent_biotech_inspector_d",
         fallback_desc="Hełm z osłoną twarzy, kombinezon, podkładka. Notuje cię.",
-        tags=["monster","humanoid","corporate","novachem","responder"],
+        # P29.66 — psychika: czysty kombinezon, sterylne procedury — widok
+        # robactwa go brzydzi (odraza → cofnięcie). Cisnij w niego szczura.
+        tags=["monster","humanoid","corporate","novachem","responder",
+              "odraza:robactwo"],
         affordances=["inspect","attack","intimidate","talk"],
         hp=18, max_hp=18, ac=13, attack_bonus=4, damage_dice="1d6+2",
         # HazMat suit — chem-proof but a battery makes it crackle.
@@ -766,7 +771,8 @@ MON = {
         desc_key="ent_mutant_szczur_d",
         fallback_desc="Dwa razy większy niż powinien. Trzy oczy. "
                       "Ślina kapie na podłogę i syczy.",
-        tags=["monster","beast","zoo","pack","floor_min:3"],
+        # P29.66 — też „robactwo": żywa amunicja na strachy panicza.
+        tags=["monster","beast","zoo","pack","floor_min:3","robactwo"],
         affordances=["inspect","attack"],
         hp=12, max_hp=12, ac=12, attack_bonus=3, damage_dice="1d6+1",
         damage_type="physical",
