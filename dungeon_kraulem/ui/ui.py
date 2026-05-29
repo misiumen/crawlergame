@@ -451,7 +451,10 @@ def draw_creation(surf, state, *, click_registry=None,
         except Exception:
             pass
         sel = state.get("selected_bg", 0)
-        cy = 140
+        # P29.62 — odstępy zagęszczone (22+18 → 20+16), bo lista origin
+        # urosła (14 baz + odblokowane). Trzyma się powyżej podpowiedzi
+        # na dole (sh-40), nie wchodzi w bleed nawet z paroma unlockami.
+        cy = 132
         for i, key in enumerate(bgs):
             col = ACCENT if i == sel else NORMAL_TEXT
             if key in origin_meta:
@@ -461,13 +464,13 @@ def draw_creation(surf, state, *, click_registry=None,
             marker = "▶ " if i == sel else "  "
             row_y = cy
             text(surf, f"{marker}[{i+1:2d}] {label}", 80, cy, col,
-                 body_size, bold=(i==sel)); cy += 22
+                 body_size, bold=(i==sel)); cy += 20
             if key in origin_meta:
                 desc = origin_meta[key].reward_pl
             else:
                 desc = t(f"bg_{key}_d", fallback="")
             if desc:
-                text(surf, "        " + desc, 80, cy, DIM_TEXT, small_size - 1); cy += 18
+                text(surf, "        " + desc, 80, cy, DIM_TEXT, small_size - 1); cy += 16
             row_h = cy - row_y
             if click_registry is not None and on_action is not None:
                 def _pick(_idx=i, _was_sel=(i == sel)):

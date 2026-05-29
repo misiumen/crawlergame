@@ -12,7 +12,31 @@ BACKGROUNDS = (
     "courier", "student", "streamer", "soldier", "unemployed_hustler",
     "janitor", "paramedic",
     "opiekun_zwierzaka",   # Prompt 19
+    "bezdomny",            # P29.62 — underdog challenge origin
 )
+
+
+# P29.62 — „Przetrwanie", pasywka origin „bezdomny". Wyprowadzona z
+# `background` (nie osobne pole) — dzięki temu jest odporna na save/load
+# (background jest serializowany) i nie trzeba migrować starych zapisów.
+# Sprawdzana w: game._attempt_consume (jedzenie/picie) i corpses.eat
+# (zwłoki / niejadalne).
+def survival_heal_mult(character) -> float:
+    """Mnożnik leczenia z jedzenia i napojów. Bezdomny nauczył się
+    wyciskać z byle ochłapu maksimum kalorii — +50%."""
+    return 1.5 if getattr(character, "background", "") == "bezdomny" else 1.0
+
+
+def has_tough_stomach(character) -> bool:
+    """Twardy żołądek: bezdomny zjada padlinę i to, co inni by zwymiotowali,
+    bez kary (statusu zatrucia/choroby). Niejadalne zwłoki też przełyka."""
+    return getattr(character, "background", "") == "bezdomny"
+
+
+def salvage_bonus(character) -> int:
+    """Szperacz (bezdomny): lata grzebania w śmietnikach uczą wyciskać
+    z każdego truchła odrobinę więcej — +1 do każdego plonu z patroszenia."""
+    return 1 if getattr(character, "background", "") == "bezdomny" else 0
 
 
 @dataclass

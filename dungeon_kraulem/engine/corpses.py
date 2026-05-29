@@ -250,6 +250,10 @@ def butcher(world, corpse: Entity, character,
         if preferred & wtags:
             tool_bonus = 1
 
+    # P29.62 — szperacz (bezdomny): +1 do każdego plonu z patroszenia.
+    from . import character as _char
+    scav_bonus = _char.salvage_bonus(character) if character is not None else 0
+
     # Roll each material.
     out_mats: Dict[str, int] = {}
     for mat_key, span in salvage_spec.items():
@@ -258,8 +262,7 @@ def butcher(world, corpse: Entity, character,
         else:
             lo = hi = int(span)
         amt = rng.randint(min(lo, hi), max(lo, hi))
-        if tool_bonus:
-            amt += tool_bonus
+        amt += tool_bonus + scav_bonus
         if amt > 0:
             out_mats[mat_key] = out_mats.get(mat_key, 0) + amt
 
@@ -345,7 +348,12 @@ def eat(world, corpse: Entity, character) -> EatResult:
 
     key = st.get("original_key", "")
     tpl = template_for(key)
-    if not tpl.get("edible", False):
+    edible = bool(tpl.get("edible", False))
+    # P29.62 — „twardy żołądek" (bezdomny): trawi padlinę i niejadalne
+    # zwłoki, których nikt normalny by nie tknął, i bez kary statusu.
+    from . import character as _char
+    tough = _char.has_tough_stomach(character)
+    if not edible and not tough:
         # Refuse cleanly — eating an unmarked-edible corpse is a stop
         # rather than a hidden penalty. Players know the score.
         return EatResult(
@@ -355,6 +363,18 @@ def eat(world, corpse: Entity, character) -> EatResult:
 
     hp_delta = int(tpl.get("eat_hp_delta", 0))
     status   = tpl.get("eat_status")
+
+    # P29.62 — twardy żołądek znosi karę: żadnego statusu, żadnej utraty
+    # HP, a z niejadalnego trupa wyciska przynajmniej trochę kalorii.
+    if tough:
+        status = None
+        if hp_delta < 0:
+            hp_delta = 0
+        if not edible and hp_delta <= 0:
+            hp_delta = 5
+    # Przetrwanie: pożywne zwłoki leczą bezdomnego mocniej (+50%).
+    if hp_delta > 0:
+        hp_delta = int(round(hp_delta * _char.survival_heal_mult(character)))
     tag      = tpl.get("eat_audience_tag")
     cannibal = (tpl.get("cannibal_tag")
                 if st.get("original_type") == T_CRAWLER else None)

@@ -428,6 +428,11 @@ class Game:
             "janitor":           {"STR": 12, "DEX": 10, "CON": 14, "INT": 9,  "WIS": 11, "CHA": 8},
             "paramedic":         {"STR": 10, "DEX": 12, "CON": 11, "INT": 13, "WIS": 14, "CHA": 10},
             "opiekun_zwierzaka": {"STR": 9,  "DEX": 11, "CON": 10, "INT": 10, "WIS": 14, "CHA": 13},
+            # P29.62 — bezdomny: NAJSŁABSZY profil (suma 54 vs 64-68 reszty).
+            # Żaden stat nie wybija się ponad przeciętność; CHA dno (świat
+            # go spisał na straty). Wyzwanie origin — rekompensuje go
+            # Przetrwanie + mechanika underdoga, nie surowe staty.
+            "bezdomny":          {"STR": 9,  "DEX": 10, "CON": 9,  "INT": 9,  "WIS": 11, "CHA": 6},
         }
         profile = STAT_PROFILES.get(background)
         if profile:
@@ -452,6 +457,11 @@ class Game:
             # Prompt 19 — opiekun_zwierzaka starts with food for the pet
             # and a battered carrier; the pet itself is assigned below.
             "opiekun_zwierzaka": ["snack_bar","duct_tape"],
+            # P29.62 — bezdomny: same uzbierane śmieci. Pęknięty kubek
+            # (improwizowana tłuczka) + ochłap jedzenia. Bez bandaża —
+            # ze swoim startowym statusem ma się zmierzyć Przetrwaniem,
+            # nie gotową kuracją.
+            "bezdomny":      ["cracked_mug","snack_bar"],
         }.get(background, ["cracked_mug"])
         for k in starters:
             it = make_item(k, location_id="inventory:player")
@@ -479,6 +489,9 @@ class Game:
             "janitor":           [("kalosze","legs"),("pas_narzedziowy","back")],
             "paramedic":         [("fartuch_laboratoryjny","torso"),("buty_taktyczne","legs"),("dirty_bandage","main")],
             "opiekun_zwierzaka": [("kurtka_skorzana","torso"),("snack_bar","off")],
+            # P29.62 — bezdomny: żadnej zbroi, żadnej broni. Czapka i
+            # gumiaki ze śmietnika — tyle, ile uzbierał na ulicy.
+            "bezdomny":          [("czapka_uszanka","head"),("kalosze","legs")],
         }
         for item_key, slot in STARTER_LOADOUT.get(background, []):
             try:
@@ -513,6 +526,22 @@ class Game:
                 _cr.starting_recipes_for(background)
         except Exception:
             pass
+
+        # P29.62 — bezdomny: underdog na każdym froncie. Wchodzi do lochu
+        # bez grosza przy duszy i z dolegliwością, którą wlókł ze sobą
+        # z ulicy (świeża rana / zatrucie czymś, co zjadł / niezaleczone
+        # nadwerężenie). Status nakładamy na conditions — combat i
+        # consequences czytają tę listę. Rekompensata (Przetrwanie,
+        # mnożnik widowni dla underdoga) jest gdzie indziej.
+        if background == "bezdomny":
+            self.world.character.credits = 0
+            import random as _r
+            # Statusy spójne z kluczami combat (STATUS_BLEEDING/_POISONED/
+            # _WOUNDED). Gracz widzi PL etykietę przez _STATUS_PL.
+            start_ail = _r.choice(["bleeding", "poisoned", "wounded"])
+            conds = self.world.character.conditions
+            if start_ail not in conds:
+                conds.append(start_ail)
 
         # Prompt 19 — pet-owner background gets a random companion. The
         # pet is registered BEFORE Floor 1 is built so its location_room_id
@@ -875,7 +904,10 @@ class Game:
         spec = self._CONSUMABLE_EFFECTS.get(chosen.key, {"heal": 5})
         heal = int(spec.get("heal", 0))
         if heal > 0:
-            heal = int(round(heal * _cf.heal_multiplier(ch)))
+            # P29.62 — Przetrwanie (bezdomny): jedzenie i napoje leczą +50%.
+            from . import character as _char
+            heal = int(round(heal * _cf.heal_multiplier(ch)
+                             * _char.survival_heal_mult(ch)))
             pre = ch.hp
             ch.heal(heal)
             self.log(t("feedback_consume_heal",

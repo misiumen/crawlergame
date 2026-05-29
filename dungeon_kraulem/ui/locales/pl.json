@@ -54,6 +54,8 @@
   "bg_janitor_d": "Znasz wszystkie ślepe zaułki. +1 CON, +1 INT.",
   "bg_paramedic_n": "Ratownik",
   "bg_paramedic_d": "Spokojny w sytuacjach, w których inni krzyczą. +1 WIS, +1 INT.",
+  "bg_bezdomny_n": "Bezdomny",
+  "bg_bezdomny_d": "Najsłabszy ze wszystkich i wchodzisz już ranny. Przetrwanie: jedzenie i picie leczą +50%, żołądek strawi padlinę. Bez grosza, bez broni.",
 
   "ui_clock": "Zegar",
   "ui_deadline": "Termin",

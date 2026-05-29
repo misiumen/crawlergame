@@ -54,6 +54,8 @@
   "bg_janitor_d": "You know every dead end. +1 CON, +1 INT.",
   "bg_paramedic_n": "Paramedic",
   "bg_paramedic_d": "Calm in situations where others scream. +1 WIS, +1 INT.",
+  "bg_bezdomny_n": "Homeless",
+  "bg_bezdomny_d": "The dungeon is just another place to sleep rough. Weakest stats of all, and you walk in already ailing. But Survival keeps you going: food and drink heal +50%, your gut digests even carrion, and you scavenge more. No money, no weapon.",
 
   "ui_clock": "Clock",
   "ui_deadline": "Deadline",
