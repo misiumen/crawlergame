@@ -142,8 +142,10 @@ class UISelectionState:
 _GROUP_LABEL_KEYS = {
     GROUP_ACTIONS:   ("ui_group_actions",   "Akcje"),
     GROUP_EXITS:     ("ui_group_exits",     "Wyjścia"),
-    GROUP_OBJECTS:   ("ui_group_objects",   "Obiekty"),
-    GROUP_ENTITIES:  ("ui_group_entities",  "Postacie"),
+    # P29.64 — panel OTOCZENIE: tab-y środowiskowe nazwane jak świat,
+    # nie jak kategorie UI. Obiekty→Środowisko, Postacie→Istoty.
+    GROUP_OBJECTS:   ("ui_group_objects",   "Środowisko"),
+    GROUP_ENTITIES:  ("ui_group_entities",  "Istoty"),
     GROUP_PERSONEL:  ("ui_group_personel",  "Usługi"),
     GROUP_PET:       ("ui_group_pet",       "Zwierzę"),
     GROUP_INVENTORY: ("ui_group_inventory", "Ekwipunek"),
@@ -260,6 +262,11 @@ def _restore_selection(state: "UISelectionState",
 
 def _basic_actions(world, room=None) -> List[SelectableOption]:
     out = [
+        # P29.64 — `zbadaj pomieszczenie`: główny punkt wejścia w odkrycie
+        # OTOCZENIA (istoty / środowisko z właściwościami / wyjścia).
+        SelectableOption("act_examine",
+                         t("nav_examine_room", fallback="Zbadaj pomieszczenie"),
+                         "zbadaj pomieszczenie", GROUP_ACTIONS),
         SelectableOption("act_look",   t("nav_look",   fallback="Rozejrzyj się"),
                          "rozejrzyj się", GROUP_ACTIONS),
         SelectableOption("act_search", t("nav_search", fallback="Przeszukaj pokój"),

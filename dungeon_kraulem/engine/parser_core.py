@@ -273,6 +273,25 @@ def parse(text: str, world=None) -> ActionIntent:
                 intent.confidence = 0.95
                 return intent
 
+    # ── „zbadaj" — zunifikowane odkrycie OTOCZENIA (P29.64) ──────────────────
+    # „zbadaj" / „zbadaj pomieszczenie / otoczenie / pokój" → examine_room
+    # (czytelny przegląd istot, środowiska z właściwościami, wyjść).
+    # „zbadaj <obiekt>" → inspect tego obiektu (jak sprawdź).
+    if folded == "zbadaj" or folded.startswith("zbadaj "):
+        rest = folded[len("zbadaj "):].strip() if folded != "zbadaj" else ""
+        if rest in ("", "pomieszczenie", "otoczenie", "pokoj", "pokój",
+                    "dookola", "dookoła", "wokol", "wokół", "teren",
+                    "okolice", "okolicę", "miejsce", "wszystko"):
+            intent.intent = "examine_room"
+            intent.verb = "zbadaj"
+            intent.confidence = 0.95
+            return intent
+        intent.intent = "inspect"
+        intent.verb = "zbadaj"
+        intent.targets.append(_strip_articles(rest))
+        intent.confidence = 0.9
+        return intent
+
     # ── Fast-path quick intents ──────────────────────────────────────────────
     for ikey, cues in _QUICK_INTENTS.items():
         for cue in cues:
@@ -1265,7 +1284,7 @@ def _intent_from_llm_dict(d: dict, raw_text: str) -> ActionIntent:
 
 # Whitelist of intent strings the LLM may produce that we accept verbatim.
 _LLM_INTENT_PASSTHROUGH = {
-    "look","inspect","search","move","listen","wait","rest_short","rest_long",
+    "look","inspect","search","examine_room","move","listen","wait","rest_short","rest_long",
     "attack","defend","use","talk","intimidate","bribe","sneak","hide","flee",
     "craft","loot","open","close","hack","force","lockpick","throw_at",
     "push_into","lure","perform","ask_rumor","check_inventory","check_character",

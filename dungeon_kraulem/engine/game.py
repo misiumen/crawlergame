@@ -2535,6 +2535,11 @@ class Game:
         # handler iterates the room's visible entities and applies the
         # action to every valid target — accumulating time, noise,
         # materials, and consequences.
+        # P29.64 — `zbadaj pomieszczenie`: zunifikowane odkrycie OTOCZENIA
+        # (istoty / środowisko z właściwościami / wyjścia). Obserwacja,
+        # nie loot — `przeszukaj` zostaje osobno na przeszukiwanie.
+        if intent.intent == "examine_room":
+            self._attempt_examine_room(); return
         if intent.intent == "mass_salvage":
             self._attempt_mass_salvage(intent); return
         if intent.intent == "mass_search":
@@ -4634,6 +4639,56 @@ class Game:
             ch.flags["safehouse_theft_warnings"] = int(
                 ch.flags.get("safehouse_theft_warnings", 0)) + 1
 
+    def _attempt_examine_room(self):
+        """P29.64 — `zbadaj pomieszczenie`: zunifikowane odkrycie
+        OTOCZENIA. Czytelny przegląd: ISTOTY, ŚRODOWISKO (z właściwościami
+        ujawnionymi przez silnik systemowy — gracz dedukuje użycie, nie
+        dostaje gotowego przepisu) i WYJŚCIA. To OBSERWACJA, nie loot —
+        `przeszukaj` zostaje na przeszukiwanie pojemników."""
+        from . import systemic as _sys
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            self.log(t("feedback_no_room", fallback="Nie jesteś nigdzie."),
+                     LOG_WARN)
+            return
+        self.log(t("examine_room_header",
+                   fallback="Lustrujesz otoczenie — co tu można wykorzystać."),
+                 LOG_SYSTEM)
+        ents = list(room.visible_entities())
+        beings = [e for e in ents
+                  if e.entity_type in ("monster", "crawler", "npc")
+                  and e.is_alive()]
+        env = [e for e in ents
+               if e.entity_type not in ("monster", "crawler", "npc")]
+        any_section = False
+        if beings:
+            any_section = True
+            self.log("ISTOTY:", LOG_NORMAL)
+            for e in beings:
+                self.log(f"  • {e.display_name()}", LOG_NORMAL)
+        if env:
+            any_section = True
+            self.log("ŚRODOWISKO:", LOG_NORMAL)
+            for e in env:
+                obs = _sys.salient_observations(e)
+                if obs:
+                    self.log(f"  • {e.display_name()} — {'; '.join(obs)}",
+                             LOG_SUCCESS)
+                else:
+                    self.log(f"  • {e.display_name()}", LOG_NORMAL)
+        exits = [(lbl, ed) for lbl, ed in (room.exits or {}).items()
+                 if not ed.get("hidden")]
+        if exits:
+            any_section = True
+            self.log("WYJŚCIA:", LOG_NORMAL)
+            for lbl, ed in exits:
+                lock = " (zamknięte)" if ed.get("locked") else ""
+                self.log(f"  • {lbl}{lock}", LOG_NORMAL)
+        if not any_section:
+            self.log("  Pusto. Goła podłoga i twój własny oddech.",
+                     LOG_NORMAL)
+
     def _attempt_mass_search(self, intent):
         """Search every visible container/corpse/drawer/shelf in the room."""
         from . import time_system as ts
@@ -4910,6 +4965,8 @@ class Game:
             "help", "journal_open", "journal_close",
             "journal_objectives", "journal_crawlers", "save",
             "set_monitor", "set_resolution",
+            # P29.64 — ocena otoczenia w walce (czego użyć?) jest darmowa.
+            "examine_room",
         }
         if intent.intent in FREE_IN_COMBAT:
             return False

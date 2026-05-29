@@ -439,6 +439,48 @@ def is_slowed(target) -> bool:
     return bool(st.get("systemic_slow"))
 
 
+# ── Odkrycie OTOCZENIA: obserwacje właściwości (P29.64) ─────────────
+#
+# `zbadaj pomieszczenie` ujawnia WŁAŚCIWOŚCI rzeczy, nie gotowe przepisy.
+# Gracz sam dedukuje („łatwopalne + mam zapałki = podpalę"). To realizuje
+# „odkrycie jako mechanika" + „mechaniki ukryte" — pokazujemy świat, nie
+# instrukcję obsługi.
+
+
+# Property celu → naturalna obserwacja PL (co gracz „widzi/czuje").
+_PROP_OBSERVATION = {
+    "łatwopalne":  "suche, łatwo zajmie się ogniem",
+    "przewodzące": "wilgotne albo metalowe — poprowadzi prąd",
+    "metal":       "z litego metalu",
+    "mokre":       "ocieka wodą",
+    "kruche":      "kruche, pęknie od porządnego ciosu",
+}
+
+# Element źródła (hazard / przedmiot) → obserwacja PL.
+_ELEMENT_OBSERVATION = {
+    "ogień": "bucha żarem",
+    "prąd":  "trzaska iskrami — pod napięciem",
+    "kwas":  "żrące opary, syczy",
+    "mróz":  "wieje przejmującym chłodem",
+}
+
+
+def salient_observations(ent) -> List[str]:
+    """Lista obserwacji PL o systemowo istotnych cechach encji
+    (właściwości materii + niesiony żywioł). Pusta, gdy nic
+    eksploatowalnego — wtedy obiekt jest po prostu tłem."""
+    out: List[str] = []
+    for prop in target_matter_props(ent):
+        obs = _PROP_OBSERVATION.get(prop)
+        if obs and obs not in out:
+            out.append(obs)
+    for el in source_elements(ent):
+        obs = _ELEMENT_OBSERVATION.get(el)
+        if obs and obs not in out:
+            out.append(obs)
+    return out
+
+
 def roll_stun(target, rng) -> bool:
     """True, jeśli cel w tej turze traci akcję (paraliż od prądu/lodu)."""
     st = _st(target) or {}
