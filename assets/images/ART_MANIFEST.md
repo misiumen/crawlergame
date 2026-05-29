@@ -48,22 +48,31 @@ odległe (inny gatunek ilustracji, inna paleta, inny nastrój).
 
 ---
 
-## Portrety wrogów  (1:1, ~512, popiersie; styl PASUJĄCY do biomu wroga)
+## Portrety wrogów  (CAŁA SYLWETKA, pion ~2:3 np. 512×768; styl biomu wroga)
 
-Łańcuch: `wrog_<klucz_moba>` → `wrog_<archetyp>`. Portret rób w stylu
-biomu, z którego mob pochodzi (zwierzak z zoo ≠ żołnierz z okopów).
+Łańcuch: `wrog_<klucz_moba>` → `wrog_<archetyp>`. Styl wg biomu moba
+(zwierzak z zoo ≠ żołnierz z okopów).
 
-| Klucz                 | Subiekt |
+**KRYTYCZNE — całe ciało, nie popiersie.** VATS targetuje strefy:
+głowa / tors / ramiona / **nogi**. Popiersie ucina nogi → nie da się ich
+celować. Wymagania:
+- **pełna postać head-to-feet**, front, stojąca, kończyny ROZDZIELONE
+  (nie skrzyżowane) — żeby strefy ciała siadały na realnych członkach,
+- **tło proste/ciemne lub przezroczyste (PNG alpha)** — bez gęstej sceny
+  za postacią (kłóci się z nakładką stref VATS),
+- format pionowy ~2:3 (głowa u góry, stopy na dole).
+
+| Klucz                 | Subiekt (zawsze FULL-BODY, stojąca postać) |
 |-----------------------|---------|
-| `wrog_humanoid`       | hostile humanoid scavenger, makeshift armor |
-| `wrog_beast`          | mutated beast, fangs, matted fur |
-| `wrog_robot`          | battered security robot, red optic, wiring |
-| `wrog_blob`           | amorphous translucent ooze, dripping |
-| `wrog_aberration`     | eldritch anomaly, wrong geometry, too many eyes |
-| `wrog_undead`         | reanimated crawler corpse, grey flesh |
-| `wrog_intake_warden`  | F1 boss: hulking intake warden, riot gear |
-| `wrog_boss_panicz_zoo`| F3 boss: pampered show-beast, bear-like, gaudy zoo glam |
-| `wrog_tunnel_runt`    | small vicious tunnel rat, wet, red eyes |
+| `wrog_humanoid`       | full-body hostile humanoid scavenger, makeshift armor, standing |
+| `wrog_beast`          | full-body mutated beast on all-fours/standing, fangs, matted fur |
+| `wrog_robot`          | full-body battered security robot, red optic, exposed wiring |
+| `wrog_blob`           | full-body amorphous translucent ooze, dripping, upright mass |
+| `wrog_aberration`     | full-body eldritch anomaly, wrong geometry, too many limbs |
+| `wrog_undead`         | full-body reanimated crawler corpse, grey flesh, shambling |
+| `wrog_intake_warden`  | F1 boss: full-body hulking intake warden, riot gear |
+| `wrog_boss_panicz_zoo`| F3 boss: full-body pampered show-beast, bear-like, gaudy zoo glam |
+| `wrog_tunnel_runt`    | full-body small vicious tunnel rat, wet, red eyes |
 
 (Dla pozostałych bossów: `wrog_<klucz_z_entity_templates>`.)
 
