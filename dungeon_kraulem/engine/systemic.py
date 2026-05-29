@@ -682,3 +682,72 @@ def resolve_psyche(world, verb: str, source, target) -> Interaction:
         if psyche and (ident & psyche):
             return _apply_psyche(target, effect_key)
     return Interaction(matched=False)
+
+
+# ── BODŹCE + REAKCJE (P29.68) — hałas/światło/zapach jako NARZĘDZIE ──
+#
+# Każdy mob ma profil reakcji na bodziec (ciekawski/płochliwy/agresywny/
+# obojętny). Gracz emituje bodziec (hałas, błysk, zapach) → mob reaguje
+# WEDŁUG PROFILU, nie wedle płaskiej liczby. Hałas przestaje być karą
+# (stary noise = sama eskalacja threatu) i staje się dźwignią: zwab
+# ciekawskiego, spłosz płochliwego, ściągnij agresywnego na wabik.
+
+
+_REACTION_PROFILES = ("ciekawski", "płochliwy", "agresywny", "obojętny")
+
+# Inferencja profilu z tagów (gdy brak jawnego `reakcja:<profil>`).
+# Priorytet skanu: agresja > ciekawość > płochliwość > obojętność.
+def reaction_profile(ent) -> str:
+    tags = set(getattr(ent, "tags", None) or [])
+    for tg in tags:
+        if isinstance(tg, str) and tg.startswith("reakcja:"):
+            v = tg.split(":", 1)[1].strip()
+            if v in _REACTION_PROFILES:
+                return v
+    if tags & {"brute", "pack", "hunter", "aggressive", "biting", "rabid"}:
+        return "agresywny"
+    if tags & {"cunning", "curious", "mental", "sensor", "scavenger"}:
+        return "ciekawski"
+    if tags & {"beast", "small", "prey", "skittish", "vermin", "robactwo"}:
+        return "płochliwy"
+    if tags & {"construct", "robot", "machine", "drone", "undead", "ai"}:
+        return "obojętny"
+    return "obojętny"
+
+
+# profil → (status, profil_efektu, szablon_logu). Wszystkie nie-obojętne
+# zabierają mobowi turę przeciw graczowi (rusza ku/od hałasu).
+_STIMULUS_REACTION = {
+    "ciekawski": ("zwabiony", {"slow": True, "turns": 2},
+                  "{cel} nadstawia uszu i rusza w stronę hałasu."),
+    "płochliwy": ("spłoszony", {"stun": 0.6, "turns": 2},
+                  "{cel} płoszy się, kuli i pierzcha od dźwięku."),
+    "agresywny": ("rozjuszony", {"stun": 0.5, "turns": 1},
+                  "{cel} wpada w furię i szarżuje na źródło hałasu."),
+    "obojętny":  (None, None, "{cel} nawet nie drgnie."),
+}
+
+
+def apply_stimulus(target, bodziec: str = "hałas") -> Interaction:
+    """Emituje bodziec na cel; reakcja zależy od profilu. Zwraca
+    Interaction (matched=False dla obojętnych — brak skutku)."""
+    if target is None:
+        return Interaction(matched=False)
+    profile = reaction_profile(target)
+    status, prof, tmpl = _STIMULUS_REACTION.get(
+        profile, (None, None, "{cel} nie reaguje."))
+    line = tmpl.format(cel=_display(target))
+    if status is None or prof is None:
+        return Interaction(matched=False, lines=[line])
+    st = target.state if target.state is not None else {}
+    statuses = st.setdefault("systemic_statuses", [])
+    if status not in statuses:
+        statuses.append(status)
+    if prof.get("slow"):
+        st["systemic_slow"] = True
+    if prof.get("stun"):
+        st["systemic_stun_chance"] = float(prof["stun"])
+    st["systemic_turns"] = int(prof.get("turns", 1))
+    target.state = st
+    return Interaction(matched=True, effect=f"bodziec_{profile}",
+                       lines=[line])

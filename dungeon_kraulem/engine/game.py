@@ -2542,6 +2542,8 @@ class Game:
             self._attempt_examine_room(); return
         if intent.intent == "cast":
             self._attempt_cast(intent); return
+        if intent.intent == "distract":
+            self._attempt_distract(); return
         if intent.intent == "mass_salvage":
             self._attempt_mass_salvage(intent); return
         if intent.intent == "mass_search":
@@ -4649,6 +4651,43 @@ class Game:
             ch.flags["safehouse_theft_warnings"] = int(
                 ch.flags.get("safehouse_theft_warnings", 0)) + 1
 
+    def _attempt_distract(self):
+        """P29.68 — `odwróć uwagę` / `hałasuj`: emituje bodziec HAŁASU.
+        Moby reagują WEDŁUG PROFILU (ciekawski rusza ku, płochliwy
+        pierzcha, agresywny szarżuje na wabik, obojętny ignoruje). Hałas
+        = narzędzie, nie kara. Reakcje zabierają mobowi turę przeciw
+        graczowi."""
+        from . import systemic as _sys
+        from . import combat as _cmb
+        from . import time_system as _ts
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            self.log(t("feedback_no_room", fallback="Nie jesteś nigdzie."),
+                     LOG_WARN)
+            return
+        self.log(t("feedback_distract_intro",
+                   fallback="Robisz raban — łomot, krzyk, cokolwiek ściągnie "
+                            "albo odciągnie uwagę."), LOG_SYSTEM)
+        hostiles = _cmb.alive_hostiles_in(room)
+        if not hostiles:
+            self.log("  Cisza. Nikt nie nadstawia ucha.", LOG_NORMAL)
+        else:
+            for ent in hostiles:
+                r = _sys.apply_stimulus(ent, "hałas")
+                for ln in r.lines:
+                    self.log("  " + ln,
+                             LOG_SUCCESS if r.matched else LOG_NORMAL)
+        cs = _cmb.get_combat(room)
+        if cs is not None:
+            cs.last_action = "distract"
+            self._combat_after_player_action(cs)
+        else:
+            try:
+                _ts.advance(self.world, 1)
+            except Exception:
+                pass
+
     def _attempt_cast(self, intent):
         """P29.67 — `czaruj <szkoła> [w/na cel]`. Czar produkuje sygnał,
         który silnik systemowy rozstrzyga jak fizykę (materia / psyche).
@@ -5065,6 +5104,7 @@ class Game:
             "intimidate", "bribe", "talk", "persuade",  # parley path
             "hack",         # robot combat → hack-to-disable is a key tactic
             "cast",         # P29.67 — czar w walce (gł. tryb maga)
+            "distract",     # P29.68 — hałas jako narzędzie (zwab/spłosz)
         }
         if intent.intent in ALLOWED_FALLTHROUGH:
             return False

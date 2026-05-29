@@ -66,6 +66,10 @@ _QUICK_INTENTS = {
     "look":          ["rozejrzyj","rozejrzy","spójrz","spojrz","look","look around"],
     "search":        ["przeszukaj","szukaj","przetrzas","search"],
     "wait":          ["czekaj","poczekaj","wait"],
+    # P29.68 — bodziec hałasu: ściągnij/odwróć uwagę mobów wg ich profilu.
+    "distract":      ["odwróć uwagę","odwroc uwage","odwracam uwagę",
+                      "hałasuj","halasuj","narób hałasu","narob halasu",
+                      "zrób hałas","zrob halas","rób hałas"],
     "rest_short":    ["odpocznij","short rest","odpoczynek"],
     # P27.7 — class active ability trigger.
     "class_active":  ["umiejętność","umiejetnosc","umiejetność","umiejetnosć",
@@ -1299,7 +1303,7 @@ def _intent_from_llm_dict(d: dict, raw_text: str) -> ActionIntent:
 
 # Whitelist of intent strings the LLM may produce that we accept verbatim.
 _LLM_INTENT_PASSTHROUGH = {
-    "look","inspect","search","examine_room","move","listen","wait","rest_short","rest_long",
+    "look","inspect","search","examine_room","distract","move","listen","wait","rest_short","rest_long",
     "attack","defend","use","talk","intimidate","bribe","sneak","hide","flee",
     "craft","loot","open","close","hack","force","lockpick","throw_at","cast",
     "push_into","lure","perform","ask_rumor","check_inventory","check_character",
