@@ -292,6 +292,21 @@ def parse(text: str, world=None) -> ActionIntent:
         intent.confidence = 0.9
         return intent
 
+    # ── „czaruj <szkoła> [na/w <cel>]" — magia (P29.67) ──────────────────────
+    # „rzuć czar X" też; samo „rzuć X" (bez „czar") zostaje rzutem fizycznym.
+    cast_m = re.match(
+        r"^(?:czaruj|czaruje|zaklnij|rzuc\s+czar|rzuc\s+zaklecie|cast)\s+"
+        r"(\w+)(?:\s+(?:na|w|we|przy|ku)\s+(.+))?$", folded)
+    if cast_m:
+        intent.intent = "cast"
+        intent.verb = "czaruj"
+        intent.tool = cast_m.group(1)            # token szkoły (folded)
+        tgt = cast_m.group(2)
+        if tgt:
+            intent.targets.append(_strip_articles(tgt))
+        intent.confidence = 0.9
+        return intent
+
     # ── Fast-path quick intents ──────────────────────────────────────────────
     for ikey, cues in _QUICK_INTENTS.items():
         for cue in cues:
@@ -1286,7 +1301,7 @@ def _intent_from_llm_dict(d: dict, raw_text: str) -> ActionIntent:
 _LLM_INTENT_PASSTHROUGH = {
     "look","inspect","search","examine_room","move","listen","wait","rest_short","rest_long",
     "attack","defend","use","talk","intimidate","bribe","sneak","hide","flee",
-    "craft","loot","open","close","hack","force","lockpick","throw_at",
+    "craft","loot","open","close","hack","force","lockpick","throw_at","cast",
     "push_into","lure","perform","ask_rumor","check_inventory","check_character",
     "check_map","save","help","deploy","salvage","strip","harvest",
     # Prompt 07: memetic intent labels.

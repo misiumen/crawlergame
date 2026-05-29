@@ -2540,6 +2540,8 @@ class Game:
         # nie loot — `przeszukaj` zostaje osobno na przeszukiwanie.
         if intent.intent == "examine_room":
             self._attempt_examine_room(); return
+        if intent.intent == "cast":
+            self._attempt_cast(intent); return
         if intent.intent == "mass_salvage":
             self._attempt_mass_salvage(intent); return
         if intent.intent == "mass_search":
@@ -2802,7 +2804,15 @@ class Game:
         mechanik nie działa."""
         try:
             from . import combat as _cmb
+            from . import magic as _magic
             from .entity import T_MONSTER, T_CRAWLER
+            # P29.67 — w arenie gracz dostaje podstawowy zestaw zaklęć +
+            # pełną manę, żeby przetestować magię (w normalnej grze brak,
+            # póki nie ma akwizycji — „szary człowiek" zostaje szary).
+            _magic.grant_core(self.world.character)
+            _magic.ensure_mana(self.world.character)
+            self.world.character.flags["mana"] = \
+                _magic.max_mana(self.world.character)
             room = self.world.current_floor.current_room()
             if room is None:
                 return
@@ -4639,6 +4649,63 @@ class Game:
             ch.flags["safehouse_theft_warnings"] = int(
                 ch.flags.get("safehouse_theft_warnings", 0)) + 1
 
+    def _attempt_cast(self, intent):
+        """P29.67 — `czaruj <szkoła> [w/na cel]`. Czar produkuje sygnał,
+        który silnik systemowy rozstrzyga jak fizykę (materia / psyche).
+        Mana gating + nauka zaklęć w engine.magic."""
+        from . import magic as _magic
+        from . import combat as _cmb
+        from .validation import _resolve_entities
+        ch = self.world.character
+        school = _magic.resolve_school(getattr(intent, "tool", None))
+        if school is None:
+            self.log(t("feedback_cast_unknown_school",
+                       fallback="Nie znasz takiego zaklęcia."), LOG_WARN)
+            return
+        spec = _magic.SPELLS[school]
+        name = spec["name"]
+        if not _magic.knows(ch, school):
+            self.log(t("feedback_cast_not_learned",
+                       fallback=f"Nie umiesz rzucić „{name}”. Nie nauczyłeś "
+                                f"się tej sztuki."), LOG_WARN)
+            return
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        target = None
+        if intent.targets and room is not None:
+            cands = _resolve_entities(room, intent.targets[0])
+            target = cands[0] if cands else None
+        if target is None:
+            self.log(t("feedback_cast_no_target",
+                       fallback=f"Na kogo rzucasz „{name}”? Wskaż cel."),
+                     LOG_WARN)
+            return
+        if _magic.mana(ch) < int(spec["mana"]):
+            self.log(t("feedback_cast_no_mana",
+                       fallback=f"Za mało many na „{name}” "
+                                f"(masz {_magic.mana(ch)}/{int(spec['mana'])})."),
+                     LOG_WARN)
+            return
+
+        victim_name = target.display_name()
+        res = _magic.cast(self.world, school, ch, target)
+        for ln in res.lines:
+            self.log(ln, LOG_SUCCESS)
+        self.log(f"  Mana: {_magic.mana(ch)}/"
+                 f"{(ch.flags or {}).get('max_mana', 0)}.", LOG_SYSTEM)
+        if not target.is_alive() and getattr(target, "max_hp", 0) > 0:
+            self.log(f"„{victim_name}” pada.", LOG_SUCCESS)
+            try:
+                from . import corpses as _cp
+                _cp.transform_to_corpse(self.world, target, killer=ch)
+            except Exception:
+                pass
+        # Tura wroga, jeśli walka aktywna.
+        cs = _cmb.get_combat(room) if room is not None else None
+        if cs is not None:
+            cs.last_action = f"cast:{school}"
+            self._combat_after_player_action(cs)
+
     def _attempt_examine_room(self):
         """P29.64 — `zbadaj pomieszczenie`: zunifikowane odkrycie
         OTOCZENIA. Czytelny przegląd: ISTOTY, ŚRODOWISKO (z właściwościami
@@ -4997,6 +5064,7 @@ class Game:
             "wear", "take_off",  # P25 — re-armor mid-fight (risky)
             "intimidate", "bribe", "talk", "persuade",  # parley path
             "hack",         # robot combat → hack-to-disable is a key tactic
+            "cast",         # P29.67 — czar w walce (gł. tryb maga)
         }
         if intent.intent in ALLOWED_FALLTHROUGH:
             return False
