@@ -156,3 +156,80 @@ def test_cast_refused_when_player_knows_nothing():
     out = sess.send("czaruj ogień w szczurek")
     text = "\n".join(t for t, _ in out)
     assert "nie umiesz" in text.lower() or "nie nauczył" in text.lower()
+
+
+# ── Szkoły egzotyczne (A/4b) ────────────────────────────────────────
+
+from ...engine.entity import T_CORPSE  # noqa: E402
+
+
+def _corpse(name="ciało"):
+    e = Entity(key="zwloki", entity_type=T_CORPSE, fallback_name=name,
+               hp=0, max_hp=0)
+    e.state = {"original_key": "tunnel_runt", "eaten_uses": 0, "dead": True}
+    return e
+
+
+def test_grant_includes_exotic_schools():
+    c = _mage()
+    for s in ("nekromancja", "ferromancja", "krew", "pustka"):
+        assert _magic.knows(c, s), f"brak nauki {s}"
+
+
+def test_necromancy_reanimates_corpse():
+    c = _mage()
+    corpse = _corpse()
+    r = _magic.cast(None, "nekromancja", c, corpse)
+    assert r.ok and (corpse.state or {}).get("reanimated") is True
+    assert corpse.entity_type == T_MONSTER
+    assert "sojusznik" in (corpse.tags or [])
+
+
+def test_necromancy_fizzles_on_living():
+    c = _mage()
+    r = _magic.cast(None, "nekromancja", c, _foe("monster"))
+    assert r.ok and r.reason == "fizzle"
+
+
+def test_ferromancy_crushes_metal_harder():
+    c = _mage()
+    metal = _foe("armored", ac=16)
+    r = _magic.cast(None, "ferromancja", c, metal)
+    assert r.ok and metal.ac <= 13          # -3 dla metalu
+    assert _sys.has_systemic_status(metal, "rozbrojony")
+
+
+def test_ferromancy_weak_on_nonmetal():
+    c = _mage()
+    soft = _foe("monster", "beast", ac=12)
+    r = _magic.cast(None, "ferromancja", c, soft)
+    assert r.ok and soft.ac == 11           # tylko -1
+
+
+def test_blood_magic_costs_hp_and_lifesteals():
+    c = _mage()
+    c.hp = c.max_hp = 100
+    foe = _foe(hp=40)
+    r = _magic.cast(None, "krew", c, foe)
+    assert r.ok
+    assert foe.hp == 30                      # -10
+    assert c.hp == 99                        # -6 koszt, +5 lifesteal
+
+
+def test_blood_magic_refused_when_low_hp():
+    c = _mage()
+    c.hp = 5
+    r = _magic.cast(None, "krew", c, _foe(hp=40))
+    assert r.ok is False and r.reason == "no_hp" and c.hp == 5
+
+
+def test_void_strips_systemic_and_silences():
+    c = _mage()
+    foe = _foe("monster", hp=40)
+    foe.state = {"systemic_statuses": ["płonie"],
+                 "systemic_dot": {"dmg": 3, "turns": 3, "status": "płonie"},
+                 "systemic_turns": 3}
+    r = _magic.cast(None, "pustka", c, foe)
+    assert r.ok
+    assert not _sys.has_systemic_status(foe, "płonie")   # zdjęte
+    assert _sys.has_systemic_status(foe, "uciszony")     # cisza nałożona

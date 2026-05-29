@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from . import systemic as _sys
-from .entity import Entity, T_OBJECT
+from .entity import Entity, T_OBJECT, T_MONSTER
 
 
 # ── Katalog zaklęć (A/4a) ───────────────────────────────────────────
@@ -38,10 +38,18 @@ SPELLS: Dict[str, dict] = {
               "damage_type": "cold"},
     "telekineza": {"name": "Pchnięcie", "mana": 3, "kind": "push"},
     "iluzja":     {"name": "Mara",      "mana": 3, "kind": "illusion"},
+    # ── Egzotyczne szkoły (A/4b) ──
+    "nekromancja": {"name": "Wskrzeszenie", "mana": 4, "kind": "necro"},
+    "ferromancja": {"name": "Magnetar",     "mana": 3, "kind": "ferro"},
+    "krew":        {"name": "Krwawa Danina", "mana": 0, "hp_cost": 6,
+                    "kind": "blood"},
+    "pustka":      {"name": "Pustka",       "mana": 3, "kind": "void"},
 }
 
-# Podstawowy zestaw udostępniany w arenie (do testu / playtestu).
+# Podstawowy zestaw (żywioły + bazowe). Egzotyczne osobno.
 CORE_SPELLS = ("ogień", "prąd", "kwas", "mróz", "telekineza", "iluzja")
+EXOTIC_SPELLS = ("nekromancja", "ferromancja", "krew", "pustka")
+ALL_SPELLS = CORE_SPELLS + EXOTIC_SPELLS
 
 
 def resolve_school(token: Optional[str]) -> Optional[str]:
@@ -120,8 +128,8 @@ def learn(ch, school: str) -> None:
 
 
 def grant_core(ch) -> None:
-    """Daje podstawowy zestaw (arena / testy)."""
-    for s in CORE_SPELLS:
+    """Daje pełny zestaw zaklęć (arena / testy) — wszystkie szkoły."""
+    for s in ALL_SPELLS:
         learn(ch, s)
 
 
@@ -189,5 +197,82 @@ def cast(world, school: str, caster, target) -> CastResult:
         spend_mana(caster, int(spec["mana"]))
         return CastResult(True, [f"„{name}” przybiera kształt z najgłębszego "
                                  f"lęku celu. "] + list(res.lines))
+
+    # ── Egzotyczne szkoły (A/4b) ──────────────────────────────────
+
+    if kind == "necro":
+        from .entity import T_CORPSE
+        if getattr(target, "entity_type", None) != T_CORPSE:
+            return CastResult(True, [f"„{name}” szuka zwłok do podniesienia, "
+                                     f"ale {cel} jeszcze oddycha."], "fizzle")
+        st = target.state if target.state is not None else {}
+        if st.get("reanimated"):
+            return CastResult(True, [f"{cel} już raz wstał. Drugi raz nie "
+                                     f"da rady."], "fizzle")
+        spend_mana(caster, int(spec["mana"]))
+        # Wskrzeszenie: trup wstaje jako słaby, krótkotrwały sojusznik.
+        st["reanimated"] = True
+        target.state = st
+        target.entity_type = T_MONSTER
+        target.hp = target.max_hp = 6
+        tags = list(getattr(target, "tags", None) or [])
+        if "sojusznik" not in tags:
+            tags.append("sojusznik")
+        target.tags = tags
+        return CastResult(True, [f"„{name}”: {cel} drga, wstaje i staje po "
+                                 f"twojej stronie. Na krótko."])
+
+    if kind == "ferro":
+        spend_mana(caster, int(spec["mana"]))
+        is_metal = "metal" in _sys.target_matter_props(target)
+        ac_drop = 3 if is_metal else 1
+        if hasattr(target, "ac"):
+            target.ac = max(0, int(target.ac) - ac_drop)
+        st = target.state if target.state is not None else {}
+        statuses = st.setdefault("systemic_statuses", [])
+        if "rozbrojony" not in statuses:
+            statuses.append("rozbrojony")
+        target.state = st
+        dmg = 4 if is_metal else 1
+        if getattr(target, "max_hp", 0) > 0:
+            target.hp = max(0, int(target.hp) - dmg)
+        flavor = ("Metal jęczy — pancerz wygina się do środka"
+                  if is_metal else "Pole ledwie szarpie")
+        return CastResult(True, [f"„{name}”: {flavor}. {cel} — broń wyrwana "
+                                 f"z dłoni, AC w dół (-{dmg})."])
+
+    if kind == "blood":
+        hp_cost = int(spec.get("hp_cost", 6))
+        if int(getattr(caster, "hp", 0)) <= hp_cost:
+            return CastResult(False, [f"„{name}”: za mało krwi, by zapłacić "
+                                      f"daninę."], "no_hp")
+        caster.hp = int(caster.hp) - hp_cost          # paliwo = HP, nie mana
+        dmg = 10
+        healed = 0
+        if getattr(target, "max_hp", 0) > 0:
+            target.hp = max(0, int(target.hp) - dmg)
+            healed = min(dmg // 2,
+                         int(getattr(caster, "max_hp", 0)) - int(caster.hp))
+            if healed > 0:
+                caster.hp = int(caster.hp) + healed
+        return CastResult(True, [f"„{name}”: tniesz własną dłoń (-{hp_cost} "
+                                 f"HP). Krew leci ku {cel} (-{dmg}) i wraca "
+                                 f"do ciebie (+{healed})."])
+
+    if kind == "void":
+        spend_mana(caster, int(spec["mana"]))
+        had = bool((getattr(target, "state", None) or {}).get(
+            "systemic_statuses"))
+        _sys._clear_systemic(target)
+        st = target.state if target.state is not None else {}
+        statuses = st.setdefault("systemic_statuses", [])
+        if "uciszony" not in statuses:
+            statuses.append("uciszony")
+        st["systemic_turns"] = max(int(st.get("systemic_turns", 0)), 2)
+        target.state = st
+        tail = (" Wszystkie zaklęcia z niego opadają."
+                if had else "")
+        return CastResult(True, [f"„{name}”: wokół {cel} gaśnie magia — "
+                                 f"cisza, pustka.{tail}"])
 
     return CastResult(False, [], "unknown")
