@@ -922,8 +922,13 @@ def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
     port = max(40, min(64, w // 3))
     try:
         from . import art as _art
+        _biome = ""
+        _f = getattr(world, "current_floor", None)
+        if _f is not None:
+            _biome = getattr(_f, "biome_key", "") or ""
         _art.draw_enemy_portrait(surf, target,
-                                 (x + w - port - 10, y + 6, port, port))
+                                 (x + w - port - 10, y + 6, port, port),
+                                 biome=_biome)
     except Exception:
         pass
     name_w = w - 28 - port

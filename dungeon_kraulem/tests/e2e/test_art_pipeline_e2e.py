@@ -39,13 +39,15 @@ def _room(biome="", rtype="combat"):
 
 
 def test_room_bg_key_chain_order():
+    # P29.74 — wszystko per biom (bg_<biome>_<typ> → bg_<biome>), bez
+    # biome-agnostycznych bg_room_<typ>/bg_default (bleed między biomami).
     keys = _art.room_bg_keys(_room(biome="zoo_korporacyjne", rtype="boss"))
-    assert keys == ["bg_zoo_korporacyjne", "bg_room_boss", "bg_default"]
+    assert keys == ["bg_zoo_korporacyjne_boss", "bg_zoo_korporacyjne"]
 
 
 def test_room_bg_key_chain_no_biome():
-    keys = _art.room_bg_keys(_room(biome="", rtype="combat"))
-    assert keys == ["bg_room_combat", "bg_default"]
+    # Brak biomu → brak kluczy → gradient (żadnego wspólnego bg_default).
+    assert _art.room_bg_keys(_room(biome="", rtype="combat")) == []
 
 
 def test_enemy_archetype_from_tags():
@@ -61,7 +63,12 @@ def test_enemy_archetype_from_tags():
 def test_enemy_art_keys_chain():
     e = Entity(key="intake_warden", entity_type=T_MONSTER,
                fallback_name="W", tags=["monster", "humanoid"])
+    # Bez biomu: mob → archetyp neutralny.
     assert _art.enemy_art_keys(e) == ["wrog_intake_warden", "wrog_humanoid"]
+    # Z biomem: mob → archetyp-biom → archetyp neutralny (P29.74).
+    assert _art.enemy_art_keys(e, "intake_industrial") == [
+        "wrog_intake_warden", "wrog_humanoid_intake_industrial",
+        "wrog_humanoid"]
 
 
 # ── Loader: None gdy brak pliku ─────────────────────────────────────

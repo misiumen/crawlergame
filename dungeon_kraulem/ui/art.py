@@ -48,15 +48,17 @@ def _room_type(room) -> str:
 
 
 def room_bg_keys(room):
-    """Łańcuch kluczy tła pokoju (od najbardziej szczegółowego)."""
+    """Łańcuch kluczy tła pokoju — WSZYSTKO per biom (P29.74), żeby
+    grafika jednego biomu NIE wyciekała na inny. Brak pliku → gradient
+    w tincie biomu. Celowo bez `bg_room_<typ>`/`bg_default` (były
+    biome-agnostyczne → bleed między biomami)."""
     keys = []
     b = _biome_of(room)
     t = _room_type(room)
+    if b and t:
+        keys.append(f"bg_{b}_{t}")     # np. bg_intake_industrial_boss
     if b:
-        keys.append(f"bg_{b}")
-    if t:
-        keys.append(f"bg_room_{t}")
-    keys.append("bg_default")
+        keys.append(f"bg_{b}")         # np. bg_intake_industrial
     return keys
 
 
@@ -119,13 +121,20 @@ def enemy_archetype(entity) -> str:
     return "humanoid"
 
 
-def enemy_art_keys(entity):
-    """Łańcuch kluczy portretu wroga."""
+def enemy_art_keys(entity, biome: str = ""):
+    """Łańcuch kluczy portretu wroga (P29.74 — archetyp PER BIOM).
+      wrog_<klucz_moba>            — własny obrazek danego moba
+      wrog_<archetyp>_<biom>       — archetyp specyficzny dla biomu
+      wrog_<archetyp>              — neutralny ostatni ratunek (zwykle brak)
+    Dzięki temu „humanoid z intake" ≠ „humanoid z zoo"."""
     out = []
     k = getattr(entity, "key", None)
     if k:
         out.append(f"wrog_{k}")
-    out.append(f"wrog_{enemy_archetype(entity)}")
+    arch = enemy_archetype(entity)
+    if biome:
+        out.append(f"wrog_{arch}_{biome}")
+    out.append(f"wrog_{arch}")
     return out
 
 
@@ -139,15 +148,15 @@ _ARCH_COLOR = {
 }
 
 
-def draw_enemy_portrait(surf, entity, rect) -> bool:
-    """Portret wroga w `rect`: PNG jeśli jest, inaczej prosta sylwetka
-    proceduralna wg archetypu (placeholder). Zwraca True gdy PNG."""
+def draw_enemy_portrait(surf, entity, rect, biome: str = "") -> bool:
+    """Portret wroga w `rect`: PNG jeśli jest (per mob / per archetyp-biom),
+    inaczej prosta sylwetka proceduralna wg archetypu. Zwraca True gdy PNG."""
     if not _HAS_PYGAME or surf is None or entity is None:
         return False
     x, y, w, h = rect
     if w <= 0 or h <= 0:
         return False
-    for key in enemy_art_keys(entity):
+    for key in enemy_art_keys(entity, biome):
         img = _assets.load_image(key, w, h)
         if img is not None:
             surf.blit(img, (x, y))

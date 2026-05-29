@@ -42,9 +42,13 @@ odległe (inny gatunek ilustracji, inna paleta, inny nastrój).
 | `bg_room_boss`          | wg biomu + reflektor i kamery | arena bossa: ostre światło, broadcast, napięcie |
 | `bg_default`            | neutralny mrok | zapasowy korytarz (gdy biom bez własnego tła) |
 
-> Łańcuch w grze: `bg_<biome>` → `bg_room_<typ>` → `bg_default`.
-> Pokoje walki/lore w danym biomie odziedziczą `bg_<biome>` — nie musisz
-> robić osobnych. Boss/treasure/safehouse warto wyróżnić.
+> Łańcuch w grze (P29.74 — WSZYSTKO per biom, zero bleedu między biomami):
+> `bg_<biome>_<typ>` → `bg_<biome>` → gradient w tincie biomu.
+> Pokoje walki/lore dziedziczą `bg_<biome>` — nie musisz robić osobnych.
+> Warto wyróżnić: `bg_<biome>_boss`, `bg_<biome>_safehouse`,
+> `bg_<biome>_treasure`, `bg_<biome>_start`.
+> (Nie ma już `bg_room_<typ>` ani `bg_default` — były wspólne dla
+> wszystkich biomów → powodowały „zlewanie się".)
 
 ---
 
