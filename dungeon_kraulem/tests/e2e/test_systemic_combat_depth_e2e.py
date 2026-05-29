@@ -175,3 +175,21 @@ def test_game_tick_dot_kill_makes_corpse():
     assert mob.hp == 0
     assert mob.entity_type == T_CORPSE
     assert sess.log_contains("dogorywa")
+
+
+# ── HUD: statusy systemowe widoczne na planszy (nie tylko w logu) ────
+
+
+def test_hud_status_labels_merge_systemic_with_turn_count():
+    from ...ui.ui import _all_status_labels
+    mob = _mob("m", hp=40)
+    mob.conditions = ["bleeding"]
+    mob.state = {"systemic_statuses": ["płonie"], "systemic_turns": 3}
+    labels = _all_status_labels(mob)
+    assert any("krwaw" in l.lower() for l in labels), "stan walki zniknął"
+    assert "płonie (3t)" in labels, f"brak systemowego z licznikiem: {labels}"
+
+
+def test_hud_status_labels_empty_when_clean():
+    from ...ui.ui import _all_status_labels
+    assert _all_status_labels(_mob("c", hp=10)) == []

@@ -881,6 +881,28 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None):
             if cy > y + h - 18: break
 
 
+def _all_status_labels(target):
+    """P29.63 — etykiety statusów do HUD: stany walki (conditions, przez
+    status_label EN→PL) + statusy SYSTEMOWE (state.systemic_statuses:
+    płonie/porażony/skorodowany...). Systemowe dostają licznik tur „(Nt)",
+    żeby gracz widział, że efekt TRWA — plansza zamiast log-spamu."""
+    from ..engine import combat as _cmb
+    out, seen = [], set()
+    for s in (getattr(target, "conditions", None) or []):
+        lbl = _cmb.status_label(s, "pl")
+        if lbl not in seen:
+            seen.add(lbl)
+            out.append(lbl)
+    st = getattr(target, "state", None) or {}
+    turns = int(st.get("systemic_turns", 0) or 0)
+    for s in (st.get("systemic_statuses") or []):
+        if s in seen:
+            continue
+        seen.add(s)
+        out.append(f"{s} ({turns}t)" if turns > 0 else s)
+    return out
+
+
 def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
                       *, click_registry=None):
     """P26a — VATS-style target detail: silhouette with clickable body
@@ -947,12 +969,12 @@ def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
         text(surf, f"Dystans: {band_pl}", x + 14, cy, ACCENT2,
              L.font_small - 1); cy += 14
 
-    # Statuses with PL labels.
-    if target.conditions:
+    # Statuses with PL labels (combat conditions + systemowe P29.63).
+    labels = _all_status_labels(target)
+    if labels:
         cy += 4
         text(surf, t("ui_enemy_statuses", fallback="Stan:"),
              x + 14, cy, DANGER, L.font_small - 1, True); cy += 14
-        labels = [_cmb.status_label(s, "pl") for s in target.conditions]
         # Wrap statuses across rows.
         line_w = w - 28
         f_small = font(L.font_small - 1)
@@ -2581,14 +2603,10 @@ def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
             hp_bar(surf, nm_x, y + 22, nm_w, 8, ent.hp, ent.max_hp)
         text(surf, stats_line,
              nm_x, y + 32, NORMAL_TEXT, L.font_small - 2)
-        # Statuses (truncated).
-        if ent.conditions:
-            try:
-                from ..engine import combat as _cmb
-                lbl = ", ".join(_cmb.status_label(s, "pl")
-                                for s in ent.conditions)
-            except Exception:
-                lbl = ", ".join(ent.conditions)
+        # Statuses (truncated) — combat + systemowe (P29.63).
+        _roster_labels = _all_status_labels(ent)
+        if _roster_labels:
+            lbl = ", ".join(_roster_labels)
             f_st = font(L.font_small - 2)
             if f_st.size(lbl)[0] > nm_w:
                 while lbl and f_st.size(lbl + "…")[0] > nm_w:
