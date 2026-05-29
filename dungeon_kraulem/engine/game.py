@@ -29,6 +29,11 @@ STATE_VICTORY   = "victory"
 STATE_DEFEAT    = "defeat"
 STATE_SETTINGS  = "settings"   # Prompt 11: simple settings popup from title
 STATE_SLOTS     = "slots"      # P29.9: save-slot picker (3 slots)
+# P29.60 — Arena testowa: combat-only sandbox.
+# STATE_ARENA_MENU = wybór wariantu, STATE_ARENA_PLAY reuses STATE_PLAY
+# input/render ale z arena_mode flag żeby ominąć floor descent / save.
+STATE_ARENA_MENU = "arena_menu"
+STATE_ARENA_PLAY = "arena_play"
 
 
 _NUMS = {
@@ -1431,7 +1436,9 @@ class Game:
         pre_room_id = (self.world.current_floor.current_room_id
                        if self.world and self.world.current_floor else None)
         if not text_val: return
-        if self.state == STATE_PLAY:
+        # P29.60 — arena play reuses STATE_PLAY input logic, just w
+        # innym state. Tu treatujemy oba identycznie.
+        if self.state == STATE_PLAY or self.state == STATE_ARENA_PLAY:
             # Record to lightweight command history for Up/Down recall.
             if not self.cmd_history or self.cmd_history[-1] != text_val:
                 self.cmd_history.append(text_val)
@@ -2663,7 +2670,12 @@ class Game:
         # Hooks: class offer trigger
         self._maybe_offer_class()
         # Hooks: floor descent (P27) or final victory.
-        if self.world.current_floor and self.world.current_floor.current_room_id in self.world.current_floor.exit_room_ids:
+        # P29.60 — arena mode: pomijamy descent (no exits) ale sprawdzamy
+        # win/loss żeby wrócić do arena menu.
+        in_arena = bool(getattr(self.world, "flags", {}).get("arena_mode"))
+        if in_arena:
+            self._check_arena_end()
+        elif self.world.current_floor and self.world.current_floor.current_room_id in self.world.current_floor.exit_room_ids:
             if self.world.current_floor.exits_unlocked:
                 self._descend_or_win()
             else:
@@ -2673,8 +2685,53 @@ class Game:
 
         # Health check
         if not self.world.character.is_alive():
-            self._check_player_dead("post_action",
-                                    "od kumulatywnych obrażeń")
+            if in_arena:
+                # Arena mode loss handled by _check_arena_end
+                pass
+            else:
+                self._check_player_dead("post_action",
+                                        "od kumulatywnych obrażeń")
+
+    # ── P29.60 — Arena testowa ────────────────────────────────────────
+
+    def start_arena_variant(self, variant_key: str) -> bool:
+        """Inicjalizuje sesję arenową dla wybranego wariantu.
+        Returns True on success, False (z log msg) on error."""
+        from . import arena as _arena
+        try:
+            world, _floor = _arena.build_arena_world(variant_key)
+        except ValueError as exc:
+            # Powinno się dziać tylko gdy disabled variant — pokaż info.
+            if self.world is not None:
+                self.world.log_msg(f"Arena: {exc}", "warn")
+            return False
+        self.world = world
+        self.state = STATE_ARENA_PLAY
+        self.world.log_msg(
+            world.current_floor.current_room().fallback_first_enter,
+            "normal")
+        return True
+
+    def _check_arena_end(self) -> None:
+        """Po każdym command dispatch w arena_mode sprawdza win/loss
+        i routes do feedback + return-to-menu."""
+        from . import arena as _arena
+        if _arena.arena_is_lost(self.world):
+            self.log("Arena: zawodnik wyeliminowany. Test zakończony.",
+                     LOG_DANGER)
+            self.state = STATE_ARENA_MENU
+            return
+        if _arena.arena_is_won(self.world):
+            self.log("Arena: wszyscy przeciwnicy padli. Test zakończony.",
+                     LOG_SUCCESS)
+            self.state = STATE_ARENA_MENU
+            return
+
+    def open_arena_menu(self) -> None:
+        """Przejście z title menu do arena variant picker."""
+        self.state = STATE_ARENA_MENU
+        # Reset world — arena nie korzysta z save state
+        self.world = None
 
     # ── P27 — floor descent ────────────────────────────────────────────
 
