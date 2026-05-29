@@ -75,16 +75,20 @@ def test_load_image_none_when_missing(_pg):
 # ── Fallback renderuje się bez grafik (gra nie pęka) ────────────────
 
 
-def test_room_background_fallback_renders(_pg):
+def test_room_background_fallback_renders(_pg, monkeypatch):
+    # Wymuś BRAK plików (izolacja od grafik wrzuconych na dysk, np.
+    # bg_default.png), żeby przetestować ścieżkę gradientu.
+    monkeypatch.setattr(_art._assets, "load_image", lambda *a, **k: None)
     surf = pygame.Surface((200, 120))
     used_real = _art.draw_room_background(surf, _room(biome="bar_skurczybyk"),
                                           (0, 0, 200, 120))
-    assert used_real is False           # brak PNG → fallback
+    assert used_real is False           # brak PNG → fallback gradient
     # Gradient: górny i dolny piksel różne.
     assert surf.get_at((5, 2))[:3] != surf.get_at((5, 117))[:3]
 
 
-def test_enemy_portrait_fallback_renders(_pg):
+def test_enemy_portrait_fallback_renders(_pg, monkeypatch):
+    monkeypatch.setattr(_art._assets, "load_image", lambda *a, **k: None)
     surf = pygame.Surface((80, 80))
     e = Entity(key="x", entity_type=T_MONSTER, fallback_name="x",
                tags=["monster", "robot"])
