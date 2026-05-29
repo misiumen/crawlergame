@@ -929,7 +929,7 @@ def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
              f"trafienie {z_mod:+d}",
              f"obraż. ×{z_mul:.1f}"]
     if maim:
-        parts.append(f"maim: {maim_label}")
+        parts.append(f"uraz: {maim_label}")
     text(surf, "  ·  ".join(parts), x + 14, cy, ACCENT2,
          L.font_small - 1); cy += 14
     text(surf, f"HP strefy: {zp_hp}/{zp_max}"
@@ -2507,7 +2507,7 @@ def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
                + ("  [złamana]" if broken else ""),
          x + 10, cy, DANGER if broken else NORMAL_TEXT, L.font_small - 1); cy += 13
     if maim_label:
-        text(surf, f"  maim: {maim_label}",
+        text(surf, f"  uraz: {maim_label}",
              x + 10, cy, WARN, L.font_small - 1); cy += 13
     # Hint about double-click to commit.
     text(surf, "  (dwuklik = zaatakuj)",
