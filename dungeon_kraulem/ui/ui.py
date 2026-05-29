@@ -1065,10 +1065,11 @@ def draw_sidebar(surf, world, layout=None, *, click_registry=None):
     c = world.character
     cy = y + 10
 
-    # Portrait (placeholder).
+    # P29.70 — awatar gracza (budowany z EQ) zamiast literki.
     port_size = max(72, min(128, w - 28))
     port_x = x + (w - port_size) // 2
-    _draw_player_portrait_placeholder(surf, c, port_x, cy, port_size, port_size)
+    _draw_player_portrait_placeholder(surf, c, port_x, cy, port_size,
+                                      port_size, world=world)
     cy += port_size + 6
 
     # Name + background.
@@ -2663,26 +2664,15 @@ def _draw_player_combat_chip(surf, world, x, y, w, h, L):
          hp_x, y + 34, NORMAL_TEXT, L.font_small - 1)
 
 
-def _draw_player_portrait_placeholder(surf, character, x, y, w, h):
-    """Placeholder for the player portrait. Future P27 swaps in
-    `assets/portraits/<class>.png` (or background fallback). Today: a
-    tinted square with the first letter of the character name + class
-    glyph in the corner."""
-    tint = (40, 50, 60)
-    if character.class_key:
-        # Slight per-class tint so the placeholder isn't a uniform gray.
-        seed = sum(ord(c) for c in character.class_key) % 6
-        palette = [(48, 44, 60), (60, 48, 44), (44, 60, 48),
-                   (44, 50, 60), (60, 56, 44), (50, 44, 60)]
-        tint = palette[seed]
-    pygame.draw.rect(surf, tint, (x, y, w, h))
-    pygame.draw.rect(surf, ACCENT, (x, y, w, h), 2)
-    initial = (character.name or "?")[:1].upper() if character.name else "?"
-    img = font(max(28, h // 2), bold=True).render(initial, True, BRIGHT_TEXT)
-    surf.blit(img, (x + (w - img.get_width()) // 2,
-                    y + (h - img.get_height()) // 2))
-    # Class glyph in corner.
-    if character.class_key:
+def _draw_player_portrait_placeholder(surf, character, x, y, w, h, *,
+                                      world=None):
+    """P29.70 — awatar gracza BUDOWANY proceduralnie z wyposażenia
+    (hełm/kamizelka/nogawki/plecak/broń), zamiast tinta z literką.
+    Deleguje do ui.avatar; klasa nadal sygnalizowana glifem w rogu."""
+    from . import avatar as _avatar
+    _avatar.draw_avatar(surf, character, x, y, w, h, world=world)
+    # Klasa: glif w rogu (zachowane z placeholdera).
+    if character is not None and character.class_key:
         c_img = font(max(10, h // 8)).render(
             character.class_key[:3].upper(), True, ACCENT2)
         surf.blit(c_img, (x + 4, y + h - c_img.get_height() - 4))
