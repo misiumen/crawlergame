@@ -33,11 +33,11 @@ def test_4_variants_in_catalog():
                     "boss_fight", "trap_room"}
 
 
-def test_only_duel_1v1_enabled_for_mvp():
-    """MVP: tylko 1 wariant gotowy do gry. Reszta 'wkrótce'."""
+def test_all_4_variants_enabled_after_cz2():
+    """Po cz.2: wszystkie 4 warianty enabled."""
     enabled = {v.key for v in _arena.all_variants() if v.enabled}
-    assert enabled == {"duel_1v1"}, (
-        f"MVP scope: tylko duel_1v1 enabled, got {enabled}")
+    assert enabled == {"duel_1v1", "triple_threat",
+                       "boss_fight", "trap_room"}
 
 
 def test_variant_labels_are_polish():
@@ -68,17 +68,39 @@ def test_build_arena_world_marks_arena_flag():
     assert w.flags.get("arena_variant") == "duel_1v1"
 
 
-def test_build_arena_disabled_variant_raises():
-    """Disabled variant — explicit error."""
-    import pytest
-    with pytest.raises(ValueError):
-        _arena.build_arena_world("boss_fight")  # disabled w MVP
-
-
 def test_build_arena_unknown_variant_raises():
     import pytest
     with pytest.raises(ValueError):
         _arena.build_arena_world("nieistniejący")
+
+
+def test_triple_threat_spawns_3_mobs_different_factions():
+    """triple_threat: 3 moby — szczur (beast), kapitan (liga), rzeźnik."""
+    w, floor = _arena.build_arena_world("triple_threat")
+    room = floor.rooms["arena_room"]
+    assert len(room.entities) >= 3
+    names = [e.fallback_name for e in room.entities]
+    assert any("Szczurek" in n for n in names)
+    assert any("Kapitan" in n for n in names)
+
+
+def test_boss_fight_spawns_boss():
+    """boss_fight: spawnuje Strażnika Bramy (intake floor boss)."""
+    w, floor = _arena.build_arena_world("boss_fight")
+    room = floor.rooms["arena_room"]
+    names = [e.fallback_name for e in room.entities]
+    assert any("Strażnik" in n for n in names)
+
+
+def test_trap_room_spawns_traps_and_mob():
+    """trap_room: mob + 3 hazards (kałuża kwasu, zwarcie, rura pary)."""
+    from ...engine.entity import T_HAZARD, T_MONSTER
+    w, floor = _arena.build_arena_world("trap_room")
+    room = floor.rooms["arena_room"]
+    mobs = [e for e in room.entities if e.entity_type == T_MONSTER]
+    traps = [e for e in room.entities if e.entity_type == T_HAZARD]
+    assert len(mobs) >= 1, "trap_room: brak moba"
+    assert len(traps) >= 2, f"trap_room: za mało pułapek ({len(traps)})"
 
 
 def test_arena_is_won_after_killing_all_mobs():
@@ -115,14 +137,13 @@ def test_game_start_arena_variant_transitions_to_arena_play():
                for e in room.entities)
 
 
-def test_game_start_disabled_variant_logs_and_returns_false():
+def test_game_start_unknown_variant_returns_false():
+    """Unknown variant key — error, not crash."""
     game = Game(screen=None)
-    # Najpierw musi istnieć world żeby log_msg działało
     ok_setup = game.start_arena_variant("duel_1v1")
     assert ok_setup
 
-    # Teraz disabled variant
-    ok = game.start_arena_variant("boss_fight")
+    ok = game.start_arena_variant("nieistniejacy_xyz")
     assert ok is False
 
 
@@ -191,3 +212,83 @@ def test_arena_player_can_attack_szczurek_via_command():
     )), (
         f"komenda nie wywołała żadnego combat-y log/state change.\n"
         f"State: {game.state}, logs: {new_logs!r}")
+
+
+# ── E2E: Title → arena menu → loadout → arena ─────────────────────
+
+
+def test_title_to_arena_menu_via_callback():
+    """Symuluje click 'Arena testowa' z title menu."""
+    from ...engine.game import STATE_TITLE
+    game = Game(screen=None)
+    assert game.state == STATE_TITLE
+
+    game._title_action("arena_menu")
+    assert game.state == STATE_ARENA_MENU
+
+
+def test_arena_menu_pick_variant_opens_loadout():
+    """Wybór wariantu z arena menu otwiera loadout picker."""
+    from ...engine.game import STATE_ARENA_LOADOUT
+    game = Game(screen=None)
+    game.open_arena_menu()
+
+    game._arena_pick_variant("duel_1v1")
+    assert game.state == STATE_ARENA_LOADOUT
+    assert game._pending_arena_variant == "duel_1v1"
+    assert game.arena_loadout_step == "weapon"
+
+
+def test_arena_loadout_full_flow_starts_arena():
+    """Pełna ścieżka: arena menu → wybór wariantu → weapon →
+    class → STATE_ARENA_PLAY."""
+    from ...engine.game import (
+        STATE_ARENA_LOADOUT, ARENA_WEAPONS, ARENA_CLASSES,
+    )
+    game = Game(screen=None)
+    game.open_arena_menu()
+    game._arena_pick_variant("duel_1v1")
+    assert game.state == STATE_ARENA_LOADOUT
+
+    # Step 1: wybór broni
+    game._arena_loadout_pick("weapon", ARENA_WEAPONS[0][0])
+    assert game.arena_loadout_step == "class"
+    assert game.arena_loadout.get("weapon") == ARENA_WEAPONS[0][0]
+
+    # Step 2: wybór klasy → start arena
+    game._arena_loadout_pick("class", ARENA_CLASSES[0][0])
+    assert game.state == STATE_ARENA_PLAY
+    assert game.world is not None
+    # Weapon zapisany w flags
+    assert (game.world.character.flags.get("arena_starting_weapon")
+            == ARENA_WEAPONS[0][0])
+
+
+def test_arena_back_to_title_from_menu():
+    """Z arena menu Esc → STATE_TITLE."""
+    from ...engine.game import STATE_TITLE
+    game = Game(screen=None)
+    game.open_arena_menu()
+    game._arena_back_to_title()
+    assert game.state == STATE_TITLE
+
+
+def test_arena_back_to_menu_from_loadout():
+    """Z arena loadout Esc → STATE_ARENA_MENU."""
+    game = Game(screen=None)
+    game.open_arena_menu()
+    game._arena_pick_variant("duel_1v1")
+    game._arena_back_to_menu()
+    assert game.state == STATE_ARENA_MENU
+    assert game._pending_arena_variant is None
+
+
+def test_all_variants_have_polish_loadout_content():
+    """Loadout pickers Polish-only."""
+    from ...engine.game import ARENA_WEAPONS, ARENA_CLASSES
+    BAD = (" the ", " your ", "weapon", "class", "rifle")
+    for key, label, desc in ARENA_WEAPONS + ARENA_CLASSES:
+        text = (label + " " + desc).lower()
+        for bad in BAD:
+            assert bad not in text, (
+                f"loadout {key} ma angielski {bad!r}: {label} / {desc}")

@@ -52,22 +52,19 @@ ARENA_VARIANTS: Dict[str, ArenaVariant] = {
         label_pl="Trzech naraz",
         description_pl="Mob z różnych frakcji. Test multi-target i AI.",
         mob_keys=["tunnel_runt", "kapitan_druzyny", "freezer_carver"],
-        enabled=False,  # follow-up sesja
     ),
     "boss_fight": ArenaVariant(
         key="boss_fight",
         label_pl="Walka z bossem",
         description_pl="Pojedynek z bossem piętra. Test mechanik bossa.",
         mob_keys=["intake_warden"],
-        enabled=False,
     ),
     "trap_room": ArenaVariant(
         key="trap_room",
         label_pl="Pokój z pułapkami",
-        description_pl="Mob i pułapki. Test wabienia w trap.",
+        description_pl="Mob i pułapki środowiskowe. Test environmental damage.",
         mob_keys=["tunnel_runt"],
-        trap_keys=["floor_collapse_trap", "spike_trap"],
-        enabled=False,
+        trap_keys=["acid_pool", "zwarcie_kablowe", "peknieta_rura_pary"],
     ),
 }
 
@@ -161,7 +158,28 @@ def build_arena_world(variant_key: str, *, character_name: str = "Zawodnik",
         room.entities.append(ent)
         w.register(ent)
 
-    # MVP: pomijamy trap spawn (variant.trap_keys = []) — follow-up
+    # Spawn traps from HAZ catalog (P29.60 cz.2 — trap variant).
+    from ..content.data.entity_templates import HAZ
+    from .entity import Entity as E, T_HAZARD
+    for trap_key in variant.trap_keys:
+        proto = HAZ.get(trap_key)
+        if proto is None:
+            continue
+        ent = E(
+            key=trap_key,
+            entity_type=T_HAZARD,
+            name_key=proto.get("name_key", ""),
+            fallback_name=proto.get("fallback_name", trap_key),
+            desc_key=proto.get("desc_key", ""),
+            fallback_desc=proto.get("fallback_desc", ""),
+            tags=list(proto.get("tags", [])),
+            affordances=list(proto.get("affordances",
+                                       ["inspect"])),
+            location_id="arena_room",
+        )
+        ent.damage_type = proto.get("damage_type", "physical")
+        room.entities.append(ent)
+        w.register(ent)
 
     # Mark arena flag — używane przez game.py win/loss routing
     w.flags = getattr(w, "flags", {}) or {}

@@ -157,11 +157,13 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0,
         (t("title_load_game",       fallback="[2] WCZYTAJ ZAPIS") if save_exists else
          t("title_load_disabled",   fallback="[2] WCZYTAJ ZAPIS (brak)"),
          BRIGHT_TEXT if save_exists else DIM_TEXT),
-        (t("title_settings",        fallback="[3] USTAWIENIA"), BRIGHT_TEXT),
-        (t("title_quit",            fallback="[4] WYJDŹ Z TRANSMISJI"), BRIGHT_TEXT),
+        # P29.60 — Arena testowa: combat-only sandbox dla tuningu walki.
+        (t("title_arena",           fallback="[3] ARENA TESTOWA"), BRIGHT_TEXT),
+        (t("title_settings",        fallback="[4] USTAWIENIA"), BRIGHT_TEXT),
+        (t("title_quit",            fallback="[5] WYJDŹ Z TRANSMISJI"), BRIGHT_TEXT),
     ]
     sel = max(0, min(int(selected_idx or 0), len(items) - 1))
-    action_keys = ["new_game", "load_game", "settings", "quit"]
+    action_keys = ["new_game", "load_game", "arena_menu", "settings", "quit"]
     for i, (label, col) in enumerate(items):
         if i == sel:
             label = "▶  " + label + "  ◀"
@@ -1225,6 +1227,164 @@ def draw_left_sidebar(surf, world, layout=None, *,
                 if cy > y + h - 24: break
     except Exception:
         pass
+
+
+# ── P29.60 Arena testowa — menu screens ────────────────────────────
+
+
+def draw_arena_menu(surf, variants, selected_idx: int = 0, *,
+                    click_registry=None, on_select=None, on_back=None):
+    """Variant picker dla areny testowej.
+
+    Args:
+        variants: list of ArenaVariant dataclass
+        selected_idx: aktualnie wybrana opcja (0..len(variants), gdzie
+                      ostatni indeks to 'Powrót do menu')
+        click_registry / on_select(variant_key) / on_back: parallel
+                       mouse path
+    """
+    surf.fill((6, 8, 12))
+    sw, sh = surf.get_size()
+
+    # Header
+    title_img = font(36, bold=True).render(
+        "ARENA TESTOWA", True, ACCENT)
+    surf.blit(title_img, ((sw - title_img.get_width()) // 2, 80))
+
+    sub_img = font(15).render(
+        "Combat sandbox — testuj broń, mob i pułapki bez całej gry.",
+        True, DIM_TEXT)
+    surf.blit(sub_img, ((sw - sub_img.get_width()) // 2, 140))
+
+    cy = 220
+    item_h = 70
+    # Items: variants + 'Powrót do menu' at the end
+    total_items = len(variants) + 1
+    sel = max(0, min(int(selected_idx or 0), total_items - 1))
+
+    for i, v in enumerate(variants):
+        is_sel = (i == sel)
+        is_enabled = v.enabled
+        # Background
+        item_w = 700
+        item_x = (sw - item_w) // 2
+        bg_col = (24, 28, 38) if is_sel else (16, 18, 26)
+        pygame.draw.rect(surf, bg_col, (item_x, cy, item_w, item_h - 10))
+        border_col = ACCENT if is_sel else (40, 48, 60)
+        pygame.draw.rect(surf, border_col, (item_x, cy, item_w, item_h - 10), 2)
+
+        # Label
+        label_col = BRIGHT_TEXT if is_enabled else DIM_TEXT
+        if is_sel and is_enabled:
+            label_col = ACCENT
+        label_text = f"{i + 1}. {v.label_pl}"
+        if not is_enabled:
+            label_text += "  (wkrótce)"
+        l_img = font(22, bold=True).render(label_text, True, label_col)
+        surf.blit(l_img, (item_x + 20, cy + 8))
+
+        # Description
+        desc_col = NORMAL_TEXT if is_enabled else DIM_TEXT
+        d_img = font(14).render(v.description_pl, True, desc_col)
+        surf.blit(d_img, (item_x + 20, cy + 36))
+
+        # Click zone
+        if click_registry is not None and on_select is not None and is_enabled:
+            def _click(_k=v.key):
+                on_select(_k)
+            click_registry.add(
+                (item_x, cy, item_w, item_h - 10),
+                _click, label=f"arena_variant_{v.key}")
+
+        cy += item_h
+
+    # Powrót item
+    is_sel = (sel == len(variants))
+    item_x = (sw - 700) // 2
+    bg_col = (24, 28, 38) if is_sel else (16, 18, 26)
+    pygame.draw.rect(surf, bg_col, (item_x, cy, 700, item_h - 10))
+    border_col = ACCENT if is_sel else (40, 48, 60)
+    pygame.draw.rect(surf, border_col, (item_x, cy, 700, item_h - 10), 2)
+    back_col = ACCENT if is_sel else BRIGHT_TEXT
+    back_img = font(22, bold=True).render(
+        f"{len(variants) + 1}. Powrót do menu głównego", True, back_col)
+    surf.blit(back_img, (item_x + 20, cy + 16))
+    if click_registry is not None and on_back is not None:
+        click_registry.add(
+            (item_x, cy, 700, item_h - 10), on_back,
+            label="arena_back")
+
+    # Footer hint
+    hint = font(13).render(
+        "Strzałki góra/dół, Enter wybierz, Esc powrót", True, DIM_TEXT)
+    surf.blit(hint, ((sw - hint.get_width()) // 2, sh - 40))
+
+
+def draw_arena_loadout(surf, variant_label: str, step: str,
+                        weapons, classes,
+                        weapon_idx: int = 0, class_idx: int = 0,
+                        *, click_registry=None, on_pick=None, on_back=None):
+    """Loadout picker — wybór broni + klasy przed startem wariantu.
+
+    Args:
+        variant_label: label wariantu (do nagłówka)
+        step: "weapon" | "class" — który picker aktywny
+        weapons: list of (key, label_pl, description_pl)
+        classes: list of (key, label_pl, description_pl)
+        weapon_idx / class_idx: aktualnie wybrane
+        on_pick(step, key): mouse callback
+        on_back: cofa do arena menu
+    """
+    surf.fill((6, 8, 12))
+    sw, sh = surf.get_size()
+
+    # Header
+    title_img = font(28, bold=True).render(
+        f"LOADOUT — {variant_label}", True, ACCENT)
+    surf.blit(title_img, ((sw - title_img.get_width()) // 2, 60))
+
+    # Step indicator
+    step_label = ("Krok 1/2: wybierz broń" if step == "weapon"
+                  else "Krok 2/2: wybierz klasę")
+    s_img = font(16).render(step_label, True, BRIGHT_TEXT)
+    surf.blit(s_img, ((sw - s_img.get_width()) // 2, 110))
+
+    # Active list
+    options = weapons if step == "weapon" else classes
+    sel_idx = weapon_idx if step == "weapon" else class_idx
+    sel = max(0, min(int(sel_idx or 0), len(options) - 1))
+
+    cy = 170
+    item_w = 700
+    item_h = 60
+    item_x = (sw - item_w) // 2
+
+    for i, (key, label_pl, desc_pl) in enumerate(options):
+        is_sel = (i == sel)
+        bg_col = (24, 28, 38) if is_sel else (16, 18, 26)
+        pygame.draw.rect(surf, bg_col, (item_x, cy, item_w, item_h - 8))
+        border_col = ACCENT if is_sel else (40, 48, 60)
+        pygame.draw.rect(surf, border_col, (item_x, cy, item_w, item_h - 8), 2)
+
+        label_col = ACCENT if is_sel else BRIGHT_TEXT
+        l_img = font(18, bold=True).render(label_pl, True, label_col)
+        surf.blit(l_img, (item_x + 20, cy + 6))
+        d_img = font(13).render(desc_pl, True, NORMAL_TEXT)
+        surf.blit(d_img, (item_x + 20, cy + 30))
+
+        if click_registry is not None and on_pick is not None:
+            def _click(_s=step, _k=key):
+                on_pick(_s, _k)
+            click_registry.add(
+                (item_x, cy, item_w, item_h - 8), _click,
+                label=f"arena_loadout_{step}_{key}")
+
+        cy += item_h
+
+    # Footer hint
+    hint = font(13).render(
+        "Strzałki, Enter potwierdza, Esc — powrót", True, DIM_TEXT)
+    surf.blit(hint, ((sw - hint.get_width()) // 2, sh - 40))
 
 
 def draw_log_and_input(surf, log, input_text, blink, scroll=0,

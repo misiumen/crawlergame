@@ -33,7 +33,33 @@ STATE_SLOTS     = "slots"      # P29.9: save-slot picker (3 slots)
 # STATE_ARENA_MENU = wybór wariantu, STATE_ARENA_PLAY reuses STATE_PLAY
 # input/render ale z arena_mode flag żeby ominąć floor descent / save.
 STATE_ARENA_MENU = "arena_menu"
+STATE_ARENA_LOADOUT = "arena_loadout"
 STATE_ARENA_PLAY = "arena_play"
+
+
+# P29.60 — Arena loadout pickers content.
+# (key, label_pl, description_pl)
+ARENA_WEAPONS = [
+    ("tani_noz", "Tani nóż",
+     "1k6 cięcia. Standardowy janitor-grade."),
+    ("zardzewiala_paika", "Zardzewiała pałka",
+     "1k6+1 obuch. Cięższa, prostsza, głośniejsza."),
+    ("paralizator", "Paralizator sponsorski",
+     "1k4 prąd. Szansa na ogłuszenie celu."),
+    ("kij_baseballowy", "Kij baseballowy",
+     "1k8 obuch. Klasyk piętra 2, ciężki, dwuręczny."),
+]
+
+ARENA_CLASSES = [
+    ("janitor", "Sprzątacz",
+     "+1 INT, +1 CON. Skromne stats, dobre HP."),
+    ("brawler", "Pięściarz",
+     "+2 STR, -1 INT. Damage bonus, słaby na hack."),
+    ("medic", "Medyk polowy",
+     "+1 WIS, +1 DEX. Bandaże leczą +2."),
+    ("scout", "Zwiadowca",
+     "+2 DEX, -1 CHA. Wysoka inicjatywa, słaba społecznie."),
+]
 
 
 _NUMS = {
@@ -115,6 +141,12 @@ class Game:
         # P29.9 — save-slot picker state (mode + cursor index).
         self.slot_picker_mode = "new"
         self.slot_picker_idx = 0
+        # P29.60 — Arena testowa state cursors.
+        self.arena_menu_idx = 0          # variant picker selected
+        self.arena_loadout_step = "weapon"  # "weapon" | "class"
+        self.arena_loadout_weapon_idx = 0
+        self.arena_loadout_class_idx = 0
+        self.arena_loadout = {}          # final picks: {"weapon", "class"}
         # Command history (lightweight) — Up/Down in text mode walks it.
         self.cmd_history: list[str] = []
         self.cmd_history_idx = -1     # -1 = "current draft (not in history)"
@@ -1571,6 +1603,10 @@ class Game:
                 self.slot_picker_mode = "load"
                 self.slot_picker_idx = 0
                 self.state = STATE_SLOTS
+        elif action_key == "arena_menu":
+            # P29.60 — wejście do arena variant picker.
+            self.arena_menu_idx = 0
+            self.open_arena_menu()
         elif action_key == "settings":
             self._open_settings()
         elif action_key == "quit":
@@ -2732,6 +2768,74 @@ class Game:
         self.state = STATE_ARENA_MENU
         # Reset world — arena nie korzysta z save state
         self.world = None
+
+    def _arena_pick_variant(self, variant_key: str) -> None:
+        """Mouse/Enter callback z STATE_ARENA_MENU. Otwiera loadout
+        picker dla wybranego wariantu."""
+        from . import arena as _arena
+        v = _arena.get_variant(variant_key)
+        if v is None or not v.enabled:
+            return
+        self._pending_arena_variant = variant_key
+        self.arena_loadout_step = "weapon"
+        self.arena_loadout_weapon_idx = 0
+        self.arena_loadout_class_idx = 0
+        self.arena_loadout = {}
+        self.state = STATE_ARENA_LOADOUT
+
+    def _arena_back_to_title(self) -> None:
+        """Z arena menu back to STATE_TITLE."""
+        self.state = STATE_TITLE
+        self.title_idx = 2  # cursor na "ARENA TESTOWA"
+
+    def _arena_back_to_menu(self) -> None:
+        """Z arena loadout back to arena menu."""
+        self.state = STATE_ARENA_MENU
+        self._pending_arena_variant = None
+
+    def _arena_loadout_pick(self, step: str, key: str) -> None:
+        """Mouse callback z STATE_ARENA_LOADOUT. Confirm wybor dla
+        bieżącego kroku, advance do nastepnego lub start variant."""
+        if step == "weapon":
+            self.arena_loadout["weapon"] = key
+            self.arena_loadout_step = "class"
+        elif step == "class":
+            self.arena_loadout["class"] = key
+            # Start the variant with selected loadout
+            self.start_arena_variant_with_loadout(
+                self._pending_arena_variant,
+                weapon_key=self.arena_loadout.get("weapon", "tani_noz"),
+                class_key=self.arena_loadout.get("class", "janitor"))
+
+    def start_arena_variant_with_loadout(self, variant_key: str, *,
+                                          weapon_key: str = "tani_noz",
+                                          class_key: str = "janitor") -> bool:
+        """Wraps start_arena_variant — passes class jako background,
+        zapisuje weapon do character.flags do późniejszego wpięcia
+        przez arena.build_arena_world (P29.60 cz.3 follow-up: faktyczna
+        equipment integration)."""
+        from . import arena as _arena
+        try:
+            world, _floor = _arena.build_arena_world(
+                variant_key, background=class_key)
+        except ValueError as exc:
+            if self.world is not None:
+                self.world.log_msg(f"Arena: {exc}", "warn")
+            return False
+        self.world = world
+        # Mark weapon w flags — full equipment integration follow-up
+        if world.character.flags is None:
+            world.character.flags = {}
+        world.character.flags["arena_starting_weapon"] = weapon_key
+        self.state = STATE_ARENA_PLAY
+        self.world.log_msg(
+            world.current_floor.current_room().fallback_first_enter,
+            "normal")
+        self.world.log_msg(
+            f"Loadout: broń = {weapon_key.replace('_', ' ')}, "
+            f"klasa = {class_key}.",
+            "system")
+        return True
 
     # ── P27 — floor descent ────────────────────────────────────────────
 
@@ -6938,8 +7042,10 @@ class Game:
         self._suppress_textinput = False
 
         if self.state == STATE_TITLE:
-            # Arrow-key navigation mirroring the four visible items.
-            title_actions = ["new_game", "load_game", "settings", "quit"]
+            # Arrow-key navigation mirroring the five visible items.
+            # P29.60 — arena_menu wstawione przed settings.
+            title_actions = ["new_game", "load_game", "arena_menu",
+                             "settings", "quit"]
             if key in (pygame.K_UP, pygame.K_w):
                 self.title_idx = (self.title_idx - 1) % len(title_actions)
                 self._suppress_textinput = True
@@ -6957,6 +7063,11 @@ class Game:
                 elif action == "load_game" and save_load.exists():
                     self._suppress_textinput = True
                     self._open_slot_picker("load")
+                elif action == "arena_menu":
+                    # P29.60 — arena testowa.
+                    self._suppress_textinput = True
+                    self.arena_menu_idx = 0
+                    self.open_arena_menu()
                 elif action == "settings":
                     # Prompt 11: open the settings popup.
                     self._open_settings()
@@ -6972,9 +7083,15 @@ class Game:
                 self._open_slot_picker("load")
                 return
             if digit == "3":
-                self._open_settings()
+                # P29.60 — arena testowa.
+                self._suppress_textinput = True
+                self.arena_menu_idx = 0
+                self.open_arena_menu()
                 return
             if digit == "4":
+                self._open_settings()
+                return
+            if digit == "5":
                 pygame.quit(); raise SystemExit
             if key == pygame.K_l:
                 set_language("en" if get_language() == "pl" else "pl")
@@ -7002,6 +7119,75 @@ class Game:
                 n = int(digit) - 1
                 if 0 <= n < save_load.SAVE_SLOT_COUNT:
                     self._slot_picker_pick(n)
+            return
+
+        # P29.60 — arena variant picker
+        if self.state == STATE_ARENA_MENU:
+            self._suppress_textinput = True
+            from . import arena as _arena
+            variants = _arena.all_variants()
+            total = len(variants) + 1  # +1 for "Powrót"
+            if key == pygame.K_ESCAPE:
+                self._arena_back_to_title(); return
+            if key in (pygame.K_UP, pygame.K_w):
+                self.arena_menu_idx = (self.arena_menu_idx - 1) % total
+                return
+            if key in (pygame.K_DOWN, pygame.K_s):
+                self.arena_menu_idx = (self.arena_menu_idx + 1) % total
+                return
+            if key == pygame.K_RETURN:
+                if self.arena_menu_idx < len(variants):
+                    v = variants[self.arena_menu_idx]
+                    if v.enabled:
+                        self._arena_pick_variant(v.key)
+                else:
+                    self._arena_back_to_title()
+                return
+            if digit is not None:
+                n = int(digit) - 1
+                if 0 <= n < len(variants):
+                    v = variants[n]
+                    if v.enabled:
+                        self._arena_pick_variant(v.key)
+                elif n == len(variants):
+                    self._arena_back_to_title()
+            return
+
+        # P29.60 — arena loadout picker
+        if self.state == STATE_ARENA_LOADOUT:
+            self._suppress_textinput = True
+            step = self.arena_loadout_step
+            options = ARENA_WEAPONS if step == "weapon" else ARENA_CLASSES
+            cur = (self.arena_loadout_weapon_idx if step == "weapon"
+                   else self.arena_loadout_class_idx)
+            if key == pygame.K_ESCAPE:
+                if step == "class":
+                    # Back to weapon step
+                    self.arena_loadout_step = "weapon"
+                else:
+                    self._arena_back_to_menu()
+                return
+            if key in (pygame.K_UP, pygame.K_w):
+                cur = (cur - 1) % len(options)
+                if step == "weapon":
+                    self.arena_loadout_weapon_idx = cur
+                else:
+                    self.arena_loadout_class_idx = cur
+                return
+            if key in (pygame.K_DOWN, pygame.K_s):
+                cur = (cur + 1) % len(options)
+                if step == "weapon":
+                    self.arena_loadout_weapon_idx = cur
+                else:
+                    self.arena_loadout_class_idx = cur
+                return
+            if key == pygame.K_RETURN:
+                self._arena_loadout_pick(step, options[cur][0])
+                return
+            if digit is not None:
+                n = int(digit) - 1
+                if 0 <= n < len(options):
+                    self._arena_loadout_pick(step, options[n][0])
             return
 
         if self.state == STATE_CREATE:
@@ -8187,6 +8373,51 @@ class Game:
             ui.draw_creation(s, self.cc,
                              click_registry=self.click_registry,
                              on_action=self._create_action)
+        elif self.state == STATE_ARENA_MENU:
+            # P29.60 — variant picker
+            from . import arena as _arena
+            ui.draw_arena_menu(
+                s, _arena.all_variants(),
+                selected_idx=getattr(self, "arena_menu_idx", 0),
+                click_registry=self.click_registry,
+                on_select=self._arena_pick_variant,
+                on_back=self._arena_back_to_title)
+        elif self.state == STATE_ARENA_LOADOUT:
+            # P29.60 — loadout picker (broń + klasa)
+            variant_key = getattr(self, "_pending_arena_variant", "")
+            from . import arena as _arena
+            v = _arena.get_variant(variant_key)
+            ui.draw_arena_loadout(
+                s, v.label_pl if v else variant_key,
+                step=getattr(self, "arena_loadout_step", "weapon"),
+                weapons=ARENA_WEAPONS, classes=ARENA_CLASSES,
+                weapon_idx=getattr(self, "arena_loadout_weapon_idx", 0),
+                class_idx=getattr(self, "arena_loadout_class_idx", 0),
+                click_registry=self.click_registry,
+                on_pick=self._arena_loadout_pick,
+                on_back=self._arena_back_to_menu)
+        elif self.state == STATE_ARENA_PLAY:
+            # P29.60 — reuse STATE_PLAY rendering (same room/log/UI)
+            self._refresh_layout()
+            L = self._layout
+            ui.draw_topbar(s, self.world, layout=L,
+                           click_registry=self.click_registry)
+            if L.has_left_sidebar:
+                ui.draw_left_sidebar(s, self.world, layout=L,
+                                     click_registry=self.click_registry,
+                                     on_room_click=self._on_minimap_room_click)
+            ui.draw_room_panel(s, self.world, layout=L,
+                               click_registry=self.click_registry)
+            ui.draw_sidebar(s, self.world, layout=L,
+                            click_registry=self.click_registry)
+            ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
+                                  scroll=self.log_scroll,
+                                  input_mode=self.input_mode, layout=L)
+            self._ensure_nav_state()
+            ui.draw_nav_panel(s, self.nav_state, self.input_mode, layout=L,
+                              armed=getattr(self, "_nav_selection_armed", False),
+                              click_registry=self.click_registry,
+                              on_option_click=self._on_nav_option_click)
         elif self.state == STATE_PLAY:
             self._refresh_layout()
             L = self._layout
