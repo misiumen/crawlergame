@@ -4968,9 +4968,39 @@ class Game:
             return
         self._run_enemy_turn(cs)
 
+    def _tick_systemic_on(self, ent) -> None:
+        """P29.63 — tyknij efekty systemowe (DoT + żywotność) na encji
+        i pokaż widoczne skutki. DoT może dobić → trup."""
+        from . import systemic as _sys
+        if ent is None:
+            return
+        info = _sys.tick(ent)
+        if info is None:
+            return
+        died = False
+        if info.damage > 0:
+            self.log(f"{ent.display_name()} — {info.flavor}: "
+                     f"-{info.damage} ({info.hp}/{info.max_hp}).", LOG_WARN)
+            if info.hp <= 0 and getattr(ent, "max_hp", 0) > 0:
+                victim = ent.display_name()
+                try:
+                    from . import corpses as _cp
+                    _cp.transform_to_corpse(self.world, ent,
+                                            killer=self.world.character)
+                    died = True
+                except Exception:
+                    pass
+                if died:
+                    self.log(f"„{victim}” dogorywa od „{info.status}”.",
+                             LOG_SUCCESS)
+        if info.expired and not died and ent.is_alive():
+            self.log(f"  efekt „{info.status}” mija.", LOG_NORMAL)
+
     def _run_enemy_turn(self, cs) -> None:
         from . import combat as _cmb
         from . import time_system as ts
+        from . import systemic as _sys
+        import random as _r_sys
         room = self.world.current_floor.current_room()
         ch = self.world.character
         if room is None:
@@ -4980,15 +5010,25 @@ class Game:
             ent = self.world.get(eid)
             if ent is None or not ent.is_alive():
                 continue
+            # P29.63 — paraliż systemowy (porażony/zamrożony) może
+            # zabrać wrogowi turę. Walka przestaje być wymianą ciosów.
+            if _sys.roll_stun(ent, _r_sys):
+                self.log(f"{ent.display_name()} — spazm mięśni, "
+                         f"traci turę.", LOG_SUCCESS)
+                continue
             action = _cmb.choose_enemy_action(self.world, cs, ent)
             self._apply_enemy_action(cs, ent, action)
             if not ch.is_alive():
                 break
         # Tick statuses on all participants (including player via clocks on character)
-        for eid in cs.participants:
+        for eid in list(cs.participants):
             ent = self.world.get(eid)
             _cmb.tick_statuses(ent)
+            self._tick_systemic_on(ent)          # P29.63 — DoT + żywotność
         _cmb.tick_statuses(ch)
+        # P29.63 — ogień pełznie po pokoju (reaktywne otoczenie).
+        for line in _sys.spread_fire(self.world, room):
+            self.log(line, LOG_WARN)
         # Reset per-round player buffs.
         cs.player_defend = 0
         cs.player_dodge = False
@@ -5039,6 +5079,11 @@ class Game:
                 from .dice_labels import stat_pl as _spl_e
                 e_raw = _r_enemy.randint(1, 20)
                 e_atk = int(getattr(ent, "attack_bonus", 0) or 0)
+                # P29.63 — spowolnienie systemowe (zmrożony/spowolniony)
+                # psuje celność wroga.
+                from . import systemic as _sys_slow
+                if _sys_slow.is_slowed(ent):
+                    e_atk -= 2
                 player_ac = ch.effective_ac(self.world)
                 e_total = e_raw + e_atk
                 e_outcome = ("KRYT" if e_raw == 20 else
@@ -5841,11 +5886,24 @@ class Game:
         # transform_to_corpse entity nazywa się już „padlina …" i
         # log „X pada" pokazywałby nazwę trupa zamiast wroga (bug).
         victim_name = target.display_name()
+        ac_before = int(getattr(target, "ac", 0) or 0)
         res = _sys.apply_environmental(self.world, verb, source, target)
         if not res.matched:
             return False
         for ln in res.lines:
             self.log(ln, LOG_SUCCESS)
+        # P29.63 — telegraf: korozja pokazuje spadek AC, a efekt trwały
+        # zapowiada się, żeby gracz wiedział że to się nie kończy na hicie.
+        if res.ac_delta and target.is_alive():
+            ac_after = int(getattr(target, "ac", 0) or 0)
+            self.log(f"  Pancerz słabnie — AC {ac_before}→{ac_after}.",
+                     LOG_NORMAL)
+        if target.is_alive():
+            st_sys = (getattr(target, "state", None) or {})
+            lingering = st_sys.get("systemic_statuses") or []
+            if lingering and int(st_sys.get("systemic_turns", 0)) > 0:
+                self.log(f"  {victim_name}: „{lingering[-1]}” — to się "
+                         f"utrzyma.", LOG_NORMAL)
         # Sprawdź czy cel padł od interakcji.
         if not target.is_alive():
             self.log(f"„{victim_name}” pada.", LOG_SUCCESS)

@@ -120,6 +120,31 @@ _EFFECT_AC_DELTA = {
 }
 
 
+# P29.63 — efekty TRWAŁE per synergia. Reguła materii zadaje natychmiast
+# (wyżej), a tu deklaruje co zostaje na CELU i tyka turach walki:
+#   dot/turns  — obrażenia na turę przez N tur (DoT)
+#   stun       — szansa że cel traci turę (paraliż)
+#   slow       — cel spowolniony (kara do trafienia / brak szarży)
+# Bez tego synergia była jednorazowym hitem — „pożar" nie palił dalej.
+_EFFECT_LINGER = {
+    "pożar":          {"dot": 3, "turns": 3},
+    "porażenie":      {"dot": 2, "turns": 2, "stun": 0.5},
+    "korozja":        {"dot": 0, "turns": 0},   # AC w dół utrzymuje się samo
+    "zamrożenie":     {"dot": 0, "turns": 2, "slow": True, "stun": 0.4},
+    "roztrzaskanie":  {"dot": 0, "turns": 0},
+}
+
+# Flavor PL do logu tykania DoT (po statusie celu). Polish-only.
+_TICK_FLAVOR = {
+    "płonie":          "ogień trawi",
+    "porażony":        "prąd dobija",
+    "trawiony kwasem": "kwas żre",
+    "zmrożony":        "szron krępuje",
+    "zamrożony":       "lód krępuje",
+    "ogłuszony":       "wstrząs dudni",
+}
+
+
 # ── Odczyt sygnałów ze źródła / celu ────────────────────────────────
 
 
@@ -174,6 +199,21 @@ def _apply_effect(target, effect_key: str, status: str) -> Interaction:
     statuses = st.setdefault("systemic_statuses", [])
     if status and status not in statuses:
         statuses.append(status)
+
+    # P29.63 — efekt TRWAŁY (DoT / stun / slow) zapisany na cel, żeby
+    # tykał w turach (combat woła systemic.tick co rundę).
+    linger = _EFFECT_LINGER.get(effect_key)
+    if linger:
+        turns = int(linger.get("turns", 0))
+        if int(linger.get("dot", 0)) > 0:
+            st["systemic_dot"] = {"dmg": int(linger["dot"]),
+                                  "turns": turns, "status": status}
+        if linger.get("slow"):
+            st["systemic_slow"] = True
+        if linger.get("stun"):
+            st["systemic_stun_chance"] = float(linger["stun"])
+        if turns > 0:
+            st["systemic_turns"] = turns
     target.state = st
 
     dmg = _EFFECT_DAMAGE.get(effect_key, 0)
@@ -301,6 +341,12 @@ def apply_environmental(world, verb: str, source, target) -> Interaction:
         st["systemic_slow"] = True
     if stun_chance > 0:
         st["systemic_stun_chance"] = stun_chance
+    # P29.63 — licznik żywotności (jeden dla całego efektu). DoT trwa
+    # tyle co dot_turns; sam slow/stun bez DoT dostaje 2 tury.
+    lifetime = dot_turns if dot_turns > 0 else (
+        2 if (slow or stun_chance > 0) else 0)
+    if lifetime > 0:
+        st["systemic_turns"] = lifetime
     target.state = st
 
     return Interaction(
@@ -315,3 +361,116 @@ def element_pl(damage_type: str) -> str:
     """Mapuje angielski damage_type na PL element. Fallback: zwraca
     wejście (dla „physical" itp.)."""
     return _DAMAGE_TO_ELEMENT.get(damage_type, damage_type)
+
+
+# ── Tykanie efektów trwałych w turach (P29.63 — głębia walki) ───────
+
+
+def _st(target):
+    """Bezpieczny dostęp do słownika stanu celu (Entity ma `.state`;
+    Character trzyma stany gdzie indziej — systemic celuje w Entity)."""
+    return getattr(target, "state", None)
+
+
+@dataclass
+class TickResult:
+    """Co zdarzyło się celowi w tej turze od efektu systemowego."""
+    damage: int = 0
+    status: str = ""
+    flavor: str = ""
+    expired: bool = False
+    hp: int = 0
+    max_hp: int = 0
+
+
+def tick(target) -> Optional[TickResult]:
+    """Tyka efekty trwałe (DoT + żywotność) na celu o JEDNĄ turę.
+    Zwraca TickResult, gdy coś jest aktywne, albo None. Stun/slow są
+    konsumowane osobno (faza akcji wroga) — tu odliczamy ich żywotność
+    i czyścimy po wygaśnięciu."""
+    st = _st(target)
+    if not st or int(st.get("systemic_turns", 0)) <= 0:
+        return None
+
+    dotinfo = st.get("systemic_dot")
+    status = ""
+    dmg = 0
+    if isinstance(dotinfo, dict):
+        status = dotinfo.get("status", "") or ""
+        d = int(dotinfo.get("dmg", 0))
+        if (d > 0 and getattr(target, "max_hp", 0) > 0
+                and getattr(target, "is_alive", lambda: True)()):
+            target.hp = max(0, int(getattr(target, "hp", 0)) - d)
+            dmg = d
+    if not status:
+        statuses = st.get("systemic_statuses") or []
+        status = statuses[0] if statuses else ""
+
+    turns = int(st.get("systemic_turns", 0)) - 1
+    expired = turns <= 0
+    if expired:
+        _clear_systemic(target)
+    else:
+        st["systemic_turns"] = turns
+
+    return TickResult(
+        damage=dmg, status=status,
+        flavor=_TICK_FLAVOR.get(status, "efekt działa"),
+        expired=expired,
+        hp=int(getattr(target, "hp", 0)),
+        max_hp=int(getattr(target, "max_hp", 0)))
+
+
+def _clear_systemic(target) -> None:
+    """Zdejmuje wszystkie tymczasowe efekty systemowe z celu (po
+    wygaśnięciu). NIE rusza korozji/roztrzaskania — te mają turns=0,
+    więc nigdy tu nie trafiają (AC w dół zostaje na stałe)."""
+    st = _st(target)
+    if not st:
+        return
+    for k in ("systemic_dot", "systemic_slow", "systemic_stun_chance",
+              "systemic_turns"):
+        st.pop(k, None)
+    st["systemic_statuses"] = []
+
+
+def is_slowed(target) -> bool:
+    st = _st(target) or {}
+    return bool(st.get("systemic_slow"))
+
+
+def roll_stun(target, rng) -> bool:
+    """True, jeśli cel w tej turze traci akcję (paraliż od prądu/lodu)."""
+    st = _st(target) or {}
+    chance = st.get("systemic_stun_chance")
+    if not chance:
+        return False
+    return rng.random() < float(chance)
+
+
+# ── Rozprzestrzenianie ognia (reaktywne otoczenie) ──────────────────
+
+
+def _is_flammable(ent) -> bool:
+    return "łatwopalne" in target_matter_props(ent)
+
+
+def spread_fire(world, room) -> List[str]:
+    """Ogień z płonącej istoty/obiektu przeskakuje na JEDEN łatwopalny
+    cel w pokoju (bounded: max jeden skok na turę, żeby pełzał a nie
+    wybuchał). Zwraca linie logu PL. Pusta lista = nic się nie zajęło."""
+    if room is None:
+        return []
+    ents = list(getattr(room, "entities", None) or [])
+    burning = [e for e in ents if has_systemic_status(e, "płonie")]
+    if not burning:
+        return []
+    for src in burning:
+        for tgt in ents:
+            if tgt is src or has_systemic_status(tgt, "płonie"):
+                continue
+            if _is_flammable(tgt):
+                _apply_effect(tgt, "pożar", "płonie")
+                return [f"Ogień przeskakuje na {_display(tgt)} — "
+                        f"zajmuje się."]
+    return []
