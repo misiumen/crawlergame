@@ -247,7 +247,7 @@ EXPERIMENTAL_RECIPES: List[Dict] = [
              dmg_type="cold", hits=6, extra=2, rarity="rare"),
 
     _coating("weapon_psychic_coat", "kalambur szeptu",
-             "Próbka mutacji + włókno grzybnicy + sól. Słychać szept "
+             "Próbka mutacji + włókno grzybni + sól. Słychać szept "
              "z ostrza, kiedy zbliżasz je do ofiary.",
              tier=4, tags=[("weird", 1), ("organic", 1), ("preservative", 1)],
              dmg_type="psychic", hits=3, extra=2, rarity="rare", discipline="alchemy"),

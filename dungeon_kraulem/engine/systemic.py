@@ -230,19 +230,50 @@ def has_systemic_status(target, effect_key: str) -> bool:
 # ── Interakcja środowiskowa (hazard jako źródło) ────────────────────
 
 
-# Bazowe obrażenia żywiołowe gdy wepchniesz coś w hazard, NAWET bez
-# synergii tagów (kwas parzy każdego, nie tylko metal). # TODO TUNE
-_BASE_HAZARD_DAMAGE = 6
+# Bazowy efekt środowiskowy PER ŻYWIOŁ — nawet bez synergii tagów
+# każdy żywioł działa INACZEJ (flavor + mechanika), żeby „w kwas" ≠
+# „w kable". # TODO TUNE
+#   element: (obrażenia, status, dot_na_turę, tury_dot, slow, stun_szansa,
+#             szablon_logu)
+_ELEMENT_BASE = {
+    "kwas":  (5, "trawiony kwasem", 2, 2, False, 0.0,
+              "Kwas obejmuje {cel}. Skóra syczy, dym gryzie w oczy — "
+              "i nie przestaje (-{dmg})."),
+    "prąd":  (6, "porażony", 0, 0, False, 0.4,
+              "Prąd przeszywa {cel}. Mięśnie tężeją, szczęka szczęka, "
+              "z futra idzie dym (-{dmg})."),
+    "ogień": (4, "płonie", 3, 3, False, 0.0,
+              "{cel} łapie ogień. Smród palonego włosia, panika "
+              "(-{dmg})."),
+    "mróz":  (3, "zmrożony", 0, 0, True, 0.0,
+              "Szron oblepia {cel}. Ruchy grzęzną, oddech staje "
+              "(-{dmg})."),
+    "uderzenie": (5, "ogłuszony", 0, 0, False, 0.0,
+              "{cel} obrywa z impetem. Coś chrupie (-{dmg})."),
+}
+
+# Priorytet wyboru żywiołu, gdy źródło niesie kilka.
+_ELEMENT_PRIORITY = ("ogień", "prąd", "kwas", "mróz", "uderzenie")
+
+
+def _primary_element(elements: Set[str]) -> Optional[str]:
+    for el in _ELEMENT_PRIORITY:
+        if el in elements:
+            return el
+    return None
 
 
 def apply_environmental(world, verb: str, source, target) -> Interaction:
-    """Pełna interakcja środowiskowa: synergia reguł materii ALBO —
-    jeśli synergii brak, a źródło niesie element — bazowe obrażenia
-    żywiołowe. Używane gdy gracz wpycha/wabia wroga w hazard.
+    """Pełna interakcja środowiskowa. Synergia reguł materii ma
+    pierwszeństwo (pożar/korozja/porażenie/zamrożenie/roztrzaskanie —
+    każda już odrębna). Bez synergii: bazowy efekt PER ŻYWIOŁ, też
+    odrębny — kwas żre (DoT), prąd razi (stun), ogień pali (DoT),
+    mróz mrozi (slow), uderzenie ogłusza. Stąd „w kwas" ≠ „w kable"
+    feel-owo i mechanicznie nawet na zwykłym celu.
 
-    Synergia (np. ogień+łatwopalne→pożar) ma pierwszeństwo i niesie
-    swoje obrażenia. Bez synergii: kwas/ogień/prąd i tak parzy
-    (bazowo), bo to wciąż wepchnięcie w coś groźnego."""
+    DoT/stun/slow są zapisywane na state celu; ich tykanie w turach
+    realizuje krok integracji combat (tu: natychmiastowy hit +
+    odrębny status + flavor)."""
     if source is None or target is None:
         return Interaction(matched=False)
 
@@ -250,16 +281,31 @@ def apply_environmental(world, verb: str, source, target) -> Interaction:
     if syn.matched:
         return syn
 
-    # Brak synergii — ale jeśli źródło ma element, zadaj bazowe obrażenia.
-    if source_elements(source) and getattr(target, "max_hp", 0) > 0:
-        dmg = _BASE_HAZARD_DAMAGE
-        target.hp = max(0, int(getattr(target, "hp", 0)) - dmg)
-        line = (f"{_display(target)} wpada w {_display(source)}. "
-                f"Boli (-{dmg}).")
-        return Interaction(matched=True, effect="hazard_base",
-                           lines=[line], damage=dmg)
+    element = _primary_element(source_elements(source))
+    base = _ELEMENT_BASE.get(element) if element else None
+    if base is None or getattr(target, "max_hp", 0) <= 0:
+        return Interaction(matched=False)
 
-    return Interaction(matched=False)
+    dmg, status, dot, dot_turns, slow, stun_chance, line_tmpl = base
+    target.hp = max(0, int(getattr(target, "hp", 0)) - dmg)
+
+    st = target.state if target.state is not None else {}
+    statuses = st.setdefault("systemic_statuses", [])
+    if status not in statuses:
+        statuses.append(status)
+    # Zapisz przedłużone efekty do realizacji w turach (krok combat).
+    if dot > 0:
+        st["systemic_dot"] = {"dmg": dot, "turns": dot_turns,
+                              "status": status}
+    if slow:
+        st["systemic_slow"] = True
+    if stun_chance > 0:
+        st["systemic_stun_chance"] = stun_chance
+    target.state = st
+
+    return Interaction(
+        matched=True, effect=f"baza_{element}", damage=dmg,
+        lines=[line_tmpl.format(cel=_display(target), dmg=dmg)])
 
 
 # ── Display helper (element PL) ─────────────────────────────────────

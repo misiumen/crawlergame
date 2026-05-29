@@ -134,6 +134,41 @@ def test_element_pl_mapping():
 # ── Polish-only: log lines bez angielskich kalk ─────────────────────
 
 
+def test_environmental_acid_vs_electric_differ():
+    """A (user feedback): kwas ≠ prąd. Różne flavor + status + DoT,
+    nawet na celu BEZ synergii (zwykły szczur, nie metal/przewodzące)."""
+    acid = _mk("kaluza", damage_type="acid", name="kałuża kwasu")
+    cable = _mk("zwarcie", damage_type="electric", name="zwarcie")
+    rat_a = _mk("szczur_a", tags=["small"], hp=40, name="Szczur")
+    rat_b = _mk("szczur_b", tags=["small"], hp=40, name="Szczur")
+
+    r_acid = _sys.apply_environmental(None, "wepchnij", acid, rat_a)
+    r_elec = _sys.apply_environmental(None, "wepchnij", cable, rat_b)
+
+    assert r_acid.matched and r_elec.matched
+    # Różne efekty / linie / statusy
+    assert r_acid.effect != r_elec.effect, "kwas i prąd ten sam efekt!"
+    assert r_acid.lines[0] != r_elec.lines[0], "identyczny flavor!"
+    assert _sys.has_systemic_status(rat_a, "trawiony kwasem")
+    assert _sys.has_systemic_status(rat_b, "porażony")
+    # Kwas zostawia DoT, prąd zostawia szansę stunu
+    assert (rat_a.state or {}).get("systemic_dot") is not None
+    assert (rat_b.state or {}).get("systemic_stun_chance") is not None
+
+
+def test_environmental_each_element_distinct_flavor():
+    """5 żywiołów = 5 różnych linii bazowych."""
+    seen = set()
+    for dt, name in [("acid", "kwas"), ("electric", "prąd"),
+                     ("fire", "ogień"), ("cold", "mróz")]:
+        src = _mk("src", damage_type=dt)
+        tgt = _mk("t", tags=["small"], hp=40, name="Cel")
+        r = _sys.apply_environmental(None, "wepchnij", src, tgt)
+        assert r.matched, f"żywioł {dt} nie zadziałał bazowo"
+        seen.add(r.lines[0])
+    assert len(seen) == 4, f"flavor się powtarza: {seen}"
+
+
 def test_all_rule_logs_polish_only():
     """Każdy szablon logu reguły materii Polish-only."""
     BAD = (" the ", " fire", " acid", "shatter", "frozen", "burns")

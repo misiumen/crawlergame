@@ -67,7 +67,7 @@ MATERIALS: Dict[str, MaterialDef] = {m.key: m for m in [
     _m("tooth",            "ząb",               "tooth",           ("bone","organic","sharp","small"),          "uncommon"),
     _m("claw",             "pazur",             "claw",            ("bone","organic","sharp"),                  "uncommon"),
     _m("strange_organ",    "dziwny narząd",     "strange organ",   ("organic","weird","chemical"),              "rare"),
-    _m("fungal_fiber",     "włókno grzybnicy",  "fungal fiber",    ("organic","fungal","binding"),              "uncommon"),
+    _m("fungal_fiber",     "włókno grzybni",    "fungal fiber",    ("organic","fungal","binding"),              "uncommon"),
     _m("ichor_sample",     "próbka posoki",     "ichor sample",    ("organic","weird","chemical","smell"),      "rare"),
     _m("contaminated_blood","skażona krew",     "contaminated blood",("organic","disease","chemical"),          "rare"),
 

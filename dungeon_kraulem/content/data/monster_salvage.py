@@ -87,7 +87,9 @@ CORPSE_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "meat_chunk":        (1, 2),
             "bone_fragments":    (0, 1),
             "tooth":             (0, 1),
-            "fungal_fiber":      (0, 1),  # they nest w grzybie
+            # P29.61 (bug D) — usunięto fungal_fiber: bleed biomu.
+            # Zwykły tunelowy szczur nie nosi grzybni; ta wpada tylko
+            # w biomie grzybica_bloom.
         },
         "salvage_time_min": 3,
         "salvage_noise": 1,

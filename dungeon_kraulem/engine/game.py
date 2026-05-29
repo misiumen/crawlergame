@@ -5805,6 +5805,10 @@ class Game:
         if target.entity_type not in ("monster", "crawler", "npc"):
             return False
 
+        # P29.61 — złap nazwę ŻYWEGO wroga PRZED interakcją; po
+        # transform_to_corpse entity nazywa się już „padlina …" i
+        # log „X pada" pokazywałby nazwę trupa zamiast wroga (bug).
+        victim_name = target.display_name()
         res = _sys.apply_environmental(self.world, verb, source, target)
         if not res.matched:
             return False
@@ -5812,13 +5816,13 @@ class Game:
             self.log(ln, LOG_SUCCESS)
         # Sprawdź czy cel padł od interakcji.
         if not target.is_alive():
+            self.log(f"„{victim_name}” pada.", LOG_SUCCESS)
             try:
                 from . import corpses as _cp
                 _cp.transform_to_corpse(self.world, target,
                                         killer=self.world.character)
             except Exception:
                 pass
-            self.log(f"„{target.display_name()}” pada.", LOG_SUCCESS)
         # Tura wroga / hooki combat tylko gdy walka aktywna.
         if cs is not None:
             cs.last_action = f"systemic:{res.effect}"
