@@ -1,13 +1,15 @@
 # Manifest grafik — Dungeon Kraulem (P29.71, workstream C/2)
 
-Gra wczytuje PNG z `assets/images/<klucz>.png`. Jeśli pliku brak →
-proceduralny fallback (gradient/sylwetka), więc gra działa bez grafik.
-Wrzucasz pliki o nazwach z tabel poniżej → wpadają automatycznie.
+**Ten folder (`assets/images/`) to katalog grafik gry** — leżą tu już
+`armor.png`, `room_*.png` itd. Gra wczytuje `assets/images/<klucz>.png`.
+Jeśli pliku brak → proceduralny fallback (gradient/sylwetka), więc gra
+działa bez grafik. Wrzucasz pliki o nazwach z tabel poniżej **do tego
+samego folderu** → wpadają automatycznie, bez zmian w kodzie.
 
 **Jak używać:** generujesz obraz w swoim modelu (Midjourney / SDXL / itp.)
-promptem ze wspólną dyrekcją (niżej), zapisujesz jako `<klucz>.png` w tym
-folderze. Gra skaluje do panelu, więc dokładny rozmiar nie jest krytyczny
-— trzymaj proporcje z kolumny „format".
+promptem ze wspólną dyrekcją (niżej), zapisujesz jako `<klucz>.png` TUTAJ.
+Gra skaluje do panelu, więc dokładny rozmiar nie jest krytyczny — trzymaj
+proporcje z kolumny „format".
 
 ---
 
@@ -75,4 +77,5 @@ aberration · undead.
 
 ## Status
 Pipeline gotowy (P29.71). Brak plików = fallback proceduralny. Każdy
-wrzucony PNG działa od ręki, bez zmian w kodzie.
+wrzucony PNG działa od ręki, bez zmian w kodzie. Folder docelowy =
+`assets/images/` (ten, w którym leży ten plik).
