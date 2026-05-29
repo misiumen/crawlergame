@@ -59,6 +59,19 @@ _MATTER_PROPS = frozenset({
     "łatwopalne", "przewodzące", "metal", "mokre", "kruche",
 })
 
+# P29.61 — aliasy EN→PL dla istniejącego contentu (tagi sprzed
+# immersive-sim). Pozwalają silnikowi działać NA ISTNIEJĄCYCH mobach
+# i obiektach (flammable/fragile/glass...) zanim krok 2 (obtagowanie)
+# sformalizuje wszystko na PL. Gracz i tak nigdy nie widzi tych tagów.
+_PROP_ALIASES = {
+    "flammable":  "łatwopalne",
+    "conductive": "przewodzące",
+    "wet":        "mokre",
+    "fragile":    "kruche",
+    "glass":      "kruche",
+    "metal":      "metal",   # ten sam po obu stronach
+}
+
 
 # ── Wynik interakcji ────────────────────────────────────────────────
 
@@ -127,9 +140,16 @@ def source_elements(source) -> Set[str]:
 
 
 def target_matter_props(target) -> Set[str]:
-    """Property materii na celu (z tagów)."""
+    """Property materii na celu — z tagów PL + aliasy EN→PL dla
+    istniejącego contentu (flammable→łatwopalne, glass→kruche, ...)."""
     tags = getattr(target, "tags", None) or []
-    return set(tags) & _MATTER_PROPS
+    out: Set[str] = set()
+    for t in tags:
+        if t in _MATTER_PROPS:
+            out.add(t)
+        elif t in _PROP_ALIASES:
+            out.add(_PROP_ALIASES[t])
+    return out
 
 
 def _display(target) -> str:
@@ -205,6 +225,41 @@ def has_systemic_status(target, effect_key: str) -> bool:
     """Czy cel ma nałożony dany status systemowy."""
     st = getattr(target, "state", None) or {}
     return effect_key in (st.get("systemic_statuses") or [])
+
+
+# ── Interakcja środowiskowa (hazard jako źródło) ────────────────────
+
+
+# Bazowe obrażenia żywiołowe gdy wepchniesz coś w hazard, NAWET bez
+# synergii tagów (kwas parzy każdego, nie tylko metal). # TODO TUNE
+_BASE_HAZARD_DAMAGE = 6
+
+
+def apply_environmental(world, verb: str, source, target) -> Interaction:
+    """Pełna interakcja środowiskowa: synergia reguł materii ALBO —
+    jeśli synergii brak, a źródło niesie element — bazowe obrażenia
+    żywiołowe. Używane gdy gracz wpycha/wabia wroga w hazard.
+
+    Synergia (np. ogień+łatwopalne→pożar) ma pierwszeństwo i niesie
+    swoje obrażenia. Bez synergii: kwas/ogień/prąd i tak parzy
+    (bazowo), bo to wciąż wepchnięcie w coś groźnego."""
+    if source is None or target is None:
+        return Interaction(matched=False)
+
+    syn = resolve(world, verb, source, target)
+    if syn.matched:
+        return syn
+
+    # Brak synergii — ale jeśli źródło ma element, zadaj bazowe obrażenia.
+    if source_elements(source) and getattr(target, "max_hp", 0) > 0:
+        dmg = _BASE_HAZARD_DAMAGE
+        target.hp = max(0, int(getattr(target, "hp", 0)) - dmg)
+        line = (f"{_display(target)} wpada w {_display(source)}. "
+                f"Boli (-{dmg}).")
+        return Interaction(matched=True, effect="hazard_base",
+                           lines=[line], damage=dmg)
+
+    return Interaction(matched=False)
 
 
 # ── Display helper (element PL) ─────────────────────────────────────

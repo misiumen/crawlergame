@@ -5736,6 +5736,60 @@ class Game:
         cs.last_action = "reposition"
         self._combat_after_player_action(cs)
 
+    def _try_systemic_chain(self, intent, cs) -> bool:
+        """P29.61 — przekierowuje wepchnij/zwab/rzuć przez systemowy
+        silnik reguł (engine/systemic). Zwraca True jeśli reguła
+        zadziałała (log + tura wroga).
+
+        Semantyka per czasownik:
+          * wepchnij/zwab/pchnij OBJ w DEST → DEST(hazard)=źródło,
+            OBJ(wróg)=cel
+          * rzuć OBJ w DEST → OBJ(przedmiot)=źródło, DEST(wróg)=cel
+        """
+        from . import systemic as _sys
+        from .validation import _resolve_entities
+        room = self.world.current_floor.current_room()
+        if room is None or not intent.targets:
+            return False
+        obj = _resolve_entities(room, intent.targets[0])
+        dest_frag = getattr(intent, "destination", None)
+        dest = _resolve_entities(room, dest_frag) if dest_frag else []
+        obj_e = obj[0] if obj else None
+        dest_e = dest[0] if dest else None
+
+        verb = (intent.verb or "").lower()
+        is_throw = (intent.intent == "throw_at"
+                    or verb in ("rzuc", "rzuć", "cisnij", "ciśnij",
+                                "throw", "hurl"))
+        if is_throw:
+            source, target = obj_e, dest_e   # rzuć PRZEDMIOT w WROGA
+        else:
+            source, target = dest_e, obj_e   # wepchnij WROGA w HAZARD
+
+        if source is None or target is None:
+            return False
+        # Cel musi być istotą (nie wepchniemy szafy w szafę dla efektu).
+        if target.entity_type not in ("monster", "crawler", "npc"):
+            return False
+
+        res = _sys.apply_environmental(self.world, verb, source, target)
+        if not res.matched:
+            return False
+        for ln in res.lines:
+            self.log(ln, LOG_SUCCESS)
+        cs.last_action = f"systemic:{res.effect}"
+        # Sprawdź czy cel padł od interakcji.
+        if not target.is_alive():
+            try:
+                from . import corpses as _cp
+                _cp.transform_to_corpse(self.world, target,
+                                        killer=self.world.character)
+            except Exception:
+                pass
+            self.log(f"„{target.display_name()}” pada.", LOG_SUCCESS)
+        self._combat_after_player_action(cs)
+        return True
+
     def _combat_use_environment(self, intent, cs) -> bool:
         """Break/throw/push in combat: in addition to the normal effect,
         apply a situational status to an engaged enemy if tags match.
@@ -5745,6 +5799,12 @@ class Game:
         room = self.world.current_floor.current_room()
         if room is None:
             return False
+        # P29.61 — systemowy silnik PIERWSZY. Wepchnij/zwab wroga w
+        # hazard lub rzuć czymś w wroga → resolver reguł tagów. Jeśli
+        # zadziała (np. ogień+łatwopalne→pożar), bierzemy to; inaczej
+        # fall-through do starej (hardkodowanej) logiki środowiska.
+        if self._try_systemic_chain(intent, cs):
+            return True
         from .validation import _resolve_entities
         if not intent.targets:
             return False
