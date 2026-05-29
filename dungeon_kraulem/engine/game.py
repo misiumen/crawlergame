@@ -1527,6 +1527,14 @@ class Game:
                     and not _norm.isdigit()):
                 self.world.last_player_command = text_val
             self._handle_play_input(text_val)
+            # P29.69 — skonsoliduj reakcję widowni z całej komendy (wraz
+            # z turą wroga) w jedną linię „Widownia +N", zamiast rozsiewać
+            # „+2" po logu.
+            try:
+                from . import audience as _aud_flush
+                _aud_flush.flush_audience_log(self.world)
+            except Exception:
+                pass
             # P28.6 — after every play command, if the player's room
             # changed, reset all nav focus + pre-resolved target. This
             # kills the "spam stale exit option after a move" bug.

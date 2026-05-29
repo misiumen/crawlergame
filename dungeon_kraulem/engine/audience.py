@@ -204,17 +204,14 @@ def change_audience(world, delta: int, source: str = "",
     if len(history) > 32:
         del history[:-32]
 
-    if emit_log and hasattr(world, "log"):
-        sign = "+" if delta > 0 else ""
-        # P28.8 (preserved): route przez log_msg żeby dedupe collapse'ował
-        # powtarzające się "Widownia +2" w "Widownia +2 (×N)". Reakcja
-        # widowni JEST istotnym sygnałem dla gracza — pokazuje czy akcja
-        # spodobała się publiczności. Sparkline w top-barze nie zastępuje
-        # konkretnego komunikatu w logu.
-        if hasattr(world, "log_msg"):
-            world.log_msg(f"Widownia {sign}{delta}", "system")
-        else:
-            world.log.append((f"Widownia {sign}{delta}", "system"))
+    if emit_log:
+        # P29.69 — BATCHOWANIE zamiast linii per zmiana. Pojedyncza akcja
+        # gracza potrafiła wygenerować kilka „Widownia +2" rozsianych
+        # między innymi liniami (dedupe ×N nie łączył, bo nie były
+        # sąsiednie) → spam. Teraz akumulujemy deltę i emitujemy JEDNĄ
+        # skonsolidowaną linię na koniec komendy (flush_audience_log).
+        world.audience_pending_delta = int(
+            getattr(world, "audience_pending_delta", 0) or 0) + delta
 
     if after == before:
         return None
@@ -231,6 +228,27 @@ def change_audience(world, delta: int, source: str = "",
     )
     _emit_band_crossing(world, crossing)
     return crossing
+
+
+def flush_audience_log(world) -> None:
+    """P29.69 — wypisz JEDNĄ skonsolidowaną linię reakcji widowni za całą
+    bieżącą komendę (suma zakumulowanych zmian) i wyzeruj akumulator.
+    Wołane na koniec dispatchu komendy gracza. Band crossings logują się
+    osobno (natychmiast, bo to istotny próg)."""
+    if world is None:
+        return
+    pending = int(getattr(world, "audience_pending_delta", 0) or 0)
+    if pending == 0:
+        return
+    world.audience_pending_delta = 0
+    if not hasattr(world, "log"):
+        return
+    sign = "+" if pending > 0 else ""
+    line = f"Widownia {sign}{pending}"
+    if hasattr(world, "log_msg"):
+        world.log_msg(line, "system")
+    else:
+        world.log.append((line, "system"))
 
 
 def tick_decay(world, minutes_elapsed: int) -> None:

@@ -114,22 +114,25 @@ def test_log_does_not_dedupe_player_input_echo():
     print(f"  log keeps player echos separate: OK")
 
 
-def test_audience_changes_dedupe_via_log_msg():
-    """P28.8 regression: audience.change_audience() used to bypass
-    log_msg via direct world.log.append, which meant consecutive
-    'Widownia +2' entries piled up without the (×N) suffix and
-    visually bled into adjacent rows. Now routed through log_msg."""
+def test_audience_changes_batch_into_one_line():
+    """P29.69 (supersedes P28.8): change_audience już NIE loguje per
+    zmiana — akumuluje deltę, a flush_audience_log emituje JEDNĄ
+    skonsolidowaną linię na koniec komendy. 5×(+2) → „Widownia +10",
+    nie pięć „+2" rozsianych po logu (spam widowni)."""
     from ..engine import audience as _aud
     w = _mk_world()
     w.character.audience_rating = 0
     pre_len = len(w.log)
     for _ in range(5):
         _aud.change_audience(w, 2, source="test_repeat", emit_log=True)
+    # Bez flushu — nic w logu (delta tylko zakumulowana).
+    mid = [s for s, _ in w.log[pre_len:] if s.startswith("Widownia")]
+    assert mid == [], f"przed flushem nie powinno być linii; jest {mid}"
+    _aud.flush_audience_log(w)
     after = [s for s, _ in w.log[pre_len:] if s.startswith("Widownia")]
-    # Expect ONE deduped entry, not five.
-    assert len(after) == 1, f"expected 1 deduped audience entry; got {after}"
-    assert "(×5)" in after[0], f"expected (×5) suffix; got {after[0]}"
-    print(f"  audience log dedupes: {after[0]}: OK")
+    assert len(after) == 1, f"oczekiwano 1 skonsolidowanej linii; jest {after}"
+    assert "+10" in after[0], f"oczekiwano sumy +10; jest {after[0]}"
+    print(f"  audience batched: {after[0]}: OK")
 
 
 # ── Ghost-action filter ──────────────────────────────────────────────────
