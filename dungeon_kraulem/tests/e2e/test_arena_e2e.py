@@ -292,3 +292,54 @@ def test_all_variants_have_polish_loadout_content():
         for bad in BAD:
             assert bad not in text, (
                 f"loadout {key} ma angielski {bad!r}: {label} / {desc}")
+
+
+# ── Render smoke tests — Rule 12d gap close ──────────────────────────
+#
+# User natknął się na crash gry przy wejściu do arena menu — moje E2E
+# testowały LOGIKĘ (state transitions, world setup) ale NIE renderingu
+# (draw_arena_menu wołało nieistniejący kwarg). Te smoke testy wołają
+# faktyczne `Game.draw()` żeby wyłapać API mismatch.
+
+
+def _render_smoke(setup_callback):
+    """Helper: tworzy headless Game z screen, woła setup_callback,
+    potem draw(). Zwraca True jeśli draw nie crashuje."""
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    import pygame
+    if not pygame.get_init():
+        pygame.init()
+    if not pygame.display.get_init():
+        pygame.display.init()
+    screen = pygame.display.set_mode((1280, 800))
+    g = Game(screen=screen)
+    setup_callback(g)
+    g.draw()  # raises if anything wrong z render path
+    return True
+
+
+def test_render_state_arena_menu_doesnt_crash():
+    """`Game.draw()` w STATE_ARENA_MENU musi nie crashować — user-facing
+    flow z title menu '[3] ARENA TESTOWA'."""
+    _render_smoke(lambda g: g.open_arena_menu())
+
+
+def test_render_state_arena_loadout_doesnt_crash():
+    """`Game.draw()` w STATE_ARENA_LOADOUT po wybraniu wariantu."""
+    def _setup(g):
+        g.open_arena_menu()
+        g._arena_pick_variant("duel_1v1")
+    _render_smoke(_setup)
+
+
+def test_render_state_arena_play_doesnt_crash():
+    """`Game.draw()` w STATE_ARENA_PLAY — reuses STATE_PLAY rendering."""
+    _render_smoke(lambda g: g.start_arena_variant("duel_1v1"))
+
+
+def test_render_all_4_variants_in_arena_play():
+    """Każdy z 4 wariantów renderuje się bez crasha w STATE_ARENA_PLAY."""
+    for variant_key in ("duel_1v1", "triple_threat",
+                         "boss_fight", "trap_room"):
+        _render_smoke(
+            lambda g, vk=variant_key: g.start_arena_variant(vk))

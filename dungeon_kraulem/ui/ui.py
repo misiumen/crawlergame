@@ -1294,7 +1294,7 @@ def draw_arena_menu(surf, variants, selected_idx: int = 0, *,
                 on_select(_k)
             click_registry.add(
                 (item_x, cy, item_w, item_h - 10),
-                _click, label=f"arena_variant_{v.key}")
+                _click, category=f"arena_variant_{v.key}")
 
         cy += item_h
 
@@ -1312,7 +1312,7 @@ def draw_arena_menu(surf, variants, selected_idx: int = 0, *,
     if click_registry is not None and on_back is not None:
         click_registry.add(
             (item_x, cy, 700, item_h - 10), on_back,
-            label="arena_back")
+            category="arena_back")
 
     # Footer hint
     hint = font(13).render(
@@ -1377,7 +1377,7 @@ def draw_arena_loadout(surf, variant_label: str, step: str,
                 on_pick(_s, _k)
             click_registry.add(
                 (item_x, cy, item_w, item_h - 8), _click,
-                label=f"arena_loadout_{step}_{key}")
+                category=f"arena_loadout_{step}_{key}")
 
         cy += item_h
 
