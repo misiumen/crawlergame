@@ -52,13 +52,13 @@ ARENA_WEAPONS = [
 
 ARENA_CLASSES = [
     ("janitor", "Sprzątacz",
-     "+1 INT, +1 CON. Skromne stats, dobre HP."),
+     "+1 INT, +1 KON. Skromne statystyki, dobre HP."),
     ("brawler", "Pięściarz",
-     "+2 STR, -1 INT. Damage bonus, słaby na hack."),
+     "+2 SIŁ, -1 INT. Premia do obrażeń, słaby na włamywanie."),
     ("medic", "Medyk polowy",
-     "+1 WIS, +1 DEX. Bandaże leczą +2."),
+     "+1 MDR, +1 ZRĘ. Bandaże leczą +2."),
     ("scout", "Zwiadowca",
-     "+2 DEX, -1 CHA. Wysoka inicjatywa, słaba społecznie."),
+     "+2 ZRĘ, -1 CHA. Wysoka inicjatywa, słaba społecznie."),
 ]
 
 

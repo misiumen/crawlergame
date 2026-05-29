@@ -284,14 +284,22 @@ def test_arena_back_to_menu_from_loadout():
 
 
 def test_all_variants_have_polish_loadout_content():
-    """Loadout pickers Polish-only."""
+    """Loadout pickers Polish-only. Reguła 1 (Polish-only) + Reguła 8
+    (calques). Włącza English stat names (STR/DEX/CON/WIS) — w polskiej
+    grze MUSI być SIŁ/ZRĘ/KON/MDR. Plus stage'owane angielskie:
+    'damage', 'hack', 'stats', 'rifle'."""
     from ...engine.game import ARENA_WEAPONS, ARENA_CLASSES
-    BAD = (" the ", " your ", "weapon", "class", "rifle")
+    BAD = (" the ", " your ", "weapon", "class", "rifle",
+           # P29.60 hotfix: stat names w PL
+           " str", " dex", " con", " wis",
+           # P29.60 hotfix: angielskie technical terms
+           "damage", "hack", " stats")
     for key, label, desc in ARENA_WEAPONS + ARENA_CLASSES:
-        text = (label + " " + desc).lower()
+        text = (" " + label + " " + desc + " ").lower()
         for bad in BAD:
             assert bad not in text, (
-                f"loadout {key} ma angielski {bad!r}: {label} / {desc}")
+                f"loadout {key} ma angielski {bad!r}: "
+                f"{label} / {desc}")
 
 
 # ── Render smoke tests — Rule 12d gap close ──────────────────────────
