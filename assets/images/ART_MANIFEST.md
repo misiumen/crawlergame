@@ -1,81 +1,74 @@
-# Manifest grafik — Dungeon Kraulem (P29.71, workstream C/2)
+# Manifest grafik — Dungeon Kraulem (P29.71 + P29.72 per-biome)
 
-**Ten folder (`assets/images/`) to katalog grafik gry** — leżą tu już
-`armor.png`, `room_*.png` itd. Gra wczytuje `assets/images/<klucz>.png`.
-Jeśli pliku brak → proceduralny fallback (gradient/sylwetka), więc gra
-działa bez grafik. Wrzucasz pliki o nazwach z tabel poniżej **do tego
-samego folderu** → wpadają automatycznie, bez zmian w kodzie.
-
-**Jak używać:** generujesz obraz w swoim modelu (Midjourney / SDXL / itp.)
-promptem ze wspólną dyrekcją (niżej), zapisujesz jako `<klucz>.png` TUTAJ.
-Gra skaluje do panelu, więc dokładny rozmiar nie jest krytyczny — trzymaj
-proporcje z kolumny „format".
+**Ten folder (`assets/images/`) to katalog grafik gry.** Gra wczytuje
+`assets/images/<klucz>.png`; brak pliku → proceduralny fallback. Wrzucasz
+plik o nazwie z tabel → wpada automatycznie, zero zmian w kodzie.
 
 ---
 
-## Wspólna dyrekcja artystyczna (wklej na początek KAŻDEGO promptu)
+## ZASADA NACZELNA: biom = własny styl. Wspólny jest tylko CIENKI „show".
 
-```
-dark neon dungeon reality-show, gritty cyber-industrial, painterly concept
-art, moody volumetric lighting, magenta-and-cyan neon glow, wet grimy
-metal, high detail, cinematic, desaturated shadows with saturated neon
-accents, 35mm, no text, no watermark, no logos
-```
+NIE generuj wszystkiego w jednym stylu — biomy mają się RÓŻNIĆ (inaczej
+zlewają się w jedno). Spójność daje **cienka warstwa programu**, nie
+paleta.
 
-Trzymaj jeden **seed/styl** dla spójności całej serii. Bez napisów i
-realnych marek (gra unika brandów i bezpośrednich odniesień do prozy).
+### Warstwa WSPÓLNA (ta sama wszędzie — trzymaj w każdym promptie)
+```
+reality-show broadcast overlay: subtle neon HUD frame, faint CRT scanlines
+and grain, a small sponsor-logo corner, deathgame TV framing; no real
+brands, no text, no watermark
+```
++ **spójność techniczna**: ten sam poziom kontrastu i głębi czerni (żeby
+sceny siadały w tym samym panelu UI), subiekt skomponowany centralnie/
+nisko (pod panel), format poziomy ~16:10 (tła) / 1:1 (portrety).
+
+### Warstwa PER BIOM (RÓŻNA — to jej zadanie odróżniać piętra)
+Każde tło = warstwa wspólna **+** poniższa tożsamość. Style mają być
+odległe (inny gatunek ilustracji, inna paleta, inny nastrój).
+
+| Klucz `bg_<biome>`      | Paleta              | Styl / motyw |
+|-------------------------|---------------------|--------------|
+| `bg_intake_industrial`  | sodowy pomarańcz + stalowy błękit, beton | zimny brutal-przemysł, taśmociągi, zbrojenia, iskry spawu |
+| `bg_zoo_korporacyjne`   | jaskrawe pastele + plamy krwi, plastik | korpo-słodki HORROR, pęknięte maskotki, klatki, neon-cyrk |
+| `bg_muzeum_spektakli`   | sepia + zimny reflektor, kurz | wyblakły przepych, woskowe figury, rolki taśmy, barok w rozkładzie |
+| `bg_bar_skurczybyk`     | bursztyn/czerwień neon, dym | brudna speluna, mosiężne krany, lepka podłoga, brudny glamour |
+| `bg_grzybica_bloom`     | turkus/fiolet bioluminescencja, wilgoć | OBCY organizm, świecące grzyby, zarodniki, mięsiste tekstury |
+| `bg_okopy_frontowe`     | błoto-brąz + gazowa zieleń | piekło okopów I-wojny, worki z piaskiem, mgła iperytu, druty |
+| `bg_fabryka_pary`       | mosiądz/miedź + biel pary, żar pieca | steampunk, kotły, zawory ciśnieniowe, tłoki, mgła pary |
+| `bg_stacja_orbital`     | chłodna biel/cyan, czerń kosmosu | sterylne sci-fi, iluminatory z gwiazdami, panele nawigacyjne |
+| `bg_kuznia_polorkow`    | czerń + żar-czerwień, dym | mroczne dark-fantasy, kowadła, lawa, dymny mrok kuźni |
+| `bg_biblioteka_miejska` | sepia/głęboki fiolet, blask świecy | OKULTYZM, zakazane tomy, woskowe pieczęcie, kurz i mrok |
+| `bg_room_safehouse`     | przygaszony ciepły neon | brudny lounge między piętrami — ulga, antrakt programu |
+| `bg_room_boss`          | wg biomu + reflektor i kamery | arena bossa: ostre światło, broadcast, napięcie |
+| `bg_default`            | neutralny mrok | zapasowy korytarz (gdy biom bez własnego tła) |
+
+> Łańcuch w grze: `bg_<biome>` → `bg_room_<typ>` → `bg_default`.
+> Pokoje walki/lore w danym biomie odziedziczą `bg_<biome>` — nie musisz
+> robić osobnych. Boss/treasure/safehouse warto wyróżnić.
 
 ---
 
-## Tła pokojów  (format poziomy ~16:10, np. 1024×640)
+## Portrety wrogów  (1:1, ~512, popiersie; styl PASUJĄCY do biomu wroga)
 
-Łańcuch: `bg_<biome>` → `bg_room_<typ>` → `bg_default`.
+Łańcuch: `wrog_<klucz_moba>` → `wrog_<archetyp>`. Portret rób w stylu
+biomu, z którego mob pochodzi (zwierzak z zoo ≠ żołnierz z okopów).
 
-| Klucz pliku            | Subiekt do promptu |
-|------------------------|--------------------|
-| `bg_default`           | generic dungeon corridor, pipes and grates |
-| `bg_intake_industrial` | industrial intake hall, conveyor, rebar, sparks |
-| `bg_zoo_korporacyjne`  | corporate zoo, cages, feeding troughs, animal stink |
-| `bg_muzeum_spektakli`  | museum of spectacles, wax figures, film reels, plaster |
-| `bg_bar_skurczybyk`    | dive bar, brass taps, neon booze signs, sticky floor |
-| `bg_grzybica_bloom`    | fungal bloom cavern, glowing mushrooms, spores, mycelium |
-| `bg_okopy_frontowe`    | trench warfare tunnels, mud, sandbags, gas haze |
-| `bg_fabryka_pary`      | steam factory, boilers, pressure valves, coal glow |
-| `bg_stacja_orbital`    | orbital cargo station, viewport stars, nav panels |
-| `bg_kuznia_polorkow`   | half-orc forge, anvils, molten iron, charcoal smoke |
-| `bg_biblioteka_miejska`| occult city library, forbidden tomes, wax seals, dust |
-| `bg_room_safehouse`    | grimy safehouse lounge, vending, reception, dim neon |
-| `bg_room_boss`         | boss arena, ominous spotlight, broadcast cameras |
-| `bg_room_treasure`     | loot vault, sponsor crates, glinting credits |
-
-## Portrety wrogów  (format kwadrat ~1:1, np. 512×512, popiersie)
-
-Łańcuch: `wrog_<klucz_moba>` → `wrog_<archetyp>`.
-Archetypy (fallback dla każdego moba): humanoid · beast · robot · blob ·
-aberration · undead.
-
-| Klucz pliku           | Subiekt do promptu |
-|-----------------------|--------------------|
-| `wrog_humanoid`       | hostile humanoid scavenger, makeshift armor, bust |
-| `wrog_beast`          | mutated dungeon beast, fangs, matted fur, bust |
-| `wrog_robot`          | battered security robot, red optic, exposed wiring |
-| `wrog_blob`           | amorphous ooze creature, translucent, dripping |
+| Klucz                 | Subiekt |
+|-----------------------|---------|
+| `wrog_humanoid`       | hostile humanoid scavenger, makeshift armor |
+| `wrog_beast`          | mutated beast, fangs, matted fur |
+| `wrog_robot`          | battered security robot, red optic, wiring |
+| `wrog_blob`           | amorphous translucent ooze, dripping |
 | `wrog_aberration`     | eldritch anomaly, wrong geometry, too many eyes |
-| `wrog_undead`         | reanimated crawler corpse, grey flesh, dead eyes |
-| `wrog_intake_warden`  | floor-1 boss: hulking intake warden in riot gear |
-| `wrog_boss_panicz_zoo`| floor-3 boss: pampered show-beast, bear-like, gaudy |
+| `wrog_undead`         | reanimated crawler corpse, grey flesh |
+| `wrog_intake_warden`  | F1 boss: hulking intake warden, riot gear |
+| `wrog_boss_panicz_zoo`| F3 boss: pampered show-beast, bear-like, gaudy zoo glam |
 | `wrog_tunnel_runt`    | small vicious tunnel rat, wet, red eyes |
 
-(Dla pozostałych bossów dodawaj `wrog_<klucz_z_entity_templates>`.)
+(Dla pozostałych bossów: `wrog_<klucz_z_entity_templates>`.)
 
-## Portret gracza  (opcjonalny, kwadrat ~1:1)
-
-Łańcuch awatara można nadpisać: `portret_<origin>` (np.
-`portret_bezdomny`). Bez pliku → budowany proceduralnie z EQ (ui/avatar).
+## Portret gracza  (opcjonalny 1:1): `portret_<origin>` (np.
+`portret_bezdomny`). Bez pliku → budowany proceduralnie z EQ.
 
 ---
-
-## Status
-Pipeline gotowy (P29.71). Brak plików = fallback proceduralny. Każdy
-wrzucony PNG działa od ręki, bez zmian w kodzie. Folder docelowy =
-`assets/images/` (ten, w którym leży ten plik).
+Status: pipeline gotowy. Audio per biom → `assets/audio/AUDIO_MANIFEST.md`.
