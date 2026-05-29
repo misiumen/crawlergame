@@ -98,9 +98,9 @@ def test_new_hunter_mon_templates_are_combat_ready():
            "weteran_trybun")
     for k in new:
         m = MON[k]
-        # _apply_balance_scale multiplied HP × 5; expect at least
-        # 14 design → 70 effective.
-        assert m["hp"] >= 60, f"{k} HP too low: {m['hp']}"
+        # P29.65 fixed-dice: hunterzy mają autorskie HP (MOB_COMBAT_STATS) na
+        # skali gry; najlżejszy łowca ~49 HP.
+        assert m["hp"] >= 40, f"{k} HP too low: {m['hp']}"
         assert m["ac"] >= 10
         assert m.get("damage_dice")
         assert "sponsor_hunter" in (m.get("tags") or [])

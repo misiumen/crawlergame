@@ -203,7 +203,11 @@ ROOM_POOL = [
         "template_id": "pool_corridor_runt",
         "role": "danger",
         "actual_type": "combat",
-        "tags": ["dangerous", "combat", "environment", "non_combat"],
+        # P29.75 — pokój seeduje tunnel_runt (mob SORTOWNI) → MUSI nieść
+        # room_tag „intake", inaczej filtr biomu traktuje go jak neutralny
+        # i wpuszcza na obce biomy (mob wyciekał do zoo/muzeum/...). Każdy
+        # mob należy do jednego biomu — pokój który go seeduje też.
+        "tags": ["dangerous", "combat", "environment", "non_combat", "intake"],
         "name_pool": ["Korytarz Serwisowy A", "Mokry Łącznik B",
                       "Sekcja Konserwacyjna 3"],
         "first_enter_pool": [
@@ -272,7 +276,9 @@ ROOM_POOL = [
         "template_id": "pool_freezer_carver",
         "role": "danger",
         "actual_type": "combat",
-        "tags": ["dangerous", "combat", "stealth", "non_combat", "locked"],
+        # P29.75 — seeduje freezer_carver (mob SORTOWNI) → room_tag „intake"
+        # (był neutralny, mob wyciekał na obce biomy).
+        "tags": ["dangerous", "combat", "stealth", "non_combat", "locked", "intake"],
         "name_pool": ["Zamrażarka — Mięso Nieidentyfikowalne",
                       "Chłodnia Konserwacyjna", "Lodówka 4-C"],
         "first_enter_pool": [
@@ -1098,7 +1104,7 @@ ROOM_POOL = [
                       "Bramka Wejściowa"],
         "first_enter_pool": [
             "Pomieszczenie z pojedynczą lampą i biurkiem. Za biurkiem "
-            "siedzi Strażnik Aklimatyzacji — pierwszy mundur, jaki "
+            "siedzi Strażnik Sortowni — pierwszy mundur, jaki "
             "tu zobaczysz. Mówi spokojnie: „Witaj w programie. "
             "Twoja autoryzacja zejścia kosztuje dwie minuty życia. "
             "Czyli moją, jeśli pójdzie pechowo.”",
@@ -2702,7 +2708,9 @@ ROOM_POOL = [
         ],
         "sensory_tags": ["bright", "stale", "metal"],
         "entity_seed_pools": {
-            "mon":  ["mutant_szczur"],
+            # P29.75b — był mutant_szczur (mob ZOO!) w pokoju intake → leak
+            # obcego biomu. Sortownia ma własnego szczura: tunnel_runt.
+            "mon":  ["tunnel_runt"],
             "env":  ["vending_machine", "sponsor_screen"],
             "item": ["snack_bar", "credits_pile"],
         },
@@ -2710,6 +2718,82 @@ ROOM_POOL = [
         "guaranteed_min_exits": 1,
         "guaranteed_max_exits": 3,
         "weight": 5,
+        "floor_min": 1,
+        "floor_max": 2,
+    },
+    {
+        # P29.75b — pokój seedujący biotech_inspector (dotąd nieużywany w
+        # żadnym pokoju). NovaChem sortuje świeży narybek na taśmie.
+        "template_id": "pool_intake_tasma_sortujaca",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "intake"],
+        "name_pool": ["Taśma Sortująca", "Linia Segregacji A",
+                      "Stanowisko Klasyfikacji"],
+        "first_enter_pool": [
+            "Szeroka taśma sunie przez salę, a na niej — części. Niektóre "
+            "metalowe, niektóre nie. Inspektor NovaChem w kombinezonie "
+            "przesuwa wzrokiem po taśmie i po tobie, jakbyś był kolejną "
+            "pozycją do zaklasyfikowania.",
+        ],
+        "look_pool": [
+            "Nad taśmą tablica świetlna: PRZYJĘTO / ODRZUCONO / DO BADAŃ. "
+            "Licznik ODRZUCONO bije najszybciej.",
+        ],
+        "search_pool": [
+            "W koszu z napisem DO BADAŃ znajdujesz całkiem sprawny zestaw "
+            "i czyjąś opaskę startową.",
+        ],
+        "public_hint_pool": [
+            "Miarowy klekot taśmy. Ktoś coś notuje.",
+        ],
+        "sensory_tags": ["bright", "sterile", "machine_hum"],
+        "entity_seed_pools": {
+            "mon":  ["biotech_inspector"],
+            "env":  ["sponsor_camera", "broken_monitor", "loose_shelf"],
+            "item": ["toolkit"],
+        },
+        "exit_hints": ["wschód", "zachód"],
+        "guaranteed_min_exits": 1,
+        "guaranteed_max_exits": 2,
+        "weight": 5,
+        "floor_min": 1,
+        "floor_max": 2,
+    },
+    {
+        # P29.75b — drugi pokój combat Sortowni (różnorodność F1-2), mix
+        # rzeźnika i szczura.
+        "template_id": "pool_intake_hala_przyjec",
+        "role": "danger",
+        "actual_type": "combat",
+        "tags": ["dangerous", "combat", "intake"],
+        "name_pool": ["Hala Przyjęć Zawodników", "Punkt Rejestracji 2B",
+                      "Strefa Rozładunku"],
+        "first_enter_pool": [
+            "Wielka hala z rzędami pustych krzeseł przykręconych do podłogi. "
+            "Kiedyś sadzano tu nowych zawodników. Teraz coś tu mieszka — i "
+            "nie czeka grzecznie w kolejce.",
+        ],
+        "look_pool": [
+            "Na ścianie wyblakły baner: WITAMY W PROGRAMIE. Pod nim plama, "
+            "której wolisz nie dotykać. Z boku uchylone drzwi chłodni.",
+        ],
+        "search_pool": [
+            "Pod jednym z krzeseł zapomniana torba: bandaż, baton i nóż.",
+        ],
+        "public_hint_pool": [
+            "Echo pustej hali. Gdzieś z boku — mokry oddech.",
+        ],
+        "sensory_tags": ["dim", "echoing", "cold"],
+        "entity_seed_pools": {
+            "mon":  ["freezer_carver", "tunnel_runt"],
+            "env":  ["broken_table", "debris_pile", "sponsor_camera"],
+            "item": ["bandage", "snack_bar"],
+        },
+        "exit_hints": ["północ", "wschód", "zachód"],
+        "guaranteed_min_exits": 2,
+        "guaranteed_max_exits": 3,
+        "weight": 6,
         "floor_min": 1,
         "floor_max": 2,
     },

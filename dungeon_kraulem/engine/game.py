@@ -25,6 +25,14 @@ STATE_PLAY      = "play"
 STATE_DIALOG    = "dialog"
 STATE_CLASS_OFFER = "class_offer"
 STATE_SPECIES_OFFER = "species_offer"
+# P29.76 — picker rozdawania punktów atrybutu z awansów (DCC: gracz sam
+# rozdaje). Wzór: STATE_CLASS_OFFER.
+STATE_LEVELUP_ALLOC = "levelup_alloc"
+STAT_ORDER = ("STR", "DEX", "CON", "INT", "WIS", "CHA")
+STAT_LABELS_PL = {
+    "STR": "Siła", "DEX": "Zręczność", "CON": "Kondycja",
+    "INT": "Inteligencja", "WIS": "Mądrość", "CHA": "Charyzma",
+}
 STATE_VICTORY   = "victory"
 STATE_DEFEAT    = "defeat"
 STATE_SETTINGS  = "settings"   # Prompt 11: simple settings popup from title
@@ -164,6 +172,10 @@ class Game:
 
         # Class / species offers
         self.offer_candidates = []
+
+        # P29.76 / Feature#2 — stan reveala skrzynki (hybryda VS: modal +
+        # lekka animacja). None = brak. Ustawiany przez handlers.boxes.
+        self._box_reveal = None
 
         # Prompt 20: pending disambiguation from the last ambiguous_target
         # validation. Holds the original intent + candidate entity ids so
@@ -2328,6 +2340,8 @@ class Game:
             self._open_journal(_journal.TAB_INVENTORY); return
         if intent.intent == "check_character":
             self._show_character(); return
+        if intent.intent == "rozdaj_punkty":
+            self.open_stat_allocation(); return
         if intent.intent == "check_map":
             self._open_journal(_journal.TAB_MAP); return
         if intent.intent == "help":
@@ -2907,7 +2921,7 @@ class Game:
         from . import arena as _arena
         try:
             world, _floor = _arena.build_arena_world(
-                variant_key, background=class_key)
+                variant_key, background=class_key, weapon_key=weapon_key)
         except ValueError as exc:
             if self.world is not None:
                 self.world.log_msg(f"Arena: {exc}", "warn")
@@ -3338,6 +3352,35 @@ class Game:
             self.log(t("log_class_picked", fallback=f"Klasa: {key}",
                        name=t(f"class_{key}_n", fallback=key)), LOG_SUCCESS)
         self.state = STATE_PLAY
+
+    # ── P29.76 — rozdawanie punktów atrybutu z awansów ──────────────────
+    def open_stat_allocation(self) -> bool:
+        """Otwiera picker rozdania punktów, jeśli są nierozdane. Zwraca
+        True gdy otwarto, False gdy nic do rozdania."""
+        ch = self.world.character if self.world else None
+        if ch is None or int(getattr(ch, "unspent_stat_points", 0) or 0) <= 0:
+            self.log("Brak punktów atrybutu do rozdania.", LOG_NORMAL)
+            return False
+        self.title_idx = 0
+        self._return_state_after_alloc = self.state
+        self.state = STATE_LEVELUP_ALLOC
+        return True
+
+    def _accept_stat_point(self, idx: int):
+        ch = self.world.character if self.world else None
+        ret = getattr(self, "_return_state_after_alloc", STATE_PLAY) or STATE_PLAY
+        if ch is None or int(getattr(ch, "unspent_stat_points", 0) or 0) <= 0:
+            self.state = ret
+            return
+        if not (0 <= idx < len(STAT_ORDER)):
+            return
+        stat = STAT_ORDER[idx]
+        ch.stats[stat] = int(ch.stats.get(stat, 10)) + 1
+        ch.unspent_stat_points = int(ch.unspent_stat_points) - 1
+        self.log(f"+1 {STAT_LABELS_PL.get(stat, stat)} (teraz {ch.stats[stat]}). "
+                 f"Punkty do rozdania: {ch.unspent_stat_points}.", LOG_SUCCESS)
+        if int(ch.unspent_stat_points) <= 0:
+            self.state = ret
 
     # ── Info panels (rendered as log dumps to keep code compact) ────────────
 
@@ -5234,6 +5277,31 @@ class Game:
             self.log(t("feedback_combat_won",
                        fallback="Wszyscy wrogowie pokonani."), LOG_SUCCESS)
 
+    def _spawn_combat_fx(self, anchor, txt, color, *, big=False, shake=0.0):
+        """P29.65 game-juice: przejściowy efekt walki — pływająca liczba
+        obrażeń + błysk celu + opcjonalny shake. Trzymane na `world.combat_fx`,
+        rysowane przez ui.draw_combat_arena, wygaszane w update(dt). Defensywne —
+        nigdy nie wywala tury. `anchor` = entity_id wroga albo „player"."""
+        try:
+            w = self.world
+            if w is None:
+                return
+            fx = getattr(w, "combat_fx", None)
+            if not isinstance(fx, dict):
+                fx = {"floaters": [], "flash": {}, "shake": 0.0}
+                w.combat_fx = fx
+            fx["floaters"].append({"anchor": anchor, "text": str(txt),
+                                   "color": color, "age": 0.0,
+                                   "ttl": 950.0, "big": bool(big)})
+            if len(fx["floaters"]) > 24:
+                del fx["floaters"][:-24]
+            fx.setdefault("flash", {})[anchor] = max(
+                float(fx.get("flash", {}).get(anchor, 0.0)), 240.0)
+            if shake:
+                fx["shake"] = max(float(fx.get("shake", 0.0)), float(shake))
+        except Exception:
+            pass
+
     def _apply_enemy_action(self, cs, ent, action) -> None:
         from . import combat as _cmb
         ch = self.world.character
@@ -5258,6 +5326,7 @@ class Game:
             return
         if action.kind in ("attack",):
             dmg = int(action.damage or 1)
+            e_crit = False
             # P27.6 (P27-UX-7): symmetric enemy roll log. Player only
             # saw final damage — never knew WHY they got hit or what
             # AC the enemy needed. Now we show the enemy's d20 + atk
@@ -5274,6 +5343,7 @@ class Game:
                     e_atk -= 2
                 player_ac = ch.effective_ac(self.world)
                 e_total = e_raw + e_atk
+                e_crit = (e_raw == 20)
                 e_outcome = ("KRYT" if e_raw == 20 else
                              ("trafienie" if e_total >= player_ac else
                               ("pudło" if e_raw > 1 else "fuks")))
@@ -5289,6 +5359,10 @@ class Game:
                     return
             except Exception:
                 pass
+            # P29.65 — kryt wroga PODWAJA obrażenia (dotąd log mówił „KRYT", a
+            # dmg był ten sam). Liczone przed mitygacją (defend/dodge/tarcza).
+            if e_crit:
+                dmg = int(dmg) * 2
             # P26b: faction-aware retarget. If the AI picked a rival
             # combat participant, damage that rival instead of the
             # player. Crossfire is the audience-pleasing scenario the
@@ -5375,6 +5449,9 @@ class Game:
                 pass
             self.log(f"{name} trafia cię na {dmg} HP "
                      f"(zostało {ch.hp}/{ch.max_hp}).", LOG_DANGER)
+            # P29.65 game-juice: czerwona pływająca liczba + błysk + shake.
+            self._spawn_combat_fx("player", f"-{dmg}", (255, 90, 90),
+                                  big=e_crit, shake=(7.0 if e_crit else 3.0))
             # Heavy hits cause bleeding sometimes.
             if dmg >= 5:
                 _cmb.add_status(ch, _cmb.STATUS_WOUNDED, 4)
@@ -5635,11 +5712,12 @@ class Game:
                 dmg_type = weapon.damage_type or "physical"
                 weapon_name = weapon.display_name()
             else:
-                # P27.6 balance: unarmed bumped to match new HP scale
-                # (player now has 100 HP, monsters have ~25-200 HP).
-                # 2d6+8 averages 15 — substantial chunk per hit without
-                # being one-shot territory.
-                dmg_dice = "2d6+8"
+                # P29.65 fixed-dice: pięść jest ŚCIŚLE najsłabszą „bronią"
+                # (1d4). Wcześniej hardkod 2d6+8 (~15) sprawiał, że gołe ręce
+                # biły mocniej niż realna broń (Bug #19) — bo kości broni i tak
+                # nie trafiały na encję. Teraz broń tnie swoją kością, a pięść
+                # to ostateczność.
+                dmg_dice = "1d4"
                 dmg_type = "physical"
                 weapon_name = "pięść"
             # Coating override.
@@ -5726,6 +5804,20 @@ class Game:
             elif res.get("vulnerable"):
                 tag = " (podatny!)"
             type_label = _dmg.damage_type_label(dmg_type)
+            # P29.65 game-juice: pływająca liczba + błysk na karcie wroga.
+            # Kolor wg wyniku: kryt złoty, podatny pomarańcz, osłabione/odporny
+            # szary, zwykły biały.
+            _amt = int(res.get("amount_dealt", dmg) or 0)
+            if res.get("immune") or res.get("resisted"):
+                _fxcol = (150, 160, 170)
+            elif res.get("vulnerable"):
+                _fxcol = (255, 120, 90)
+            elif crit:
+                _fxcol = (255, 210, 70)
+            else:
+                _fxcol = (235, 235, 235)
+            self._spawn_combat_fx(target.entity_id, f"-{_amt}", _fxcol,
+                                  big=crit, shake=(4.0 if crit else 0.0))
             self.log(f"„{target.display_name()}”: "
                      f"-{res['amount_dealt']} HP "
                      f"({type_label}){tag} "
@@ -5850,6 +5942,19 @@ class Game:
                         pass
                     # P29.8 — bump kill counter for the run summary.
                     self._bump_run_counter("run_kills", 1)
+                    # P29.76 — XP za zabójstwo (wg tieru z `_tags_pre` +
+                    # skalowanie piętrem). Boss/miniboss kille też tędy
+                    # (jeden hook = brak podwójnego naliczenia). award_xp
+                    # sam obsłuży ewentualny awans(y) + nagrody.
+                    try:
+                        from . import leveling as _lvl
+                        _fn_xp = int(getattr(self.world.current_floor,
+                                             "floor_number", 1) or 1)
+                        _lvl.award_xp(
+                            self.world,
+                            _lvl.xp_for_kill_tags(_tags_pre, _fn_xp))
+                    except Exception:
+                        pass
                     # P29.20 — companion chatter on kill.
                     try:
                         from . import companion_voice as _cv
@@ -7411,6 +7516,17 @@ class Game:
     def handle_keydown(self, ev):
         key = ev.key
         digit = _NUMS.get(key)
+        # P29.76 — reveal skrzynki przechwytuje input: 1. klawisz pomija
+        # animację (pełne ujawnienie), 2. klawisz zamyka overlay.
+        _br = self._box_reveal
+        if _br is not None:
+            if not _br.get("done"):
+                _br["shown"] = len(_br.get("content_lines") or [])
+                _br["done"] = True
+            else:
+                self._box_reveal = None
+            self._suppress_textinput = True
+            return
         mods = pygame.key.get_mods()
         shift_held = bool(mods & pygame.KMOD_SHIFT)
         ctrl_held  = bool(mods & pygame.KMOD_CTRL)
@@ -7682,6 +7798,30 @@ class Game:
             if digit is not None:
                 self._suppress_textinput = True
                 self._accept_class(int(digit) - 1)
+            return
+
+        if self.state == STATE_LEVELUP_ALLOC:
+            n = len(STAT_ORDER)
+            if key in (pygame.K_UP, pygame.K_w):
+                self.title_idx = (self.title_idx - 1) % n
+                self._suppress_textinput = True
+                return
+            if key in (pygame.K_DOWN, pygame.K_s):
+                self.title_idx = (self.title_idx + 1) % n
+                self._suppress_textinput = True
+                return
+            if key == pygame.K_RETURN:
+                self._suppress_textinput = True
+                self._accept_stat_point(self.title_idx % n)
+                return
+            if key == pygame.K_ESCAPE:
+                self._suppress_textinput = True
+                self.state = getattr(self, "_return_state_after_alloc",
+                                     STATE_PLAY) or STATE_PLAY
+                return
+            if digit is not None and 1 <= int(digit) <= n:
+                self._suppress_textinput = True
+                self._accept_stat_point(int(digit) - 1)
             return
 
         if self.state == STATE_SPECIES_OFFER:
@@ -8533,6 +8673,15 @@ class Game:
                 return
         except AttributeError:
             return
+        # P29.76 — klik pomija/zamyka reveal skrzynki.
+        _br = self._box_reveal
+        if _br is not None:
+            if not _br.get("done"):
+                _br["shown"] = len(_br.get("content_lines") or [])
+                _br["done"] = True
+            else:
+                self._box_reveal = None
+            return
         mx, my = ev.pos
         zone = self.click_registry.find(mx, my)
         if zone is None:
@@ -8680,6 +8829,33 @@ class Game:
         if self._blink_t > 500:
             self.blink = not self.blink
             self._blink_t = 0
+        # P29.76 — animacja reveala skrzynki: ujawniaj zawartość sekwencyjnie
+        # (~200 ms/item), po pełnym ujawnieniu czeka na dismiss (done=True).
+        _br = self._box_reveal
+        if _br is not None and not _br.get("done"):
+            _br["elapsed"] = _br.get("elapsed", 0.0) + dt
+            total = len(_br.get("content_lines") or [])
+            _br["shown"] = min(total, 1 + int(_br["elapsed"] // 200))
+            if _br["elapsed"] >= 200 * (total + 1):
+                _br["shown"] = total
+                _br["done"] = True
+        # P29.65 — wygaszanie efektów walki (pływające liczby / błysk / shake).
+        _fx = getattr(self.world, "combat_fx", None) if self.world else None
+        if isinstance(_fx, dict):
+            _fl = _fx.get("floaters")
+            if _fl:
+                for _f in _fl:
+                    _f["age"] = _f.get("age", 0.0) + dt
+                _fx["floaters"] = [_f for _f in _fl
+                                   if _f["age"] < _f.get("ttl", 950.0)]
+            _fla = _fx.get("flash")
+            if _fla:
+                for _k in list(_fla.keys()):
+                    _fla[_k] -= dt
+                    if _fla[_k] <= 0:
+                        del _fla[_k]
+            if _fx.get("shake", 0.0) > 0:
+                _fx["shake"] = max(0.0, _fx["shake"] - dt)
         # Audio routing per state
         try:
             audio.play_music(self._music_key_for_state())
@@ -8869,6 +9045,29 @@ class Game:
                 lines.append(f"[{i}] {tr(f'class_{key}_n', fallback=key)} — {tr(f'class_{key}_d', fallback='')}")
             lines.append(tr("offer_pick", fallback="Wybierz numerem (1-3)"))
             self._overlay(lines)
+        elif self.state == STATE_LEVELUP_ALLOC:
+            self._refresh_layout()
+            L = self._layout
+            ui.draw_topbar(s, self.world, layout=L)
+            if L.has_left_sidebar:
+                ui.draw_left_sidebar(s, self.world, layout=L)
+            ui.draw_room_panel(s, self.world, layout=L)
+            ui.draw_sidebar(s, self.world, layout=L)
+            ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
+                                  scroll=self.log_scroll, layout=L)
+            ch = self.world.character
+            left = int(getattr(ch, "unspent_stat_points", 0) or 0)
+            lines = [f"AWANS — rozdaj punkt atrybutu (zostało: {left})"]
+            cur_i = self.title_idx % len(STAT_ORDER)
+            for i, stat in enumerate(STAT_ORDER, 1):
+                val = ch.stats.get(stat, 10)
+                mod = ch.stat_mod(stat)
+                sign = "+" if mod >= 0 else ""
+                arrow = "►" if (i - 1) == cur_i else "  "
+                lines.append(f"{arrow} [{i}] {STAT_LABELS_PL.get(stat, stat)}: "
+                             f"{val} ({sign}{mod})")
+            lines.append("Numer 1-6 lub Enter • Esc = później")
+            self._overlay(lines)
         elif self.state == STATE_SPECIES_OFFER:
             self._refresh_layout()
             L = self._layout
@@ -8936,6 +9135,13 @@ class Game:
             self._end_screen(t("victory_title", fallback="ZEJŚCIE ZALICZONE."), True)
         elif self.state == STATE_DEFEAT:
             self._end_screen(t("defeat_title", fallback="ZAWODNIK WYELIMINOWANY."), False)
+        # P29.76 / Feature#2 — reveal skrzynki (hybryda VS) rysowany NA WIERZCHU
+        # każdego stanu, tuż przed flip.
+        if self._box_reveal is not None:
+            try:
+                ui.draw_box_reveal(s, self._box_reveal)
+            except Exception:
+                self._box_reveal = None
         pygame.display.flip()
 
     def _overlay(self, lines):
@@ -9027,32 +9233,11 @@ _SALVAGE_TAG_RULES = [
 
 
 def _roll_dice_spec(spec: str, rng) -> int:
-    """Prompt 23: parse and roll '1d6+2' / '2d4' / '3'. Robust to
-    garbage — returns the additive part on parse failure. Used for
-    weapon damage dice."""
-    if not spec:
-        return 0
-    spec = str(spec).strip().lower().replace(" ", "")
-    if spec.isdigit():
-        return int(spec)
-    plus = 0
-    if "+" in spec:
-        spec, plus_s = spec.split("+", 1)
-        try:
-            plus = int(plus_s)
-        except ValueError:
-            plus = 0
-    if "d" not in spec:
-        return plus
-    try:
-        n, sides = spec.split("d", 1)
-        n = int(n or "1")
-        sides = int(sides)
-    except ValueError:
-        return plus
-    if n <= 0 or sides <= 0:
-        return plus
-    return sum(rng.randint(1, sides) for _ in range(n)) + plus
+    """Prompt 23 / P29.65: roll '1d6+2' / '2d4' / '3'. Cienki wrapper na
+    współdzielony `engine.dice.roll_spec` (jedno źródło z mobami; obsługuje
+    `NdS+B`, `NdS-B`, gołą liczbę). Woła go ścieżka obrażeń gracza."""
+    from .dice import roll_spec
+    return roll_spec(spec, rng)
 
 
 def _pick_salvage_table_key(entity):

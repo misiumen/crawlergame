@@ -12,7 +12,8 @@ from ..content.data.room_templates import (
     FLOOR_1_THEME_KEY, FLOOR_1_THEME_FALLBACK,
     FLOOR_1_SPONSOR_KEY, FLOOR_1_SPONSOR_FALLBACK,
 )
-from ..content.data.entity_templates import ENV, HAZ, TERM, SVC, MON
+from ..content.data.entity_templates import (
+    ENV, HAZ, TERM, SVC, MON, apply_combat_profile)
 
 
 _TYPE_FOR_SEED = {
@@ -135,7 +136,7 @@ def _instantiate_seed(seed, room_id: str, world, floor_num: int):
     if kind == "svc":
         return _from_template(SVC, seed[1], room_id, T_SERVICE)
     if kind == "mon":
-        ent = _from_template(MON, seed[1], room_id, T_MONSTER)
+        ent = _from_template(MON, seed[1], room_id, T_MONSTER, floor=floor_num)
         return ent
     if kind == "item":
         item = make_item(seed[1], location_id=room_id)
@@ -149,7 +150,7 @@ def _instantiate_seed(seed, room_id: str, world, floor_num: int):
     return None
 
 
-def _from_template(table, key: str, room_id: str, etype: str):
+def _from_template(table, key: str, room_id: str, etype: str, floor=None):
     proto = table.get(key)
     if proto is None:
         return None
@@ -169,4 +170,11 @@ def _from_template(table, key: str, room_id: str, etype: str):
         attack_bonus=proto.get("attack_bonus", 0),
         damage_dice=proto.get("damage_dice", "1d4"),
     )
+    # P29.75 — przepisz profil bojowy (damage_type/resists/vulnerable_to/
+    # immune_to/behavior); konstruktor wyżej ich pomijał.
+    apply_combat_profile(e, proto)
+    # P29.65 — łagodna krzywa głębokości (no-op gdy piętro domowe nieznane).
+    if floor is not None:
+        from .balance import scale_for_floor
+        scale_for_floor(e, floor, home_floor=proto.get("floor_min"))
     return e

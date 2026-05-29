@@ -134,6 +134,11 @@ class Entity:
         e.max_hp = d.get("max_hp", 0)
         e.ac = d.get("ac", 10)
         e.damage_dice = d.get("damage_dice", "1d4")
+        # P29.65 — back-fill starych save'ów broni: gdy damage_dice nie było
+        # zapisane (default "1d4"), a state niesie weapon_dice, użyj go (leczy
+        # przedmioty zapisane przed fixem make_item w P29.65).
+        if e.damage_dice == "1d4" and (e.state or {}).get("weapon_dice"):
+            e.damage_dice = e.state["weapon_dice"]
         e.damage_type = d.get("damage_type", "physical")
         e.attack_bonus = d.get("attack_bonus", 0)
         e.conditions = list(d.get("conditions", []))

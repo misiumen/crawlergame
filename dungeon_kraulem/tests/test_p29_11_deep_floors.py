@@ -39,8 +39,9 @@ def test_new_deep_floor_monsters_exist():
 
 def test_final_boss_has_endgame_stats():
     prezes = MON["boss_prezes_syndykatu"]
-    # Post _apply_balance_scale: HP × 5, damage_dice mutated.
-    assert prezes["hp"] >= 400, f"final boss HP too low: {prezes['hp']}"
+    # P29.65 fixed-dice: final boss ma autorskie HP (MOB_COMBAT_STATS) na skali
+    # endgame (był ×5 = 600; teraz jawne ~312).
+    assert prezes["hp"] >= 300, f"final boss HP too low: {prezes['hp']}"
     assert "final_boss" in (prezes.get("tags") or [])
     assert prezes.get("floor_min") == 18 and prezes.get("floor_max") == 18
     print(f"  final boss stats: HP={prezes['hp']}, AC={prezes['ac']}: OK")

@@ -34,6 +34,16 @@ class ArenaVariant:
     description_pl: str
     mob_keys: List[str] = field(default_factory=list)
     trap_keys: List[str] = field(default_factory=list)
+    # P29.75c — biom areny: napędza tło (bg_<biome>) i portrety wrogów
+    # (wrog_<biome>_*). Domyślnie Sortownia — jedyny zbudowany biom.
+    biome: str = "intake_industrial"
+    # P29.76 — poziom startowy postaci w arenie (testbed: HP + punkty do
+    # pickera + skrzynka do reveala). NIE balans — dostęp do mechanik.
+    suggested_level: int = 5
+    # P29.65 — powłoka broni dopasowana do słabości wroga wariantu (ogień/kwas).
+    # Daje graczowi narzędzie do PRZETESTOWANIA systemu słabości (2× „podatny!")
+    # — bez tego arena ma tylko broń fizyczną, a nadzorca odbija fizyczne.
+    arena_coating: str = ""
     enabled: bool = True  # False = grayed out 'wkrótce'
 
 
@@ -43,21 +53,34 @@ class ArenaVariant:
 ARENA_VARIANTS: Dict[str, ArenaVariant] = {
     "duel_1v1": ArenaVariant(
         key="duel_1v1",
-        label_pl="Pojedynek 1 na 1",
-        description_pl="Tunelowy Szczurek. Test broni i VATS-a.",
-        mob_keys=["tunnel_runt"],  # MON key z entity_templates
+        label_pl="Pojedynek: Rzeźnik z Zamrażarki",
+        description_pl="Rzeźnik z Zamrażarki — wróg Sortowni. Słabość: ogień. "
+                       "Test broni i VATS-a.",
+        mob_keys=["freezer_carver"],
+        arena_coating="fire",
+    ),
+    "miniboss_sortownia": ArenaVariant(
+        key="miniboss_sortownia",
+        label_pl="Miniboss: Nadzorca Sortowni",
+        description_pl="Nadzorca Sortowni — opancerzony, odporny na obrażenia "
+                       "fizyczne (bierz kwas). Słabość: kwas.",
+        mob_keys=["nadzorca_sortowni"],
+        arena_coating="acid",
     ),
     "triple_threat": ArenaVariant(
         key="triple_threat",
         label_pl="Trzech naraz",
         description_pl="Mob z różnych frakcji. Test multi-target i AI.",
         mob_keys=["tunnel_runt", "kapitan_druzyny", "freezer_carver"],
+        arena_coating="fire",
     ),
     "boss_fight": ArenaVariant(
         key="boss_fight",
-        label_pl="Walka z bossem",
-        description_pl="Pojedynek z bossem piętra. Test mechanik bossa.",
+        label_pl="Boss: Strażnik Sortowni",
+        description_pl="Strażnik Sortowni — boss piętra Sortowni. Słabość: "
+                       "kwas i ogień. Test mechanik bossa.",
         mob_keys=["intake_warden"],
+        arena_coating="acid",
     ),
     "trap_room": ArenaVariant(
         key="trap_room",
@@ -71,7 +94,8 @@ ARENA_VARIANTS: Dict[str, ArenaVariant] = {
 
 def all_variants() -> List[ArenaVariant]:
     """Lista wariantów w stabilnej kolejności (do menu)."""
-    order = ["duel_1v1", "triple_threat", "boss_fight", "trap_room"]
+    order = ["duel_1v1", "miniboss_sortownia", "boss_fight",
+             "triple_threat", "trap_room"]
     return [ARENA_VARIANTS[k] for k in order if k in ARENA_VARIANTS]
 
 
@@ -82,8 +106,47 @@ def get_variant(key: str) -> Optional[ArenaVariant]:
 # ── Setup ─────────────────────────────────────────────────────────
 
 
+def _apply_arena_loadout(world, character, weapon_key: str = "miecz_okopowy_oficera"):
+    """P29.75c — ubiera arenową postać w wygrywalny zestaw (dotąd loadout był
+    tylko zapisywany we flagach, nie zakładany → postać wchodziła bez broni).
+    Broń biała + pancerz (AC) + zapas leczenia. Melee gracza jest fizyczne i
+    nie ma gotowego itemu żywiołowego (acid_flask tylko z craftingu) — stąd
+    stawiamy na solidną broń fizyczną zamiast exploitu słabości."""
+    from ..content.items import make_item
+    from . import equipment as _eq
+
+    def _mk(key):
+        it = make_item(key, location_id="inventory:player")
+        world.register(it)
+        character.inventory_ids.append(it.entity_id)
+        return it
+
+    # Broń do ręki głównej: miecz_okopowy_oficera = 1d10+2, +1 vs humanoid
+    # (cała trójka Sortowni to humanoidy). Wzór wpięcia jak STARTER_LOADOUT.
+    wpn = _mk(weapon_key or "miecz_okopowy_oficera")
+    character.wielded_main_id = wpn.entity_id
+    try:
+        character.inventory_ids.remove(wpn.entity_id)
+    except ValueError:
+        pass
+
+    # Pancerz na tors (AC) — przeżywalność vs boss 55 HP.
+    armor = _mk("kamizelka_taktyczna")
+    try:
+        _eq.equip(world, character, armor, "torso")
+    except Exception:
+        pass
+
+    # Zapas leczenia na walkę (pełne HP i tak na starcie).
+    for _ in range(3):
+        _mk("bandage")
+    for _ in range(2):
+        _mk("snack_bar")
+
+
 def build_arena_world(variant_key: str, *, character_name: str = "Zawodnik",
-                       background: str = "janitor"):
+                       background: str = "security_guard",
+                       weapon_key: str = "miecz_okopowy_oficera"):
     """Buduje WorldState + Character + minimalne piętro arenowe
     pod konkretny wariant.
 
@@ -92,10 +155,10 @@ def build_arena_world(variant_key: str, *, character_name: str = "Zawodnik",
     Raises ValueError gdy variant_key nieznany lub disabled.
     """
     from .world import WorldState
-    from .character import Character
+    from .character import Character, apply_background_stats
     from .floor import FloorState
     from .room import RoomState
-    from ..content.data.entity_templates import MON
+    from ..content.data.entity_templates import MON, apply_combat_profile
     from .entity import Entity, T_MONSTER
 
     variant = get_variant(variant_key)
@@ -108,12 +171,39 @@ def build_arena_world(variant_key: str, *, character_name: str = "Zawodnik",
     # World + character
     w = WorldState()
     w.character = Character(name=character_name, background=background)
+    # P29.75c — aplikuj staty z profilu (arena tego NIE robiła → mod +0 na
+    # wszystkim, postać bezużyteczna w walce). Teraz np. security_guard ma
+    # SIŁ 14 (+2 do trafienia i obrażeń).
+    apply_background_stats(w.character, background)
     # Pełne HP, default credits
     w.character.hp = w.character.max_hp
+    # P29.75c — loadout bojowy (broń + pancerz + leczenie do testów walki).
+    _apply_arena_loadout(w, w.character, weapon_key)
+    # P29.65 — powłoka broni pod słabość wroga wariantu (test systemu słabości:
+    # 2× „podatny!"). Limit trafień — gdy powłoka się zużyje, gracz zobaczy też
+    # zwykłe (czasem „osłabione") ciosy, więc testuje obie strony mechaniki.
+    if variant.arena_coating:
+        _wpn = w.get(w.character.wielded_main_id)
+        if _wpn is not None:
+            _wpn.state = _wpn.state or {}
+            _wpn.state["coating"] = {"damage_type": variant.arena_coating,
+                                     "hits_remaining": 12}
+    # P29.76 — testbed: nadaj poziom startowy (skala HP + punkty do rozdania
+    # w pickerze + skrzynka do reveala), żeby od razu testować nowy combat,
+    # awans i otwieranie skrzynek. To NIE strojenie balansu — to dostęp do
+    # mechanik progresji w sandboxie.
+    try:
+        from . import leveling as _lvl
+        _lvl.pre_level(w, getattr(variant, "suggested_level", 1))
+    except Exception:
+        pass
 
     # Arena floor: 1 room z mobami
     floor = FloorState(floor_id=f"arena_{variant_key}", floor_number=1)
+    # P29.75c — biom areny napędza tło (bg_<biome>) i portrety (wrog_<biome>_*).
+    floor.biome_key = variant.biome
     room = RoomState(room_id="arena_room", actual_type="combat")
+    room.biome = variant.biome
     room.fallback_short_title = "Arena"
     room.fallback_title = f"Arena testowa: {variant.label_pl}"
     room.fallback_first_enter = (
@@ -151,12 +241,45 @@ def build_arena_world(variant_key: str, *, character_name: str = "Zawodnik",
             damage_type=proto.get("damage_type", "physical"),
             location_id="arena_room",
         )
-        # Resists/vulnerabilities z proto
-        ent.resists = list(proto.get("resists", []))
-        ent.vulnerable_to = list(proto.get("vulnerable_to", []))
-        ent.immune_to = list(proto.get("immune_to", []))
+        # P29.75 — wspólny helper: resists/vulnerable_to/immune_to +
+        # damage_type + behavior override z szablonu (jedno źródło prawdy).
+        apply_combat_profile(ent, proto)
+        # P29.65 — ten sam tor skalowania głębokości co realna gra (na F1
+        # testbedu to no-op; trio i tak dostaje autorskie staty z MON).
+        try:
+            from .balance import scale_for_floor
+            scale_for_floor(ent, getattr(floor, "floor_number", 1),
+                            home_floor=proto.get("floor_min"))
+        except Exception:
+            pass
         room.entities.append(ent)
         w.register(ent)
+
+    # P29.76 — obiekty OTOCZENIA (env) do testowania panelu OTOCZENIE,
+    # `zbadaj pomieszczenie` i interakcji systemowych (ciśnij w kałużę,
+    # podpal łatwopalne, zwarcie na mokrym). Stały ambient intake.
+    from ..content.data.entity_templates import ENV as _ENV
+    from .entity import T_OBJECT as _T_OBJ
+    # Wariant z pułapkami NIE dostaje ambientu — ma własny zestaw hazardów
+    # i to one są testowane (uniknij kolizji „kałuża wody" vs „kałuża kwasu").
+    _env_keys = () if variant.trap_keys else (
+        "sponsor_camera", "exposed_wiring", "water_pool", "broken_table")
+    for env_key in _env_keys:
+        proto = _ENV.get(env_key)
+        if proto is None:
+            continue
+        eo = Entity(
+            key=env_key, entity_type=_T_OBJ,
+            name_key=proto.get("name_key", ""),
+            fallback_name=proto.get("fallback_name", env_key),
+            desc_key=proto.get("desc_key", ""),
+            fallback_desc=proto.get("fallback_desc", ""),
+            tags=list(proto.get("tags", [])),
+            affordances=list(proto.get("affordances", ["inspect"])),
+            location_id="arena_room",
+        )
+        room.entities.append(eo)
+        w.register(eo)
 
     # Spawn traps from HAZ catalog (P29.60 cz.2 — trap variant).
     from ..content.data.entity_templates import HAZ

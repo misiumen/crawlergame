@@ -12,7 +12,7 @@ game still reads naturally even before the JSON is filled in.
 """
 
 FLOOR_1_TITLE_KEY = "floor1_title"
-FLOOR_1_TITLE_FALLBACK = "Piętro 1 — Strefa Aklimatyzacji"
+FLOOR_1_TITLE_FALLBACK = "Piętro 1 — Sortownia Zawodników"
 FLOOR_1_THEME_KEY = "floor1_theme"
 FLOOR_1_THEME_FALLBACK = "Przemysłowe korytarze, sponsorowane przez 'NovaChem'."
 FLOOR_1_SPONSOR_KEY = "floor1_sponsor"

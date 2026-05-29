@@ -104,9 +104,9 @@ def test_new_monsters_present_in_MON():
     }
     missing = expected - set(_et.MON.keys())
     assert not missing, f"missing MON entries: {missing}"
-    # Verify HP got scaled by _apply_balance_scale (×5)
-    assert _et.MON["mutant_szczur"]["hp"] >= 12 * 5
-    print(f"  20 new monsters present + balance-scaled: OK")
+    # P29.65 fixed-dice: mutant_szczur to zwykły mob na skali gry (autorskie HP).
+    assert _et.MON["mutant_szczur"]["hp"] >= 30
+    print(f"  20 new monsters present + fixed-dice authored: OK")
 
 
 def test_new_monsters_have_salvage_tables():

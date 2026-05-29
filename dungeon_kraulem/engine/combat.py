@@ -299,7 +299,7 @@ def _inject_pending_hunters(room, world) -> None:
         return
     leftover = []
     try:
-        from ..content.data.entity_templates import MON
+        from ..content.data.entity_templates import MON, apply_combat_profile
         from .entity import Entity, T_MONSTER
     except Exception:
         return
@@ -320,10 +320,27 @@ def _inject_pending_hunters(room, world) -> None:
                 fallback_name=tmpl.get("fallback_name", hunter_key),
                 hp=int(tmpl.get("hp", 6)),
                 max_hp=int(tmpl.get("max_hp", tmpl.get("hp", 6))),
+                # P29.65 — kopiuj też ac/atk/dice z szablonu; wcześniej hunter
+                # dostawał defaulty Entity (ac10/atk0/1d4), więc autorskie
+                # stat-blocki (MOB_COMBAT_STATS) nigdy nie działały dla łowców.
+                ac=int(tmpl.get("ac", 10)),
+                attack_bonus=int(tmpl.get("attack_bonus", 0)),
+                damage_dice=tmpl.get("damage_dice", "1d4"),
                 tags=list(tmpl.get("tags") or []) + ["sponsor_hunter"],
                 affordances=list(tmpl.get("affordances") or ["attack"]),
                 location_id=room.room_id,
             )
+            # P29.75 — profil bojowy z szablonu (typ obrażeń/odporności/
+            # słabości/behavior); konstruktor wyżej ich nie ustawiał.
+            apply_combat_profile(ent, tmpl)
+            # P29.65 — łagodna krzywa głębokości (no-op gdy piętro nieznane).
+            try:
+                from .balance import scale_for_floor
+                _fn = int(getattr(getattr(world, "current_floor", None),
+                                  "floor_number", 1) or 1)
+                scale_for_floor(ent, _fn, home_floor=tmpl.get("floor_min"))
+            except Exception:
+                pass
             world.register(ent)
             room.entities.append(ent)
         except Exception:
@@ -555,17 +572,17 @@ def _pick_rival_target(world, cs: "CombatState", enemy) -> Optional[int]:
 
 def _enemy_attack_damage(enemy, *, ranged: bool = False,
                          heavy: bool = False) -> int:
-    """Roll the entity's damage dice + bonus, with rough modifiers."""
+    """Roll the entity's damage dice, with rough modifiers.
+
+    P29.65: routes through the shared `engine.dice.roll_spec` roller. The old
+    inline `split("d")` + `int(sides)` threw on the scaler's `'NdS+B'` format
+    (e.g. `int("8+13")`) and silently fell back to `1d4`, so every scaled mob
+    dealt ~`1d4` instead of its real dice — the core of the dead-damage bug.
+    Damage is now DICE-ONLY: `attack_bonus` is the to-hit stat and is no longer
+    folded into the damage roll (that double-dip inflated both axes at once)."""
     import random as _r
-    # Parse damage_dice like "1d4" / "2d6"
-    dice = enemy.damage_dice or "1d4"
-    try:
-        n, sides = dice.lower().split("d")
-        n = int(n or "1"); sides = int(sides)
-    except (ValueError, AttributeError):
-        n, sides = 1, 4
-    roll = sum(_r.randint(1, max(1, sides)) for _ in range(max(1, n)))
-    dmg = roll + int(getattr(enemy, "attack_bonus", 0) or 0)
+    from .dice import roll_spec
+    dmg = roll_spec(enemy.damage_dice or "1d4", _r)
     if heavy:  dmg += 1
     if ranged: dmg = max(1, dmg - 1)
     # Statuses on the enemy itself reduce its output.

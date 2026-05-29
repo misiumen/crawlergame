@@ -21,6 +21,7 @@ from ...ui.lang import t
 
 # Cost constants — single source of truth for credit-sink balance.
 TRAIN_COST    = 80
+RESPEC_COST   = 40   # P29.76 — Wiercimajster przekłada Twoje punkty, nie sprzedaje surowych statów
 BRIBE_COST    = 20
 CALL_POD_COST = 50
 UPGRADE_COST  = 100
@@ -39,50 +40,54 @@ _STAT_ALIAS = {
 
 
 def attempt_train_stat(game, intent) -> None:
-    """`trening <stat>` — pay 80 kr for +1 to one stat. Each stat
-    is trainable ONCE per character (flag `trained_<STAT>`)."""
+    """P29.76 — Wiercimajster = RESPEC, nie sprzedaż surowych statów.
+    `przebudowa <stat>` (alias: trening) — za RESPEC_COST kr zdejmuje 1 punkt
+    z danego statu (nie poniżej bazy z profilu pochodzenia) i zwraca go do puli
+    nierozdanych punktów (`unspent_stat_points`) do ponownego rozdania w
+    pickerze awansu. Powtarzalne (brak flagi one-time)."""
     if not intent.targets:
-        game.log(t("feedback_train_syntax",
-                   fallback="Składnia: trening <stat> "
-                            "(STR/DEX/CON/INT/WIS/CHA)."), LOG_WARN)
+        game.log(t("feedback_respec_syntax",
+                   fallback="Składnia: przebudowa <stat> "
+                            "(STR/DEX/CON/INT/WIS/CHA). Punkt wraca do puli."),
+                 LOG_WARN)
         return
     ch = game.world.character
     raw = (intent.targets[0] or "").strip().lower()
     stat = _STAT_ALIAS.get(raw)
     if stat is None:
-        game.log(t("feedback_train_bad_stat",
-                   fallback=f"Nie wiem, jak trenować „{raw}”. "
+        game.log(t("feedback_respec_bad_stat",
+                   fallback=f"Nie wiem, jak przebudować „{raw}”. "
                             f"STR / DEX / CON / INT / WIS / CHA."),
                  LOG_WARN)
         return
-    flag = f"trained_{stat}"
-    if (ch.flags or {}).get(flag):
-        game.log(t("feedback_train_already_done",
-                   fallback=f"Trener: „{stat} już z tobą "
-                            f"pracował. Nie da więcej.”"), LOG_WARN)
+    # Baza z profilu pochodzenia — poniżej startu nie zejdziemy.
+    try:
+        from ..character import STAT_PROFILES
+        base = int(STAT_PROFILES.get(ch.background, {}).get(stat, 10))
+    except Exception:
+        base = 10
+    cur = int(ch.stats.get(stat, 10))
+    if cur <= base:
+        game.log(t("feedback_respec_at_base",
+                   fallback=f"Wiercimajster: „{stat} już na bazie "
+                            f"({base}). Nie ma czego wyjmować.”"), LOG_WARN)
         return
-    if ch.credits < TRAIN_COST:
-        game.log(t("feedback_train_no_credits",
-                   fallback=f"Trener: {TRAIN_COST} kr za sesję. "
+    if ch.credits < RESPEC_COST:
+        game.log(t("feedback_respec_no_credits",
+                   fallback=f"Wiercimajster: {RESPEC_COST} kr za przebudowę. "
                             f"Masz {ch.credits}."), LOG_WARN)
         return
-    ch.credits -= TRAIN_COST
-    ch.stats[stat] = int(ch.stats.get(stat, 10)) + 1
-    if ch.flags is None: ch.flags = {}
-    ch.flags[flag] = True
-    game.log(t("feedback_train_ok",
-               fallback=f"Trener z ciebie wyciska — {stat} "
-                        f"+1 (teraz {ch.stats[stat]}). -{TRAIN_COST} kr."),
+    ch.credits -= RESPEC_COST
+    ch.stats[stat] = cur - 1
+    ch.unspent_stat_points = int(getattr(ch, "unspent_stat_points", 0) or 0) + 1
+    game.log(t("feedback_respec_ok",
+               fallback=f"Wiercimajster wyłuskuje punkt z {stat} "
+                        f"(teraz {ch.stats[stat]}). +1 do rozdania "
+                        f"(masz {ch.unspent_stat_points}). -{RESPEC_COST} kr. "
+                        f"Rozdaj komendą „rozdaj punkty”."),
              LOG_SUCCESS)
     try:
         from .. import time_system as _ts
-    except Exception:
-        try:
-            from ..time_system import advance as _adv
-            _adv(game.world, 30); return
-        except Exception:
-            return
-    try:
         _ts.advance(game.world, 30)
     except Exception:
         pass

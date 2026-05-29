@@ -64,34 +64,50 @@ def test_parser_routes_each_sink():
 
 # ── trening ─────────────────────────────────────────────────────────────
 
-def test_training_bumps_stat_and_burns_slot():
+def test_respec_pulls_point_back_to_pool():
+    # P29.76 — Wiercimajster = respec: zdejmuje punkt z statu (powyżej bazy)
+    # i zwraca do puli nierozdanych punktów. Powtarzalny.
     from ..engine.game import Game
     w, _r = _mk_world(credits=200)
     g = Game(screen=None); g.world = w; g.state = "play"
-    pre_dex = w.character.stats["DEX"]
+    w.character.background = "janitor"     # baza DEX = 10
+    w.character.stats["DEX"] = 13          # 3 punkty z poziomów
+    w.character.unspent_stat_points = 0
     pre_cr = w.character.credits
+    g.submit_generated_command("przebudowa DEX")
+    assert w.character.stats["DEX"] == 12              # -1
+    assert w.character.unspent_stat_points == 1        # punkt wraca do puli
+    assert w.character.credits == pre_cr - 40
+    # Alias „trening" też mapuje na respec.
     g.submit_generated_command("trening DEX")
-    assert w.character.stats["DEX"] == pre_dex + 1
-    assert w.character.credits == pre_cr - 80
-    assert w.character.flags.get("trained_DEX") is True
-    # Second time should refuse.
-    pre_cr = w.character.credits
-    g.submit_generated_command("trening DEX")
-    assert w.character.stats["DEX"] == pre_dex + 1
-    assert w.character.credits == pre_cr
-    print(f"  training +1 then refuses re-train: OK "
-          f"(DEX {pre_dex}→{w.character.stats['DEX']})")
+    assert w.character.stats["DEX"] == 11
+    assert w.character.unspent_stat_points == 2
+    print("  respec pulls points back to pool (repeatable): OK")
 
 
-def test_training_refuses_no_credits():
+def test_respec_refuses_at_base_stat():
+    from ..engine.game import Game
+    w, _r = _mk_world(credits=200)
+    g = Game(screen=None); g.world = w; g.state = "play"
+    w.character.background = "janitor"
+    w.character.stats["DEX"] = 10          # już na bazie
+    w.character.unspent_stat_points = 0
+    g.submit_generated_command("przebudowa DEX")
+    assert w.character.stats["DEX"] == 10              # nie schodzi poniżej bazy
+    assert w.character.unspent_stat_points == 0
+    print("  respec refuses at base stat: OK")
+
+
+def test_respec_refuses_no_credits():
     from ..engine.game import Game
     w, _r = _mk_world(credits=10)
     g = Game(screen=None); g.world = w; g.state = "play"
-    pre = w.character.stats["INT"]
-    g.submit_generated_command("trening INT")
-    assert w.character.stats["INT"] == pre, "should not bump without credits"
+    w.character.background = "janitor"
+    w.character.stats["DEX"] = 13
+    g.submit_generated_command("przebudowa DEX")
+    assert w.character.stats["DEX"] == 13, "brak kredytów → bez respecu"
     assert w.character.credits == 10
-    print("  training refuses on insufficient credits: OK")
+    print("  respec refuses on insufficient credits: OK")
 
 
 # ── łapówka ─────────────────────────────────────────────────────────────

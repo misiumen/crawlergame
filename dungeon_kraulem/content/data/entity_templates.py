@@ -1,16 +1,15 @@
 """Entity templates instantiated by the procgen seeds.
 
-P27.6 balance pass: HP and damage dice for all MON entries are
-scaled at MODULE-LOAD time via `_apply_balance_scale()` so the source
-templates stay readable with their original "design" numbers while the
-runtime values match the new HP-100 player scale.
-
-Player baseline went 14 → 100 HP (×7). Monsters scale ×5 (less than
-player so combat doesn't take 7× longer), damage ×4. Outcome: each hit
-takes ~10-25% of the bar, fights last 4-7 turns instead of 1-3.
+P29.65 fixed-dice re-author: combat stats (HP/dmg/atk/ac) for MON entries are
+authored explicitly in `MOB_COMBAT_STATS` and applied at MODULE-LOAD via
+`_apply_mob_stat_authoring()`. The old P27.6 ×5/×4 multiplier is gone — its
+×4-damage half NEVER worked (the mob roller threw on the "NdS+B" format and
+silently fell back to 1d4), so combat felt „like Excel". Numbers now sit on the
+player's ~100-HP scale directly; floor depth is handled separately by
+engine.balance.scale_for_floor at spawn time. Inline hp/dmg in templates below
+are a historical „design seed" — MOB_COMBAT_STATS is the source of truth.
 """
 from __future__ import annotations
-import re as _re_balance
 
 # Environmental features (env)
 ENV = {
@@ -483,8 +482,12 @@ MON = {
         fallback_desc="Niski, mokry, bardzo zły. Chrupie dłoń jeśli mu pozwolisz.",
         # P29.66 — tożsamość „robactwo": można nim CISNĄĆ w kogoś, kto się
         # robactwa boi/brzydzi (reguła psychiki).
-        tags=["monster","small","biting","flammable","robactwo"],
+        tags=["monster","small","biting","flammable","robactwo","intake"],
         affordances=["inspect","attack","intimidate","lure","sneak"],
+        # P29.75 — mob SORTOWNI (intake-only; nie ma puli generycznych mobów —
+        # każdy mob należy do jednego biomu). Mały, liczny → roj (swarm z taga
+        # „small"). Ciśnięty w kogoś brzydzącego się robactwa odpala psychikę
+        # (odraza).
         hp=8, max_hp=8, ac=11, attack_bonus=3, damage_dice="1d4+1",
         # Prompt 21: small + furry = vulnerable to fire AND cold.
         vulnerable_to=["fire","cold"],
@@ -493,10 +496,12 @@ MON = {
         name_key="ent_freezer_carver_n", fallback_name="Rzeźnik z Zamrażarki",
         desc_key="ent_freezer_carver_d",
         fallback_desc="Człowiek w fartuchu, z bardzo ostrym nożem i bardzo pustymi oczami.",
-        tags=["monster","humanoid","sharp"],
+        tags=["monster","humanoid","sharp","intake"],
         affordances=["inspect","attack","talk","intimidate","lure","sneak"],
         hp=18, max_hp=18, ac=12, attack_bonus=4, damage_dice="1d8+1",
-        # Lives at sub-zero — vulnerable to fire, resistant to cold.
+        # P29.75 — mob SORTOWNI (intake-only): agresywny rzeźnik, szarżuje
+        # (berserker). Żyje w mrozie → ogień podwaja, zimno połowi obrażenia.
+        behavior="berserker",
         vulnerable_to=["fire"],
         resists=["cold"],
     ),
@@ -523,8 +528,12 @@ MON = {
         # P29.66 — psychika: czysty kombinezon, sterylne procedury — widok
         # robactwa go brzydzi (odraza → cofnięcie). Cisnij w niego szczura.
         tags=["monster","humanoid","corporate","novachem","responder",
-              "odraza:robactwo"],
+              "odraza:robactwo","intake"],
         affordances=["inspect","attack","intimidate","talk"],
+        # P29.75 — metodyczny biurokrata: trzyma pozycję, ostrożne ataki
+        # (guard). Psychika „odraza:robactwo" — cofa się, gdy ciśniesz w
+        # niego szczura.
+        behavior="guard",
         hp=18, max_hp=18, ac=13, attack_bonus=4, damage_dice="1d6+2",
         # HazMat suit — chem-proof but a battery makes it crackle.
         immune_to=["poison"],
@@ -761,8 +770,9 @@ MON = {
     ),
 
     # ═════════════════════════════════════════════════════════════════════
-    # P29.1 — Floors 3-6 themed monsters. HP/dmg values are pre-balance
-    # (×5 HP, ×4 dmg applied at module load by _apply_balance_scale).
+    # P29.1 — Floors 3-6 themed monsters. Bojowe staty (HP/dmg/atk/ac) są
+    # nadpisywane przy module-load z MOB_COMBAT_STATS (P29.65 fixed-dice);
+    # liczby inline poniżej to historyczny „design seed".
     # ═════════════════════════════════════════════════════════════════════
 
     # ── Piętro 3: ZOO ─────────────────────────────────────────────────────
@@ -801,6 +811,26 @@ MON = {
         damage_type="psychic",
         vulnerable_to=["physical"],
         floor_min=3, floor_max=4,
+    ),
+    # ── Miniboss SORTOWNI (F1-2) — P29.75b ────────────────────────────
+    "nadzorca_sortowni": dict(
+        name_key="ent_nadzorca_sortowni_n",
+        fallback_name="Nadzorca Sortowni",
+        desc_key="ent_nadzorca_sortowni_d",
+        fallback_desc="Brygadzista w odblaskowej kamizelce, z paralizatorem "
+                      "i planszetką. Na liście odhacza, kto wjeżdża na taśmę, "
+                      "a kto schodzi z obiegu. Twoje nazwisko jest na samym "
+                      "dole. Pancerz na ramionach skrzypi przy każdym ruchu.",
+        tags=["monster","humanoid","intake","miniboss","floor_min:1"],
+        affordances=["inspect","attack","intimidate","talk"],
+        hp=24, max_hp=24, ac=13, attack_bonus=4, damage_dice="2d4+2",
+        damage_type="electric",        # paralizator
+        # Opancerzony → połowa od fizycznych; kwas żre pancerz (odkrywalna
+        # słabość — działa dzięki wiringowi P29.75). Broni taśmy: guard.
+        resists=["physical"],
+        vulnerable_to=["acid"],
+        behavior="guard",
+        floor_min=1, floor_max=2,
     ),
     "miniboss_alfa_szczur": dict(
         name_key="ent_miniboss_alfa_szczur_n",
@@ -1047,7 +1077,7 @@ MON = {
     # na pierwszym piętrze na zawsze. Bug znaleziony w playthrough.
     "intake_warden": dict(
         name_key="ent_intake_warden_n",
-        fallback_name="Strażnik Aklimatyzacji",
+        fallback_name="Strażnik Sortowni",
         desc_key="ent_intake_warden_d",
         fallback_desc="Pierwszy mundur, jaki zobaczysz w lochu. "
                       "Sponsorska opaska na ramieniu, paralizator za "
@@ -1057,6 +1087,8 @@ MON = {
         tags=["monster","humanoid","intake","floor_boss",
               "floor_min:1"],
         affordances=["inspect","attack","talk","intimidate","bribe"],
+        # P29.75 — boss Sortowni: blokuje zejście, broni (guard).
+        behavior="guard",
         hp=55, max_hp=55, ac=12, attack_bonus=4, damage_dice="1d8+2",
         damage_type="electric",
         vulnerable_to=["acid","fire"],
@@ -1192,7 +1224,7 @@ MON = {
     #   10-12 FUNGAL_BLOOM       (zmutowany biom, NovaChem winy)
     #   13-15 MACHINE_CHURCH     (korpo-kult, AI z Ministerstwa Pamięci)
     #   16-18 HELLFLOOR          (sanktuarium Syndykatu)
-    # HP/damage are PRE-SCALE numbers; _apply_balance_scale() multiplies.
+    # Bojowe staty nadpisywane z MOB_COMBAT_STATS (P29.65); liczby inline to seed.
 
     # Band 1: UNDERGROUND (floors 7-9)
     "kanal_widmo": dict(
@@ -1714,61 +1746,168 @@ MON = {
 }
 
 
-# ── P27.6 Balance pass ─────────────────────────────────────────────────────
+# ── P29.65 — Fixed-dice stat-blocki (re-author balansu walki) ───────────────
+#
+# Zastępuje martwy mnożnik P27.6 (×5 HP / ×4 dmg). Tamten ×4-na-obrażeniach był
+# NIGDY niedziałający (parser mobów wywalał się na formacie "NdS+B" → fallback do
+# 1d4), więc moby biły jak 1d4, a HP rosło ×5 → walka „jak Excel". Tu mamy JAWNĄ
+# tabelę: każdy mob ma autorskie HP + fixed-dice obrażenia NA SKALI GRY (gracz
+# ~100 HP). Jedno miejsce do strojenia. Krzywa głębokości żyje osobno w
+# engine/balance.py (scale_for_floor), wołana przez buildery przy spawnie.
+#
+# Cel feel (P29.65): „taktyczna, ~4-6 rund" — moby grożą, ale wybaczają; jest
+# czas na VATS / typy obrażeń / krycie. Role wg tagów:
+#   chaff (small/swarm) ~3.5/cios · normal ~5.5 · twardy ~7.5 · elite ~10
+#   miniboss ~11-13 · floor_boss ~12-16 · final_boss ~19.5
+# Krotka: key -> (hp, damage_dice, attack_bonus, ac).
+MOB_COMBAT_STATS = {
+    # ── chaff ──
+    "indeksowy_robak": (20, "1d4+1", 2, 10),
+    "tunnel_runt": (22, "1d4+1", 2, 10),
+    # ── normal ──
+    "spiker_kanalu": (30, "1d6+2", 3, 11),
+    "dzieciak_z_blokowiska": (30, "1d6+2", 3, 11),
+    "stadionowy_szaleniec": (35, "1d6+2", 3, 11),
+    "bekajacy_paw": (35, "1d6+2", 3, 11),
+    "smarownik_pasow": (35, "1d6+2", 3, 11),
+    "manometrowiec": (38, "1d6+2", 3, 11),
+    "wegielnik_kuzni": (38, "1d6+2", 3, 11),
+    "anty_gospodarz": (42, "1d6+2", 3, 11),
+    "kibic_zlobiarz": (42, "1d6+2", 3, 11),
+    "mutant_szczur": (42, "1d6+2", 3, 11),
+    "duch_zwiedzajacego": (42, "1d6+2", 3, 11),
+    "drono_sprzatacz": (42, "1d6+2", 3, 11),
+    "bibliotekarz_zlowieszczy": (42, "1d6+2", 3, 11),
+    "okopowy_grenadier": (46, "1d6+2", 3, 11),
+    # ── twardy / striker ──
+    "koordynator_robotniczy": (49, "1d8+3", 4, 12),
+    "pielgrzym_recyklera": (49, "1d8+3", 4, 12),
+    "klatkowy_kot": (49, "1d8+3", 4, 12),
+    "pijany_crawler": (49, "1d8+3", 4, 12),
+    "sanitariuszka_propaganda": (49, "1d8+3", 4, 12),
+    "technik_sluzy": (49, "1d8+3", 4, 12),
+    "czytelnik_zaginiony": (49, "1d8+3", 4, 12),
+    "redaktor_naczelny": (52, "1d8+3", 4, 12),
+    "usmiechniety_sasiad": (52, "1d8+3", 4, 12),
+    "pasazer_zaginiony": (52, "1d8+3", 4, 12),
+    "podkowiarz_polork": (52, "1d8+3", 4, 12),
+    "agent_kontroli_jakosci": (56, "1d8+3", 4, 12),
+    "ochroniarz_areny": (56, "1d8+3", 4, 12),
+    "kostny_kurator": (56, "1d8+3", 4, 12),
+    "lokator_baru": (56, "1d8+3", 4, 12),
+    "konserwator_kotla": (56, "1d8+3", 4, 12),
+    "mlociarz_cechowy": (60, "1d8+3", 4, 12),
+    "freezer_carver": (63, "1d8+3", 4, 12),
+    "biotech_inspector": (63, "1d8+3", 4, 12),
+    "windykator": (63, "1d8+3", 4, 12),
+    "asesor_komornika": (63, "1d8+3", 4, 12),
+    "kucharka_z_swietlicy": (63, "1d8+3", 4, 12),
+    "lazarz_blotny": (63, "1d8+3", 4, 12),
+    "kaplan_polimerow": (70, "1d8+3", 4, 12),
+    "weteran_trybun": (70, "1d8+3", 4, 12),
+    "mechaniczny_strazak": (70, "1d8+3", 4, 12),
+    "kantor_pamieci": (70, "1d8+3", 4, 12),
+    "egzekutor_ligi": (77, "1d8+3", 4, 13),
+    "bramkarz": (77, "1d8+3", 4, 12),
+    "kanal_widmo": (77, "1d8+3", 4, 12),
+    "ekstremalny_zawodnik": (84, "1d8+3", 4, 12),
+    "kwiat_padliny": (84, "1d8+3", 4, 12),
+    # ── elite (głębokie piętra) ──
+    "zarodnikowiec": (91, "2d6+3", 5, 12),
+    "diakon_korpo": (98, "2d6+3", 5, 12),
+    "mokry_kolega": (105, "2d6+3", 5, 12),
+    "windykator_ostateczny": (133, "2d6+3", 5, 12),
+    "anti_host_lite": (154, "2d6+3", 5, 12),
+    # ── miniboss ──
+    "trener_szkoleniowiec": (100, "2d6+4", 5, 13),
+    "kapitan_druzyny": (110, "2d6+4", 5, 13),
+    "nadzorca_sortowni": (120, "2d6+4", 5, 13),
+    "miniboss_kartograf_dluznik": (120, "2d6+4", 5, 13),
+    "miniboss_alfa_szczur": (125, "2d6+4", 5, 13),
+    "miniboss_archiwista_zakazany": (135, "2d6+4", 5, 13),
+    "miniboss_oddzialowa": (140, "2d6+4", 5, 13),
+    "miniboss_strazak_galerii": (140, "2d6+4", 5, 13),
+    "miniboss_kapitan_doku": (140, "2d6+4", 5, 14),
+    "miniboss_szef_baru": (150, "2d8+4", 5, 13),
+    "miniboss_brygadzista_kuzni": (150, "2d8+4", 5, 14),
+    "miniboss_sierzant_blachy": (160, "2d8+4", 5, 14),
+    "miniboss_majster_cechu": (160, "2d8+4", 5, 14),
+    "miniboss_egzekutor_widowni": (170, "2d8+4", 5, 13),
+    # ── floor_boss ──
+    "relay_warden": (102, "2d6+5", 6, 14),
+    "intake_warden": (150, "2d8+5", 6, 13),   # F1 boss — łagodniejszy start
+    "arbiter_finalowy": (128, "2d8+5", 6, 14),
+    "boss_panicz_zoo": (128, "2d8+5", 6, 13),
+    "boss_konserwator_zbiorow": (128, "2d8+5", 6, 13),
+    "boss_kurator_naczelny": (134, "2d8+5", 6, 13),
+    "boss_komandor_proznii": (134, "2d8+5", 6, 13),
+    "boss_showman": (141, "2d8+5", 6, 13),
+    "boss_palacz_sterling": (141, "2d8+5", 6, 13),
+    "boss_blok_parent": (144, "2d8+5", 6, 13),
+    "boss_kapelmistrz_wojny": (147, "2d8+5", 6, 13),
+    "boss_starszy_cechu": (147, "2d8+5", 6, 13),
+    "boss_burmistrz_kanalow": (160, "2d10+5", 6, 13),
+    "boss_matka_zarodników": (224, "2d10+5", 6, 13),
+    "boss_proboszcz_korpo": (250, "2d10+5", 6, 13),
+    # ── final_boss ──
+    "boss_prezes_syndykatu": (312, "3d8+6", 7, 14),
+}
 
-# Multipliers applied to every MON entry at module-load time.
-_HP_SCALE  = 5     # monster HP × 5 (player HP scaled 7x to 100, monsters
-                   # less to keep fights to 4-7 turns instead of 10+)
-_DMG_MULT  = 4     # damage dice constant × 4 (so 1d4+1 → 1d4+5 approx)
-_DMG_DICE_BUMP = 1 # plus +1 die per `Nd` term (so 1d4 → 2d4 — wider
-                   # damage curve, more variance feels alive)
+
+_STATS_APPLIED = False
 
 
-def _scale_damage_dice(spec: str) -> str:
-    """Apply the balance multipliers to a dice spec like '1d4+1'.
-    `NdS+B` → `(N+_DMG_DICE_BUMP)dS+(B*_DMG_MULT + N*S/2)` approximation
-    that lifts average damage by ~3-4×."""
-    if not spec or "d" not in spec:
-        return spec
-    m = _re_balance.match(r"^\s*(\d+)\s*d\s*(\d+)\s*([+\-]\s*\d+)?\s*$", spec)
-    if not m:
-        return spec
-    n = int(m.group(1))
-    s = int(m.group(2))
-    b = int((m.group(3) or "+0").replace(" ", ""))
-    # Lift dice count and add a flat bonus matching old avg × (_DMG_MULT-1).
-    new_n = n + _DMG_DICE_BUMP
-    # old avg = n*(s+1)/2 + b ; we want ~4× that.
-    old_avg = n * (s + 1) / 2 + b
-    new_dice_avg = new_n * (s + 1) / 2
-    target = old_avg * _DMG_MULT
-    new_b = max(0, int(round(target - new_dice_avg)))
-    return f"{new_n}d{s}+{new_b}" if new_b else f"{new_n}d{s}"
-
-
-_BALANCE_APPLIED = False
-
-
-def _apply_balance_scale() -> None:
-    """Mutates every MON entry in place. Called once at module load.
-    Idempotent via module-level `_BALANCE_APPLIED` flag (NOT stored in
-    MON dict — that would pollute iterators expecting every entry to
-    be a monster template)."""
-    global _BALANCE_APPLIED
-    if _BALANCE_APPLIED:
+def _apply_mob_stat_authoring() -> None:
+    """Wpisuje autorskie stat-blocki (MOB_COMBAT_STATS) na encje MON przy
+    module-load. Idempotentne (`_STATS_APPLIED`). Mob spoza tabeli zostaje na
+    wartościach z szablonu — BRAK ślepego mnożnika (P29.65)."""
+    global _STATS_APPLIED
+    if _STATS_APPLIED:
         return
-    for key, tmpl in list(MON.items()):
+    for key, (hp, dice, atk, ac) in MOB_COMBAT_STATS.items():
+        tmpl = MON.get(key)
         if not isinstance(tmpl, dict):
             continue
-        if "hp" in tmpl:
-            tmpl["hp"] = int(tmpl["hp"]) * _HP_SCALE
-        if "max_hp" in tmpl:
-            tmpl["max_hp"] = int(tmpl["max_hp"]) * _HP_SCALE
-        if "damage_dice" in tmpl:
-            tmpl["damage_dice"] = _scale_damage_dice(tmpl["damage_dice"])
-        if "attack_bonus" in tmpl:
-            tmpl["attack_bonus"] = int(tmpl["attack_bonus"]) + 1
-    _BALANCE_APPLIED = True
+        tmpl["hp"] = int(hp)
+        tmpl["max_hp"] = int(hp)
+        tmpl["damage_dice"] = dice
+        tmpl["attack_bonus"] = int(atk)
+        tmpl["ac"] = int(ac)
+    _STATS_APPLIED = True
 
 
-_apply_balance_scale()
+_apply_mob_stat_authoring()
+
+
+# ── P29.75 — wiring profilu bojowego z szablonu na encję ────────────
+# KRYTYCZNE: buildery encji (floor_generator._entity_from_table,
+# procgen._from_template, combat sponsor-hunter) konstruowały Entity
+# BEZ przepisania damage_type / resists / vulnerable_to / immune_to —
+# więc cała autorska tabela słabości w MON była MARTWYM kodem (np.
+# „freezer_carver wrażliwy na ogień" nigdy nie działało w realnej grze;
+# tylko arena.py kopiowała te pola). Ten helper to jedno źródło prawdy
+# wywoływane przez wszystkie buildery.
+def apply_combat_profile(ent, proto):
+    """Nakłada na `ent` pola bojowe z dicta szablonu `proto`:
+      • damage_type   — typ obrażeń zadawanych przez moba
+      • resists       — połowi przychodzące obrażenia danego typu
+      • vulnerable_to — podwaja przychodzące obrażenia danego typu
+      • immune_to     — zeruje przychodzące obrażenia danego typu
+      • behavior      — override profilu AI (state[„behavior"]), np.
+                        „guard"/„coward"; inaczej AI wnioskowane z tagów.
+    Idempotentny i bezpieczny dla nie-potworów (ENV/HAZ zwykle nie mają
+    tych kluczy → listy zostają puste, jak w domyślnym Entity)."""
+    if ent is None or not proto:
+        return ent
+    dt = proto.get("damage_type")
+    if dt:
+        ent.damage_type = dt
+    ent.resists = list(proto.get("resists", []) or [])
+    ent.vulnerable_to = list(proto.get("vulnerable_to", []) or [])
+    ent.immune_to = list(proto.get("immune_to", []) or [])
+    beh = proto.get("behavior")
+    if beh:
+        if ent.state is None:
+            ent.state = {}
+        ent.state["behavior"] = beh
+    return ent

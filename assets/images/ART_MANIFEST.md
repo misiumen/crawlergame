@@ -54,8 +54,25 @@ odległe (inny gatunek ilustracji, inna paleta, inny nastrój).
 
 ## Portrety wrogów  (CAŁA SYLWETKA, pion ~2:3 np. 512×768; styl biomu wroga)
 
-Łańcuch: `wrog_<klucz_moba>` → `wrog_<archetyp>`. Styl wg biomu moba
-(zwierzak z zoo ≠ żołnierz z okopów).
+**Konwencja BIOME-FIRST (P29.75).** Każdy mob należy do JEDNEGO biomu —
+nie ma „mobów generycznych". Nazwa pliku = `wrog_<biom>_<reszta>`, gdzie
+`<biom>` to KRÓTKI człon klucza biomu (`intake_industrial` → **`intake`**,
+`zoo_korporacyjne` → **`zoo`**). Łańcuch rozwiązywania (pierwszy istniejący
+plik wygrywa):
+```
+wrog_<biom>_<klucz_moba>           # np. wrog_intake_tunnel_runt  (per mob)
+wrog_<klucz_moba>                  # gdy klucz moba już zawiera biom (wrog_intake_warden)
+wrog_<biom>_<archetyp>_<ogon>      # np. wrog_intake_humanoid_industrial (per archetyp)
+wrog_<biom>_<archetyp>             # np. wrog_intake_humanoid
+wrog_<archetyp>                    # ostatni ratunek (zwykle brak — proceduralny fallback)
+```
+`<ogon>` = drugi człon klucza biomu (`intake_industrial` → `industrial`).
+Styl wg biomu moba (zwierzak z zoo ≠ żołnierz z okopów).
+
+Pliki Sortowni już wrzucone: `wrog_intake_tunnel_runt`,
+`wrog_intake_freezer_carver`, `wrog_intake_biotech_inspector`,
+`wrog_intake_warden`, `wrog_intake_humanoid_industrial`,
+`wrog_intake_beast_industrial`.
 
 **KRYTYCZNE — całe ciało, nie popiersie.** VATS targetuje strefy:
 głowa / tors / ramiona / **nogi**. Popiersie ucina nogi → nie da się ich
@@ -74,11 +91,15 @@ celować. Wymagania:
 | `wrog_blob`           | full-body amorphous translucent ooze, dripping, upright mass |
 | `wrog_aberration`     | full-body eldritch anomaly, wrong geometry, too many limbs |
 | `wrog_undead`         | full-body reanimated crawler corpse, grey flesh, shambling |
-| `wrog_intake_warden`  | F1 boss: full-body hulking intake warden, riot gear |
-| `wrog_boss_panicz_zoo`| F3 boss: full-body pampered show-beast, bear-like, gaudy zoo glam |
-| `wrog_tunnel_runt`    | full-body small vicious tunnel rat, wet, red eyes |
+| `wrog_intake_warden`  | boss Sortowni: full-body hulking intake warden, riot gear |
+| `wrog_intake_tunnel_runt` | full-body small vicious tunnel rat, wet, red eyes |
+| `wrog_intake_freezer_carver` | full-body butcher in frost-rimed apron, cleaver |
+| `wrog_intake_biotech_inspector` | full-body NovaChem hazmat inspector, clipboard |
+| `wrog_intake_nadzorca_sortowni` | miniboss: full-body hi-vis foreman, stun baton, clipboard, shoulder armor |
 
-(Dla pozostałych bossów: `wrog_<klucz_z_entity_templates>`.)
+> Wiersze `wrog_<archetyp>` powyżej = OSTATNI ratunek (gdy biom nie ma
+> własnego pliku). Realne pliki per biom: `wrog_<biom>_<archetyp>_<ogon>`
+> lub `wrog_<biom>_<klucz_moba>`. Bossy biomów: `wrog_<biom>_<klucz_moba>`.
 
 ## Portret gracza  (opcjonalny 1:1): `portret_<origin>` (np.
 `portret_bezdomny`). Bez pliku → budowany proceduralnie z EQ.

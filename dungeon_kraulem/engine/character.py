@@ -16,6 +16,38 @@ BACKGROUNDS = (
 )
 
 
+# Staty startowe per background (STR, DEX, CON, INT, WIS, CHA). Jedno
+# źródło prawdy — używane przez game.start_new_game ORAZ arena.build_arena_world
+# (P29.75c: arena wcześniej NIE aplikowała statów → postać miała mod +0 na
+# wszystkim i była bezużyteczna w walce).
+STAT_PROFILES: Dict[str, Dict[str, int]] = {
+    "office_worker":     {"STR": 8,  "DEX": 10, "CON": 9,  "INT": 14, "WIS": 11, "CHA": 12},
+    "mechanic":          {"STR": 13, "DEX": 12, "CON": 12, "INT": 13, "WIS": 9,  "CHA": 9},
+    "nurse":             {"STR": 9,  "DEX": 11, "CON": 11, "INT": 12, "WIS": 14, "CHA": 13},
+    "cook":              {"STR": 11, "DEX": 14, "CON": 12, "INT": 10, "WIS": 10, "CHA": 9},
+    "security_guard":    {"STR": 14, "DEX": 11, "CON": 13, "INT": 9,  "WIS": 9,  "CHA": 10},
+    "courier":           {"STR": 10, "DEX": 15, "CON": 12, "INT": 9,  "WIS": 11, "CHA": 9},
+    "student":           {"STR": 8,  "DEX": 10, "CON": 9,  "INT": 15, "WIS": 12, "CHA": 12},
+    "streamer":          {"STR": 8,  "DEX": 11, "CON": 9,  "INT": 11, "WIS": 9,  "CHA": 15},
+    "soldier":           {"STR": 14, "DEX": 12, "CON": 14, "INT": 9,  "WIS": 11, "CHA": 8},
+    "unemployed_hustler":{"STR": 9,  "DEX": 13, "CON": 10, "INT": 11, "WIS": 9,  "CHA": 14},
+    "janitor":           {"STR": 12, "DEX": 10, "CON": 14, "INT": 9,  "WIS": 11, "CHA": 8},
+    "paramedic":         {"STR": 10, "DEX": 12, "CON": 11, "INT": 13, "WIS": 14, "CHA": 10},
+    "opiekun_zwierzaka": {"STR": 9,  "DEX": 11, "CON": 10, "INT": 10, "WIS": 14, "CHA": 13},
+    "bezdomny":          {"STR": 9,  "DEX": 10, "CON": 9,  "INT": 9,  "WIS": 11, "CHA": 6},
+}
+
+
+def apply_background_stats(character, background: str) -> None:
+    """Ustawia staty postaci wg STAT_PROFILES danego background. No-op gdy
+    background nieznany (zostają domyślne BASE_STATS)."""
+    prof = STAT_PROFILES.get(background)
+    if not prof:
+        return
+    for stat, value in prof.items():
+        character.stats[stat] = value
+
+
 # P29.62 — „Przetrwanie", pasywka origin „bezdomny". Wyprowadzona z
 # `background` (nie osobne pole) — dzięki temu jest odporna na save/load
 # (background jest serializowany) i nie trzeba migrować starych zapisów.
@@ -138,6 +170,13 @@ class Character:
     run_death_cause: str = ""        # short tag e.g. "combat:bandzior" / "trap_self"
     run_death_cause_label: str = ""  # Polish display, e.g. "od ciosu Bandziora"
 
+    # P29.76 — XP + poziomy (DCC-faithful). `level`/`xp` napędzają progresję
+    # mocy; `unspent_stat_points` to nierozdane punkty atrybutów z awansów
+    # (gracz rozdaje je sam, jak w DCC). Skalowanie liczone w engine/leveling.py.
+    level: int = 1
+    xp: int = 0
+    unspent_stat_points: int = 0
+
     # ── Derived ──────────────────────────────────────────────────────────────
 
     def stat_mod(self, stat: str) -> int:
@@ -238,6 +277,10 @@ class Character:
             "run_max_floor_reached": self.run_max_floor_reached,
             "run_death_cause":       self.run_death_cause,
             "run_death_cause_label": self.run_death_cause_label,
+            # P29.76 — XP / poziomy
+            "level":                 self.level,
+            "xp":                    self.xp,
+            "unspent_stat_points":   self.unspent_stat_points,
         }
 
     @classmethod
@@ -275,4 +318,8 @@ class Character:
         c.run_max_floor_reached = int(d.get("run_max_floor_reached", 1))
         c.run_death_cause       = str(d.get("run_death_cause", "") or "")
         c.run_death_cause_label = str(d.get("run_death_cause_label", "") or "")
+        # P29.76 — XP/poziomy (back-compat: stare save'y = L1, 0 XP).
+        c.level                 = int(d.get("level", 1))
+        c.xp                    = int(d.get("xp", 0))
+        c.unspent_stat_points   = int(d.get("unspent_stat_points", 0))
         return c

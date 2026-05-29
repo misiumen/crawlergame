@@ -26,18 +26,19 @@ from ...engine.game import (
 # ── Arena variants catalog ──────────────────────────────────────────
 
 
-def test_4_variants_in_catalog():
-    """Wszystkie 4 warianty są zarejestrowane."""
+def test_variants_in_catalog():
+    """P29.75c — 5 wariantów (doszedł miniboss_sortownia: trójka Sortowni
+    = duel_1v1/miniboss_sortownia/boss_fight + triple_threat/trap_room)."""
     keys = {v.key for v in _arena.all_variants()}
-    assert keys == {"duel_1v1", "triple_threat",
-                    "boss_fight", "trap_room"}
+    assert keys == {"duel_1v1", "miniboss_sortownia", "boss_fight",
+                    "triple_threat", "trap_room"}
 
 
-def test_all_4_variants_enabled_after_cz2():
-    """Po cz.2: wszystkie 4 warianty enabled."""
+def test_all_variants_enabled():
+    """Wszystkie warianty enabled."""
     enabled = {v.key for v in _arena.all_variants() if v.enabled}
-    assert enabled == {"duel_1v1", "triple_threat",
-                       "boss_fight", "trap_room"}
+    assert enabled == {"duel_1v1", "miniboss_sortownia", "boss_fight",
+                       "triple_threat", "trap_room"}
 
 
 def test_variant_labels_are_polish():
@@ -54,11 +55,11 @@ def test_variant_labels_are_polish():
 
 
 def test_build_arena_world_for_duel_spawns_mob():
-    """duel_1v1 → world ma room z Tunelowy Szczurek."""
+    """P29.75c — duel_1v1 → wróg Sortowni: Rzeźnik z Zamrażarki."""
     w, floor = _arena.build_arena_world("duel_1v1")
     room = floor.rooms["arena_room"]
     mob_names = [e.fallback_name for e in room.entities]
-    assert "Tunelowy Szczurek" in mob_names
+    assert "Rzeźnik z Zamrażarki" in mob_names
 
 
 def test_build_arena_world_marks_arena_flag():
@@ -133,8 +134,9 @@ def test_game_start_arena_variant_transitions_to_arena_play():
     assert game.world.flags.get("arena_mode") is True
 
     room = game.world.current_floor.current_room()
-    assert any("Szczurek" in e.fallback_name
-               for e in room.entities)
+    # P29.75c — duel_1v1 spawnuje moba Sortowni (wróg = Rzeźnik z Zamrażarki).
+    from ...engine.entity import T_MONSTER
+    assert any(e.entity_type == T_MONSTER for e in room.entities)
 
 
 def test_game_start_unknown_variant_returns_false():

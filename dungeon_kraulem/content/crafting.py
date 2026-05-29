@@ -555,8 +555,8 @@ def make_crafted_entity(result_key: str, room_id: str = "",
         "improvised_knife":      ("1d6",   "physical", ["weapon","sharp","melee","one_handed"]),
         "improvised_spear":      ("1d8",   "physical", ["weapon","sharp","melee","two_handed","reach"]),
         "improvised_club":       ("1d6+1", "physical", ["weapon","heavy","melee","one_handed"]),
-        "improvised_garrote":    ("1d4",   "physical", ["weapon","silent","melee","one_handed"]),
-        "improvised_taser":      ("1d4",   "electric", ["weapon","electrical","melee","one_handed"]),
+        "improvised_garrote":    ("1d4+1", "physical", ["weapon","silent","melee","one_handed"]),
+        "improvised_taser":      ("1d4+1", "electric", ["weapon","electrical","melee","one_handed"]),
         "improvised_chembottle": ("1d6",   "acid",     ["weapon","chemical","throwable","one_handed"]),
     }
     damage_dice = "1d4"

@@ -67,6 +67,13 @@ _REVEAL_BY_SOURCE = {
         '{contents}',
         'Loch redystrybuuje. Statystycznie.',
     ],
+    # P29.76 — skrzynka za awans (DCC: każdy poziom = loot box).
+    'level_up': [
+        'System brzęczy triumfalnie: „AWANS POTWIERDZONY". Skrzynka '
+        'materializuje się w smudze światła i pęka.',
+        '{contents}',
+        'Konferansjer: „Rośniesz w siłę, zawodniku. Widownia to uwielbia."',
+    ],
 }
 
 
@@ -264,3 +271,26 @@ def attempt_open_box(game, intent) -> None:
             contents=contents_line,
         )
         game.log(formatted, LOG_SUCCESS)
+
+    # P29.76 / Feature#2 — wizualny reveal w stylu VS (hybryda: modal +
+    # lekka animacja). Log wyżej zostaje (dostępność + testy); overlay to
+    # „moment otwarcia". Generyczny dla każdego źródła skrzynki.
+    try:
+        game._box_reveal = {
+            "intro": template[0].format(
+                tier=tier, source_name=source_name or "",
+                tagline=tagline or "", contents=""),
+            "title": tier,
+            "rarity": state.get("rarity", "common"),
+            "content_lines": list(spawned_names),
+            "catchphrase": template[-1].format(
+                tier=tier, source_name=source_name or "",
+                tagline=tagline or "", contents=""),
+            "elapsed": 0.0, "shown": 0, "done": False,
+        }
+        # Mini-fanfara: reuse istniejącego dzwonka nagrody (audyt
+        # test_p29_13 wymaga assetu .wav dla każdego klucza play_sfx).
+        from ...ui import audio as _audio
+        _audio.play_sfx("sponsor_chime")
+    except Exception:
+        pass

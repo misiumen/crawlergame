@@ -18,7 +18,8 @@ from .room import RoomState
 from .entity import Entity, T_OBJECT, T_HAZARD, T_TERMINAL, T_MONSTER, T_SERVICE
 from ..systems.crawlers import make_random_crawler
 from ..content.items import make_item
-from ..content.data.entity_templates import ENV, HAZ, TERM, SVC, MON
+from ..content.data.entity_templates import (
+    ENV, HAZ, TERM, SVC, MON, apply_combat_profile)
 from ..content.data.floor_archetypes import FLOOR_ARCHETYPES
 from ..content import content_loader as cl
 
@@ -623,7 +624,7 @@ def _seed_to_entity(kind: str, key: str, room_id: str,
     if kind == "svc":
         return _entity_from_table(SVC, key, room_id, T_SERVICE)
     if kind == "mon":
-        return _entity_from_table(MON, key, room_id, T_MONSTER)
+        return _entity_from_table(MON, key, room_id, T_MONSTER, floor=floor_num)
     if kind == "item":
         return make_item(key, location_id=room_id)
     if kind == "npc":
@@ -637,11 +638,12 @@ def _seed_to_entity(kind: str, key: str, room_id: str,
     return None
 
 
-def _entity_from_table(table: Dict, key: str, room_id: str, etype: str):
+def _entity_from_table(table: Dict, key: str, room_id: str, etype: str,
+                       floor=None):
     proto = table.get(key)
     if proto is None:
         return None
-    return Entity(
+    ent = Entity(
         key=key, entity_type=etype,
         name_key=proto.get("name_key", ""),
         fallback_name=proto.get("fallback_name", key.replace("_"," ")),
@@ -655,6 +657,16 @@ def _entity_from_table(table: Dict, key: str, room_id: str, etype: str):
         attack_bonus=proto.get("attack_bonus", 0),
         damage_dice=proto.get("damage_dice", "1d4"),
     )
+    # P29.75 — KRYTYCZNE: bez tego damage_type/resists/vulnerable_to/
+    # immune_to/behavior z szablonu NIGDY nie trafiały na encję (główna
+    # ścieżka spawnu floor) — cała tabela słabości była martwa.
+    apply_combat_profile(ent, proto)
+    # P29.65 — łagodna krzywa głębokości (no-op gdy mob na swoim piętrze albo
+    # piętro domowe nieznane). Bazowe staty z MOB_COMBAT_STATS; depth dolicza tu.
+    if floor is not None:
+        from .balance import scale_for_floor
+        scale_for_floor(ent, floor, home_floor=proto.get("floor_min"))
+    return ent
 
 
 def _pick_template_for_role(role: str, rng: random.Random,
@@ -1179,7 +1191,7 @@ def _entity_from_table_mon(mkey: str, room_id: str, floor_num: int):
     tpl = MON.get(mkey)
     if not tpl:
         return None
-    return _entity_from_table(MON, mkey, room_id, T_MONSTER)
+    return _entity_from_table(MON, mkey, room_id, T_MONSTER, floor=floor_num)
 
 
 # ── P29.22 — Celebrity NPC placement ─────────────────────────────────────────

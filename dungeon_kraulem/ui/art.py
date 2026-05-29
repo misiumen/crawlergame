@@ -122,19 +122,31 @@ def enemy_archetype(entity) -> str:
 
 
 def enemy_art_keys(entity, biome: str = ""):
-    """Łańcuch kluczy portretu wroga (P29.74 — archetyp PER BIOM).
-      wrog_<klucz_moba>            — własny obrazek danego moba
-      wrog_<archetyp>_<biom>       — archetyp specyficzny dla biomu
-      wrog_<archetyp>              — neutralny ostatni ratunek (zwykle brak)
-    Dzięki temu „humanoid z intake" ≠ „humanoid z zoo"."""
+    """Łańcuch kluczy portretu wroga (P29.75 — konwencja BIOME-FIRST).
+
+    User nazywa pliki z prefiksem biomu z przodu (krótki człon klucza biomu),
+    np. dla biomu `intake_industrial` (krótko „intake", ogon „industrial"):
+      wrog_intake_tunnel_runt          — per mob, prefiks biomu
+      wrog_intake_warden               — per mob (klucz moba już ma „intake")
+      wrog_intake_humanoid_industrial  — per archetyp w biomie
+      wrog_humanoid                    — neutralny ostatni ratunek
+    Pierwszy istniejący plik wygrywa. Dzięki temu „humanoid z intake" ≠
+    „humanoid z zoo", a każdy mob należy wizualnie do swojego biomu."""
     out = []
-    k = getattr(entity, "key", None)
-    if k:
-        out.append(f"wrog_{k}")
+    mob = getattr(entity, "key", None)
     arch = enemy_archetype(entity)
-    if biome:
-        out.append(f"wrog_{arch}_{biome}")
-    out.append(f"wrog_{arch}")
+    head = biome.split("_")[0] if biome else ""             # intake
+    tail = biome.split("_", 1)[1] if (biome and "_" in biome) else ""  # industrial
+    if mob:
+        if head:
+            out.append(f"wrog_{head}_{mob}")    # wrog_intake_tunnel_runt
+        out.append(f"wrog_{mob}")               # wrog_intake_warden / legacy
+    if head:
+        if tail:
+            out.append(f"wrog_{head}_{arch}_{tail}")  # wrog_intake_humanoid_industrial
+        out.append(f"wrog_{head}_{arch}")             # wrog_intake_humanoid
+        out.append(f"wrog_{arch}_{biome}")            # legacy: wrog_humanoid_intake_industrial
+    out.append(f"wrog_{arch}")                         # wrog_humanoid
     return out
 
 

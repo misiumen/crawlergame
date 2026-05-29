@@ -49,7 +49,7 @@ FLOOR_BIOMES: Dict[str, FloorBiome] = {
 
     "intake_industrial": FloorBiome(
         key="intake_industrial",
-        name_pl="Strefa Aklimatyzacji",
+        name_pl="Sortownia Zawodników",
         theme_pl="Świetlówki nad głową drgają, automaty nie działają, "
                  "kamery sponsorów bujają się na przewodach.",
         floor_min=1, floor_max=2,

@@ -77,6 +77,10 @@ _QUICK_INTENTS = {
     "rest_long":     ["spij","śpij","sleep","wyspij","wyśpij","long rest"],
     "check_inventory": ["ekwipunek","plecak","inventory"],
     "check_character": ["postać","postac","karta","character"],
+    # P29.76 — otwórz picker rozdawania punktów atrybutu z awansów.
+    # Cue celowo specyficzne — bez bare „punkty" (kolidowało z „wzmocnij
+    # punkty" → upgrade_loadout).
+    "rozdaj_punkty": ["rozdaj punkty","rozdaj punkt","rozdaj atrybut","rozdaj","atrybuty"],
     "check_map":     ["mapa","map"],
     # ask_rumor is reserved for an NPC-side action; the journal tab cues
     # (plotki/rumors) now live in `check_beliefs` and route to the rumors
@@ -402,17 +406,18 @@ def parse(text: str, world=None) -> ActionIntent:
         return intent
 
     # ── P29.19 — Credit-sink commands ──────────────────────────────────────
-    # `trening <stat>`        → train_stat (80 kr → +1 to one stat, once per stat)
+    # `przebudowa <stat>` (alias trening) → train_stat (P29.76: RESPEC —
+    #   zdejmuje punkt ze statu i zwraca do puli do ponownego rozdania)
     # `łapówka <sponsor>`     → bribe_sponsor (20 kr → +2 attention)
     # `zamów pakiet [<sponsor>]` → call_pod (50 kr → spawn pod in room)
     # `wzmocnij hp|ac`        → upgrade_loadout (100 kr → +5 HP or +1 AC)
     import re as _re_cs
     train_re = _re_cs.compile(
-        r"^(?:trening|trenuj|trenowanie|train)\s+(.+)$")
+        r"^(?:przebudowa|przebuduj|respec|trening|trenuj|trenowanie|train)\s+(.+)$")
     tm = train_re.match(folded)
     if tm:
         intent.intent = "train_stat"
-        intent.verb = "trening"
+        intent.verb = "przebudowa"
         intent.targets.append(_strip_articles(tm.group(1)))
         intent.confidence = 0.9
         return intent
@@ -1307,6 +1312,7 @@ _LLM_INTENT_PASSTHROUGH = {
     "attack","defend","use","talk","intimidate","bribe","sneak","hide","flee",
     "craft","loot","open","close","hack","force","lockpick","throw_at","cast",
     "push_into","lure","perform","ask_rumor","check_inventory","check_character",
+    "rozdaj_punkty",
     "check_map","save","help","deploy","salvage","strip","harvest",
     # Prompt 07: memetic intent labels.
     "seed_belief","spread_rumor","create_taboo","issue_false_order",

@@ -12,7 +12,7 @@ placement, etc.).
 
 FLOOR_ARCHETYPES = {
     "survival_sprawl": {
-        "fallback_label": "Rozległa Strefa Aklimatyzacji",
+        "fallback_label": "Rozległa Sortownia Zawodników",
         "graph_shape": "wide_layered",
         "min_rooms": 16, "max_rooms": 20,
         "layer_size_min": 2, "layer_size_max": 4,

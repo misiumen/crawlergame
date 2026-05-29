@@ -65,10 +65,23 @@ def test_enemy_art_keys_chain():
                fallback_name="W", tags=["monster", "humanoid"])
     # Bez biomu: mob → archetyp neutralny.
     assert _art.enemy_art_keys(e) == ["wrog_intake_warden", "wrog_humanoid"]
-    # Z biomem: mob → archetyp-biom → archetyp neutralny (P29.74).
+    # Z biomem (P29.75 — BIOME-FIRST): prefiks krótkiego członu biomu z
+    # przodu, potem warianty archetypu. Pierwszy istniejący plik wygrywa.
     assert _art.enemy_art_keys(e, "intake_industrial") == [
-        "wrog_intake_warden", "wrog_humanoid_intake_industrial",
-        "wrog_humanoid"]
+        "wrog_intake_intake_warden", "wrog_intake_warden",
+        "wrog_intake_humanoid_industrial", "wrog_intake_humanoid",
+        "wrog_humanoid_intake_industrial", "wrog_humanoid"]
+
+
+def test_enemy_art_keys_biome_first_matches_user_files():
+    # Pliki usera dla Sortowni: wrog_intake_<mob>. Łańcuch MUSI je trafić
+    # PRZED neutralnym fallbackiem archetypu.
+    def mob(key, *tags):
+        return Entity(key=key, entity_type=T_MONSTER, fallback_name=key,
+                      tags=["monster", *tags])
+    for key in ("tunnel_runt", "freezer_carver", "biotech_inspector"):
+        keys = _art.enemy_art_keys(mob(key, "humanoid"), "intake_industrial")
+        assert keys[0] == f"wrog_intake_{key}"
 
 
 # ── Loader: None gdy brak pliku ─────────────────────────────────────

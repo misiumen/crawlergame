@@ -85,6 +85,7 @@ ITEM_TEMPLATES = {
                             rarity="common"),
     "cheap_knife":     dict(tags=["weapon","melee","sharp"], portable=True,
                             affordances=["inspect","attack","loot"],
+                            equip_state={"weapon_dice": "1d6+1"},  # P29.65 uncommon
                             rarity="uncommon"),
     "dead_phone":      dict(tags=["electronics","junk"], portable=True,
                             affordances=["inspect","loot"],
@@ -137,9 +138,12 @@ ITEM_TEMPLATES = {
     # Misc trophies referenced by monster_salvage tables (P24).
     "warden_baton":     dict(tags=["weapon","melee","electric"], portable=True,
                             affordances=["inspect","attack","loot"],
+                            equip_state={"weapon_dice": "1d6+1",   # P29.65 uncommon
+                                         "weapon_damage_type": "electric"},
                             rarity="uncommon"),
     "cleaver_handle":   dict(tags=["weapon","melee","sharp","junk"], portable=True,
                             affordances=["inspect","attack","loot"],
+                            equip_state={"weapon_dice": "1d6"},    # P29.65 common
                             rarity="common"),
     "planszetka_inspektora": dict(tags=["paper","sponsor_loot","data"], portable=True,
                             affordances=["inspect","loot","use"],
@@ -344,7 +348,7 @@ ITEM_TEMPLATES = {
     "mlot_kowalski_polorka": dict(
         tags=["weapon","melee","blunt","forge","oversized"], portable=True,
         affordances=["inspect","attack","loot","break"],
-        equip_state={"weapon_dice": "2d8+3",
+        equip_state={"weapon_dice": "2d6+3",   # P29.65 legendary (top kości)
                      "breaks_doors": True,
                      "on_equip_status":["encumbered"]},
         rarity="legendary"),
@@ -428,4 +432,14 @@ def make_item(key: str, location_id: str = "") -> Entity:
     if ent.state is None:
         ent.state = {}
     ent.state.setdefault("rarity", rarity)
+    # P29.65 — broń: kości ataku (weapon_dice) MUSZĄ trafić na encję jako
+    # damage_dice. Ścieżka walki (game.py) czyta `weapon.damage_dice`; bez tej
+    # kopii każda broń kontentowa zostawała na defaultcie Entity "1d4" i biła
+    # jak gołe ręce, mimo że equip_state nosił np. "1d10+2" (Bug #19).
+    weapon_dice = ent.state.get("weapon_dice")
+    if weapon_dice:
+        ent.damage_dice = weapon_dice
+    weapon_damage_type = ent.state.get("weapon_damage_type")
+    if weapon_damage_type:
+        ent.damage_type = weapon_damage_type
     return ent

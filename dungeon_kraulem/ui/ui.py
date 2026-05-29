@@ -1109,6 +1109,29 @@ def draw_sidebar(surf, world, layout=None, *, click_registry=None):
                f"{t('ui_credits', fallback='Kr')} {c.credits}",
          x + 14, cy, NORMAL_TEXT, L.font_small - 1); cy += 18
 
+    # P29.76 — Poziom + pasek XP + nudge o nierozdanych punktach atrybutu.
+    try:
+        from ..engine import leveling as _lvl
+        lvl = int(getattr(c, "level", 1) or 1)
+        cur_xp, need_xp = _lvl.xp_into_level(int(getattr(c, "xp", 0) or 0))
+        pts = int(getattr(c, "unspent_stat_points", 0) or 0)
+        head = f"Poziom {lvl}"
+        if pts > 0:
+            head += f"   ● {pts} pkt (rozdaj)"
+        text(surf, head, x + 14, cy,
+             ACCENT if pts > 0 else NORMAL_TEXT, L.font_small - 1); cy += 14
+        bw = w - 28
+        pygame.draw.rect(surf, (40, 44, 54), (x + 14, cy, bw, 7))
+        if need_xp > 0:
+            fillw = int(bw * max(0.0, min(1.0, cur_xp / float(need_xp))))
+            if fillw > 0:
+                pygame.draw.rect(surf, ACCENT2, (x + 14, cy, fillw, 7))
+        cy += 10
+        text(surf, f"XP {cur_xp}/{need_xp}", x + 14, cy, DIM_TEXT,
+             L.font_small - 2); cy += 16
+    except Exception:
+        pass
+
     # P28 (P27-UX-1) — fixed stat block in the right sidebar.
     # Previously stats only surfaced in `pomoc` log spam / journal
     # popup. Showing them here lets the player gauge their character
@@ -1274,6 +1297,79 @@ def draw_left_sidebar(surf, world, layout=None, *,
                 if cy > y + h - 24: break
     except Exception:
         pass
+
+
+# ── P29.76 / Feature#2 — reveal skrzynki (hybryda VS: modal + animacja) ──
+
+_BOX_RARITY_COLOR = {
+    "common":    (176, 141, 87),    # brąz
+    "uncommon":  (190, 196, 204),   # srebro
+    "rare":      (226, 188, 76),    # złoto
+    "epic":      (150, 205, 230),   # platyna
+    "legendary": (197, 122, 214),   # diament
+}
+
+
+def draw_box_reveal(surf, reveal):
+    """Wyśrodkowany modal otwarcia skrzynki w stylu Vampire Survivors
+    (hybryda): tytuł w kolorze rzadkości, zawartość ujawniana sekwencyjnie,
+    catchphrase + pulsująca ramka. Rysowany NA WIERZCHU stanu gry; sterowany
+    przez Game.update (animacja) i Game.draw (P29.76)."""
+    import math
+    sw, sh = surf.get_size()
+    col = _BOX_RARITY_COLOR.get(reveal.get("rarity") or "common",
+                                (176, 141, 87))
+    content = reveal.get("content_lines") or []
+    shown = int(reveal.get("shown", 0))
+    done = bool(reveal.get("done"))
+    elapsed = float(reveal.get("elapsed", 0.0))
+
+    def _wrap(s, maxch):
+        out, cur = [], ""
+        for wd in str(s).split():
+            if cur and len(cur) + len(wd) + 1 > maxch:
+                out.append(cur); cur = wd
+            else:
+                cur = (cur + " " + wd).strip()
+        if cur:
+            out.append(cur)
+        return out or [""]
+
+    # Przyciemnienie tła.
+    veil = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    veil.fill((0, 0, 0, 150))
+    surf.blit(veil, (0, 0))
+
+    w = min(560, sw - 120)
+    maxch = max(24, (w - 44) // 8)
+    intro_lines = _wrap(reveal.get("intro") or "", maxch)
+    cat_lines = _wrap(reveal.get("catchphrase") or "", maxch) if done else []
+    n = len(intro_lines) + 2 + max(1, len(content)) + (len(cat_lines) + 1 if done else 0)
+    h = min(sh - 60, 64 + n * 22)
+    x = (sw - w) // 2
+    y = (sh - h) // 2
+    pygame.draw.rect(surf, (18, 20, 28), (x, y, w, h))
+    pulse = 2 + int(2 * (0.5 + 0.5 * math.sin(elapsed / 140.0)))
+    pygame.draw.rect(surf, col, (x, y, w, h), pulse)
+
+    cy = y + 16
+    for ln in intro_lines:
+        text(surf, ln, x + 20, cy, DIM_TEXT, 14); cy += 18
+    cy += 4
+    burst = "✦  ▣  ✦" if shown > 0 else "▣"
+    text(surf, f"{burst}  {reveal.get('title', 'Skrzynka')}",
+         x + 20, cy, col, 20); cy += 30
+    if content:
+        for line in content[:shown]:
+            text(surf, f"   ◈ {line}", x + 20, cy, col, 16); cy += 22
+    else:
+        text(surf, "   (pusto)", x + 20, cy, DIM_TEXT, 16); cy += 22
+    if done:
+        cy += 6
+        for ln in cat_lines:
+            text(surf, ln, x + 20, cy, NORMAL_TEXT, 15); cy += 20
+        text(surf, "[dowolny klawisz / klik — zamknij]", x + 20, cy,
+             DIM_TEXT, 13)
 
 
 # ── P29.60 Arena testowa — menu screens ────────────────────────────
@@ -2398,6 +2494,15 @@ def draw_combat_arena(surf, world, cs, layout=None, *, click_registry=None):
     """
     L = _resolve_layout(layout)
     x, y, w, h = L.room_rect
+    # P29.65 game-juice — screen-shake areny: mały jitter na krytach/ciężkich
+    # trafieniach (czytane z world.combat_fx, wygaszane w game.update(dt)).
+    fx = getattr(world, "combat_fx", None)
+    if isinstance(fx, dict) and fx.get("shake", 0.0) > 0:
+        import random as _shrng
+        _mag = min(5, max(1, int(fx["shake"] / 45)))
+        x += _shrng.randint(-_mag, _mag)
+        y += _shrng.randint(-_mag, _mag)
+    fx_positions = {}
     panel(surf, (x, y, w, h))
     floor = world.current_floor
     room = floor.current_room() if floor else None
@@ -2476,18 +2581,64 @@ def draw_combat_arena(surf, world, cs, layout=None, *, click_registry=None):
         cy += 14
         cy = _draw_enemy_card_row(surf, world, cs, ranged_ids,
                                   cards_x, cy, cards_w, card_h,
-                                  L, sel_id, click_registry)
+                                  L, sel_id, click_registry, fx_positions)
         cy += 6
     if engaged_ids:
         text(surf, "ZWARCIE:", cards_x, cy, DANGER, L.font_small - 1, True)
         cy += 14
         cy = _draw_enemy_card_row(surf, world, cs, engaged_ids,
                                   cards_x, cy, cards_w, card_h,
-                                  L, sel_id, click_registry)
+                                  L, sel_id, click_registry, fx_positions)
 
     # Player chip at the bottom of the arena.
     chip_y = y + h - chip_h - 10
     _draw_player_combat_chip(surf, world, x + 14, chip_y, w - 28, chip_h, L)
+    # P29.65 — błyski trafień + pływające liczby obrażeń (game-juice).
+    fx_positions["player"] = (x + 14, chip_y, w - 28, chip_h)
+    if isinstance(fx, dict):
+        _draw_combat_fx(surf, fx, fx_positions, L)
+
+
+def _draw_combat_fx(surf, fx, positions, L):
+    """P29.65 game-juice — rysuje błyski trafień (czerwony tint na karcie/chipie,
+    który oberwał) i pływające liczby obrażeń (unoszą się i gasną). `positions`
+    mapuje anchor (entity_id albo „player") -> (x,y,w,h). Defensywne — wszelkie
+    braki pozycji/atrybutów po prostu pomija."""
+    if not isinstance(fx, dict) or not positions:
+        return
+    # Błyski na trafionym celu.
+    for anchor, ms in list((fx.get("flash") or {}).items()):
+        rect = positions.get(anchor)
+        if not rect:
+            continue
+        a = max(0, min(120, int(120 * (ms / 240.0))))
+        try:
+            ov = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
+            ov.fill((255, 60, 60, a))
+            surf.blit(ov, (rect[0], rect[1]))
+        except Exception:
+            pass
+    # Pływające liczby obrażeń.
+    for f in (fx.get("floaters") or []):
+        rect = positions.get(f.get("anchor"))
+        if not rect:
+            continue
+        ttl = f.get("ttl", 950.0) or 950.0
+        t = max(0.0, min(1.0, f.get("age", 0.0) / ttl))
+        rise = int(28 * t)
+        alpha = max(0, int(255 * (1.0 - t)))
+        try:
+            fnt = font(L.font_small + (6 if f.get("big") else 1),
+                       bold=bool(f.get("big")))
+            img = fnt.render(str(f.get("text", "")), True,
+                             f.get("color", (235, 235, 235)))
+            img = img.convert_alpha()
+            img.set_alpha(alpha)
+            ix = rect[0] + rect[2] // 2 - img.get_width() // 2
+            iy = rect[1] - 6 - rise
+            surf.blit(img, (ix, iy))
+        except Exception:
+            pass
 
 
 def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
@@ -2562,9 +2713,11 @@ def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
 
 
 def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
-                         sel_id, click_registry):
+                         sel_id, click_registry, positions=None):
     """Lay out enemy cards horizontally in a row. Returns the y after
-    the row ends, so the caller can stack the next band beneath."""
+    the row ends, so the caller can stack the next band beneath.
+    P29.65: gdy podano `positions`, zapisuje anchor karty (eid -> rect) do
+    kotwiczenia game-juice (pływające liczby + błysk)."""
     if not eids:
         return y
     n = len(eids)
@@ -2575,6 +2728,8 @@ def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
         ent = world.get(eid)
         if ent is None:
             continue
+        if positions is not None:
+            positions[eid] = (cx, y, card_w, h)
         is_sel = (eid == sel_id)
         # Card frame.
         col_border = DANGER if is_sel else BORDER
