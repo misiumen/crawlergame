@@ -54,6 +54,36 @@ def _fallback(key: str, w: int, h: int):
     return surf
 
 
+def load_image(key: str, w: int, h: int):
+    """P29.71 — jak load_icon, ale BEZ proceduralnego fallbacku: zwraca
+    przeskalowaną Surface gdy plik `<key>.png` istnieje, albo None.
+    Pozwala warstwie art.py zdecydować o własnym fallbacku (gradient /
+    sylwetka) zamiast brzydkiego prostokąta z literką."""
+    if not _HAS_PYGAME:
+        return None
+    ck = ("img", key, w, h)
+    if ck in _cache:
+        return _cache[ck]
+    p = _resolve(key)
+    if p is None:
+        _cache[ck] = None
+        return None
+    try:
+        loaded = pygame.image.load(p).convert_alpha()
+        if loaded.get_width() != w or loaded.get_height() != h:
+            loaded = pygame.transform.smoothscale(loaded, (w, h))
+        _cache[ck] = loaded
+        return loaded
+    except pygame.error:
+        _cache[ck] = None
+        return None
+
+
+def has_image(key: str) -> bool:
+    """True gdy istnieje plik obrazu dla klucza (bez ładowania)."""
+    return _resolve(key) is not None
+
+
 def load_icon(key: str, w: int = 32, h: int = 32):
     if not _HAS_PYGAME:
         return None

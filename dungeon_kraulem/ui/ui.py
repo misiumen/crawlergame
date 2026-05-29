@@ -781,11 +781,13 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None):
         pass
 
     x, y, w, h = L.room_rect
-    # P24.6 (P24.5-1): drop the dark panel fill — the global DARK_BG
-    # already provides the visual ground. Without the inner-panel
-    # rect we no longer get a "dark void" of unused space below the
-    # content. A subtle separator line on the left edge gives the
-    # column a soft delimiter without boxing it in.
+    # P29.71 — ilustracja pokoju w tle (PNG per biom jeśli jest, inaczej
+    # gradient per biom). Treść rysuje się na wierzchu (tło przyciemnione).
+    try:
+        from . import art as _art
+        _art.draw_room_background(surf, room, (x, y, w, h))
+    except Exception:
+        pass
     pygame.draw.line(surf, BORDER, (x, y), (x, y + h), 1)
 
     # P24.6 (P24.5-3): clearly-labeled mood placeholder. Reads as
@@ -916,8 +918,22 @@ def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
     cy = y + 8
     text(surf, t("ui_enemy_header", fallback="CEL"),
          x + 14, cy, DANGER, L.font_small, True); cy += 18
-    text(surf, target.display_name(), x + 14, cy, BRIGHT_TEXT,
-         L.font_small, True); cy += 18
+    # P29.71 — portret wroga (PNG per klucz/archetyp, inaczej sylwetka).
+    port = max(40, min(64, w // 3))
+    try:
+        from . import art as _art
+        _art.draw_enemy_portrait(surf, target,
+                                 (x + w - port - 10, y + 6, port, port))
+    except Exception:
+        pass
+    name_w = w - 28 - port
+    nm = target.display_name()
+    f_nm = font(L.font_small, bold=True)
+    if f_nm.size(nm)[0] > name_w:
+        while nm and f_nm.size(nm + "…")[0] > name_w:
+            nm = nm[:-1]
+        nm += "…"
+    text(surf, nm, x + 14, cy, BRIGHT_TEXT, L.font_small, True); cy += 18
     hp_bar(surf, x + 14, cy, w - 28, 12, target.hp, target.max_hp); cy += 16
     text(surf, f"HP {target.hp}/{target.max_hp}   AC {target.ac}",
          x + 14, cy, NORMAL_TEXT, L.font_small - 1); cy += 16
