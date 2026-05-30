@@ -29,14 +29,15 @@ Box = Tuple[float, float, float, float]
 # ── Per-portrait hitboxes (hand-traced from assets/images/wrog_intake_*) ──
 
 HITBOXES: Dict[str, Dict[str, Box]] = {
-    # Big butcher, centered, broad apron torso, cleaver low-left.
+    # Big butcher, centered, broad apron torso, cleaver low-left. Big bald
+    # head sits high; shoulders very wide.
     "wrog_intake_freezer_carver": {
-        "head":  (0.44, 0.11, 0.13, 0.11),
-        "torso": (0.34, 0.23, 0.31, 0.38),
-        "l_arm": (0.27, 0.26, 0.11, 0.30),
-        "r_arm": (0.62, 0.26, 0.11, 0.28),
-        "l_leg": (0.40, 0.62, 0.10, 0.32),
-        "r_leg": (0.51, 0.62, 0.11, 0.32),
+        "head":  (0.43, 0.08, 0.15, 0.12),
+        "torso": (0.34, 0.22, 0.31, 0.39),
+        "l_arm": (0.26, 0.24, 0.11, 0.31),
+        "r_arm": (0.62, 0.24, 0.12, 0.30),
+        "l_leg": (0.40, 0.61, 0.10, 0.33),
+        "r_leg": (0.51, 0.61, 0.11, 0.33),
     },
     # Armored warden, wide stance, helmet top-center, chainsaw left.
     "wrog_intake_warden": {
@@ -74,18 +75,20 @@ HITBOXES: Dict[str, Dict[str, Box]] = {
         "l_leg": (0.40, 0.60, 0.11, 0.34),
         "r_leg": (0.51, 0.60, 0.11, 0.34),
     },
-    # Rat — side view, facing screen-left. Quadruped zones.
+    # Rat — side view, facing screen-left, crouched; snout low-left,
+    # haunches hump up-right. Quadruped zones.
     "wrog_intake_tunnel_runt": {
-        "head":  (0.10, 0.52, 0.22, 0.22),
-        "torso": (0.30, 0.42, 0.40, 0.26),
-        "l_leg": (0.28, 0.66, 0.16, 0.27),   # front legs
-        "r_leg": (0.55, 0.64, 0.18, 0.30),   # hind legs
+        "head":  (0.09, 0.48, 0.22, 0.22),
+        "torso": (0.30, 0.40, 0.38, 0.27),
+        "l_leg": (0.28, 0.64, 0.16, 0.29),   # front legs
+        "r_leg": (0.54, 0.62, 0.18, 0.31),   # hind legs
     },
-    # Dog-beast — side view, facing screen-left, lunging. Quadruped.
+    # Dog-beast — side view, facing screen-left, snarling head low-left,
+    # high hunched shoulders, lunging. Quadruped.
     "wrog_intake_beast_industrial": {
-        "head":  (0.10, 0.38, 0.24, 0.26),
-        "torso": (0.34, 0.30, 0.40, 0.30),
-        "l_leg": (0.22, 0.60, 0.18, 0.34),   # front legs
+        "head":  (0.09, 0.42, 0.23, 0.24),
+        "torso": (0.32, 0.30, 0.38, 0.30),
+        "l_leg": (0.24, 0.60, 0.18, 0.34),   # front legs
         "r_leg": (0.58, 0.58, 0.20, 0.36),   # hind legs
     },
 }
