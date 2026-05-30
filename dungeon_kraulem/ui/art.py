@@ -172,6 +172,16 @@ _ARCH_COLOR = {
 }
 
 
+def resolve_enemy_art_key(entity, biome: str = ""):
+    """First portrait key whose PNG actually exists (same chain as
+    `draw_enemy_portrait`), else None. Lets the VATS layer pick limb
+    hitboxes tuned for the specific portrait (P30)."""
+    for key in enemy_art_keys(entity, biome):
+        if _assets.has_image(key):
+            return key
+    return None
+
+
 def draw_enemy_portrait(surf, entity, rect, biome: str = "") -> bool:
     """Portret wroga w `rect`: PNG jeśli jest (per mob / per archetyp-biom),
     inaczej prosta sylwetka proceduralna wg archetypu. Zwraca True gdy PNG."""
