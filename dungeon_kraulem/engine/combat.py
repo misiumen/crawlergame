@@ -51,6 +51,12 @@ STATUS_CHILLED      = "chilled"     # halves DEX-derived stats
 # Prompt 26a — maim statuses (body-part breakage).
 STATUS_DISARMED     = "disarmed"    # arm broken — main attack -3, drops weapon
 STATUS_SLOWED       = "slowed"      # leg broken — to-hit -2, can't approach
+# P30 — enemy defensive stance (set by the "defend" AI action). Raises the
+# enemy's effective AC while active; ticks down like any other status.
+STATUS_GUARDING     = "guarding"    # enemy braced — +AC, harder to hit
+# P30 — enrage: berserker-type at low HP / broken morale. Boosts its damage
+# output but it stops defending. Cosmetic-ish marker read by enemy_ai.
+STATUS_ENRAGED      = "enraged"
 
 _STATUS_PL = {
     STATUS_PRONE:        "przewrócony",
@@ -67,6 +73,8 @@ _STATUS_PL = {
     STATUS_CHILLED:      "wyziębiony",
     STATUS_DISARMED:     "rozbrojony",
     STATUS_SLOWED:       "okulały",
+    STATUS_GUARDING:     "w gardzie",
+    STATUS_ENRAGED:      "rozjuszony",
     # P27.5 (P27-UX-10): "shaken" was emitted by intimidate but never
     # had a PL label — leaked as raw English in the enemy panel.
     "shaken":            "roztrzęsiony",
@@ -149,6 +157,14 @@ class CombatState:
     # whose turn it normally is) and reset to False.
     free_attack_pending: bool = False
 
+    # P30 — telegraphed enemy intentions. Each living participant gets a
+    # planned intent for its NEXT turn, surfaced to the player during the
+    # player phase (category only — never exact numbers). dict eid →
+    # {"category", "kind", "special_key", "label_pl"}. Re-planned at the
+    # end of every enemy turn and at combat start. Round-trips through
+    # save/load so a reloaded fight still shows what's coming.
+    enemy_intents: Dict[int, Dict[str, Any]] = field(default_factory=dict)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "active": self.active, "round": self.round, "side": self.side,
@@ -164,6 +180,8 @@ class CombatState:
             "targeted_zone_by_eid": {str(k): v for k, v
                                      in (self.targeted_zone_by_eid or {}).items()},
             "free_attack_pending": bool(self.free_attack_pending),
+            "enemy_intents": {str(k): dict(v) for k, v
+                              in (self.enemy_intents or {}).items()},
         }
 
     @classmethod
@@ -182,6 +200,8 @@ class CombatState:
         cs.selected_target_id = int(sti) if sti is not None else None
         tzb = d.get("targeted_zone_by_eid") or {}
         cs.targeted_zone_by_eid = {int(k): str(v) for k, v in tzb.items()}
+        ei = d.get("enemy_intents") or {}
+        cs.enemy_intents = {int(k): dict(v) for k, v in ei.items()}
         return cs
 
 
@@ -252,6 +272,13 @@ def start_combat(room, world, *, triggered_by: str = "player_attack") -> CombatS
     # rozstawiona pułapka łapie pierwszego mob'a od razu na start runy 1.
     try:
         _trigger_deployed_trap_on_combat_start(room, world, cs, hostiles)
+    except Exception:
+        pass
+    # P30 — telegraph round-1 intentions so the player sees what each
+    # hostile is about to do before committing their first action.
+    try:
+        from . import enemy_ai as _ai
+        _ai.plan_intents(world, cs)
     except Exception:
         pass
     return cs
@@ -450,7 +477,8 @@ def tick_statuses(entity) -> None:
 @dataclass
 class EnemyAction:
     actor_id: int
-    kind: str                # "attack" / "approach" / "flee" / "shock" / "wait"
+    kind: str                # "attack"/"approach"/"back_off"/"flee"/
+                             # "wait"/"defend"/"special"
     note: str = ""
     damage: int = 0
     target_status: Optional[str] = None
@@ -459,65 +487,34 @@ class EnemyAction:
     # combat participant (a rival faction) instead of the player.
     # None means "target player" (legacy default).
     target_id: Optional[int] = None
+    # P30 — intent telegraphing + charged specials.
+    category: str = ""              # display bucket (see enemy_ai.CATEGORIES)
+    special_key: Optional[str] = None
+    label_pl: str = ""              # short PL intent label for the UI
+
+    def intent_dict(self) -> Dict[str, Any]:
+        """Compact, save-safe view used for the telegraphed intent."""
+        return {
+            "category": self.category or "attack",
+            "kind": self.kind,
+            "special_key": self.special_key,
+            "label_pl": self.label_pl or "",
+        }
 
 
 def choose_enemy_action(world, cs: CombatState, enemy) -> EnemyAction:
-    """Pick a v1 action for an enemy based on behavior + state + band.
-    Deterministic + cheap; no LLM."""
-    eid = enemy.entity_id
-    band = cs.bands.get(eid, BAND_ENGAGED)
-    behavior = default_behavior(enemy)
-    hp_ratio = (enemy.hp / max(1, enemy.max_hp)) if enemy.max_hp else 1.0
-    # Hard guard: if a status blocks acting, return "wait".
-    if has_status(enemy, STATUS_STUNNED) or has_status(enemy, STATUS_PRONE):
-        return EnemyAction(actor_id=eid, kind="wait",
-                           note="stunned/prone — straci turę")
+    """Pick an action for an enemy.
 
-    if behavior == BEHAVIOR_COWARD and hp_ratio < 0.4:
-        return EnemyAction(actor_id=eid, kind="flee",
-                           note="cowardly retreat")
-    if behavior == BEHAVIOR_RANGED:
-        if band == BAND_ENGAGED:
-            # Try to back away.
-            return EnemyAction(actor_id=eid, kind="back_off",
-                               note="ranged enemy backs off")
-        return EnemyAction(actor_id=eid, kind="attack",
-                           damage=_enemy_attack_damage(enemy, ranged=True),
-                           note="ranged shot")
-    if behavior == BEHAVIOR_MACHINE:
-        if has_status(enemy, STATUS_SHOCKED):
-            return EnemyAction(actor_id=eid, kind="wait", note="shock recovery")
-        if band == BAND_AT_RANGE:
-            return EnemyAction(actor_id=eid, kind="approach",
-                               note="machine closes distance")
-        return EnemyAction(actor_id=eid, kind="attack",
-                           damage=_enemy_attack_damage(enemy))
-    if behavior == BEHAVIOR_GUARD:
-        # Guards block the exit, hit but conservative.
-        if band == BAND_AT_RANGE:
-            return EnemyAction(actor_id=eid, kind="approach",
-                               note="guard advances")
-        return EnemyAction(actor_id=eid, kind="attack",
-                           damage=max(1, _enemy_attack_damage(enemy) - 1),
-                           note="guard strikes")
-    if behavior == BEHAVIOR_SWARM:
-        # Swarm always engages; small damage.
-        if band == BAND_AT_RANGE:
-            return EnemyAction(actor_id=eid, kind="approach")
-        return EnemyAction(actor_id=eid, kind="attack",
-                           damage=max(1, _enemy_attack_damage(enemy) - 2))
-    # Berserker default.
-    if band == BAND_AT_RANGE:
-        return EnemyAction(actor_id=eid, kind="approach", note="berserker charges")
-    action = EnemyAction(actor_id=eid, kind="attack",
-                       damage=_enemy_attack_damage(enemy, heavy=True),
-                       note="berserker hit")
-    # P26b: faction-aware retarget.
-    rival_id = _pick_rival_target(world, cs, enemy)
-    if rival_id is not None:
-        action.target_id = rival_id
-        action.note = action.note + " → rywal"
-    return action
+    P30: this now delegates to the utility-scoring planner in
+    `engine.enemy_ai`, which weighs candidate actions by the fight state
+    (player HP / exposure / own HP / morale / band / allies) instead of a
+    flat behavior `if/elif`. The result is still a plain `EnemyAction`,
+    so every existing caller (and the faction-retarget contract the
+    P26b tests assert) keeps working. The planner sets `target_id` via
+    `_pick_rival_target` for damaging actions, same as before.
+    """
+    from . import enemy_ai as _ai
+    return _ai.plan_action(world, cs, enemy)
 
 
 def _faction_tags(entity) -> set:

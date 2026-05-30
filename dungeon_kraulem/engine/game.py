@@ -5229,6 +5229,7 @@ class Game:
 
     def _run_enemy_turn(self, cs) -> None:
         from . import combat as _cmb
+        from . import enemy_ai as _ai
         from . import time_system as ts
         from . import systemic as _sys
         import random as _r_sys
@@ -5237,20 +5238,41 @@ class Game:
         if room is None:
             return
         cs.side = "enemies"
+        # P30 — morale: anyone who fell since the last enemy turn (player
+        # kills during their phase, DoT, crossfire) rattles the survivors.
+        self._combat_morale_check_deaths(cs)
         for eid in list(cs.participants):
             ent = self.world.get(eid)
             if ent is None or not ent.is_alive():
                 continue
+            # P30 — read the telegraphed intent. If the enemy was winding
+            # up a special and is now stunned/prone (player interrupt) or
+            # systemically paralysed, the special fizzles.
+            intent = (cs.enemy_intents or {}).get(eid) or {}
+            was_charging = (intent.get("category") == _ai.CAT_SPECIAL)
+            blocked = (_cmb.has_status(ent, _cmb.STATUS_STUNNED)
+                       or _cmb.has_status(ent, _cmb.STATUS_PRONE))
             # P29.63 — paraliż systemowy (porażony/zamrożony) może
             # zabrać wrogowi turę. Walka przestaje być wymianą ciosów.
             if _sys.roll_stun(ent, _r_sys):
-                self.log(f"{ent.display_name()} — spazm mięśni, "
-                         f"traci turę.", LOG_SUCCESS)
+                if was_charging:
+                    self.log(f"{ent.display_name()} — spazm przerywa "
+                             f"szykowany cios!", LOG_SUCCESS)
+                else:
+                    self.log(f"{ent.display_name()} — spazm mięśni, "
+                             f"traci turę.", LOG_SUCCESS)
+                _ai.tick_cooldowns(ent)
                 continue
-            action = _cmb.choose_enemy_action(self.world, cs, ent)
+            if blocked and was_charging:
+                self.log(f"{ent.display_name()} szykował cios, ale "
+                         f"powalony — atak się rozsypuje!", LOG_SUCCESS)
+            action = _ai.realize_intent(self.world, cs, ent)
             self._apply_enemy_action(cs, ent, action)
+            _ai.tick_cooldowns(ent)
             if not ch.is_alive():
                 break
+        # Catch deaths that happened during this enemy turn (crossfire).
+        self._combat_morale_check_deaths(cs)
         # Tick statuses on all participants (including player via clocks on character)
         for eid in list(cs.participants):
             ent = self.world.get(eid)
@@ -5276,6 +5298,37 @@ class Game:
             _cmb.end_combat(room, self.world, outcome="all_down")
             self.log(t("feedback_combat_won",
                        fallback="Wszyscy wrogowie pokonani."), LOG_SUCCESS)
+            return
+        # P30 — telegraph the next round's intentions for the player phase.
+        try:
+            _ai.plan_intents(self.world, cs)
+        except Exception:
+            pass
+
+    def _combat_morale_check_deaths(self, cs) -> None:
+        """P30 — detect participants who died since the last check and shake
+        the survivors' morale. Uses a transient snapshot on the combat state
+        (recomputed fresh after load, so a reloaded fight never double-dips)."""
+        from . import enemy_ai as _ai
+        cur_alive = {eid for eid in (cs.participants or [])
+                     if (self.world.get(eid) is not None
+                         and self.world.get(eid).is_alive())}
+        prev = getattr(cs, "_alive_snapshot", None)
+        if prev is None:
+            try:
+                cs._alive_snapshot = set(cur_alive)
+            except Exception:
+                pass
+            return
+        for dead in (prev - cur_alive):
+            for ent2, mor in _ai.note_ally_down(self.world, cs, dead):
+                if mor <= 30:
+                    self.log(f"{ent2.display_name()} traci animusz — "
+                             f"towarzysz padł.", LOG_SUCCESS)
+        try:
+            cs._alive_snapshot = set(cur_alive)
+        except Exception:
+            pass
 
     def _spawn_combat_fx(self, anchor, txt, color, *, big=False, shake=0.0):
         """P29.65 game-juice: przejściowy efekt walki — pływająca liczba
@@ -5324,7 +5377,19 @@ class Game:
             ent.state["fled"] = True
             ent.hp = 0     # treated as no-longer-in-fight
             return
-        if action.kind in ("attack",):
+        if action.kind == "defend":
+            # P30 — defensive stance: enemy braces, harder to hit this round.
+            _cmb.add_status(ent, _cmb.STATUS_GUARDING, 1)
+            self.log(f"{name} unosi gardę i czeka na okazję.", LOG_NORMAL)
+            return
+        if action.kind in ("attack", "special"):
+            is_special = (action.kind == "special")
+            if is_special:
+                from . import enemy_ai as _ai
+                spec_label = action.label_pl or "potężny cios"
+                self.log(f"⚠ {name}: {action.note or spec_label}!",
+                         LOG_DANGER)
+                _ai.commit_special_used(ent)
             dmg = int(action.damage or 1)
             e_crit = False
             # P27.6 (P27-UX-7): symmetric enemy roll log. Player only
@@ -5455,6 +5520,19 @@ class Game:
             # Heavy hits cause bleeding sometimes.
             if dmg >= 5:
                 _cmb.add_status(ch, _cmb.STATUS_WOUNDED, 4)
+            # P30 — landing a blow buoys the attacker's morale; charged
+            # specials also inflict their telegraphed status on the player.
+            try:
+                from . import enemy_ai as _ai
+                _ai.note_hit_player(ent, dmg, ch.max_hp)
+                if is_special and action.target_status:
+                    _cmb.add_status(ch, action.target_status,
+                                    int(action.target_status_duration or 1))
+                    self.log(f"  cios pozostawia efekt: "
+                             f"{_cmb.status_label(action.target_status, 'pl')}.",
+                             LOG_WARN)
+            except Exception:
+                pass
             # P29.8 — check death immediately after the hit lands, not
             # only at end-of-round. Without this, multiple enemies in
             # one round can each land a "killing" blow before the
@@ -5594,6 +5672,8 @@ class Game:
         except Exception:
             pass
         dc = max(6, getattr(target, "ac", 10))
+        # P30 — enemy defensive stance raises the bar to land a clean hit.
+        if _cmb.has_status(target, _cmb.STATUS_GUARDING):  dc += 3
         total = raw + mod + to_hit_bonus
         # Status modifiers
         if _cmb.has_status(target, _cmb.STATUS_PRONE):     total += 2
