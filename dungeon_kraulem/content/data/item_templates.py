@@ -265,4 +265,12 @@ ITEM_TEMPLATES = {
         "fallback_description": "Schemat tłumika do broni. Precyzyjne wymiary.",
         "affordances": ["inspect", "loot", "use", "read"], "value": 9,
     },
+    "sponsor_kepi": {
+        "type": "wearable",
+        "tags": ["slot:head", "sponsor", "badge"],
+        "fallback_name": "czapka sponsora",
+        "fallback_description": "Furażerka w barwach sponsora, z naszywką-logo. Nie chroni głowy, ale kamery cię kochają.",
+        "affordances": ["inspect", "loot", "wear"],
+        "value": 3,
+    },
 }

@@ -2865,7 +2865,10 @@ class Game:
                                        triggered_by="arena_start")
                 self.log(t("feedback_combat_start",
                            fallback="Walka się zaczyna."), LOG_WARN)
-                self._run_enemy_turn(cs)
+                # P30 — do NOT run an enemy turn here. start_combat already
+                # telegraphs each hostile's intent; the player should act
+                # first and respond to that telegraph, not eat a free hit
+                # the instant the arena loads.
         except Exception:
             pass
 

@@ -36,8 +36,8 @@ HITBOXES: Dict[str, Dict[str, Box]] = {
         "torso": (0.34, 0.22, 0.31, 0.39),
         "l_arm": (0.26, 0.24, 0.11, 0.31),
         "r_arm": (0.62, 0.24, 0.12, 0.30),
-        "l_leg": (0.40, 0.61, 0.10, 0.33),
-        "r_leg": (0.51, 0.61, 0.11, 0.33),
+        "l_leg": (0.36, 0.61, 0.12, 0.34),
+        "r_leg": (0.52, 0.61, 0.12, 0.34),
     },
     # Armored warden, wide stance, helmet top-center, chainsaw left.
     "wrog_intake_warden": {
