@@ -930,20 +930,10 @@ def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
     cy = y + 8
     text(surf, t("ui_enemy_header", fallback="CEL"),
          x + 14, cy, DANGER, L.font_small, True); cy += 18
-    # P29.71 — portret wroga (PNG per klucz/archetyp, inaczej sylwetka).
-    port = max(40, min(64, w // 3))
-    try:
-        from . import art as _art
-        _biome = ""
-        _f = getattr(world, "current_floor", None)
-        if _f is not None:
-            _biome = getattr(_f, "biome_key", "") or ""
-        _art.draw_enemy_portrait(surf, target,
-                                 (x + w - port - 10, y + 6, port, port),
-                                 biome=_biome)
-    except Exception:
-        pass
-    name_w = w - 28 - port
+    # P30 — the portrait now lives in the targeting silhouette below (it IS
+    # the body), so the old small top-right headshot is dropped to avoid
+    # showing the same art twice. Name uses the full width.
+    name_w = w - 28
     nm = target.display_name()
     f_nm = font(L.font_small, bold=True)
     if f_nm.size(nm)[0] > name_w:
@@ -969,7 +959,7 @@ def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
     sil_y = cy
     _draw_silhouette(surf, target, plan, sil_x, sil_y, sil_w, sil_h, L,
                      selected_zone, cs=cs,
-                     click_registry=click_registry)
+                     click_registry=click_registry, world=world)
     cy = sil_y + sil_h + 6
 
     # Preview line for selected zone.
@@ -2714,7 +2704,8 @@ def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
     _draw_silhouette(surf, target, plan, x + 6, cy, w - 12, sil_h, L,
                      selected_zone, cs=cs,
                      click_registry=click_registry,
-                     category_override=f"vats_zone:{target.entity_id}")
+                     category_override=f"vats_zone:{target.entity_id}",
+                     world=world)
     cy += sil_h + 6
 
     # Preview line — P27-UX-11 fix: wrap across multiple short lines
@@ -2941,33 +2932,58 @@ def _draw_player_portrait_placeholder(surf, character, x, y, w, h, *,
 def _draw_silhouette(surf, target, plan, x, y, w, h, L,
                      selected_zone, *, cs=None,
                      click_registry=None,
-                     category_override: str = "vats_zone") -> None:
-    """P26a — render a body silhouette with clickable body-part zones.
+                     category_override: str = "vats_zone",
+                     world=None, biome: str = "") -> None:
+    """P26a/P30 — render the enemy's BODY for VATS targeting with clickable
+    body-part zones.
 
-    Layout is plan-dependent. Each zone gets a colored rect (red gradient
-    by HP fraction), its label, and a click hit-zone. The selected zone
-    gets a thick accent border.
-
-    Plans we support natively:
-      humanoid          — vertical 5-row layout (head/torso/arms/legs)
-      small_quadruped   — wide horizontal layout
-      drone             — 3-row stack (sensor/body/propulsion)
-      blob              — single big rect
-    All other plans fall back to a vertical "stack of zones" rendering.
+    P30: the body is now the enemy PORTRAIT art (when a PNG exists), with the
+    limb hit-zones traced onto the drawn anatomy via `portrait_zones` and
+    overlaid translucently so the art shows through. When no art exists, we
+    fall back to the procedural archetype silhouette + the legacy block-grid
+    zone layout. Either way each zone gets an HP-tinted highlight, a label,
+    and a click hit-zone; the selected zone gets a thick accent border.
     """
-    pygame.draw.rect(surf, (24, 28, 36), (x, y, w, h))
+    from . import art as _art
+    from . import portrait_zones as _pz
+
+    if not biome and world is not None:
+        biome = _floor_biome(world)
+
+    # Body backdrop: portrait PNG → procedural silhouette. draw_enemy_portrait
+    # returns True only when a real image was blitted.
+    drew_real = False
+    art_key = None
+    try:
+        drew_real = _art.draw_enemy_portrait(surf, target, (x, y, w, h),
+                                             biome=biome)
+        if drew_real:
+            art_key = _art.resolve_enemy_art_key(target, biome)
+    except Exception:
+        drew_real = False
+    if not drew_real:
+        # No art — paint the dim block the zones used to sit on.
+        pygame.draw.rect(surf, (24, 28, 36), (x, y, w, h))
     pygame.draw.rect(surf, BORDER, (x, y, w, h), 1)
 
-    # Decide the layout family.
     zones_in_plan = set(plan.keys())
     body_parts = target.body_parts or {}
+    try:
+        arch = _art.enemy_archetype(target)
+    except Exception:
+        arch = "humanoid"
+    hitboxes = _pz.zones_for(art_key, arch, zones_in_plan)
 
-    def _zone_rect(zone_key: str) -> Tuple[int, int, int, int]:
+    def _zone_rect(zone_key: str):
+        if hitboxes and zone_key in hitboxes:
+            fx, fy, fw, fh = hitboxes[zone_key]
+            return (int(x + fx * w), int(y + fy * h),
+                    max(6, int(fw * w)), max(6, int(fh * h)))
         return _zone_layout_rect(zones_in_plan, zone_key, x, y, w, h)
 
     def _zone_color(zp: dict, broken: bool) -> Tuple[int, int, int]:
         if broken:
-            return (90, 30, 30)
+            return (200, 40, 40)
         frac = (zp.get("hp", 1) / max(1, zp.get("max_hp", 1)))
         # Healthy = teal-blue; wounded = redder.
         r = int(60 + (200 - 60) * (1 - frac))
@@ -2983,23 +2999,43 @@ def _draw_silhouette(surf, target, plan, x, y, w, h, L,
         zp = body_parts.get(zone_key) or {}
         broken = zp.get("broken", False)
         color = _zone_color(zp, broken)
-        pygame.draw.rect(surf, color, (rx, ry, rw, rh))
-        # Selected zone gets a thicker accent border + glow effect.
-        if zone_key == selected_zone:
+        is_sel = (zone_key == selected_zone)
+        # Translucent fill so the portrait reads through; heavier on the
+        # selected zone (and on the block fallback, where there's no art).
+        if drew_real:
+            fill_a = 150 if is_sel else (95 if broken else 55)
+        else:
+            fill_a = 210 if is_sel else 170
+        try:
+            ov = pygame.Surface((rw, rh), pygame.SRCALPHA)
+            ov.fill((color[0], color[1], color[2], fill_a))
+            surf.blit(ov, (rx, ry))
+        except Exception:
+            pygame.draw.rect(surf, color, (rx, ry, rw, rh))
+        # Border: thick danger accent when selected, hairline otherwise.
+        if is_sel:
             pygame.draw.rect(surf, DANGER, (rx - 1, ry - 1, rw + 2, rh + 2), 2)
         else:
             pygame.draw.rect(surf, BORDER, (rx, ry, rw, rh), 1)
-        # Label centered in the rect (single short word).
+        # Label with a dark backing strip so it stays legible over art.
         label = props.get("label_pl", zone_key)
-        # Truncate to fit.
-        f_lbl = font(max(9, min(L.font_small - 2, rh // 2)))
+        f_lbl = font(max(9, min(L.font_small - 2, max(9, rh // 3))))
         if f_lbl.size(label)[0] > rw - 4:
             while label and f_lbl.size(label + "…")[0] > rw - 4:
                 label = label[:-1]
             label = label + "…"
         img = f_lbl.render(label, True, BRIGHT_TEXT)
-        surf.blit(img, (rx + (rw - img.get_width()) // 2,
-                        ry + (rh - img.get_height()) // 2))
+        lx = rx + (rw - img.get_width()) // 2
+        ly = ry + (rh - img.get_height()) // 2
+        if drew_real:
+            try:
+                strip = pygame.Surface((img.get_width() + 6,
+                                        img.get_height() + 2), pygame.SRCALPHA)
+                strip.fill((0, 0, 0, 150))
+                surf.blit(strip, (lx - 3, ly - 1))
+            except Exception:
+                pass
+        surf.blit(img, (lx, ly))
         # Click zone — sets cs.targeted_zone_by_eid for this target.
         # P28 (P27-UX-12): category encodes "<base>:<zone>" so the
         # Game's double-click detector can spot two clicks on the
