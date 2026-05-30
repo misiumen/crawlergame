@@ -302,6 +302,20 @@ def _basic_actions(world, room=None) -> List[SelectableOption]:
                          t("nav_save", fallback="Zapisz"),
                          "zapisz", GROUP_ACTIONS),
     ])
+    # P30 — surface the level-up allocator as a real, discoverable action
+    # whenever the player has unspent stat points. Previously the only way
+    # in was typing "rozdaj", so players never found it. Shown first in the
+    # row (with the count) and only while points remain.
+    try:
+        ch = getattr(world, "character", None) if world is not None else None
+        pts = int(getattr(ch, "unspent_stat_points", 0) or 0) if ch else 0
+        if pts > 0:
+            out.append(SelectableOption(
+                "act_levelup",
+                t("nav_levelup", fallback=f"Rozdaj punkty ({pts})"),
+                "rozdaj punkty", GROUP_ACTIONS, hotkey="p"))
+    except Exception:
+        pass
     return out
 
 

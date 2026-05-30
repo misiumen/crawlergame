@@ -1160,9 +1160,15 @@ def draw_sidebar(surf, world, layout=None, *, click_registry=None):
         surf.blit(img, (cx, ry))
     cy += 16 * 2 + 4
 
-    # Statuses (compact, one line).
+    # Statuses (compact, one line). Route through the combat module's PL
+    # label map so nothing leaks the raw English key (e.g. "wounded").
     if c.conditions:
-        text(surf, "Status: " + ", ".join(c.conditions[:4]),
+        try:
+            from ..engine import combat as _cmb
+            _conds = [_cmb.status_label(s, "pl") for s in c.conditions[:4]]
+        except Exception:
+            _conds = list(c.conditions[:4])
+        text(surf, "Stan: " + ", ".join(_conds),
              x + 14, cy, DANGER, L.font_small - 2); cy += 14
 
     # P28 (P27-UX-6) — party / companion panel. Shows each active
@@ -2904,8 +2910,12 @@ def _draw_player_combat_chip(surf, world, x, y, w, h, L):
     if main_ent is not None and main_ent.state:
         coating = main_ent.state.get("coating")
     if coating and coating.get("hits_remaining", 0) > 0:
-        text(surf, f"Powłoka: {coating.get('damage_type','?')} "
-                   f"({coating['hits_remaining']})",
+        try:
+            from ..engine import damage as _dmg
+            _ct = _dmg.damage_type_label(coating.get("damage_type", "?"), "pl")
+        except Exception:
+            _ct = coating.get("damage_type", "?")
+        text(surf, f"Powłoka: {_ct} ({coating['hits_remaining']})",
              x + 8, y + 52, WARN, L.font_small - 2)
     # HP + AC on the right side.
     hp_w = max(140, w // 3)

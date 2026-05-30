@@ -860,12 +860,19 @@ class Game:
     # success. Class passive `heal_mul` (medic) doubles the heal amount.
     # Effects are intentionally small so consumables stay tactical
     # rather than replacing safehouse sleep.
+    # `verb`: "consume" (eat/drink → "Konsumujesz") or "use" (apply →
+    # "Użyłeś"). Defaults to "consume" for food, "use" for everything else.
     _CONSUMABLE_EFFECTS = {
-        "snack_bar":      {"heal": 12, "clear": []},
-        "coffee":         {"heal": 4,  "clear": ["afraid", "shaken"]},
-        "dirty_bandage":  {"heal": 18, "clear": ["bleeding"]},
-        "cracked_mug":    {"heal": 1,  "clear": []},   # tea? whatever's in it.
-        "battery":        {"heal": 0,  "buff": "next_tech_plus2"},
+        "snack_bar":      {"heal": 12, "clear": [], "verb": "consume"},
+        "coffee":         {"heal": 4,  "clear": ["afraid", "shaken"],
+                           "verb": "consume"},
+        # A bandage is APPLIED, not eaten — it staunches a wound, so it
+        # clears both bleeding and the wounded status it's meant to treat.
+        "dirty_bandage":  {"heal": 18, "clear": ["bleeding", "wounded"],
+                           "verb": "use"},
+        "cracked_mug":    {"heal": 1,  "clear": [], "verb": "consume"},
+        "battery":        {"heal": 0,  "buff": "next_tech_plus2",
+                           "verb": "use"},
     }
 
     def _attempt_consume(self, intent):
@@ -914,6 +921,12 @@ class Game:
                      LOG_WARN)
             return
         spec = self._CONSUMABLE_EFFECTS.get(chosen.key, {"heal": 5})
+        # Pick the right verb: food/drink is eaten ("Konsumujesz"), a
+        # bandage / battery is applied ("Użyłeś"). Default by tag.
+        _tags = chosen.tags or []
+        _verb = spec.get("verb") or (
+            "consume" if ("food" in _tags or "drink" in _tags) else "use")
+        _verb_word = "Konsumujesz" if _verb == "consume" else "Użyłeś"
         heal = int(spec.get("heal", 0))
         if heal > 0:
             # P29.62 — Przetrwanie (bezdomny): jedzenie i napoje leczą +50%.
@@ -922,19 +935,23 @@ class Game:
                              * _char.survival_heal_mult(ch)))
             pre = ch.hp
             ch.heal(heal)
-            self.log(t("feedback_consume_heal",
-                       fallback=f"Konsumujesz „{chosen.display_name()}”. "
-                                f"+{ch.hp - pre} HP ({ch.hp}/{ch.max_hp}).",
-                       name=chosen.display_name(),
-                       gained=ch.hp - pre, hp=ch.hp, max=ch.max_hp),
+            self.log(f"{_verb_word} „{chosen.display_name()}”. "
+                     f"+{ch.hp - pre} HP ({ch.hp}/{ch.max_hp}).",
                      LOG_SUCCESS)
         else:
-            self.log(f"Konsumujesz „{chosen.display_name()}”.", LOG_NORMAL)
-        # Clear listed statuses.
+            self.log(f"{_verb_word} „{chosen.display_name()}”.", LOG_NORMAL)
+        # Clear listed statuses (route the label through the PL map).
+        from . import combat as _cmb_lbl
         for cond in spec.get("clear", []):
             if cond in ch.conditions:
                 ch.conditions.remove(cond)
-                self.log(f"  Stan „{cond}” mija.", LOG_SUCCESS)
+                # Also drop its status-clock so it can't tick back.
+                _clk = (ch.flags or {}).get("status_clocks") \
+                    if hasattr(ch, "flags") else None
+                if isinstance(_clk, dict):
+                    _clk.pop(cond, None)
+                self.log(f"  Stan „{_cmb_lbl.status_label(cond, 'pl')}” mija.",
+                         LOG_SUCCESS)
         # Buff flag (rare).
         buff = spec.get("buff")
         if buff:
@@ -2935,10 +2952,22 @@ class Game:
         self.world.log_msg(
             world.current_floor.current_room().fallback_first_enter,
             "normal")
+        # Resolve the weapon's PL display name instead of the raw key so the
+        # log reads "miecz okopowy oficera", not "miecz_okopowy_oficera"
+        # (and never the English "warden baton").
+        try:
+            from ..content.items import make_item as _mk
+            _wname = _mk(weapon_key).display_name()
+        except Exception:
+            _wname = weapon_key.replace("_", " ")
         self.world.log_msg(
-            f"Loadout: broń = {weapon_key.replace('_', ' ')}, "
-            f"klasa = {class_key}.",
+            f"Loadout: broń = {_wname}, klasa = {class_key}.",
             "system")
+        # The loadout flow is the path the arena menu actually uses, but it
+        # never kicked off combat (only the legacy direct start_arena_variant
+        # did) — so the player dropped into the arena standing outside any
+        # fight. Auto-start combat here too.
+        self._arena_begin_combat()
         return True
 
     # ── P27 — floor descent ────────────────────────────────────────────
