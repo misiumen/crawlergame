@@ -3385,24 +3385,30 @@ class Game:
                        name=t(f"class_{key}_n", fallback=key)), LOG_SUCCESS)
         self.state = STATE_PLAY
 
-    # ── P29.76 — rozdawanie punktów atrybutu z awansów ──────────────────
+    # ── P30 — awans: klikalna karta rozdania atrybutów ──────────────────
     def open_stat_allocation(self) -> bool:
-        """Otwiera picker rozdania punktów, jeśli są nierozdane. Zwraca
-        True gdy otwarto, False gdy nic do rozdania."""
+        """Otwiera klikalną kartę rozdania punktów, jeśli są nierozdane.
+        Zwraca True gdy otwarto, False gdy nic do rozdania."""
         ch = self.world.character if self.world else None
         if ch is None or int(getattr(ch, "unspent_stat_points", 0) or 0) <= 0:
-            self.log("Brak punktów atrybutu do rozdania.", LOG_NORMAL)
+            self.log("Brak punktów awansu do rozdania.", LOG_NORMAL)
             return False
         self.title_idx = 0
         self._return_state_after_alloc = self.state
+        self._levelup_zones = []
         self.state = STATE_LEVELUP_ALLOC
         return True
 
+    def _levelup_close(self) -> None:
+        """Leave the allocation card, back to whatever opened it."""
+        self.state = (getattr(self, "_return_state_after_alloc", STATE_PLAY)
+                      or STATE_PLAY)
+        self._levelup_zones = []
+
     def _accept_stat_point(self, idx: int):
         ch = self.world.character if self.world else None
-        ret = getattr(self, "_return_state_after_alloc", STATE_PLAY) or STATE_PLAY
         if ch is None or int(getattr(ch, "unspent_stat_points", 0) or 0) <= 0:
-            self.state = ret
+            self._levelup_close()
             return
         if not (0 <= idx < len(STAT_ORDER)):
             return
@@ -3411,8 +3417,116 @@ class Game:
         ch.unspent_stat_points = int(ch.unspent_stat_points) - 1
         self.log(f"+1 {STAT_LABELS_PL.get(stat, stat)} (teraz {ch.stats[stat]}). "
                  f"Punkty do rozdania: {ch.unspent_stat_points}.", LOG_SUCCESS)
+        # Stay on the card while points remain so the player can keep
+        # spending and watch the live preview; auto-close on the last point.
         if int(ch.unspent_stat_points) <= 0:
-            self.state = ret
+            self._levelup_close()
+
+    def _levelup_click(self, pos) -> None:
+        """Mouse hit-test for the stat card: per-stat [+] buttons + the
+        Gotowe/Zatwierdź button. Zones registered by _draw_levelup_card."""
+        mx, my = pos
+        for (rx, ry, rw, rh), kind, payload in getattr(self, "_levelup_zones", []):
+            if rx <= mx <= rx + rw and ry <= my <= ry + rh:
+                if kind == "add":
+                    self._accept_stat_point(payload)
+                elif kind == "confirm":
+                    self._levelup_close()
+                return
+
+    def _draw_levelup_card(self) -> None:
+        """P30 — mouse-driven stat allocation card themed as a contestant
+        upgrade. Each attribute is a row with value + modifier and a green
+        [+] button; a live preview shows derived stats (HP / AC / to-hit);
+        a confirm button closes. Click zones are stashed on
+        self._levelup_zones and hit-tested by _levelup_click. Keyboard
+        (↑/↓ + Enter, digits, Esc) still works via handle_keydown."""
+        from ..ui.ui import (text, font, panel, PANEL_BG, BORDER, BRIGHT_TEXT,
+                             NORMAL_TEXT, DIM_TEXT, ACCENT, ACCENT2, DANGER,
+                             SUCCESS)
+        import pygame
+        s = self.screen
+        if s is None:
+            return
+        ch = self.world.character
+        W, H = s.get_size()
+        left = int(getattr(ch, "unspent_stat_points", 0) or 0)
+
+        # Dim the world behind the card.
+        veil = pygame.Surface((W, H), pygame.SRCALPHA)
+        veil.fill((0, 0, 0, 175))
+        s.blit(veil, (0, 0))
+
+        row_h = 42
+        bw = min(W - 120, 560)
+        bh = 104 + len(STAT_ORDER) * row_h + 66
+        bx = (W - bw) // 2
+        by = (H - bh) // 2
+        panel(s, (bx, by, bw, bh))
+        pygame.draw.rect(s, ACCENT, (bx, by, bw, bh), 2)
+
+        zones = []
+        text(s, "AWANS — ROZBUDOWA ZAWODNIKA", bx + 22, by + 16,
+             BRIGHT_TEXT, font(22), True)
+        text(s, f"Punkty sponsorskie do rozdania: {left}",
+             bx + 22, by + 46, ACCENT2 if left > 0 else DIM_TEXT, font(15))
+
+        rows_y = by + 82
+        name_x = bx + 26
+        val_x = bx + 230
+        mod_x = bx + 300
+        btn_w, btn_h = 36, 30
+        btn_x = bx + bw - btn_w - 28
+        cur_i = self.title_idx % len(STAT_ORDER)
+
+        for i, sk in enumerate(STAT_ORDER):
+            ry = rows_y + i * row_h
+            sel = (i == cur_i)
+            if sel:
+                pygame.draw.rect(s, (40, 48, 64),
+                                 (bx + 12, ry - 4, bw - 24, row_h - 4))
+            cur = ch.stats.get(sk, 10)
+            mod = ch.stat_mod(sk)
+            text(s, STAT_LABELS_PL.get(sk, sk), name_x, ry + 4,
+                 BRIGHT_TEXT if sel else NORMAL_TEXT, font(18), sel)
+            text(s, f"{cur}", val_x, ry + 4, BRIGHT_TEXT, font(18), True)
+            text(s, f"({mod:+d})", mod_x, ry + 6, DIM_TEXT, font(14))
+            active = left > 0
+            bcol = SUCCESS if active else (60, 60, 68)
+            pygame.draw.rect(s, bcol, (btn_x, ry, btn_w, btn_h))
+            pygame.draw.rect(s, BORDER, (btn_x, ry, btn_w, btn_h), 1)
+            text(s, "+", btn_x + btn_w // 2 - 5, ry + 4,
+                 (10, 10, 12) if active else DIM_TEXT, font(22), True)
+            if active:
+                zones.append(((btn_x, ry, btn_w, btn_h), "add", i))
+
+        # Live derived-stat preview.
+        prev_y = rows_y + len(STAT_ORDER) * row_h + 6
+        try:
+            ac = (ch.effective_ac(self.world)
+                  if hasattr(ch, "effective_ac") else 10 + ch.stat_mod("DEX"))
+            text(s, f"HP {ch.hp}/{ch.max_hp}    KP {ac}    "
+                    f"trafienie: SIŁ {ch.stat_mod('STR'):+d} / "
+                    f"ZRĘ {ch.stat_mod('DEX'):+d}",
+                 name_x, prev_y, ACCENT2, font(13))
+        except Exception:
+            pass
+
+        # Confirm button.
+        label = "ZATWIERDŹ" if left <= 0 else "GOTOWE (resztę później)"
+        cw = max(170, font(15).size(label)[0] + 28)
+        cb_h = 32
+        cb_x = bx + (bw - cw) // 2
+        cb_y = by + bh - cb_h - 16
+        pygame.draw.rect(s, (30, 60, 40), (cb_x, cb_y, cw, cb_h))
+        pygame.draw.rect(s, SUCCESS, (cb_x, cb_y, cw, cb_h), 1)
+        text(s, label, cb_x + 14, cb_y + 7, BRIGHT_TEXT, font(15), True)
+        zones.append(((cb_x, cb_y, cw, cb_h), "confirm", None))
+
+        text(s, "klik [+] lub ↑/↓ + Enter · Esc / Gotowe = zamknij",
+             bx + 22, cb_y + 7, DIM_TEXT, font(12))
+
+        self._levelup_zones = zones
 
     # ── Info panels (rendered as log dumps to keep code compact) ────────────
 
@@ -7928,8 +8042,7 @@ class Game:
                 return
             if key == pygame.K_ESCAPE:
                 self._suppress_textinput = True
-                self.state = getattr(self, "_return_state_after_alloc",
-                                     STATE_PLAY) or STATE_PLAY
+                self._levelup_close()
                 return
             if digit is not None and 1 <= int(digit) <= n:
                 self._suppress_textinput = True
@@ -9167,19 +9280,7 @@ class Game:
             ui.draw_sidebar(s, self.world, layout=L)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
                                   scroll=self.log_scroll, layout=L)
-            ch = self.world.character
-            left = int(getattr(ch, "unspent_stat_points", 0) or 0)
-            lines = [f"AWANS — rozdaj punkt atrybutu (zostało: {left})"]
-            cur_i = self.title_idx % len(STAT_ORDER)
-            for i, stat in enumerate(STAT_ORDER, 1):
-                val = ch.stats.get(stat, 10)
-                mod = ch.stat_mod(stat)
-                sign = "+" if mod >= 0 else ""
-                arrow = "►" if (i - 1) == cur_i else "  "
-                lines.append(f"{arrow} [{i}] {STAT_LABELS_PL.get(stat, stat)}: "
-                             f"{val} ({sign}{mod})")
-            lines.append("Numer 1-6 lub Enter • Esc = później")
-            self._overlay(lines)
+            self._draw_levelup_card()
         elif self.state == STATE_SPECIES_OFFER:
             self._refresh_layout()
             L = self._layout
