@@ -47,13 +47,18 @@ def _room_type(room) -> str:
             or getattr(room, "room_type", None) or "") or ""
 
 
-def room_bg_keys(room):
+def room_bg_keys(room, biome: str = ""):
     """Łańcuch kluczy tła pokoju — WSZYSTKO per biom (P29.74), żeby
     grafika jednego biomu NIE wyciekała na inny. Brak pliku → gradient
     w tincie biomu. Celowo bez `bg_room_<typ>`/`bg_default` (były
-    biome-agnostyczne → bleed między biomami)."""
+    biome-agnostyczne → bleed między biomami).
+
+    P30: `biome` może być podany jawnie przez wołającego (RoomState nie
+    trzyma biomu — zna go tylko FloorState), inaczej próbujemy odczytać
+    z pokoju. Bez tego `_biome_of(room)` zwracało "" i tła nigdy się nie
+    ładowały."""
     keys = []
-    b = _biome_of(room)
+    b = biome or _biome_of(room)
     t = _room_type(room)
     if b and t:
         keys.append(f"bg_{b}_{t}")     # np. bg_intake_industrial_boss
@@ -73,10 +78,15 @@ def _vertical_gradient(w, h, top, bot):
     return surf
 
 
-def draw_room_background(surf, room, rect) -> bool:
+def draw_room_background(surf, room, rect, biome: str = "",
+                         *, veil_alpha: int = None) -> bool:
     """Maluje tło pokoju w `rect`. PNG jeśli jest, inaczej gradient per
     biom. Przyciemnia, żeby tekst na wierzchu był czytelny. Zwraca True
-    gdy użyto prawdziwego obrazu (a nie fallbacku)."""
+    gdy użyto prawdziwego obrazu (a nie fallbacku).
+
+    P30: `biome` można podać jawnie (z FloorState). `veil_alpha` pozwala
+    wołającemu dostroić przyciemnienie (arena walki chce mocniejszą zasłonę,
+    żeby karty wrogów i log były czytelne na tle ilustracji)."""
     if not _HAS_PYGAME or surf is None or room is None:
         return False
     x, y, w, h = rect
@@ -84,18 +94,20 @@ def draw_room_background(surf, room, rect) -> bool:
         return False
     img = None
     used_real = False
-    for key in room_bg_keys(room):
+    for key in room_bg_keys(room, biome):
         img = _assets.load_image(key, w, h)
         if img is not None:
             used_real = True
             break
     if img is None:
-        top, bot = _BIOME_TINT.get(_biome_of(room), _DEFAULT_TINT)
+        top, bot = _BIOME_TINT.get(biome or _biome_of(room), _DEFAULT_TINT)
         img = _vertical_gradient(w, h, top, bot)
     surf.blit(img, (x, y))
     # Przyciemnienie dla czytelności treści.
+    if veil_alpha is None:
+        veil_alpha = 150 if used_real else 90
     veil = pygame.Surface((w, h), pygame.SRCALPHA)
-    veil.fill((0, 0, 0, 150 if used_real else 90))
+    veil.fill((0, 0, 0, max(0, min(255, int(veil_alpha)))))
     surf.blit(veil, (x, y))
     return used_real
 

@@ -757,6 +757,17 @@ def draw_topbar(surf, world, layout=None, *, click_registry=None):
     # gracz tam wchodzi sprawdzić co odblokował).
 
 
+def _floor_biome(world) -> str:
+    """The current floor's biome key (e.g. 'intake_industrial'). RoomState
+    doesn't carry the biome — only FloorState does — so the art layer needs
+    it passed in explicitly to resolve bg_/wrog_ assets."""
+    try:
+        f = getattr(world, "current_floor", None)
+        return (getattr(f, "biome_key", "") or "") if f is not None else ""
+    except Exception:
+        return ""
+
+
 def draw_room_panel(surf, world, layout=None, *, click_registry=None):
     """Render the center panel. P24.5: when combat is active in the
     current room, this delegates to draw_combat_arena() so the player
@@ -785,7 +796,8 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None):
     # gradient per biom). Treść rysuje się na wierzchu (tło przyciemnione).
     try:
         from . import art as _art
-        _art.draw_room_background(surf, room, (x, y, w, h))
+        _art.draw_room_background(surf, room, (x, y, w, h),
+                                  biome=_floor_biome(world))
     except Exception:
         pass
     pygame.draw.line(surf, BORDER, (x, y), (x, y + h), 1)
@@ -2503,11 +2515,23 @@ def draw_combat_arena(surf, world, cs, layout=None, *, click_registry=None):
         x += _shrng.randint(-_mag, _mag)
         y += _shrng.randint(-_mag, _mag)
     fx_positions = {}
-    panel(surf, (x, y, w, h))
     floor = world.current_floor
     room = floor.current_room() if floor else None
     if room is None or cs is None:
+        panel(surf, (x, y, w, h))
         return
+    # P30 — paint the biome's combat backdrop (bg_<biome>_combat → bg_<biome>)
+    # behind the arena instead of a flat panel. Heavier veil keeps the enemy
+    # cards, log and player chip legible over the illustration. draw_room_
+    # background always paints (PNG, else biome gradient); only if the art
+    # layer is missing entirely do we fall back to the flat panel.
+    try:
+        from . import art as _art
+        _art.draw_room_background(surf, room, (x, y, w, h),
+                                  biome=_floor_biome(world), veil_alpha=185)
+        pygame.draw.rect(surf, BORDER, (x, y, w, h), 1)
+    except Exception:
+        panel(surf, (x, y, w, h))
 
     # Header: round banner + room one-liner.
     n_hostile = sum(1 for eid in cs.participants
@@ -2780,20 +2804,32 @@ def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
         pygame.draw.rect(surf, PANEL_BG, (cx, y, card_w, h))
         pygame.draw.rect(surf, col_border, (cx, y, card_w, h),
                          2 if is_sel else 1)
-        # Portrait slot — 48×48 placeholder.
-        port_size = 48
-        _draw_entity_portrait_placeholder(surf, ent,
-                                          cx + 6, y + 6,
-                                          port_size, port_size)
-        # Name + HP + statuses.
-        # P29.5 — fog of war: unknown → "???" + vague shape, no stats.
-        # seen → name + HP bar but no AC/HP numbers. inspected → all.
+        # Fog of war state drives both the stats AND the portrait.
+        # P29.5 — unknown → "???" + vague shape, no stats. seen → name +
+        # HP bar but no numbers. inspected → all.
         try:
             from ..engine import visibility as _vis
             vis_state = _vis.get_state(ent)
         except Exception:
             _vis = None
             vis_state = "inspected"
+        # Portrait slot. P30 — once the enemy is seen/inspected, blit the
+        # real biome art (wrog_<biome>_<key> → archetype → silhouette);
+        # an unknown enemy keeps the obscured glyph placeholder so fog of
+        # war still hides who you haven't scouted.
+        port_size = 48
+        if vis_state == "unknown":
+            _draw_entity_portrait_placeholder(surf, ent, cx + 6, y + 6,
+                                              port_size, port_size)
+        else:
+            try:
+                from . import art as _art
+                _art.draw_enemy_portrait(
+                    surf, ent, (cx + 6, y + 6, port_size, port_size),
+                    biome=_floor_biome(world))
+            except Exception:
+                _draw_entity_portrait_placeholder(surf, ent, cx + 6, y + 6,
+                                                  port_size, port_size)
         nm_x = cx + 6 + port_size + 8
         nm_w = card_w - (port_size + 22)
         if vis_state == "unknown":
