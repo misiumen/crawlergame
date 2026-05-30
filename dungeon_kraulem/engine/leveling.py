@@ -154,9 +154,13 @@ def pre_level(world, target_level: int) -> None:
     ch.unspent_stat_points = int(getattr(ch, "unspent_stat_points", 0) or 0) + (lvl - 1)
     try:
         from .handlers import boxes as _boxes
+        # Use an UNSEEDED rng — seeding with `lvl` made the arena testbed
+        # box deterministic, so the same level always rolled the identical
+        # reward (the "cleaver handle every time" bug). The box should be a
+        # fresh roll each run.
         _boxes.make_box(
             world, source="level_up", source_name="Trening areny",
-            contents=roll_levelup_box_contents(_random.Random(lvl), lvl, 1),
+            contents=roll_levelup_box_contents(_random.Random(), lvl, 1),
             rarity=box_rarity_for_level(lvl))
     except Exception:
         pass

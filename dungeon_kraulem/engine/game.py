@@ -860,12 +860,19 @@ class Game:
     # success. Class passive `heal_mul` (medic) doubles the heal amount.
     # Effects are intentionally small so consumables stay tactical
     # rather than replacing safehouse sleep.
+    # `verb`: "consume" (eat/drink → "Konsumujesz") or "use" (apply →
+    # "Użyłeś"). Defaults to "consume" for food, "use" for everything else.
     _CONSUMABLE_EFFECTS = {
-        "snack_bar":      {"heal": 12, "clear": []},
-        "coffee":         {"heal": 4,  "clear": ["afraid", "shaken"]},
-        "dirty_bandage":  {"heal": 18, "clear": ["bleeding"]},
-        "cracked_mug":    {"heal": 1,  "clear": []},   # tea? whatever's in it.
-        "battery":        {"heal": 0,  "buff": "next_tech_plus2"},
+        "snack_bar":      {"heal": 12, "clear": [], "verb": "consume"},
+        "coffee":         {"heal": 4,  "clear": ["afraid", "shaken"],
+                           "verb": "consume"},
+        # A bandage is APPLIED, not eaten — it staunches a wound, so it
+        # clears both bleeding and the wounded status it's meant to treat.
+        "dirty_bandage":  {"heal": 18, "clear": ["bleeding", "wounded"],
+                           "verb": "use"},
+        "cracked_mug":    {"heal": 1,  "clear": [], "verb": "consume"},
+        "battery":        {"heal": 0,  "buff": "next_tech_plus2",
+                           "verb": "use"},
     }
 
     def _attempt_consume(self, intent):
@@ -914,6 +921,12 @@ class Game:
                      LOG_WARN)
             return
         spec = self._CONSUMABLE_EFFECTS.get(chosen.key, {"heal": 5})
+        # Pick the right verb: food/drink is eaten ("Konsumujesz"), a
+        # bandage / battery is applied ("Użyłeś"). Default by tag.
+        _tags = chosen.tags or []
+        _verb = spec.get("verb") or (
+            "consume" if ("food" in _tags or "drink" in _tags) else "use")
+        _verb_word = "Konsumujesz" if _verb == "consume" else "Użyłeś"
         heal = int(spec.get("heal", 0))
         if heal > 0:
             # P29.62 — Przetrwanie (bezdomny): jedzenie i napoje leczą +50%.
@@ -922,19 +935,23 @@ class Game:
                              * _char.survival_heal_mult(ch)))
             pre = ch.hp
             ch.heal(heal)
-            self.log(t("feedback_consume_heal",
-                       fallback=f"Konsumujesz „{chosen.display_name()}”. "
-                                f"+{ch.hp - pre} HP ({ch.hp}/{ch.max_hp}).",
-                       name=chosen.display_name(),
-                       gained=ch.hp - pre, hp=ch.hp, max=ch.max_hp),
+            self.log(f"{_verb_word} „{chosen.display_name()}”. "
+                     f"+{ch.hp - pre} HP ({ch.hp}/{ch.max_hp}).",
                      LOG_SUCCESS)
         else:
-            self.log(f"Konsumujesz „{chosen.display_name()}”.", LOG_NORMAL)
-        # Clear listed statuses.
+            self.log(f"{_verb_word} „{chosen.display_name()}”.", LOG_NORMAL)
+        # Clear listed statuses (route the label through the PL map).
+        from . import combat as _cmb_lbl
         for cond in spec.get("clear", []):
             if cond in ch.conditions:
                 ch.conditions.remove(cond)
-                self.log(f"  Stan „{cond}” mija.", LOG_SUCCESS)
+                # Also drop its status-clock so it can't tick back.
+                _clk = (ch.flags or {}).get("status_clocks") \
+                    if hasattr(ch, "flags") else None
+                if isinstance(_clk, dict):
+                    _clk.pop(cond, None)
+                self.log(f"  Stan „{_cmb_lbl.status_label(cond, 'pl')}” mija.",
+                         LOG_SUCCESS)
         # Buff flag (rare).
         buff = spec.get("buff")
         if buff:
@@ -2848,7 +2865,10 @@ class Game:
                                        triggered_by="arena_start")
                 self.log(t("feedback_combat_start",
                            fallback="Walka się zaczyna."), LOG_WARN)
-                self._run_enemy_turn(cs)
+                # P30 — do NOT run an enemy turn here. start_combat already
+                # telegraphs each hostile's intent; the player should act
+                # first and respond to that telegraph, not eat a free hit
+                # the instant the arena loads.
         except Exception:
             pass
 
@@ -2935,10 +2955,22 @@ class Game:
         self.world.log_msg(
             world.current_floor.current_room().fallback_first_enter,
             "normal")
+        # Resolve the weapon's PL display name instead of the raw key so the
+        # log reads "miecz okopowy oficera", not "miecz_okopowy_oficera"
+        # (and never the English "warden baton").
+        try:
+            from ..content.items import make_item as _mk
+            _wname = _mk(weapon_key).display_name()
+        except Exception:
+            _wname = weapon_key.replace("_", " ")
         self.world.log_msg(
-            f"Loadout: broń = {weapon_key.replace('_', ' ')}, "
-            f"klasa = {class_key}.",
+            f"Loadout: broń = {_wname}, klasa = {class_key}.",
             "system")
+        # The loadout flow is the path the arena menu actually uses, but it
+        # never kicked off combat (only the legacy direct start_arena_variant
+        # did) — so the player dropped into the arena standing outside any
+        # fight. Auto-start combat here too.
+        self._arena_begin_combat()
         return True
 
     # ── P27 — floor descent ────────────────────────────────────────────
@@ -3353,24 +3385,30 @@ class Game:
                        name=t(f"class_{key}_n", fallback=key)), LOG_SUCCESS)
         self.state = STATE_PLAY
 
-    # ── P29.76 — rozdawanie punktów atrybutu z awansów ──────────────────
+    # ── P30 — awans: klikalna karta rozdania atrybutów ──────────────────
     def open_stat_allocation(self) -> bool:
-        """Otwiera picker rozdania punktów, jeśli są nierozdane. Zwraca
-        True gdy otwarto, False gdy nic do rozdania."""
+        """Otwiera klikalną kartę rozdania punktów, jeśli są nierozdane.
+        Zwraca True gdy otwarto, False gdy nic do rozdania."""
         ch = self.world.character if self.world else None
         if ch is None or int(getattr(ch, "unspent_stat_points", 0) or 0) <= 0:
-            self.log("Brak punktów atrybutu do rozdania.", LOG_NORMAL)
+            self.log("Brak punktów awansu do rozdania.", LOG_NORMAL)
             return False
         self.title_idx = 0
         self._return_state_after_alloc = self.state
+        self._levelup_zones = []
         self.state = STATE_LEVELUP_ALLOC
         return True
 
+    def _levelup_close(self) -> None:
+        """Leave the allocation card, back to whatever opened it."""
+        self.state = (getattr(self, "_return_state_after_alloc", STATE_PLAY)
+                      or STATE_PLAY)
+        self._levelup_zones = []
+
     def _accept_stat_point(self, idx: int):
         ch = self.world.character if self.world else None
-        ret = getattr(self, "_return_state_after_alloc", STATE_PLAY) or STATE_PLAY
         if ch is None or int(getattr(ch, "unspent_stat_points", 0) or 0) <= 0:
-            self.state = ret
+            self._levelup_close()
             return
         if not (0 <= idx < len(STAT_ORDER)):
             return
@@ -3379,8 +3417,116 @@ class Game:
         ch.unspent_stat_points = int(ch.unspent_stat_points) - 1
         self.log(f"+1 {STAT_LABELS_PL.get(stat, stat)} (teraz {ch.stats[stat]}). "
                  f"Punkty do rozdania: {ch.unspent_stat_points}.", LOG_SUCCESS)
+        # Stay on the card while points remain so the player can keep
+        # spending and watch the live preview; auto-close on the last point.
         if int(ch.unspent_stat_points) <= 0:
-            self.state = ret
+            self._levelup_close()
+
+    def _levelup_click(self, pos) -> None:
+        """Mouse hit-test for the stat card: per-stat [+] buttons + the
+        Gotowe/Zatwierdź button. Zones registered by _draw_levelup_card."""
+        mx, my = pos
+        for (rx, ry, rw, rh), kind, payload in getattr(self, "_levelup_zones", []):
+            if rx <= mx <= rx + rw and ry <= my <= ry + rh:
+                if kind == "add":
+                    self._accept_stat_point(payload)
+                elif kind == "confirm":
+                    self._levelup_close()
+                return
+
+    def _draw_levelup_card(self) -> None:
+        """P30 — mouse-driven stat allocation card themed as a contestant
+        upgrade. Each attribute is a row with value + modifier and a green
+        [+] button; a live preview shows derived stats (HP / AC / to-hit);
+        a confirm button closes. Click zones are stashed on
+        self._levelup_zones and hit-tested by _levelup_click. Keyboard
+        (↑/↓ + Enter, digits, Esc) still works via handle_keydown."""
+        from ..ui.ui import (text, font, panel, PANEL_BG, BORDER, BRIGHT_TEXT,
+                             NORMAL_TEXT, DIM_TEXT, ACCENT, ACCENT2, DANGER,
+                             SUCCESS)
+        import pygame
+        s = self.screen
+        if s is None:
+            return
+        ch = self.world.character
+        W, H = s.get_size()
+        left = int(getattr(ch, "unspent_stat_points", 0) or 0)
+
+        # Dim the world behind the card.
+        veil = pygame.Surface((W, H), pygame.SRCALPHA)
+        veil.fill((0, 0, 0, 175))
+        s.blit(veil, (0, 0))
+
+        row_h = 42
+        bw = min(W - 120, 560)
+        bh = 104 + len(STAT_ORDER) * row_h + 66
+        bx = (W - bw) // 2
+        by = (H - bh) // 2
+        panel(s, (bx, by, bw, bh))
+        pygame.draw.rect(s, ACCENT, (bx, by, bw, bh), 2)
+
+        zones = []
+        text(s, "AWANS — ROZBUDOWA ZAWODNIKA", bx + 22, by + 16,
+             BRIGHT_TEXT, font(22), True)
+        text(s, f"Punkty sponsorskie do rozdania: {left}",
+             bx + 22, by + 46, ACCENT2 if left > 0 else DIM_TEXT, font(15))
+
+        rows_y = by + 82
+        name_x = bx + 26
+        val_x = bx + 230
+        mod_x = bx + 300
+        btn_w, btn_h = 36, 30
+        btn_x = bx + bw - btn_w - 28
+        cur_i = self.title_idx % len(STAT_ORDER)
+
+        for i, sk in enumerate(STAT_ORDER):
+            ry = rows_y + i * row_h
+            sel = (i == cur_i)
+            if sel:
+                pygame.draw.rect(s, (40, 48, 64),
+                                 (bx + 12, ry - 4, bw - 24, row_h - 4))
+            cur = ch.stats.get(sk, 10)
+            mod = ch.stat_mod(sk)
+            text(s, STAT_LABELS_PL.get(sk, sk), name_x, ry + 4,
+                 BRIGHT_TEXT if sel else NORMAL_TEXT, font(18), sel)
+            text(s, f"{cur}", val_x, ry + 4, BRIGHT_TEXT, font(18), True)
+            text(s, f"({mod:+d})", mod_x, ry + 6, DIM_TEXT, font(14))
+            active = left > 0
+            bcol = SUCCESS if active else (60, 60, 68)
+            pygame.draw.rect(s, bcol, (btn_x, ry, btn_w, btn_h))
+            pygame.draw.rect(s, BORDER, (btn_x, ry, btn_w, btn_h), 1)
+            text(s, "+", btn_x + btn_w // 2 - 5, ry + 4,
+                 (10, 10, 12) if active else DIM_TEXT, font(22), True)
+            if active:
+                zones.append(((btn_x, ry, btn_w, btn_h), "add", i))
+
+        # Live derived-stat preview.
+        prev_y = rows_y + len(STAT_ORDER) * row_h + 6
+        try:
+            ac = (ch.effective_ac(self.world)
+                  if hasattr(ch, "effective_ac") else 10 + ch.stat_mod("DEX"))
+            text(s, f"HP {ch.hp}/{ch.max_hp}    KP {ac}    "
+                    f"trafienie: SIŁ {ch.stat_mod('STR'):+d} / "
+                    f"ZRĘ {ch.stat_mod('DEX'):+d}",
+                 name_x, prev_y, ACCENT2, font(13))
+        except Exception:
+            pass
+
+        # Confirm button.
+        label = "ZATWIERDŹ" if left <= 0 else "GOTOWE (resztę później)"
+        cw = max(170, font(15).size(label)[0] + 28)
+        cb_h = 32
+        cb_x = bx + (bw - cw) // 2
+        cb_y = by + bh - cb_h - 16
+        pygame.draw.rect(s, (30, 60, 40), (cb_x, cb_y, cw, cb_h))
+        pygame.draw.rect(s, SUCCESS, (cb_x, cb_y, cw, cb_h), 1)
+        text(s, label, cb_x + 14, cb_y + 7, BRIGHT_TEXT, font(15), True)
+        zones.append(((cb_x, cb_y, cw, cb_h), "confirm", None))
+
+        text(s, "klik [+] lub ↑/↓ + Enter · Esc / Gotowe = zamknij",
+             bx + 22, cb_y + 7, DIM_TEXT, font(12))
+
+        self._levelup_zones = zones
 
     # ── Info panels (rendered as log dumps to keep code compact) ────────────
 
@@ -7896,8 +8042,7 @@ class Game:
                 return
             if key == pygame.K_ESCAPE:
                 self._suppress_textinput = True
-                self.state = getattr(self, "_return_state_after_alloc",
-                                     STATE_PLAY) or STATE_PLAY
+                self._levelup_close()
                 return
             if digit is not None and 1 <= int(digit) <= n:
                 self._suppress_textinput = True
@@ -9048,7 +9193,8 @@ class Game:
                                      click_registry=self.click_registry,
                                      on_room_click=self._on_minimap_room_click)
             ui.draw_room_panel(s, self.world, layout=L,
-                               click_registry=self.click_registry)
+                               click_registry=self.click_registry,
+                               command_cb=self.submit_generated_command)
             ui.draw_sidebar(s, self.world, layout=L,
                             click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
@@ -9070,7 +9216,8 @@ class Game:
                                      click_registry=self.click_registry,
                                      on_room_click=self._on_minimap_room_click)
             ui.draw_room_panel(s, self.world, layout=L,
-                               click_registry=self.click_registry)
+                               click_registry=self.click_registry,
+                               command_cb=self.submit_generated_command)
             ui.draw_sidebar(s, self.world, layout=L,
                             click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
@@ -9135,19 +9282,7 @@ class Game:
             ui.draw_sidebar(s, self.world, layout=L)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
                                   scroll=self.log_scroll, layout=L)
-            ch = self.world.character
-            left = int(getattr(ch, "unspent_stat_points", 0) or 0)
-            lines = [f"AWANS — rozdaj punkt atrybutu (zostało: {left})"]
-            cur_i = self.title_idx % len(STAT_ORDER)
-            for i, stat in enumerate(STAT_ORDER, 1):
-                val = ch.stats.get(stat, 10)
-                mod = ch.stat_mod(stat)
-                sign = "+" if mod >= 0 else ""
-                arrow = "►" if (i - 1) == cur_i else "  "
-                lines.append(f"{arrow} [{i}] {STAT_LABELS_PL.get(stat, stat)}: "
-                             f"{val} ({sign}{mod})")
-            lines.append("Numer 1-6 lub Enter • Esc = później")
-            self._overlay(lines)
+            self._draw_levelup_card()
         elif self.state == STATE_SPECIES_OFFER:
             self._refresh_layout()
             L = self._layout
