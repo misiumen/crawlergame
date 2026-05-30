@@ -240,6 +240,67 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0,
     surf.blit(f_img, (sw - f_img.get_width() - 24, sh - 24))
 
 
+# ── P30 — in-game pause menu ────────────────────────────────────────────────
+
+# (action_key, label). Order = display + keyboard nav order.
+PAUSE_MENU_ITEMS = [
+    ("resume",        "Wróć do gry"),
+    ("save",          "Zapisz grę"),
+    ("load",          "Wczytaj grę"),
+    ("reseed",        "Nowy rozkład (reseed)"),
+    ("settings",      "Ustawienia"),
+    ("quit_to_menu",  "Wyjdź do menu głównego"),
+    ("quit_game",     "Zakończ grę"),
+]
+
+
+def draw_pause_menu(surf, selected_idx: int = 0, *,
+                    click_registry=None, on_select=None):
+    """P30 — pause overlay drawn on top of the frozen game. Mouse + keyboard:
+    each row is a click zone (category "pause_menu") calling
+    on_select(action_key); arrows/Enter drive `selected_idx` in the caller.
+    """
+    sw, sh = surf.get_size()
+    # Dim the live game behind the panel.
+    veil = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    veil.fill((0, 0, 0, 180))
+    surf.blit(veil, (0, 0))
+
+    L = _resolve_layout(None)
+    item_size = max(18, int(22 * L.font_scale))
+    row_h = item_size + 18
+    pad = 8
+
+    n = len(PAUSE_MENU_ITEMS)
+    pw = min(sw - 160, 460)
+    ph = 70 + n * row_h + 24
+    px = (sw - pw) // 2
+    py = (sh - ph) // 2
+    pygame.draw.rect(surf, PANEL_BG, (px, py, pw, ph))
+    pygame.draw.rect(surf, ACCENT, (px, py, pw, ph), 2)
+
+    text(surf, "PAUZA", px + 22, py + 16, BRIGHT_TEXT, item_size + 2, True)
+    text(surf, "Esc — wróć do gry", px + pw - 170, py + 22, DIM_TEXT,
+         max(12, item_size - 8))
+
+    cy = py + 60
+    for i, (ak, label) in enumerate(PAUSE_MENU_ITEMS):
+        sel = (i == selected_idx)
+        if sel:
+            pygame.draw.rect(surf, (40, 48, 64), (px + 12, cy - 4, pw - 24,
+                                                  row_h - 4))
+        marker = "▶ " if sel else "   "
+        col = BRIGHT_TEXT if sel else NORMAL_TEXT
+        text(surf, f"{marker}{i + 1}. {label}", px + 24, cy + 2, col,
+             item_size, sel)
+        if click_registry is not None and on_select is not None:
+            def _click(_ak=ak):
+                on_select(_ak)
+            click_registry.add((px + 12, cy - 4, pw - 24, row_h),
+                               _click, tooltip=label, category="pause_menu")
+        cy += row_h
+
+
 # ── P29.9 — Save-slot picker ────────────────────────────────────────────────
 
 def draw_slot_picker(surf, slots, mode: str, selected_idx: int = 0,

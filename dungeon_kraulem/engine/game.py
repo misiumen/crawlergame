@@ -37,6 +37,7 @@ STATE_VICTORY   = "victory"
 STATE_DEFEAT    = "defeat"
 STATE_SETTINGS  = "settings"   # Prompt 11: simple settings popup from title
 STATE_SLOTS     = "slots"      # P29.9: save-slot picker (3 slots)
+STATE_PAUSE     = "pause"      # P30: in-game pause / escape menu
 # P29.60 — Arena testowa: combat-only sandbox.
 # STATE_ARENA_MENU = wybór wariantu, STATE_ARENA_PLAY reuses STATE_PLAY
 # input/render ale z arena_mode flag żeby ominąć floor descent / save.
@@ -1683,6 +1684,73 @@ class Game:
             raise SystemExit
         elif action_key == "toggle_lang":
             set_language("en" if get_language() == "pl" else "pl")
+
+    # ── P30 — in-game pause / escape menu ─────────────────────────────────
+
+    def open_pause_menu(self) -> None:
+        """Open the in-game pause menu (Escape). Remembers the state we came
+        from so 'Wróć do gry' returns to it (play vs arena)."""
+        self._pause_return_state = self.state
+        self.pause_idx = 0
+        self.state = STATE_PAUSE
+
+    def _pause_resume(self) -> None:
+        self.state = getattr(self, "_pause_return_state", STATE_PLAY) or STATE_PLAY
+
+    def _pause_action(self, action_key: str) -> None:
+        """Shared click/keyboard callback for the pause menu rows."""
+        if action_key == "resume":
+            self._pause_resume()
+        elif action_key == "save":
+            ok = save_load.save(self.world)
+            self.log(t("log_save_done", fallback="Zapisano.") if ok else
+                     t("log_save_fail", fallback="Zapis nie powiódł się."),
+                     LOG_SUCCESS if ok else LOG_DANGER)
+            self._pause_resume()
+        elif action_key == "load":
+            if save_load.exists():
+                self.slot_picker_mode = "load"
+                self.slot_picker_idx = 0
+                self.state = STATE_SLOTS
+            else:
+                self.log("Brak zapisu do wczytania.", LOG_WARN)
+        elif action_key == "reseed":
+            self._restart_with_new_rolls()
+        elif action_key == "settings":
+            # _open_settings stashes prev_state; make it return to pause.
+            self._open_settings()
+            try:
+                self.settings_state["prev_state"] = STATE_PAUSE
+            except Exception:
+                pass
+        elif action_key == "quit_to_menu":
+            self.run_summary = None
+            self.world = None
+            self.state = STATE_TITLE
+            self.title_idx = 0
+        elif action_key == "quit_game":
+            pygame.quit()
+            raise SystemExit
+
+    def _restart_with_new_rolls(self) -> None:
+        """Reseed: start a fresh run with the SAME character name /
+        background / species but newly rolled floors + a new random seed.
+        Mirrors start_new_game's inputs from the current character."""
+        ch = self.world.character if self.world else None
+        name = getattr(ch, "name", "") or "Bezimienny"
+        background = getattr(ch, "background", "unemployed_hustler")
+        species = getattr(ch, "species_key", "baseline_human")
+        self.run_summary = None
+        self.start_new_game(name, background, species)
+        # Fresh seed so floor generation + rolls differ from the old run.
+        try:
+            import random as _r
+            self.world.random_seed = _r.randint(1, 2_000_000_000)
+        except Exception:
+            pass
+        self.state = STATE_PLAY
+        self.log("Nowy rozkład: świeże piętra i rzuty. Powodzenia.",
+                 LOG_SYSTEM)
 
     # ── P29.9 — slot picker ──────────────────────────────────────────────
 
@@ -7825,6 +7893,24 @@ class Game:
         if self.state == STATE_SETTINGS:
             return self._handle_settings_keydown(key, shift_held)
 
+        # P30 — pause / escape menu.
+        if self.state == STATE_PAUSE:
+            from ..ui import ui as _uimod
+            items = _uimod.PAUSE_MENU_ITEMS
+            n = len(items)
+            self._suppress_textinput = True
+            if key == pygame.K_ESCAPE:
+                self._pause_resume(); return
+            if key in (pygame.K_UP, pygame.K_w):
+                self.pause_idx = (self.pause_idx - 1) % n; return
+            if key in (pygame.K_DOWN, pygame.K_s):
+                self.pause_idx = (self.pause_idx + 1) % n; return
+            if key == pygame.K_RETURN:
+                self._pause_action(items[self.pause_idx % n][0]); return
+            if digit is not None and 1 <= int(digit) <= n:
+                self._pause_action(items[int(digit) - 1][0])
+            return
+
         # P29.9 — slot picker.
         if self.state == STATE_SLOTS:
             self._suppress_textinput = True
@@ -8446,7 +8532,12 @@ class Game:
             self.input_text = self.input_text[:-1]
             return
         if key == pygame.K_ESCAPE:
-            self.input_text = ""
+            # P30 — Esc with a non-empty command box just clears it (old
+            # behavior). On an empty box, open the pause / escape menu.
+            if self.input_text:
+                self.input_text = ""
+            else:
+                self.open_pause_menu()
             return
         # Up/Down browses command history when the input is empty or the
         # user has started browsing already.
@@ -9143,6 +9234,24 @@ class Game:
             ui.draw_title(s, save_load.exists(), selected_idx=self.title_idx,
                           click_registry=self.click_registry,
                           on_select=self._title_action)
+        elif self.state == STATE_PAUSE:
+            # Render the frozen game underneath, then overlay the menu.
+            self._refresh_layout()
+            L = self._layout
+            try:
+                ui.draw_topbar(s, self.world, layout=L)
+                if L.has_left_sidebar:
+                    ui.draw_left_sidebar(s, self.world, layout=L)
+                ui.draw_room_panel(s, self.world, layout=L)
+                ui.draw_sidebar(s, self.world, layout=L)
+                ui.draw_log_and_input(s, self.world.log, self.input_text,
+                                      self.blink, scroll=self.log_scroll,
+                                      input_mode=self.input_mode, layout=L)
+            except Exception:
+                pass
+            ui.draw_pause_menu(s, selected_idx=getattr(self, "pause_idx", 0),
+                               click_registry=self.click_registry,
+                               on_select=self._pause_action)
         elif self.state == STATE_SETTINGS:
             ui.draw_settings(s, getattr(self, "settings_state", {}),
                              save_exists=save_load.exists())
