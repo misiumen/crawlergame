@@ -2670,6 +2670,15 @@ def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
     hp_bar(surf, x + 10, cy, w - 20, 10, target.hp, target.max_hp); cy += 14
     text(surf, f"HP {target.hp}/{target.max_hp}   AC {target.ac}",
          x + 10, cy, NORMAL_TEXT, L.font_small - 1); cy += 14
+    # P30 — telegraphed intent for the selected target.
+    _intent = (getattr(cs, "enemy_intents", None) or {}).get(target.entity_id) \
+        if cs is not None else None
+    if _intent:
+        _glyph, _icol = _intent_visual(_intent.get("category", "attack"))
+        _ilabel = _intent.get("label_pl") or _intent.get("category", "")
+        text(surf, f"Zamiar: {_glyph} {_ilabel}",
+             x + 10, cy, _icol,
+             L.font_small - 1, True); cy += 14
 
     selected_zone = (cs.targeted_zone_by_eid or {}).get(target.entity_id) \
         if cs is not None else None
@@ -2710,6 +2719,41 @@ def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
     # Hint about double-click to commit.
     text(surf, "  (dwuklik = zaatakuj)",
          x + 10, cy, DIM_TEXT, L.font_small - 2); cy += 12
+
+
+def _intent_visual(category):
+    """P30 — map a telegraphed intent category to (glyph, color). Labels
+    come from the stored intent (specials carry their own PL name)."""
+    return {
+        "attack":  ("⚔", DANGER),
+        "special": ("✦", (255, 120, 205)),   # hot magenta — the danger tell
+        "defend":  ("⛊", ACCENT2),
+        "move":    ("➤", WARN),
+        "flee":    ("»", SUCCESS),
+        "wait":    ("…", DIM_TEXT),
+    }.get(category, ("•", NORMAL_TEXT))
+
+
+def _draw_intent_chip(surf, cs, ent, vis_state, nm_x, chip_y, nm_w, L):
+    """Draw the 'what this enemy is about to do' tell at the bottom of an
+    enemy card. Category only — never exact numbers. Unknown enemies show a
+    blank '?' so fog-of-war still hides who you haven't scouted."""
+    intent = (getattr(cs, "enemy_intents", None) or {}).get(ent.entity_id)
+    if vis_state == "unknown" or not intent:
+        glyph, color, label = "?", DIM_TEXT, "zamiar ?"
+    else:
+        cat = intent.get("category", "attack")
+        glyph, color = _intent_visual(cat)
+        label = intent.get("label_pl") or cat
+    txt = f"{glyph} {label}"
+    f = font(L.font_small - 2, bold=(intent is not None
+                                     and intent.get("category") == "special"))
+    if f.size(txt)[0] > nm_w:
+        while txt and f.size(txt + "…")[0] > nm_w:
+            txt = txt[:-1]
+        txt += "…"
+    img = f.render(txt, True, color)
+    surf.blit(img, (nm_x, chip_y))
 
 
 def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
@@ -2790,6 +2834,10 @@ def _draw_enemy_card_row(surf, world, cs, eids, x, y, w, h, L,
                     lbl = lbl[:-1]
                 lbl += "…"
             text(surf, lbl, nm_x, y + 46, WARN, L.font_small - 2)
+
+        # P30 — telegraphed intent at the card's bottom edge.
+        _draw_intent_chip(surf, cs, ent, vis_state, nm_x,
+                          y + h - 14, nm_w, L)
 
         # Click zone: select this enemy as target.
         if click_registry is not None:
