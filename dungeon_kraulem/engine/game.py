@@ -9193,7 +9193,8 @@ class Game:
                                      click_registry=self.click_registry,
                                      on_room_click=self._on_minimap_room_click)
             ui.draw_room_panel(s, self.world, layout=L,
-                               click_registry=self.click_registry)
+                               click_registry=self.click_registry,
+                               command_cb=self.submit_generated_command)
             ui.draw_sidebar(s, self.world, layout=L,
                             click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
@@ -9215,7 +9216,8 @@ class Game:
                                      click_registry=self.click_registry,
                                      on_room_click=self._on_minimap_room_click)
             ui.draw_room_panel(s, self.world, layout=L,
-                               click_registry=self.click_registry)
+                               click_registry=self.click_registry,
+                               command_cb=self.submit_generated_command)
             ui.draw_sidebar(s, self.world, layout=L,
                             click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,

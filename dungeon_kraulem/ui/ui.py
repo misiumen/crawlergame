@@ -768,7 +768,8 @@ def _floor_biome(world) -> str:
         return ""
 
 
-def draw_room_panel(surf, world, layout=None, *, click_registry=None):
+def draw_room_panel(surf, world, layout=None, *, click_registry=None,
+                    command_cb=None):
     """Render the center panel. P24.5: when combat is active in the
     current room, this delegates to draw_combat_arena() so the player
     gets a dedicated tactical surface instead of the normal room view."""
@@ -792,109 +793,118 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None):
         pass
 
     x, y, w, h = L.room_rect
-    # P29.71 — ilustracja pokoju w tle (PNG per biom jeśli jest, inaczej
-    # gradient per biom). Treść rysuje się na wierzchu (tło przyciemnione).
+
+    # P30 — illustration-first room view with CLICKABLE OBJECT PINS.
+    # The biome art fills the panel (light veil only). Each visible
+    # entity/object becomes a numbered pin on the art; clicking a pin runs
+    # `sprawdź <name>` via command_cb. A thin description bar at the bottom
+    # carries the room text (or the hovered pin's blurb) so prose never sits
+    # over the artwork.
     try:
         from . import art as _art
         _art.draw_room_background(surf, room, (x, y, w, h),
-                                  biome=_floor_biome(world))
+                                  biome=_floor_biome(world), veil_alpha=70)
     except Exception:
         pass
     pygame.draw.line(surf, BORDER, (x, y), (x, y + h), 1)
 
-    # P24.6 (P24.5-3): clearly-labeled mood placeholder. Reads as
-    # "intentional slot for future art" instead of "broken asset".
-    mood_h = max(48, min(120, h // 6))
-    _draw_room_mood_placeholder(surf, x + 14, y + 12, w - 28, mood_h, room,
-                                show_caption=True)
+    try:
+        from ..engine import visibility as _vis
+    except Exception:
+        _vis = None
 
-    # Compose the content block, render top-down. Vertical centering
-    # happens AFTER measuring total height when content is short
-    # relative to the panel.
-    content_start_y = y + 12 + mood_h + 14
-    title_str = room.display_title()
-    desc_str = (room.display_first_enter()
-                if room.last_visited_minute == f.current_minute
-                else room.display_look())
-    wrap_w = min(w - 28, 900)
+    # Title chip — small dark plate, top-left, so it stays readable on art.
+    title_str = room.display_title() if hasattr(room, "display_title") else "Pokoj"
+    _tw = font(L.font_title - 6, bold=True).size(title_str)[0]
+    _plate = pygame.Surface((_tw + 20, 30), pygame.SRCALPHA)
+    _plate.fill((0, 0, 0, 150))
+    surf.blit(_plate, (x + 10, y + 10))
+    text(surf, title_str, x + 20, y + 14, BRIGHT_TEXT, L.font_title - 6, True)
 
-    # Measure pass — figure out total content height to decide whether
-    # to center vertically. Cheap because we re-wrap; only matters for
-    # short rooms.
-    desc_lines = _soft_wrap(desc_str, wrap_w, L.font_body - 1)
-    f_body = font(L.font_body - 1)
-    body_lh = f_body.get_height() + 3
-    title_h = font(L.font_title - 4, bold=True).get_height() + 6
-    desc_h = len(desc_lines) * body_lh
+    # ── Object pins on a loose grid inside the art ─────────────────────
     visible = room.visible_entities()
-    ents_h  = 0
-    if visible:
-        ents_h = 22 + 16 * min(len(visible), 6)
-    exits_h = 0
-    if room.exits:
-        exits_h = 22 + 16 * min(len(room.exits), 6)
-    total_h = title_h + desc_h + 12 + ents_h + 16 + exits_h
-    avail_h = (y + h) - content_start_y - 12
-    pad_top = max(0, (avail_h - total_h) // 4) if total_h < avail_h else 0
-    cy = content_start_y + pad_top
+    bar_h = 64
+    pax, pay = x + 24, y + 52
+    paw, pah = w - 48, h - 52 - bar_h - 12
+    cols = 4
+    pin_r = 16
+    try:
+        mxy = pygame.mouse.get_pos()
+    except Exception:
+        mxy = None
+    hovered = None
+    n_rows = max(1, (len(visible) + cols - 1) // cols)
+    placed = []
+    for idx, e in enumerate(visible):
+        col = idx % cols
+        row = idx // cols
+        cx = pax + int((col + 0.5) * (paw / cols))
+        cyp = pay + int((row + 0.5) * (pah / max(1, n_rows)))
+        cyp = min(cyp, pay + pah - pin_r)
+        placed.append((idx, e, cx, cyp))
 
-    text(surf, title_str, x + 14, cy, ACCENT2, L.font_title - 4, True)
-    cy += title_h
-    cy += text_wrapped(surf, desc_str, x + 14, cy, wrap_w,
-                       NORMAL_TEXT, L.font_body - 1)
-    cy += 10
+    for idx, e, cx, cyp in placed:
+        unknown = (_vis is not None and _vis.is_unknown(e))
+        et = getattr(e, "entity_type", "object")
+        if et == "monster":   base = (210, 70, 70)
+        elif et == "crawler": base = (90, 150, 210)
+        elif et == "hazard":  base = (220, 170, 60)
+        elif et == "npc":     base = (110, 200, 130)
+        else:                 base = (175, 175, 190)
+        if unknown:
+            base = (120, 120, 130)
+        is_hover = False
+        if mxy is not None:
+            if (mxy[0] - cx) ** 2 + (mxy[1] - cyp) ** 2 <= (pin_r + 3) ** 2:
+                is_hover = True
+                hovered = idx
+        pygame.draw.circle(surf, (10, 10, 14), (cx, cyp + 1), pin_r + 2)
+        pygame.draw.circle(surf, base, (cx, cyp), pin_r)
+        pygame.draw.circle(surf, BRIGHT_TEXT if is_hover else (20, 20, 26),
+                           (cx, cyp), pin_r, 2)
+        glyph = "?" if unknown else str(idx + 1)
+        gimg = font(L.font_small, bold=True).render(glyph, True, (12, 12, 16))
+        surf.blit(gimg, (cx - gimg.get_width() // 2,
+                         cyp - gimg.get_height() // 2))
+        if click_registry is not None:
+            label = "???" if unknown else e.display_name()
+            def _mk(nm):
+                def _cb():
+                    if command_cb is not None:
+                        command_cb("sprawdz " + nm)
+                return _cb
+            click_registry.add((cx - pin_r, cyp - pin_r, pin_r * 2, pin_r * 2),
+                               _mk(e.display_name()),
+                               tooltip="Sprawdz: " + label,
+                               category="room_pin")
 
-    if visible:
-        text(surf, t("ui_visible", fallback="Widzisz:"), x + 14, cy, ACCENT,
-             L.font_small, True); cy += 18
-        # P29.5 — fog of war: unknown entities render as vague shapes
-        # in dim text; only seen/inspected show real names.
-        try:
-            from ..engine import visibility as _vis
-        except Exception:
-            _vis = None
-        for e in visible:
-            if _vis is not None and _vis.is_unknown(e):
-                name = _vis.shape_for_unknown(e)
-                line_col = DIM_TEXT
-                tag = " ?"   # marker: needs `sprawdź`
-            else:
-                name = e.display_name()
-                line_col = NORMAL_TEXT
-                if e.entity_type == "monster":   tag = " ⚔"
-                elif e.entity_type == "crawler": tag = " ☻"
-                elif e.entity_type == "hazard":  tag = " ⚠"
-                else:                            tag = ""
-                if _vis is not None and _vis.is_inspected(e):
-                    tag += " ✓"
-            text(surf, f"  • {name}{tag}", x + 16, cy, line_col, L.font_small); cy += 16
-            if cy > y + h - 80: break
-
-    if room.exits:
-        cy += 6
-        text(surf, t("ui_exits", fallback="Wyjścia:"), x + 14, cy, ACCENT,
-             L.font_small, True); cy += 18
-        # P27.5 (P27-UX-21): filter hidden + skip per-exit hint text
-        # when stack is getting tight, so the list doesn't truncate
-        # mid-room (Lounge had 6 exits, last one fell off-screen).
-        visible_exits = [(lbl, ed) for lbl, ed in room.exits.items()
-                         if not ed.get("hidden")]
-        # Compact mode: if more than 5 exits, skip the per-exit hint
-        # lines (which double the height).
-        compact = len(visible_exits) > 5
-        for label, ed in visible_exits:
-            target_id = ed.get("target","")
-            target = f.rooms.get(target_id)
-            target_name = target.display_short_title() if target else "?"
-            lock = "🔒" if ed.get("locked") else ""
-            hint = ed.get("fallback_hint") or t(ed.get("hint_key",""), fallback="")
-            line = f"  → {label}  ({target_name}) {lock}"
-            text(surf, line, x + 16, cy, NORMAL_TEXT, L.font_small); cy += 16
-            if hint and not compact:
-                text(surf, f"      {hint}", x + 16, cy, DIM_TEXT, L.font_small - 1); cy += 14
-            if cy > y + h - 18: break
-
-
+    # ── Bottom description bar ─────────────────────────────────────────
+    bar_y = y + h - bar_h
+    barsurf = pygame.Surface((w, bar_h), pygame.SRCALPHA)
+    barsurf.fill((0, 0, 0, 185))
+    surf.blit(barsurf, (x, bar_y))
+    pygame.draw.line(surf, BORDER, (x, bar_y), (x + w, bar_y), 1)
+    if hovered is not None and hovered < len(visible):
+        e = visible[hovered]
+        unknown = (_vis is not None and _vis.is_unknown(e))
+        nm = "???" if unknown else e.display_name()
+        text(surf, f"{hovered + 1}. {nm}", x + 14, bar_y + 8,
+             BRIGHT_TEXT, L.font_small, True)
+        sub = ("Kliknij, aby sprawdzic." if unknown
+               else (getattr(e, "fallback_desc", "")
+                     or "Kliknij, aby sprawdzic."))
+        for j, ln in enumerate(_soft_wrap(sub, w - 28, L.font_small - 1)[:2]):
+            text(surf, ln, x + 14, bar_y + 28 + j * 15, NORMAL_TEXT,
+                 L.font_small - 1)
+    else:
+        desc_str = (room.display_first_enter()
+                    if room.last_visited_minute == f.current_minute
+                    else room.display_look())
+        for j, ln in enumerate(_soft_wrap(desc_str, w - 28,
+                                          L.font_small - 1)[:3]):
+            text(surf, ln, x + 14, bar_y + 8 + j * 17, NORMAL_TEXT,
+                 L.font_small - 1)
+    return
 def _all_status_labels(target):
     """P29.63 — etykiety statusów do HUD: stany walki (conditions, przez
     status_label EN→PL) + statusy SYSTEMOWE (state.systemic_statuses:
