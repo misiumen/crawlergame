@@ -3000,42 +3000,67 @@ def _draw_silhouette(surf, target, plan, x, y, w, h, L,
         broken = zp.get("broken", False)
         color = _zone_color(zp, broken)
         is_sel = (zone_key == selected_zone)
-        # Translucent fill so the portrait reads through; heavier on the
-        # selected zone (and on the block fallback, where there's no art).
         if drew_real:
-            fill_a = 150 if is_sel else (95 if broken else 55)
+            # The PORTRAIT is the body. Zones are clickable OUTLINES traced on
+            # the anatomy — NOT filled blocks (a teal fill over the dark art
+            # read as a paper-doll and hid the portrait). Only fill when a zone
+            # needs to scream: selected (thin), or broken/wounded (red tint).
+            fill_a = 0
+            if is_sel:
+                fill_a = 70
+            elif broken:
+                fill_a = 80
+            elif zp.get("hp", 1) < zp.get("max_hp", 1):
+                fill_a = 40
+            if fill_a > 0:
+                try:
+                    ov = pygame.Surface((rw, rh), pygame.SRCALPHA)
+                    ov.fill((color[0], color[1], color[2], fill_a))
+                    surf.blit(ov, (rx, ry))
+                except Exception:
+                    pass
+            # Outline every zone so the click targets read at a glance.
+            if is_sel:
+                pygame.draw.rect(surf, DANGER, (rx - 1, ry - 1, rw + 2, rh + 2), 2)
+            elif broken:
+                pygame.draw.rect(surf, DANGER, (rx, ry, rw, rh), 1)
+            else:
+                pygame.draw.rect(surf, (130, 190, 210), (rx, ry, rw, rh), 1)
         else:
-            fill_a = 210 if is_sel else 170
-        try:
-            ov = pygame.Surface((rw, rh), pygame.SRCALPHA)
-            ov.fill((color[0], color[1], color[2], fill_a))
-            surf.blit(ov, (rx, ry))
-        except Exception:
-            pygame.draw.rect(surf, color, (rx, ry, rw, rh))
-        # Border: thick danger accent when selected, hairline otherwise.
-        if is_sel:
-            pygame.draw.rect(surf, DANGER, (rx - 1, ry - 1, rw + 2, rh + 2), 2)
-        else:
-            pygame.draw.rect(surf, BORDER, (rx, ry, rw, rh), 1)
-        # Label with a dark backing strip so it stays legible over art.
-        label = props.get("label_pl", zone_key)
-        f_lbl = font(max(9, min(L.font_small - 2, max(9, rh // 3))))
-        if f_lbl.size(label)[0] > rw - 4:
-            while label and f_lbl.size(label + "…")[0] > rw - 4:
-                label = label[:-1]
-            label = label + "…"
-        img = f_lbl.render(label, True, BRIGHT_TEXT)
-        lx = rx + (rw - img.get_width()) // 2
-        ly = ry + (rh - img.get_height()) // 2
-        if drew_real:
+            # No art — keep the solid colored block silhouette + outline.
             try:
-                strip = pygame.Surface((img.get_width() + 6,
-                                        img.get_height() + 2), pygame.SRCALPHA)
-                strip.fill((0, 0, 0, 150))
-                surf.blit(strip, (lx - 3, ly - 1))
+                ov = pygame.Surface((rw, rh), pygame.SRCALPHA)
+                ov.fill((color[0], color[1], color[2], 210 if is_sel else 170))
+                surf.blit(ov, (rx, ry))
             except Exception:
-                pass
-        surf.blit(img, (lx, ly))
+                pygame.draw.rect(surf, color, (rx, ry, rw, rh))
+            if is_sel:
+                pygame.draw.rect(surf, DANGER, (rx - 1, ry - 1, rw + 2, rh + 2), 2)
+            else:
+                pygame.draw.rect(surf, BORDER, (rx, ry, rw, rh), 1)
+        # Labels: over a portrait only the SELECTED zone is labelled (dark
+        # backing strip for legibility) so the art stays clean; the other
+        # zones are identified by hover tooltip + the "Cel:" preview line.
+        # Without art, every block keeps its label.
+        if is_sel or not drew_real:
+            label = props.get("label_pl", zone_key)
+            f_lbl = font(max(9, min(L.font_small - 2, max(9, rh // 3))))
+            if f_lbl.size(label)[0] > rw - 4:
+                while label and f_lbl.size(label + "…")[0] > rw - 4:
+                    label = label[:-1]
+                label = label + "…"
+            img = f_lbl.render(label, True, BRIGHT_TEXT)
+            lx = rx + (rw - img.get_width()) // 2
+            ly = ry + (rh - img.get_height()) // 2
+            if drew_real:
+                try:
+                    strip = pygame.Surface((img.get_width() + 6,
+                                            img.get_height() + 2), pygame.SRCALPHA)
+                    strip.fill((0, 0, 0, 175))
+                    surf.blit(strip, (lx - 3, ly - 1))
+                except Exception:
+                    pass
+            surf.blit(img, (lx, ly))
         # Click zone — sets cs.targeted_zone_by_eid for this target.
         # P28 (P27-UX-12): category encodes "<base>:<zone>" so the
         # Game's double-click detector can spot two clicks on the

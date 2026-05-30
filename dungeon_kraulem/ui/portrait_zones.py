@@ -31,12 +31,12 @@ Box = Tuple[float, float, float, float]
 HITBOXES: Dict[str, Dict[str, Box]] = {
     # Big butcher, centered, broad apron torso, cleaver low-left.
     "wrog_intake_freezer_carver": {
-        "head":  (0.42, 0.07, 0.17, 0.15),
-        "torso": (0.35, 0.22, 0.30, 0.40),
-        "l_arm": (0.26, 0.27, 0.11, 0.30),
-        "r_arm": (0.63, 0.27, 0.11, 0.30),
-        "l_leg": (0.39, 0.62, 0.12, 0.33),
-        "r_leg": (0.51, 0.62, 0.12, 0.33),
+        "head":  (0.44, 0.11, 0.13, 0.11),
+        "torso": (0.34, 0.23, 0.31, 0.38),
+        "l_arm": (0.27, 0.26, 0.11, 0.30),
+        "r_arm": (0.62, 0.26, 0.11, 0.28),
+        "l_leg": (0.40, 0.62, 0.10, 0.32),
+        "r_leg": (0.51, 0.62, 0.11, 0.32),
     },
     # Armored warden, wide stance, helmet top-center, chainsaw left.
     "wrog_intake_warden": {
