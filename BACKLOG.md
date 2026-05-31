@@ -7,6 +7,183 @@ albo usuwamy. Najnowsze na górze.
 
 ## Open
 
+### UX-10 · Model interakcji ze ŚWIATEM bez zakładek
+**Problem (user):** „nie lubię całego designu zakładek dla obiektów
+interaktywnych… nienawidzę pomysłu interakcji z grą w ten sposób".
+Żeby dotknąć obiektu / postaci / pokoju trzeba przełączać
+`[Akcje][Wyjścia][Środowisko][Istoty]…` i wybierać z list — męczące.
+
+**Granica (ważna, wg user'a):**
+- **Zakładki ZOSTAJĄ** dla systemów menu: dziennik, crafting,
+  lootboxy/skrzynki, ekwipunek — to ekrany-menu, tam zakładki są OK.
+- **Zakładki PRECZ** z interakcji ze światem: obiekty, NPC, pokój,
+  wyjścia, środowisko. To ma być bezpośrednie, nie nawigacja po
+  zakładkach.
+
+**Kierunek (do rozwinięcia):** interakcja BEZPOŚREDNIA i kontekstowa —
+klik w encję (pin na ilustracji albo wiersz) ujawnia jej istotne
+czasowniki INLINE w miejscu (`sprawdź / pogadaj / zaatakuj / zbierz /
+rozbierz…`). Ta sama zasada co COMBAT-1 A („jedna powierzchnia,
+działasz na to, co wskazujesz") + spójne z pinami (UX-7/UX-9). Parser
+tekstowy zostaje jako równoległa ścieżka.
+
+**Powiązane:** UX-7, UX-9 (piny), COMBAT-1 A. Duży redesign — rozbić na
+etapy; iterować w trybie Demo (Intake).
+
+**Pliki:** render akcji/zakładek w `ui/ui.py`, `engine/game.py`
+(action panel build + click routing), `ui/click_registry.py`.
+
+---
+
+### UX-4b · „pogadaj" z generycznym NPC nie odpala drzewka (root cause)
+**Problem (user, re-test):** „pogadaj z Nadzorca Sortowni" → tylko
+`[rozmowa] d20(8) + CHA(-1) + tła(+1) = 8 vs TT 10 → częśc. sukces`,
+zero treści. (Powiązane z UX-4.)
+
+**Diagnoza (potwierdzona):** system drzewek dialogowych DZIAŁA
+(`engine/dialogue.py` + `content/data/npc_dialogues.py` ma drzewka:
+default_crawler / liga_brawurowa / intake_warden / placeholder). ALE
+`game.py:_guess_dialogue_tree` (1986) zwraca tree tylko dla
+`faction:liga`, `intake`+`floor_boss`, albo `T_CRAWLER`. Generyczny NPC
+(„Nadzorca Sortowni") nie pasuje → zwraca `""` → talk-intent przechodzi
+do **legacy skill-check** (`game.py:2880` `resolve`) → goły rzut
+`[rozmowa]`, bez treści. Co ważne: `npc_dialogues.py:538`
+`_build_placeholder_tree()` ISTNIEJE, ale nie jest używane jako
+fallback.
+
+**Fix-szkic (mały):**
+- `_guess_dialogue_tree`: dla DOWOLNEGO NPC z affordance „talk" bez
+  specyficznego drzewka → zwróć `placeholder` zamiast `""`.
+- Upewnić się, że legacy `[rozmowa]` roll już nie odpala, gdy jest
+  drzewko (albo całkiem wyciąć legacy ścieżkę dla „talk").
+- Docelowo: placeholder per-archetyp/sponsor zamiast jednego ogólnego
+  (treść wg `docs/CONTENT_BIBLE.md`), ale fallback najpierw.
+
+**Pliki:** `engine/game.py` (`_guess_dialogue_tree`, talk dispatch),
+`content/data/npc_dialogues.py` (placeholder), `engine/dialogue.py`.
+
+---
+
+### LOC-1 · Słabe polskie nazwy osiągnięć (tytuł vs. opis zdarzenia)
+**Problem (user):** „Osiągnięcia: Konferansjer warknął" jest bez sensu
+jako nazwa. To tytuł osiągnięcia za last-stand (`anty_host_warknal`,
+`systems/achievements.py:285`) — ale brzmi jak fragment logu opisujący
+reakcję KONFERANSJERA, nie wyczyn GRACZA.
+
+**Fix-szkic:**
+- Przemianować `fallback_name_pl` na tytuł-wyczyn, np. **„Nie tak
+  szybko"** (echo kwestii hosta), „Jedna klatka życia", „Na resztkach
+  adrenaliny", „Jeszcze nie teraz". (opis PL już dobry.)
+- **Sweep:** przejrzeć WSZYSTKIE `fallback_name_pl` w
+  `systems/achievements.py` pod kątem tego samego błędu (nazwa = tytuł
+  wyczynu, nie zdanie-zdarzenie). Voice wg `docs/CONTENT_BIBLE.md`.
+- Szersza zasada: nazwy = tytuły, nie opisy zdarzeń; opisy zdania pełne.
+
+**Pliki:** `systems/achievements.py`, ew. inne player-facing nazwy.
+
+---
+
+### CMB-2 · Ogony (i inne części) dla bestii w VATS
+**Problem (user):** bestie (np. szczur z długim ogonem) powinny mieć
+celowalny **ogon**, nie tylko głowa/tułów/łapy — żeby okaleczyć albo
+przestraszyć stwora. Części tylko tam, gdzie mają sens.
+
+**Fix-szkic:**
+- `content/data/body_plans.py`: dodać zonę `"tail"` (`label_pl:"ogon"`)
+  do planu czworonoga — albo nowy plan `large_quadruped`/`tailed_beast`
+  dla stworów z ogonem (szczur, bestia-pies). Silnik wspiera
+  `maim_status` → trafienie/złamanie ogona = `STATUS_AFRAID` (postraszyć)
+  lub `STATUS_SLOWED` (utrata równowagi) + drop przy patroszeniu.
+- `ui/portrait_zones.py`: hitbox `tail` per art-key (np. ogon szczura
+  zamiatający w prawo) + ew. w archetypie `quadruped`/`beast`.
+- Zero zmian w silniku — to dane per-plan/per-art.
+
+**Pliki:** `content/data/body_plans.py`, `ui/portrait_zones.py`.
+
+---
+
+### CMB-3 · Dokładniejsze hitboxy VATS z dostarczonych PNG
+**Problem (user):** czy mogę „lepiej zeskanować" dostarczony PNG, żeby
+narysować strefy celowania dokładniej?
+
+**Ustalenia:** hitboxy to ręcznie obrysowane znormalizowane boxy per
+art-key (`ui/portrait_zones.py HITBOXES`) + generyczne fallbacki
+archetypów (stąd niedopasowania do konkretnej ilustracji).
+- **Realna ścieżka:** asystent OTWIERA dostarczony PNG (Read renderuje
+  obrazy), patrzy na anatomię i ręcznie obrysowuje strefy (głowa/tułów/
+  łapy/**ogon**/itd.) pod ten konkretny obrazek. Najpewniejsze, skaluje
+  się z dokładaniem artu.
+- **Czego unikać:** w pełni automatyczna detekcja semantyczna („znajdź
+  ogon") z dowolnego stylizowanego PNG jest zawodna. Analiza alpha/
+  sylwetki da bounding-box figury (przydatne do auto-dopasowania ramki),
+  ale nie rozróżni „to ręka vs ogon" bez ML (overkill + kruche na
+  nie-ludzkich kształtach).
+- **Proces docelowy:** user wrzuca portret → asystent ogląda → obrysowuje
+  strefy do faktycznego artu.
+
+**Pliki:** `ui/portrait_zones.py` (+ widok delivered PNG przez Read).
+
+---
+
+### COMBAT-1 · Przeprojektowanie odczucia walki (epik)
+**Problem (user):** start walki i cała pętla są niesatysfakcjonujące:
+zidentyfikuj wroga → wejdź w zakładkę [Istoty] → kliknij „zaatakuj" →
+1 tura gra się automatycznie → klikaj aż padnie. Złe odczucie i zła
+ergonomia. Oczekiwana zmiana — „probably more dramatically than before".
+
+**Diagnoza:** silnik JUŻ ma głębię (`engine/combat.py`,
+`engine/enemy_ai.py`), tylko UX/pacing ją spłaszcza:
+- telegraf intencji wroga (`CombatState.enemy_intents`),
+- VATS / cios w kończynę (`targeted_zone_by_eid` + `body_plans`),
+- warianty ataku `careful`/`heavy`, `defend`, `dodge`, `assess`,
+  `reposition` (zbliż/oddal), push-into-hazard / throw / break, `lure`,
+- słabości (`Słaby na: …`), bandy (zwarcie/oddal), statusy, frakcje,
+  ładowane specjale wroga.
+Trzy realne wady: (1) tarcie wejścia (sprawdź + zakładka [Istoty]),
+(2) brak znaczącej decyzji na turę → dominuje spam „zaatakuj",
+(3) martwy pacing (1 akcja → auto-tura wroga → powtórz).
+
+**Kierunki (user wybrał WSZYSTKIE A–D, 2026-05-31). Kolejność wg
+satysfakcja/koszt):**
+
+- **A · Jeden ekran, zero tarcia** *(głównie reuse UI)*: na starcie
+  walki auto-zaznacz najbliższego wroga; assess inline pod portretem
+  (banda HP, threat, **słabość**, **telegraf intencji**); kontekstowy
+  pasek akcji na/pod portretem (Atak / Unik / Obrona / Cel: kończyna /
+  Otoczenie). Usuwa krok `sprawdź` i zakładkę [Istoty].
+
+- **B · Odczyt telegrafu i kontry** *(reuse intents+dodge/defend/VATS)*:
+  głośno pokaż planowaną intencję wroga („szykuje cios w głowę",
+  „ładuje specjał") i każ na nią ODPOWIEDZIEĆ — unik neguje ciężki
+  cios, obrona tłumi, atak w ładującą kończynę PRZERYWA specjał. Tura =
+  pętla odczyt/kontra zamiast wyścigu obrażeń.
+
+- **C · Cios w kończynę jako główny czasownik**: klik strefy ciała na
+  portrecie = atak (nie ukryta podopcja). Głowa = ryzyko/kryt+oszołom,
+  ręce = rozbrojenie/mniej ich dmg, nogi = stop podejściu/ucieczce.
+  Plus eksploatacja słabości (posmaruj broń kwasem, wepchnij w iskrzące
+  przewody). Ujawnia `body_plans`/VATS.
+
+- **D · Pacing + dramat teleturnieju** *(NAJWIĘCEJ nowego kodu+testów)*:
+  ekonomia akcji (2 PA/turę → sekwencja decyzji, nie 1 klik); reakcje
+  widowni/sponsorów na efektowne zabójstwa (krytyczny cios w kończynę →
+  skok widowni → pod sponsora w trakcie walki); prompty finiszera przy
+  niskim HP wroga; kinowy log + shake/SFX (częściowo już są).
+
+**Rekomendowana sekwencja:** A+B najpierw (największy zysk/koszt, niemal
+sam reuse) → potem C (called-shot rdzeniem) → potem D (ekonomia akcji +
+dramat widowni; tu dochodzą nowe systemy + testy).
+
+**Iteracja:** używać trybu **Demo (Intake)** do szybkiego tuningu walki
+na F1 — zmiany w `engine/combat.py` propagują do wszystkich trybów.
+
+**Pliki:** `engine/combat.py`, `engine/enemy_ai.py`,
+`ui/portrait_zones.py` + render walki w `ui/ui.py`, dispatch w
+`engine/game.py` (`_combat_*`), `content/data/body_plans.py`; ekonomia
+akcji = nowe pole na `CombatState` + testy.
+
+---
+
 ### UX-9 · Klik w pin (sprawdź) otwiera dziennik zamiast inspekcji
 **Problem (user):** klik w pin 7 (obiekt „coś ważnego dla zadania")
 otwiera dziennik zamiast wykonać `sprawdź`. „wiring here must be janky".
