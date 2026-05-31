@@ -443,7 +443,7 @@ _add(AchievementDef(
 ))
 _add(AchievementDef(
     key="karaoke_killer",
-    fallback_name_pl="Karaoke killer",
+    fallback_name_pl="Zabójca karaoke",
     fallback_name_en="Karaoke Killer",
     fallback_description_pl="Skończyłeś piętro w Barze U Skurczybyka. Mikrofon pamięta ciszę po twoim wyjściu.",
     fallback_description_en="Cleared a Skurczybyk Bar floor. The mic remembers the silence after.",
