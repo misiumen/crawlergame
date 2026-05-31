@@ -320,7 +320,15 @@ Pozycja = funkcja kolejności na liście, nie natury obiektu.
   draw() liczy ją co klatkę — gołe `random()` = skaczące piny.
 - Anty-overlap: minimalny odstęp / jitter w obrębie strefy.
 
-**Pliki:** `ui/ui.py` (pętla pinów), ew. `content/data/
+**Status (2026-05-31): TYPY PINÓW + PINY WYJŚĆ ZROBIONE** (commit 986b99f).
+4 odrębne rodzaje: wróg (czerwone koło + halo), npc (zielone koło), obiekt
+(szare koło), wyjście (bursztynowy „door" rounded-rect z → / 🔒 przy
+krawędziach wg kierunku, klik = idź/wyłam). `ui._entity_pin_kind`,
+`_PIN_COLORS`, `_draw_exit_pins`. Test: `test_exit_and_pin_kinds.py`.
+ZOSTAJE: logiczne rozmieszczenie pinów ENCJI wg natury (sufit/ściana/
+podłoga) + stabilny seed + anty-overlap.
+
+**Pliki:** `ui/ui.py` (pętla pinów, `_draw_exit_pins`), ew. `content/data/
 entity_templates.py` (hint `placement`).
 
 ---
