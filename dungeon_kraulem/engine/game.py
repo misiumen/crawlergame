@@ -2846,6 +2846,35 @@ class Game:
             self._attempt_distract(); return
         if intent.intent == "mass_salvage":
             self._attempt_mass_salvage(intent); return
+
+        # UX-2 — room-wide scan actions (rozejrzyj się / nasłuchuj /
+        # przeszukaj pokój) are one-and-done per room. A repeat just
+        # reprints the same text with no progress, so we refuse cheaply
+        # (no turn) and the action panel hides the row (ui_nav._basic_
+        # actions reads room.state["actions_done"], which saves/loads).
+        # This guard sits BEFORE the mass_search dispatch because
+        # "przeszukaj pokój" parses to `mass_search` and returns right
+        # after; `look`/`listen` continue to the standard pipeline below.
+        # Per-OBJECT searches ("przeszukaj <skrzynia>") parse to `loot`
+        # and are never affected.
+        _scan_key = None
+        if intent.intent in ("look", "listen"):
+            _scan_key = intent.intent
+        elif intent.intent == "mass_search":
+            _scan_key = "search"
+        if _scan_key is not None:
+            _room = (self.world.current_floor.current_room()
+                     if self.world.current_floor else None)
+            if _room is not None:
+                _done = _room.state.setdefault("actions_done", [])
+                if _scan_key in _done:
+                    self.log(t("feedback_action_exhausted",
+                               fallback="Już to zrobiłeś tutaj. "
+                                        "Nic nowego się nie pojawia."),
+                             LOG_WARN)
+                    return
+                _done.append(_scan_key)
+
         if intent.intent == "mass_search":
             self._attempt_mass_search(intent); return
         if intent.intent == "mass_loot_take":
@@ -2890,37 +2919,10 @@ class Game:
         if intent.intent == "invoke_belief":
             self._attempt_invoke_belief(intent); return
 
-        # UX-2 — room-scoped scan actions (rozejrzyj się / nasłuchuj /
-        # przeszukaj pokój) are one-and-done per room. Repeating them just
-        # reprints the same text without progress, so we refuse cheaply (no
-        # turn) and the action panel hides them (see ui_nav._basic_actions).
-        # The "done" set lives on room.state, which already round-trips
-        # through save/load. NOTE: object searches (przeszukaj <skrzynia>)
-        # are per-object and are NOT room-scans — only `search` whose target
-        # is the room itself qualifies.
-        _ROOM_WORDS = {"pokoj", "pokój", "pomieszczenie", "pomieszczeniu",
-                       "pokoju", "wokol", "wokół", "okolicy", "otoczenie"}
-        _is_room_scan = intent.intent in ("look", "listen")
-        if intent.intent == "search":
-            # The deterministic parser strips a stripped/object target into
-            # intent.targets, but parse_with_optional_llm drops it — so we
-            # judge room-vs-object from the normalized command text instead:
-            # a room scan is "przeszukaj" alone, or "przeszukaj <room-word>".
-            _toks = (intent.normalized_text or "").lower().split()
-            _rest = [w for w in _toks[1:] if w]  # drop the verb
-            _is_room_scan = (not _rest) or all(w in _ROOM_WORDS for w in _rest)
-        if _is_room_scan:
-            _room = (self.world.current_floor.current_room()
-                     if self.world.current_floor else None)
-            if _room is not None:
-                done = _room.state.setdefault("actions_done", [])
-                if intent.intent in done:
-                    self.log(t("feedback_action_exhausted",
-                               fallback="Już to zrobiłeś tutaj. "
-                                        "Nic nowego się nie pojawia."),
-                             LOG_WARN)
-                    return
-                done.append(intent.intent)
+        # NOTE: the UX-2 room-scan exhaustion guard lives EARLIER (right
+        # before the mass_search dispatch ~line 2849), because "przeszukaj
+        # pokój" parses to `mass_search` which returns there and would never
+        # reach this point. See `_scan_key` block above.
 
         # Standard pipeline: validate → resolve → apply
         v = validate(intent, self.world)
