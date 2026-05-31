@@ -833,7 +833,7 @@ def _floor_biome(world) -> str:
 
 
 def draw_room_panel(surf, world, layout=None, *, click_registry=None,
-                    command_cb=None):
+                    command_cb=None, entity_action_cb=None):
     """Render the center panel. P24.5: when combat is active in the
     current room, this delegates to draw_combat_arena() so the player
     gets a dedicated tactical surface instead of the normal room view."""
@@ -932,13 +932,17 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
                          cyp - gimg.get_height() // 2))
         if click_registry is not None:
             label = "???" if unknown else e.display_name()
-            def _mk(nm):
+            def _mk(eid, nm):
                 def _cb():
-                    if command_cb is not None:
+                    # Direct, parser-free dispatch by entity id (UX-9) so a
+                    # name containing a reserved keyword can't hijack the click.
+                    if entity_action_cb is not None:
+                        entity_action_cb(eid, "inspect")
+                    elif command_cb is not None:
                         command_cb("sprawdz " + nm)
                 return _cb
             click_registry.add((cx - pin_r, cyp - pin_r, pin_r * 2, pin_r * 2),
-                               _mk(e.display_name()),
+                               _mk(e.entity_id, e.display_name()),
                                tooltip="Sprawdz: " + label,
                                category="room_pin")
 

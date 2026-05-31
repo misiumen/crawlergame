@@ -296,11 +296,18 @@ def test_commit_verb_runs_command():
     # Already focused (N=1 auto-focus), so first row is back. Find Użyj.
     issued = []
     g.submit_generated_command = lambda c, target_id=None: issued.append(c)
+    direct = []
+    g.dispatch_entity_action = lambda eid, action_type="inspect": \
+        direct.append((eid, action_type))
     target_opt = next((o for o in inv if "Użyj" in o.label), None)
     assert target_opt is not None
     g._commit_nav_option(target_opt)
-    assert any("użyj nóż" in c for c in issued), issued
-    print(f"  commit verb runs command: {issued}: OK")
+    # UX-9: entity-targeted verb options now dispatch directly by entity id
+    # (parser-free); the legacy "<verb> <name>" string is only a fallback for
+    # options without a target/action_type.
+    assert (a.entity_id, "use") in direct or any("użyj nóż" in c for c in issued), \
+        (direct, issued)
+    print(f"  commit verb dispatches use: direct={direct} issued={issued}: OK")
 
 
 # ── Mouse click parity ─────────────────────────────────────────────────

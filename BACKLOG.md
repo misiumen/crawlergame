@@ -202,19 +202,24 @@ otwiera dziennik zamiast wykonać `sprawdź`. „wiring here must be janky".
   `ekwipunek`, `postać`, `plotki`…) zostanie przejęta tak samo — i
   klikiem, i przez wpisanie z palca.
 
-**Fix-szkic:**
-- Docelowo: pin (i każda jawna akcja „sprawdź TĘ encję") powinien
-  dispatchować **bezpośrednią inspekcję po entity_id**, z pominięciem
-  fuzzy keyword-matchingu. Pin zna konkretną encję — nie ma powodu
-  serializować do stringa i re-parsować.
-- Alternatywa/uzupełnienie: gdy verb jest jawny (`sprawdź` + encja
-  obecna w pokoju), parser ma preferować dopasowanie nazwy encji w
-  bieżącym pokoju PRZED globalnymi quick-intentami.
-- Band-aid (niewystarczający sam): przemianować klucz-encję, by nazwa
-  nie zawierała zarezerwowanych słów.
+**Status (2026-05-31): KLIKI NAPRAWIONE.** Dodano parser-free
+`Game.dispatch_entity_action(entity_id, action_type)` (buduje ActionIntent
+wprost via `_forced_intent`, pomija `parse_with_optional_llm`). Piny i
+panel akcji (oba commit-paths) routują przez nią po `target_id`+
+`action_type`. Test: `test_direct_entity_dispatch.py`. ZOSTAJE: ścieżka
+WPISANA z palca (np. wpisanie „sprawdź coś ważnego dla zadania") nadal
+może być przejęta przez keyword — niższy priorytet, do rozważenia
+precedencja w `parser_core`.
 
-**Pliki:** `ui/ui.py` (callback pina), `engine/game.py` (ścieżka
-inspekcji / `command_cb`), `engine/parser_core.py` (precedencja).
+**Fix-szkic (zrobione / reszta):**
+- [x] pin / panel → bezpośrednia inspekcja po entity_id, bez fuzzy
+  keyword-matchingu.
+- [ ] parser: przy jawnym verbie preferować encję w pokoju PRZED
+  globalnymi quick-intentami (dla ścieżki wpisywanej).
+
+**Pliki:** `ui/ui.py` (callback pina), `engine/game.py`
+(`dispatch_entity_action`, `_forced_intent`), `engine/parser_core.py`
+(precedencja — TODO).
 
 ---
 

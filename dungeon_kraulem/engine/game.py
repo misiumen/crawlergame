@@ -205,6 +205,11 @@ class Game:
         # dispatch cycle so the validator can bypass disambiguation for
         # the already-resolved target. Cleared after each command.
         self._preresolved_target_id = None
+        # When set (by dispatch_entity_action), the next _handle_play_input
+        # skips the fuzzy parser and uses this pre-built intent instead, so a
+        # UI click that already knows its entity + verb can't be hijacked by
+        # keyword matching on the entity's name (UX-9). Read-once.
+        self._forced_intent = None
 
         # P24.5: full-screen graphical map overlay (M key toggles).
         self.full_map_open = False
@@ -2370,6 +2375,41 @@ class Game:
         self._preresolved_target_id = target_id
         self.submit_input()
 
+    # Action-type → Polish display verb. The action_type IS the affordance /
+    # intent key (talk, attack, inspect, hack, salvage, …), so the forced
+    # intent uses it directly; this map only supplies the echoed command line.
+    _ENTITY_ACTION_VERB_PL = {
+        "inspect": "sprawdź", "talk": "pogadaj", "attack": "zaatakuj",
+        "intimidate": "zastrasz", "hack": "zhakuj", "use": "użyj",
+        "salvage": "rozbierz", "strip": "zdemontuj", "search": "przeszukaj",
+        "loot": "przeszukaj", "open": "otwórz", "bribe": "przekup",
+    }
+
+    def dispatch_entity_action(self, entity_id, action_type: str = "inspect") -> None:
+        """Run an action against a specific entity WITHOUT round-tripping
+        through the fuzzy text parser.
+
+        Pins and the action panel already know exactly which entity and which
+        verb the player picked, so serialising to "<verb> <name>" and
+        re-parsing is both wasteful and buggy: an entity whose name contains a
+        reserved keyword (e.g. "…dla zadania") gets hijacked into a global
+        quick-intent like opening the journal (UX-9). We build the
+        ActionIntent directly and feed it to the normal validate→dispatch
+        pipeline via `_forced_intent`. `action_type` equals the intent key.
+        """
+        if self.world is None or entity_id is None:
+            return
+        ent = self.world.get(entity_id)
+        if ent is None:
+            return
+        at = action_type or "inspect"
+        verb = self._ENTITY_ACTION_VERB_PL.get(at, at)
+        name = ent.display_name()
+        self.input_text = f"{verb} {name}".strip()
+        self._preresolved_target_id = entity_id
+        self._forced_intent = {"intent": at, "verb": verb, "targets": [name]}
+        self.submit_input()
+
     def _handle_create_input(self, text_val):
         if self.cc.get("step") == "name":
             self.cc["name_input"] = text_val
@@ -2437,6 +2477,21 @@ class Game:
                     return
 
         intent = parse_with_optional_llm(text_val, self.world)
+        # UX-9 — direct entity dispatch from a pin / action-panel click.
+        # `dispatch_entity_action` stashed the exact intent + target, so we
+        # replace the parser's (possibly keyword-hijacked) result with it.
+        fi = getattr(self, "_forced_intent", None)
+        if fi is not None:
+            self._forced_intent = None
+            from .parser_core import ActionIntent
+            forced = ActionIntent()
+            forced.intent = fi["intent"]
+            forced.verb = fi["verb"]
+            forced.targets = list(fi["targets"])
+            forced.normalized_text = (text_val or "").strip().lower()
+            forced.raw_text = text_val or ""
+            forced.parser_source = "ui_direct"
+            intent = forced
         # Prompt 17: when combat is active, the combat router runs BEFORE
         # the generic intent dispatch. Combat-flavored commands (attack /
         # defend / dodge / flee / assess / use-environment / lure-into-
@@ -9059,8 +9114,12 @@ class Game:
         if kind == "back":
             self.nav_state.clear_focus(group_key)
             return
-        # verb / plain — run the command.
-        if opt.command:
+        # verb / plain — run the command. When the option targets a known
+        # entity with a known action_type, dispatch directly (parser-free)
+        # so an entity name containing a reserved keyword can't be hijacked.
+        if getattr(opt, "target_id", None) is not None and getattr(opt, "action_type", None):
+            self.dispatch_entity_action(opt.target_id, opt.action_type)
+        elif opt.command:
             self.submit_generated_command(opt.command,
                                           target_id=opt.target_id)
 
@@ -9077,7 +9136,9 @@ class Game:
         if kind == "back":
             self.nav_state.clear_focus()
             return
-        if opt.command:
+        if getattr(opt, "target_id", None) is not None and getattr(opt, "action_type", None):
+            self.dispatch_entity_action(opt.target_id, opt.action_type)
+        elif opt.command:
             self.submit_generated_command(opt.command,
                                           target_id=opt.target_id)
 
@@ -9403,7 +9464,8 @@ class Game:
                                      on_room_click=self._on_minimap_room_click)
             ui.draw_room_panel(s, self.world, layout=L,
                                click_registry=self.click_registry,
-                               command_cb=self.submit_generated_command)
+                               command_cb=self.submit_generated_command,
+                               entity_action_cb=self.dispatch_entity_action)
             ui.draw_sidebar(s, self.world, layout=L,
                             click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
@@ -9426,7 +9488,8 @@ class Game:
                                      on_room_click=self._on_minimap_room_click)
             ui.draw_room_panel(s, self.world, layout=L,
                                click_registry=self.click_registry,
-                               command_cb=self.submit_generated_command)
+                               command_cb=self.submit_generated_command,
+                               entity_action_cb=self.dispatch_entity_action)
             ui.draw_sidebar(s, self.world, layout=L,
                             click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
