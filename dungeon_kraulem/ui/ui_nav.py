@@ -479,6 +479,20 @@ def _two_tier_route(flat_options: List[SelectableOption],
     return out
 
 
+def _panel_name(e) -> str:
+    """UX-3 — name shown in the action panel. Unrecognised entities are
+    masked ('coś ?', 'ktoś ?') so the panel never spoils what the room
+    description is still hiding behind fog-of-war. Acting still works
+    because options carry the real target_id."""
+    try:
+        from ..engine import visibility as _vis
+        if _vis.is_unknown(e):
+            return _vis.masked_label(e)
+    except Exception:
+        pass
+    return e.display_name()
+
+
 def _flat_object_verbs(world, room) -> List[SelectableOption]:
     """Original per-entity object-verb generator (pre-P24.7 logic).
     Now used by `_object_options` as the source for picker/verb routing.
@@ -548,7 +562,7 @@ def _flat_object_verbs(world, room) -> List[SelectableOption]:
         # don't do anything meaningful — pure noise.
         if "service" in tags:
             continue
-        name = e.display_name()
+        name = _panel_name(e)
         affs = e.affordances or []
         # Inspect: always offer when the entity has a description to
         # display. Decorations with no desc would just print a generic
@@ -694,7 +708,7 @@ def _flat_entity_verbs(world, room) -> List[SelectableOption]:
             continue
         if not e.is_alive():
             continue
-        name = e.display_name()
+        name = _panel_name(e)
         affs = e.affordances or []
         # Talk path — always for crawler/npc, only if affordance for monster.
         if e.entity_type in ("crawler", "npc") or "talk" in affs:
