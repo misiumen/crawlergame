@@ -1041,6 +1041,88 @@ def draw_entity_popover(surf, popover, *, layout=None, click_registry=None,
                                tooltip=o.label, category="entity_popover")
 
 
+def draw_dialogue_screen(surf, world, npc, *, speaker, body, option_rows,
+                         sel_idx=0, biome="", room=None, layout=None,
+                         click_registry=None, on_pick=None, on_close=None):
+    """Full-screen conversation: room art backdrop + NPC portrait + speaker
+    line + player options. Options are BOTH mouse-clickable (click zones) and
+    keyboard-navigable (the caller passes `sel_idx`; arrows/Enter live in the
+    keydown handler). `option_rows` is a list of (label, suffix) — suffix
+    carries the optional "[CHA vs TT 13]" skill-check hint. `on_pick(i)` runs
+    option i; `on_close()` exits."""
+    from . import art as _art
+    L = _resolve_layout(layout)
+    sw, sh = surf.get_size()
+    surf.fill((6, 8, 12))
+    # Room backdrop across the upper band (dimmed so text stays legible).
+    if room is not None:
+        try:
+            _art.draw_room_background(surf, room, (0, 0, sw, int(sh * 0.60)),
+                                      biome=biome, veil_alpha=150)
+        except Exception:
+            pass
+    veil = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    veil.fill((4, 6, 10, 130))
+    surf.blit(veil, (0, 0))
+
+    # NPC portrait panel (left). draw_enemy_portrait falls back to a
+    # procedural silhouette when no PNG exists, so this always renders.
+    port_w = min(380, sw // 3)
+    port_h = int(port_w * 1.15)
+    px = int(sw * 0.07)
+    py = int(sh * 0.16)
+    pygame.draw.rect(surf, PANEL_BG, (px - 6, py - 6, port_w + 12, port_h + 12))
+    pygame.draw.rect(surf, ACCENT, (px - 6, py - 6, port_w + 12, port_h + 12), 2)
+    if npc is not None:
+        try:
+            _art.draw_enemy_portrait(surf, npc, (px, py, port_w, port_h),
+                                     biome=biome)
+        except Exception:
+            pass
+    # Speaker plate under the portrait.
+    plate_y = py + port_h + 16
+    text(surf, speaker or "", px - 6, plate_y, BRIGHT_TEXT, L.font_title - 2, True)
+
+    # Right column: NPC line + options.
+    tx = px + port_w + 56
+    tw = sw - tx - 90
+    ty = py + 6
+    for ln in _soft_wrap(body or "", tw, L.font_body + 2):
+        text(surf, ln, tx, ty, NORMAL_TEXT, L.font_body + 2)
+        ty += L.font_body + 12
+    ty += 22
+    row_h = L.font_body + 18
+    for i, (label, suffix) in enumerate(option_rows or []):
+        is_sel = (i == sel_idx)
+        if is_sel:
+            pygame.draw.rect(surf, (38, 50, 68), (tx - 10, ty - 4, tw + 20, row_h))
+        col = ACCENT if is_sel else BRIGHT_TEXT
+        prefix = "▸ " if is_sel else "  "
+        text(surf, f"{prefix}[{i + 1}] {label}", tx, ty, col,
+             L.font_body, bold=is_sel)
+        if suffix:
+            sw_x = tx + font(L.font_body, bold=is_sel).size(
+                f"{prefix}[{i + 1}] {label}")[0] + 16
+            text(surf, suffix, sw_x, ty + 1, DIM_TEXT, L.font_small)
+        if click_registry is not None and on_pick is not None:
+            def _mk(idx):
+                def _cb():
+                    on_pick(idx)
+                return _cb
+            click_registry.add((tx - 10, ty - 4, tw + 20, row_h), _mk(i),
+                               tooltip=label, category="dialogue_opt")
+        ty += row_h + 4
+
+    ty += 18
+    close_lbl = "[Esc] Wyjdź z rozmowy"
+    text(surf, close_lbl, tx, ty, DIM_TEXT, L.font_small)
+    if click_registry is not None and on_close is not None:
+        cw = font(L.font_small).size(close_lbl)[0] + 16
+        click_registry.add((tx - 6, ty - 4, cw, L.font_small + 12),
+                           lambda: on_close(), tooltip="Wyjdź",
+                           category="dialogue_close")
+
+
 def _all_status_labels(target):
     """P29.63 — etykiety statusów do HUD: stany walki (conditions, przez
     status_label EN→PL) + statusy SYSTEMOWE (state.systemic_statuses:

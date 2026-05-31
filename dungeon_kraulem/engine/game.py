@@ -194,6 +194,9 @@ class Game:
         # rozmowy. Ustawiane przy interceptcie "talk", czyszczone
         # przy zakończeniu drzewka.
         self.dialogue_state = None  # engine.dialogue.DialogueState | None
+        # Keyboard cursor for the dialogue option list (mouse + keyboard
+        # parity). Reset on open; clamped to the available options each draw.
+        self.dialogue_sel_idx = 0
 
         # Prompt 23.5 (backlog #1): log scrollback. 0 = pinned to newest.
         # PgUp / PgDn bump this in `_handle_play_keydown`; new log writes
@@ -2038,6 +2041,7 @@ class Game:
                      LOG_WARN)
             return
         self.dialogue_state = state
+        self.dialogue_sel_idx = 0
         self.state = STATE_DIALOG
 
     def _dialogue_log_callback(self, text: str, severity: str) -> None:
@@ -8381,16 +8385,24 @@ class Game:
                 return
             return
 
-        # P29.41 — dialog tree z NPC. 1-9 wybiera opcję, Esc zamyka.
+        # P29.41 — dialog tree z NPC. 1-9 / strzałki+Enter wybiera, Esc zamyka.
         if self.state == STATE_DIALOG:
+            self._suppress_textinput = True
             if digit is not None:
-                self._suppress_textinput = True
                 idx = int(digit) - 1
                 if idx >= 0:
                     self._pick_dialogue_option(idx)
                 return
+            if key in (pygame.K_UP, pygame.K_w):
+                self.dialogue_sel_idx = max(0, self.dialogue_sel_idx - 1)
+                return
+            if key in (pygame.K_DOWN, pygame.K_s):
+                self.dialogue_sel_idx += 1   # clamped against options at draw
+                return
+            if key == pygame.K_RETURN:
+                self._pick_dialogue_option(self.dialogue_sel_idx)
+                return
             if key == pygame.K_ESCAPE:
-                self._suppress_textinput = True
                 self._close_dialogue()
                 return
             return
@@ -9690,39 +9702,44 @@ class Game:
         elif self.state == STATE_DIALOG and self.dialogue_state is not None:
             self._refresh_layout()
             L = self._layout
-            ui.draw_topbar(s, self.world, layout=L)
-            if L.has_left_sidebar:
-                ui.draw_left_sidebar(s, self.world, layout=L)
-            ui.draw_room_panel(s, self.world, layout=L)
-            ui.draw_sidebar(s, self.world, layout=L)
-            ui.draw_log_and_input(s, self.world.log, self.input_text,
-                                   self.blink, scroll=self.log_scroll,
-                                   layout=L)
-            # P29.41 — dialog overlay: speaker + tekst + ponumerowane
-            # opcje. Klawisz 1-9 wybiera, Esc zamyka.
+            # Full-screen conversation (room backdrop + NPC portrait + clickable
+            # / keyboard options). Replaces the old text-only overlay so the
+            # mouse works and the NPC gets a face.
             from . import dialogue as _dlg
-            import textwrap as _tw
             node = _dlg.current_node(self.dialogue_state)
-            lines = []
+            npc = self.world.get(self.dialogue_state.npc_entity_id)
+            room = (self.world.current_floor.current_room()
+                    if self.world.current_floor else None)
+            biome = getattr(self.world.current_floor, "biome_key", "") \
+                if self.world.current_floor else ""
+            option_rows = []
+            speaker = ""
+            body = "(rozmowa zakończona)"
             if node is not None:
-                lines.append(f"— {node.speaker} —")
-                # Łamanie długiego tekstu na 80 znaków per linia.
-                txt = node.text or ""
-                lines.extend(_tw.wrap(txt, width=80) or [""])
-                lines.append("")
+                speaker = node.speaker
+                body = node.text or ""
                 avail = _dlg.available_options(
                     self.world, self.dialogue_state, node)
-                for i, (_real, opt) in enumerate(avail, 1):
+                for (_real, opt) in avail:
                     suffix = ""
                     if opt.skill_check is not None:
                         stat, dc = opt.skill_check
-                        suffix = f"  [{stat} vs TT {dc}]"
-                    lines.append(f"[{i}] {opt.label}{suffix}")
-                lines.append("")
-                lines.append("[Esc] Wyjdź z rozmowy.")
+                        suffix = f"[{stat} vs TT {dc}]"
+                    option_rows.append((opt.label, suffix))
+            # Clamp the keyboard cursor to the available rows.
+            n_opts = len(option_rows)
+            if n_opts:
+                self.dialogue_sel_idx = max(0, min(self.dialogue_sel_idx,
+                                                   n_opts - 1))
             else:
-                lines = ["(rozmowa zakończona — Esc)"]
-            self._overlay(lines)
+                self.dialogue_sel_idx = 0
+            ui.draw_dialogue_screen(
+                s, self.world, npc, speaker=speaker, body=body,
+                option_rows=option_rows, sel_idx=self.dialogue_sel_idx,
+                biome=biome, room=room, layout=L,
+                click_registry=self.click_registry,
+                on_pick=self._pick_dialogue_option,
+                on_close=self._close_dialogue)
         elif self.state == STATE_VICTORY:
             self._end_screen(t("victory_title", fallback="ZEJŚCIE ZALICZONE."), True)
         elif self.state == STATE_DEFEAT:

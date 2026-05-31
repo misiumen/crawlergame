@@ -7,6 +7,42 @@ albo usuwamy. Najnowsze na górze.
 
 ## Open
 
+### DIAL-1 · Głębokie drzewka dialogowe (sojusze / zdrada / romans / stawki)
+**Cel (user):** dużo rozgałęzień, zdrada, sojusze, stawki, romans — jak w
+porządnym RPG — BEZ pisania wszystkiego ręcznie.
+
+**Co już jest (silnik wystarczający):** `engine/dialogue.py` — węzły +
+opcje z `skill_check (stat, DC)` i `fail_node_id`, `requires_flag`/
+`forbids_flag` (gating), `one_shot`, oraz `consequences`: audience,
+sponsor, threat, give_item, **set_flag**, log, end. To wystarcza na
+rozgałęzienia, stawki (checki), sojusze/zdradę/romans (flagi + relacja +
+konsekwencje). Bottleneck = TREŚĆ (ręczne drzewka w
+`content/data/npc_dialogues.py`, dziś ~4 drzewka). Pełny ekran rozmowy +
+mysz: ZROBIONE (`ui.draw_dialogue_screen`).
+
+**Skalowanie treści bez pisania (rekomendacja — hybryda):**
+1. **Szablonowe archetypy drzewek** — kilkanaście parametryzowanych
+   drzew („nieufny biegacz", „desperacki sojusznik", „rywal", „romans-
+   kandydat") wypełnianych nazwą/frakcją/relacją NPC. Piszesz ~12, grasz
+   setki. Deterministyczne, mechaniki pewne.
+2. **Relacja/flagi jako system** — generyczne łuki (alliance/betrayal/
+   romance) jako stan + relacja; dialog tylko je *ujawnia* przez
+   szablonowe linie. Głębia z interakcji systemowych, nie z prozy.
+3. **LLM tylko na FLAWOR** — `llm/llm_roles.py` ma już `ROLE_DIALOGUE`
+   (lokalny Ollama, bezpieczny fallback, nie mutuje stanu). Może
+   generować *prozę* linii NPC na bazie kontekstu; szkielet (gałęzie,
+   checki, konsekwencje) zostaje deterministyczny. NIE oddawać LLM-owi
+   logiki rozgałęzień/stawek.
+**Wniosek:** szkielet szablonowy + flagowy system relacji = dużo RPG przy
+małym pisaniu; LLM dokłada zmienność prozy gdy włączony. Czysto-LLM pełne
+gałęzie ze stawkami = zawodne.
+
+**Pliki:** `content/data/npc_dialogues.py` (archetypy), `engine/dialogue.py`
+(ew. `relationship` delta + romance arc), nowy `engine/relationships.py`?,
+`llm/llm_roles.py` (ROLE_DIALOGUE flavor).
+
+---
+
 ### UX-10 · Model interakcji ze ŚWIATEM bez zakładek
 **Problem (user):** „nie lubię całego designu zakładek dla obiektów
 interaktywnych… nienawidzę pomysłu interakcji z grą w ten sposób".
