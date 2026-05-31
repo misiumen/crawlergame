@@ -11,18 +11,20 @@ ZROBIONE i wypchnięte: UX-9 (direct dispatch), UX-10 (popover akcji —
 mysz+klawiatura, ZOSTAJE: usunięcie zakładek world-interaction),
 pełnoekranowy dialog (mysz + art), typy pinów + piny wyjść (UX-7 część),
 UX-4b (placeholder dialog dla NPC), UX-6 (znikają piny zużytych obiektów),
-CMB-2 (ogony bestii), LOC-1 (nazwa „Nie tak szybko" — ZOSTAJE sweep
-reszty nazw), UX-1 (scroll tylko przy overflow), UX-8 (cel = zejście +
-„Zadania dodatkowe").
+CMB-2 (ogony bestii), LOC-1 (nazwy osiągnięć — „Nie tak szybko",
+„Pierwszy boss z głowy", „Zabójca karaoke", „Widziałem legendę"),
+UX-1 (scroll tylko przy overflow), UX-8 (cel = zejście + „Zadania
+dodatkowe"), UX-2 (look/listen/przeszukaj-pokój wyczerpują się per pokój,
+znikają z panelu; per-obiekt search bez zmian).
 
 ODŁOŻONE (świadomie):
-- **UX-3** — zrewertowane. `display_name()` już maskuje unknowny; prawdziwy
-  problem to PARYTET opis-pokoju vs panel na warstwie mgły, nie override w
-  panelu. Do zrobienia na warstwie fog (opis pokoju).
-- **UX-2** (znikanie wyczerpanych akcji look/search/listen) — net-new:
-  hook w handlerze + filtr panelu + persist w save. Wymaga pewnego
-  dostępu do `_handle_look_search_listen`; do zrobienia osobno na świeżo.
-- **LOC-1 sweep** — przejrzeć resztę `fallback_name_pl` (nazwa=tytuł).
+- **UX-3** — zrewertowane DWUKROTNIE. `display_name()` zostaje. Maska w
+  panelu jest poprawna dla realnej gry (trywialne obiekty auto-promują do
+  `seen`), ale koliduje z wieloma fixture'ami testów. Prawdziwy fix =
+  PARYTET opisu pokoju vs panel na warstwie mgły + promocja w fixture'ach,
+  jako jedna świadoma zmiana. NIE override w panelu.
+- **Audyt duplikatów osiągnięć** — sweep LOC-1 wyłapał możliwe duplikaty
+  (spawn-task odpalony osobno).
 
 EPIKI (nie „szybkie taski", osobne sesje): COMBAT-1 (przeprojektowanie
 walki A–D), DIAL-1 (archetypy drzew + system relacji + LLM flavor),
