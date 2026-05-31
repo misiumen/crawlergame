@@ -7,6 +7,81 @@ albo usuwamy. Najnowsze na górze.
 
 ## Open
 
+### UX-8 · Cel piętra bez sensu — przepisać na „znajdź drogę w dół"
+**Problem (user, ze screenshota demo F1):** `Cel piętra: Zrób coś, co
+wygra przerywnik reklamowy` — kompletnie nie ma sensu jako główny cel.
+
+**Fix-szkic:**
+- Główny cel każdego piętra = dotrzeć do wyjścia przed deadline'em.
+  Tekst typu: **„Znajdź drogę na następne piętro zanim upłynie czas."**
+  (jeden, stały, niezależny od proc-genu).
+- Obecny losowy „floor objective" (`content/data/floor_objective_
+  templates.py`, wybierany w `floor_generator._pick_objective` /
+  `procgen`) → zdegradować do **celów pobocznych**, nie głównego.
+- Cele poboczne (z klasy, sponsorów, NPC, crawlerów, itd.) pokazywać
+  pod głównym jako osobna sekcja **„Zadania dodatkowe"**. Pusta sekcja
+  = nie pokazujemy nagłówka.
+- Render: panel „Cel piętra" w lewej kolumnie (minimap/known-rooms
+  blok, `ui/ui.py` / `ui/minimap.py`?) — najpierw główny cel, potem
+  lista zadań dodatkowych.
+
+**Pliki:** `engine/floor_generator.py` (`_pick_objective`),
+`engine/floor.py` (objective_* pola), `content/data/floor_objective_
+templates.py`, render celu w `ui/`.
+
+---
+
+### UX-7 · Piny obiektów: pozycja losowa zamiast logicznej / stałej siatki
+**Problem (user):** piny zawsze w tej samej kolejności i miejscach;
+rozmieścić bardziej losowo, a najlepiej logicznie (krata/wentylacja
+u góry, złom na podłodze itd.).
+
+**Diagnoza:** `ui/ui.py` ~888-943 rozkłada piny po stałej siatce
+4-kolumnowej w kolejności `room.visible_entities()` (`col = idx % 4`).
+Pozycja = funkcja kolejności na liście, nie natury obiektu.
+
+**Fix-szkic:**
+- Mapowanie tag/`entity_type` → strefa pionowa (sufit / ściana /
+  środek / podłoga). Dane już są w `entity_templates`: `loose_grate`
+  (sufit), `exposed_wiring`/`pipe_cluster`/`mirror` (ściana),
+  `water_pool`/złom/`trash_bin` (podłoga), `furniture_*` (środek).
+- Opcjonalny jawny hint `placement` w szablonach dla niejasnych.
+- **Stabilność:** pozycję seedować z (`room_id` + key/id encji), bo
+  draw() liczy ją co klatkę — gołe `random()` = skaczące piny.
+- Anty-overlap: minimalny odstęp / jitter w obrębie strefy.
+
+**Pliki:** `ui/ui.py` (pętla pinów), ew. `content/data/
+entity_templates.py` (hint `placement`).
+
+---
+
+### UX-6 · Piny zużytych obiektów nie znikają z ilustracji
+**Problem (user):** obiekt zsalvage'owany / przeszukany / podniesiony
+(np. „złom maszynowy — zdemontowany") dalej ma pin, mimo że nie ma już
+z nim sensownej interakcji.
+
+**Diagnoza:** piny biorą się z `room.visible_entities()`
+(`room.py:81` → `e.visible and e.discovered`). Zużycie nie czyści tych
+flag, więc encja zostaje na liście. Brak JEDNEJ flagi „zużyte" — różne
+ścieżki ustawiają różne klucze w `entity.state`: `stripped`/`depleted`
+(salvage, `game.py:3970` itd.), `destroyed`, `no_salvage`, `hacked`
+(terminale, `visibility.py:303`), przeszukane kontenery.
+
+**Fix-szkic:**
+- Jeden predykat „czy pin jeszcze wart pokazania?" (np. ukryj gdy
+  `state` ma którąś z {stripped, depleted, destroyed, hacked,
+  no_salvage} **i** jedyny afordans to bierny `inspect`). Wspólny
+  helper (`engine/affordances.py`/`visibility.py`), żeby pin-filtr,
+  panel `[Środowisko]` i opis pokoju się zgadzały.
+- **Decyzja do podjęcia:** zużyte obiekty znikają też z prozy opisu +
+  panelu `[Środowisko]`, czy tracą tylko pin (zostają jako tło)?
+  (Powiązane z UX-2.)
+
+**Pliki:** `ui/ui.py` (filtr pinów), `engine/visibility.py` /
+`engine/affordances.py` (predykat), ew. panel akcji w `engine/game.py`.
+
+---
+
 ### UX-5 · Audio: prawdziwa muzyka klimatyczna, nie pikanie w tle
 **Problem (user):** "dźwięk w grze to tylko pikanie w tle, liczyłem
 na jakąś muzyczkę pasującą do klimatu, a nie taki ambient".
