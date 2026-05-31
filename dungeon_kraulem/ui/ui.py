@@ -832,6 +832,43 @@ def _floor_biome(world) -> str:
         return ""
 
 
+# ── Pin taxonomy (4 visually-distinct kinds) ──────────────────────────────
+PIN_ENEMY  = "enemy"
+PIN_NPC    = "npc"
+PIN_OBJECT = "object"
+PIN_EXIT   = "exit"
+_PIN_COLORS = {
+    PIN_ENEMY:  (214, 72, 72),     # red — hostile
+    PIN_NPC:    (108, 200, 132),   # green — talkable crawler / npc
+    PIN_OBJECT: (176, 178, 196),   # cool grey — environment / items
+    PIN_EXIT:   (240, 196, 96),    # amber — ways out (door-shaped, see below)
+}
+
+# Exit labels containing one of these map to a screen edge; everything else
+# (named doors like "kierownictwo") spreads along the bottom edge.
+_EXIT_EDGE_KW = {
+    "N": ("północ", "polnoc", "north"),
+    "S": ("południe", "poludnie", "south"),
+    "E": ("wschód", "wschod", "east"),
+    "W": ("zachód", "zachod", "west"),
+}
+
+
+def _entity_pin_kind(e) -> str:
+    """Classify an entity into a pin kind. Monsters (and crawlers flagged
+    hostile) are enemies; npc / neutral crawlers are npc; everything else
+    (objects, hazards, terminals, items) is object."""
+    et = getattr(e, "entity_type", "object")
+    if et == "monster":
+        return PIN_ENEMY
+    if et == "crawler":
+        dispo = str(getattr(e, "disposition", "") or "").lower()
+        return PIN_ENEMY if dispo in ("hostile", "aggressive") else PIN_NPC
+    if et == "npc":
+        return PIN_NPC
+    return PIN_OBJECT
+
+
 def draw_room_panel(surf, world, layout=None, *, click_registry=None,
                     command_cb=None, entity_action_cb=None,
                     entity_menu_cb=None):
@@ -910,14 +947,8 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
 
     for idx, e, cx, cyp in placed:
         unknown = (_vis is not None and _vis.is_unknown(e))
-        et = getattr(e, "entity_type", "object")
-        if et == "monster":   base = (210, 70, 70)
-        elif et == "crawler": base = (90, 150, 210)
-        elif et == "hazard":  base = (220, 170, 60)
-        elif et == "npc":     base = (110, 200, 130)
-        else:                 base = (175, 175, 190)
-        if unknown:
-            base = (120, 120, 130)
+        kind = _entity_pin_kind(e)
+        base = (120, 120, 130) if unknown else _PIN_COLORS[kind]
         is_hover = False
         if mxy is not None:
             if (mxy[0] - cx) ** 2 + (mxy[1] - cyp) ** 2 <= (pin_r + 3) ** 2:
@@ -927,6 +958,10 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
         pygame.draw.circle(surf, base, (cx, cyp), pin_r)
         pygame.draw.circle(surf, BRIGHT_TEXT if is_hover else (20, 20, 26),
                            (cx, cyp), pin_r, 2)
+        # Enemy pins wear an extra danger halo so a hostile reads instantly,
+        # distinct from the otherwise same-shaped npc/object circles.
+        if kind == PIN_ENEMY and not unknown:
+            pygame.draw.circle(surf, base, (cx, cyp), pin_r + 4, 1)
         glyph = "?" if unknown else str(idx + 1)
         gimg = font(L.font_small, bold=True).render(glyph, True, (12, 12, 16))
         surf.blit(gimg, (cx - gimg.get_width() // 2,
@@ -949,6 +984,11 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
                                _mk(e.entity_id, e.display_name(), cx, cyp),
                                tooltip="Akcje: " + label,
                                category="room_pin")
+
+    # ── Exit pins — door-shaped, amber, at the art edges by direction ──
+    _draw_exit_pins(surf, world, room, (x, y, w, h), bar_h, L,
+                    click_registry=click_registry, command_cb=command_cb,
+                    mxy=mxy)
 
     # ── Bottom description bar ─────────────────────────────────────────
     bar_y = y + h - bar_h
@@ -977,6 +1017,83 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
             text(surf, ln, x + 14, bar_y + 8 + j * 17, NORMAL_TEXT,
                  L.font_small - 1)
     return
+
+
+def _draw_exit_pins(surf, world, room, art_rect, bar_h, L, *,
+                    click_registry=None, command_cb=None, mxy=None):
+    """Render visible exits as distinct DOOR-shaped pins (amber rounded
+    rectangles, not circles), placed at the art edge matching their compass
+    direction; named doors with no direction spread along the bottom. Click
+    → `idź <label>` (open) or `wyłam <label>` (locked). Hidden exits stay
+    hidden."""
+    L = _resolve_layout(L)
+    x, y, w, h = art_rect
+    floor = getattr(world, "current_floor", None)
+    exits = [(lbl, ed) for lbl, ed in (getattr(room, "exits", {}) or {}).items()
+             if not ed.get("hidden")]
+    if not exits:
+        return
+    ix, iy = x + 46, y + 62
+    iw, ih = w - 92, h - 62 - bar_h - 26
+    if iw <= 0 or ih <= 0:
+        return
+    midx, midy = ix + iw // 2, iy + ih // 2
+    pw, ph = 32, 24
+    edge_pos = {
+        "N": (midx, iy + ph // 2),
+        "S": (midx, iy + ih - ph // 2),
+        "E": (ix + iw - pw // 2, midy),
+        "W": (ix + pw // 2, midy),
+    }
+    used = set()
+    placed, bottom = [], []
+    for lbl, ed in exits:
+        low = str(lbl).lower()
+        edge = None
+        for e_key, kws in _EXIT_EDGE_KW.items():
+            if any(kw in low for kw in kws):
+                edge = e_key
+                break
+        if edge and edge not in used:
+            used.add(edge)
+            placed.append((lbl, ed, edge_pos[edge]))
+        else:
+            bottom.append((lbl, ed))
+    n = len(bottom)
+    for i, (lbl, ed) in enumerate(bottom):
+        cx = ix + int((i + 0.5) * (iw / max(1, n)))
+        placed.append((lbl, ed, (cx, iy + ih - ph // 2)))
+
+    discovered = (getattr(floor, "discovered_room_ids", set()) or set()) \
+        if floor else set()
+    for lbl, ed, (cx, cy) in placed:
+        locked = bool(ed.get("locked"))
+        tid = ed.get("target", "")
+        troom = floor.rooms.get(tid) if floor else None
+        tname = (troom.display_short_title()
+                 if troom and tid in discovered else "?")
+        col = (236, 150, 92) if locked else _PIN_COLORS[PIN_EXIT]
+        rect = (cx - pw // 2, cy - ph // 2, pw, ph)
+        is_hover = (mxy is not None and rect[0] <= mxy[0] < rect[0] + pw
+                    and rect[1] <= mxy[1] < rect[1] + ph)
+        pygame.draw.rect(surf, (10, 10, 14),
+                         (rect[0], rect[1] + 1, pw, ph), border_radius=5)
+        pygame.draw.rect(surf, col, rect, border_radius=5)
+        pygame.draw.rect(surf, BRIGHT_TEXT if is_hover else (20, 20, 26),
+                         rect, 2, border_radius=5)
+        glyph = "🔒" if locked else "→"
+        gimg = font(L.font_small, bold=True).render(glyph, True, (16, 12, 8))
+        surf.blit(gimg, (cx - gimg.get_width() // 2,
+                         cy - gimg.get_height() // 2))
+        if click_registry is not None and command_cb is not None:
+            cmd = ("wyłam " if locked else "idź ") + str(lbl)
+            tip = ("Wyłam: " if locked else "Idź: ") + str(lbl) + f"  →  {tname}"
+            def _mk(c):
+                def _cb():
+                    command_cb(c)
+                return _cb
+            click_registry.add(rect, _mk(cmd), tooltip=tip,
+                               category="room_exit_pin")
 
 
 def draw_entity_popover(surf, popover, *, layout=None, click_registry=None,
