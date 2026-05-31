@@ -76,7 +76,7 @@ def test_plan_quadruped_for_tunnel_runt():
     w = _mk_world()
     m = _spawn_quadruped(w)
     plan = _bp.plan_for_entity(m)
-    assert set(plan.keys()) == {"head","torso","l_leg","r_leg"}
+    assert set(plan.keys()) == {"head","torso","l_leg","r_leg","tail"}
     print("  tunnel_runt → quadruped plan: OK")
 
 

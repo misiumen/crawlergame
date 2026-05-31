@@ -486,11 +486,9 @@ def _panel_name(e) -> str:
     because options carry the real target_id."""
     try:
         from ..engine import visibility as _vis
-        if _vis.is_unknown(e):
-            return _vis.masked_label(e)
+        return _vis.display_name_for_player(e)
     except Exception:
-        pass
-    return e.display_name()
+        return e.display_name()
 
 
 def _flat_object_verbs(world, room) -> List[SelectableOption]:
