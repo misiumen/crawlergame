@@ -7,6 +7,40 @@ albo usuwamy. Najnowsze na górze.
 
 ## Open
 
+### UX-9 · Klik w pin (sprawdź) otwiera dziennik zamiast inspekcji
+**Problem (user):** klik w pin 7 (obiekt „coś ważnego dla zadania")
+otwiera dziennik zamiast wykonać `sprawdź`. „wiring here must be janky".
+
+**Diagnoza (potwierdzona):**
+- Pin to encja celu z `floor_generator.py:1326`
+  (`fallback_name="coś ważnego dla zadania"`, unknown → „???").
+- Klik pina NIE inspekcjonuje encji wprost — buduje komendę tekstową
+  `"sprawdz " + name` i przepuszcza ją przez fuzzy parser
+  (`ui/ui.py` ~938, `command_cb`).
+- Parser (`parser_core.py:119`) mapuje słowo **`zadania`** (też
+  `cel`/`cele`) na intent `journal_objectives` → `_open_journal(
+  TAB_OBJECTIVES)`. Stąd otwarcie dziennika.
+- **Szersze niż ten jeden pin:** każda encja, której nazwa zawiera
+  zarezerwowane słowo (`mapa`, `wiedza`, `cel`, `zadania`,
+  `ekwipunek`, `postać`, `plotki`…) zostanie przejęta tak samo — i
+  klikiem, i przez wpisanie z palca.
+
+**Fix-szkic:**
+- Docelowo: pin (i każda jawna akcja „sprawdź TĘ encję") powinien
+  dispatchować **bezpośrednią inspekcję po entity_id**, z pominięciem
+  fuzzy keyword-matchingu. Pin zna konkretną encję — nie ma powodu
+  serializować do stringa i re-parsować.
+- Alternatywa/uzupełnienie: gdy verb jest jawny (`sprawdź` + encja
+  obecna w pokoju), parser ma preferować dopasowanie nazwy encji w
+  bieżącym pokoju PRZED globalnymi quick-intentami.
+- Band-aid (niewystarczający sam): przemianować klucz-encję, by nazwa
+  nie zawierała zarezerwowanych słów.
+
+**Pliki:** `ui/ui.py` (callback pina), `engine/game.py` (ścieżka
+inspekcji / `command_cb`), `engine/parser_core.py` (precedencja).
+
+---
+
 ### UX-8 · Cel piętra bez sensu — przepisać na „znajdź drogę w dół"
 **Problem (user, ze screenshota demo F1):** `Cel piętra: Zrób coś, co
 wygra przerywnik reklamowy` — kompletnie nie ma sensu jako główny cel.
