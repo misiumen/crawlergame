@@ -480,15 +480,15 @@ def _two_tier_route(flat_options: List[SelectableOption],
 
 
 def _panel_name(e) -> str:
-    """UX-3 — name shown in the action panel. Unrecognised entities are
-    masked ('coś ?', 'ktoś ?') so the panel never spoils what the room
-    description is still hiding behind fog-of-war. Acting still works
-    because options carry the real target_id."""
-    try:
-        from ..engine import visibility as _vis
-        return _vis.display_name_for_player(e)
-    except Exception:
-        return e.display_name()
+    """Name shown in the action panel.
+
+    NOTE (UX-3, deferred): masking unknown names here looked simple but
+    collides with `visibility.respect_known_key_on_spawn`, which auto-promotes
+    trivial objects to `seen` on spawn — so in real play the panel rarely had
+    anything to mask, while raw test fixtures (which skip promotion) all went
+    unknown and broke. The right fix is description/panel parity at the
+    fog layer, not a panel-only override. Reverted to real names for now."""
+    return e.display_name()
 
 
 def _flat_object_verbs(world, room) -> List[SelectableOption]:
