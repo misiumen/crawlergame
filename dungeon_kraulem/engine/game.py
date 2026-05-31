@@ -2890,6 +2890,38 @@ class Game:
         if intent.intent == "invoke_belief":
             self._attempt_invoke_belief(intent); return
 
+        # UX-2 — room-scoped scan actions (rozejrzyj się / nasłuchuj /
+        # przeszukaj pokój) are one-and-done per room. Repeating them just
+        # reprints the same text without progress, so we refuse cheaply (no
+        # turn) and the action panel hides them (see ui_nav._basic_actions).
+        # The "done" set lives on room.state, which already round-trips
+        # through save/load. NOTE: object searches (przeszukaj <skrzynia>)
+        # are per-object and are NOT room-scans — only `search` whose target
+        # is the room itself qualifies.
+        _ROOM_WORDS = {"pokoj", "pokój", "pomieszczenie", "pomieszczeniu",
+                       "pokoju", "wokol", "wokół", "okolicy", "otoczenie"}
+        _is_room_scan = intent.intent in ("look", "listen")
+        if intent.intent == "search":
+            # The deterministic parser strips a stripped/object target into
+            # intent.targets, but parse_with_optional_llm drops it — so we
+            # judge room-vs-object from the normalized command text instead:
+            # a room scan is "przeszukaj" alone, or "przeszukaj <room-word>".
+            _toks = (intent.normalized_text or "").lower().split()
+            _rest = [w for w in _toks[1:] if w]  # drop the verb
+            _is_room_scan = (not _rest) or all(w in _ROOM_WORDS for w in _rest)
+        if _is_room_scan:
+            _room = (self.world.current_floor.current_room()
+                     if self.world.current_floor else None)
+            if _room is not None:
+                done = _room.state.setdefault("actions_done", [])
+                if intent.intent in done:
+                    self.log(t("feedback_action_exhausted",
+                               fallback="Już to zrobiłeś tutaj. "
+                                        "Nic nowego się nie pojawia."),
+                             LOG_WARN)
+                    return
+                done.append(intent.intent)
+
         # Standard pipeline: validate → resolve → apply
         v = validate(intent, self.world)
         if not v.valid:

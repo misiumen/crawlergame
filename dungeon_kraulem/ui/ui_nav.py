@@ -261,21 +261,38 @@ def _restore_selection(state: "UISelectionState",
 # ── Group builders ─────────────────────────────────────────────────────────
 
 def _basic_actions(world, room=None) -> List[SelectableOption]:
+    # UX-2 — hide room-scan actions once they've been exhausted in this room.
+    # The engine records performed scans in room.state["actions_done"]; we
+    # drop the matching panel rows so the player isn't invited to re-run a
+    # no-op. `zbadaj pomieszczenie` and `czekaj` are always available.
+    _done = set()
+    if room is not None:
+        try:
+            _done = set((room.state or {}).get("actions_done", []))
+        except Exception:
+            _done = set()
     out = [
         # P29.64 — `zbadaj pomieszczenie`: główny punkt wejścia w odkrycie
         # OTOCZENIA (istoty / środowisko z właściwościami / wyjścia).
         SelectableOption("act_examine",
                          t("nav_examine_room", fallback="Zbadaj pomieszczenie"),
                          "zbadaj pomieszczenie", GROUP_ACTIONS),
-        SelectableOption("act_look",   t("nav_look",   fallback="Rozejrzyj się"),
-                         "rozejrzyj się", GROUP_ACTIONS),
-        SelectableOption("act_search", t("nav_search", fallback="Przeszukaj pokój"),
-                         "przeszukaj pokój", GROUP_ACTIONS),
-        SelectableOption("act_listen", t("nav_listen", fallback="Nasłuchuj"),
-                         "nasłuchuj", GROUP_ACTIONS),
-        SelectableOption("act_wait",   t("nav_wait",   fallback="Czekaj"),
-                         "czekaj", GROUP_ACTIONS),
     ]
+    if "look" not in _done:
+        out.append(SelectableOption(
+            "act_look", t("nav_look", fallback="Rozejrzyj się"),
+            "rozejrzyj się", GROUP_ACTIONS))
+    if "search" not in _done:
+        out.append(SelectableOption(
+            "act_search", t("nav_search", fallback="Przeszukaj pokój"),
+            "przeszukaj pokój", GROUP_ACTIONS))
+    if "listen" not in _done:
+        out.append(SelectableOption(
+            "act_listen", t("nav_listen", fallback="Nasłuchuj"),
+            "nasłuchuj", GROUP_ACTIONS))
+    out.append(SelectableOption(
+        "act_wait", t("nav_wait", fallback="Czekaj"),
+        "czekaj", GROUP_ACTIONS))
     # Rest only in safe rooms (allows it always at low cost — engine validates).
     if room and (room.is_safe() if hasattr(room, "is_safe") else False):
         out.append(SelectableOption("act_rest",
