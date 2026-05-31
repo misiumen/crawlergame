@@ -278,7 +278,7 @@ def main():
     test_exit_locked_command_is_wylam()
     test_log_dedupes_consecutive_identicals()
     test_log_does_not_dedupe_player_input_echo()
-    test_audience_changes_dedupe_via_log_msg()
+    test_audience_changes_batch_into_one_line()
     test_no_salvage_flag_hides_zdemontuj()
     test_room_change_clears_nav_focus()
     test_minimap_3d_separates_up_down_into_layers()

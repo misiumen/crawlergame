@@ -193,8 +193,9 @@ def test_upgrade_ac_bumps_base_ac():
 
 def main():
     test_parser_routes_each_sink()
-    test_training_bumps_stat_and_burns_slot()
-    test_training_refuses_no_credits()
+    test_respec_pulls_point_back_to_pool()
+    test_respec_refuses_at_base_stat()
+    test_respec_refuses_no_credits()
     test_bribe_bumps_sponsor_attention()
     test_bribe_refuses_unknown_sponsor()
     test_call_pod_spawns_sponsor_pod()

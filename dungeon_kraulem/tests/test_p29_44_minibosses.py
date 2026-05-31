@@ -243,7 +243,7 @@ def main():
     _rh.reset()
     try:
         test_miniboss_count_scaling()
-        test_low_floors_get_no_minibosses()
+        test_low_floors_built_biome_gets_minibosses()
         test_mid_floor_gets_minibosses()
         test_miniboss_not_in_boss_room()
         test_universal_minibosses_exist()
