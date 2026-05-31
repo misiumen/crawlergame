@@ -1648,13 +1648,24 @@ def draw_left_sidebar(surf, world, layout=None, *,
              x + 14, cy, NORMAL_TEXT, L.font_small - 1); cy += 14
         if cy > y + h // 2: break
 
-    # Objective summary
+    # Objective summary (UX-8). The MAIN goal of every floor is fixed —
+    # descend before the deadline. The procedurally-rolled objective becomes
+    # a secondary task under „Zadania dodatkowe" (where class/sponsor/NPC
+    # quests will append later).
     cy += 12
-    if f.objective_key:
-        text(surf, t("ui_objective", fallback="Cel piętra"),
-             x + 14, cy, ACCENT, L.font_small, True); cy += 16
-        txt = f.objective_title_fallback or f.objective_key
-        cy += text_wrapped(surf, txt, x + 14, cy, w - 28, NORMAL_TEXT,
+    text(surf, t("ui_objective", fallback="Cel piętra"),
+         x + 14, cy, ACCENT, L.font_small, True); cy += 16
+    main_goal = t("ui_objective_main",
+                  fallback="Znajdź drogę na następne piętro zanim "
+                           "upłynie czas.")
+    cy += text_wrapped(surf, main_goal, x + 14, cy, w - 28, NORMAL_TEXT,
+                       L.font_small - 1)
+    sec = (f.objective_title_fallback or "").strip()
+    if sec and sec != f.objective_key:
+        cy += 8
+        text(surf, t("ui_objective_side", fallback="Zadania dodatkowe"),
+             x + 14, cy, ACCENT2, L.font_small, True); cy += 16
+        cy += text_wrapped(surf, "• " + sec, x + 14, cy, w - 28, DIM_TEXT,
                            L.font_small - 1)
 
     # Active clue / fact summary
