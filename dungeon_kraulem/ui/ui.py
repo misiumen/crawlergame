@@ -869,6 +869,28 @@ def _entity_pin_kind(e) -> str:
     return PIN_OBJECT
 
 
+# A spent object (salvaged / searched / destroyed / hacked / used-up) that has
+# nothing left to do but be looked at shouldn't keep a pin (UX-6). Creatures
+# are never "spent". Fresh inspect-only decorations are NOT hidden — only
+# things that carry a spent-state flag AND have no remaining non-inspect verb.
+_SPENT_STATE_KEYS = ("stripped", "depleted", "destroyed", "hacked",
+                     "no_salvage", "searched", "used", "vending_used")
+
+
+def _pin_is_spent(world, room, e) -> bool:
+    if getattr(e, "entity_type", "object") in ("monster", "npc", "crawler"):
+        return False
+    st = getattr(e, "state", None) or {}
+    if not any(st.get(k) for k in _SPENT_STATE_KEYS):
+        return False
+    try:
+        from . import ui_nav as _nav
+        opts = _nav.action_options_for_entity(world, room, e)
+    except Exception:
+        opts = []
+    return not any((o.action_type or "") not in ("inspect",) for o in opts)
+
+
 def draw_room_panel(surf, world, layout=None, *, click_registry=None,
                     command_cb=None, entity_action_cb=None,
                     entity_menu_cb=None):

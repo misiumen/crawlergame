@@ -96,6 +96,13 @@ PLAN_SMALL_QUADRUPED: Dict[str, dict] = {
                "butcher_intact_bonus": [("claw", 1)],
                "butcher_broken_bonus": [("sinew", 1)],
                "display_order": 3},
+    # CMB-2 — bestie z ogonem: celowalny ogon. Trafienie/złamanie zbija
+    # równowagę (STATUS_SLOWED) — „okaleczyć albo przestraszyć stwora".
+    "tail":   {"label_pl": "ogon",      "hp_frac": 0.15, "to_hit_mod": -2,
+               "damage_mul": 0.7, "maim_status": STATUS_SLOWED,
+               "butcher_intact_bonus": [("sinew", 1)],
+               "butcher_broken_bonus": [("sinew", 1)],
+               "display_order": 4},
 }
 
 

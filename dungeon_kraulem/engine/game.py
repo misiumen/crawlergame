@@ -2016,11 +2016,17 @@ class Game:
         # Generic random crawler (T_CRAWLER) — fallback dla
         # losowo spawnowanych zawodników bez tożsamości.
         try:
-            from .entity import T_CRAWLER
-            if entity.entity_type == T_CRAWLER:
-                return "default_crawler"
+            from .entity import T_CRAWLER, T_NPC
         except Exception:
-            pass
+            T_CRAWLER = "crawler"; T_NPC = "npc"
+        if getattr(entity, "entity_type", "") == T_CRAWLER:
+            return "default_crawler"
+        # UX-4b — KAŻDY rozmawialny NPC dostaje drzewko (placeholder), zamiast
+        # spadać do gołego legacy skill-checka „[rozmowa] d20… → sukces" bez
+        # treści. Lepszy ogólny placeholder niż pusty rzut.
+        affs = getattr(entity, "affordances", None) or []
+        if getattr(entity, "entity_type", "") == T_NPC or "talk" in affs:
+            return "placeholder_npc"
         return ""
 
     def _open_dialogue(self, npc_entity, tree_key: str) -> None:

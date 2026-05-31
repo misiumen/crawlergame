@@ -283,8 +283,8 @@ _add(AchievementDef(
 # Survival / dramatics.
 _add(AchievementDef(
     key="anty_host_warknal",
-    fallback_name_pl="Konferansjer warknął",
-    fallback_name_en="Anti-Host Snarled",
+    fallback_name_pl="Nie tak szybko",
+    fallback_name_en="Not So Fast",
     fallback_description_pl="Last-stand: pierwszy raz spadłeś do 1 HP i wstałeś. Tylko raz.",
     fallback_description_en="Last stand: dropped to 1 HP and got back up. Only once.",
     category="survival",

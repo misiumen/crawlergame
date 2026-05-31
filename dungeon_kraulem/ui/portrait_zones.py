@@ -82,6 +82,7 @@ HITBOXES: Dict[str, Dict[str, Box]] = {
         "torso": (0.30, 0.40, 0.38, 0.27),
         "l_leg": (0.28, 0.64, 0.16, 0.29),   # front legs
         "r_leg": (0.54, 0.62, 0.18, 0.31),   # hind legs
+        "tail":  (0.70, 0.30, 0.24, 0.20),   # long rat tail, upper-right
     },
     # Dog-beast — side view, facing screen-left, snarling head low-left,
     # high hunched shoulders, lunging. Quadruped.
@@ -90,6 +91,7 @@ HITBOXES: Dict[str, Dict[str, Box]] = {
         "torso": (0.32, 0.30, 0.38, 0.30),
         "l_leg": (0.24, 0.60, 0.18, 0.34),   # front legs
         "r_leg": (0.58, 0.58, 0.20, 0.36),   # hind legs
+        "tail":  (0.76, 0.34, 0.18, 0.22),   # beast tail
     },
 }
 
@@ -121,12 +123,14 @@ ARCHETYPE_HITBOXES: Dict[str, Dict[str, Box]] = {
         "torso": (0.32, 0.36, 0.40, 0.28),
         "l_leg": (0.26, 0.62, 0.18, 0.32),
         "r_leg": (0.56, 0.60, 0.20, 0.34),
+        "tail":  (0.74, 0.40, 0.20, 0.22),   # back/right sweep
     },
     "beast": {   # alias → quadruped silhouette
         "head":  (0.10, 0.45, 0.24, 0.26),
         "torso": (0.32, 0.36, 0.40, 0.28),
         "l_leg": (0.26, 0.62, 0.18, 0.32),
         "r_leg": (0.56, 0.60, 0.20, 0.34),
+        "tail":  (0.74, 0.40, 0.20, 0.22),
     },
     # Hovering drone (matches PLAN_DRONE: sensor/body/propulsion).
     "drone": {
