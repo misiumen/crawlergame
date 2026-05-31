@@ -52,11 +52,37 @@ def test_esc_with_text_clears_only():
 
 
 def test_esc_in_menu_resumes():
-    g = _mk_game()
-    g.handle_keydown(_key(pygame.K_ESCAPE))      # open
-    g.handle_keydown(_key(pygame.K_ESCAPE))      # resume
-    assert g.state == STATE_PLAY, g.state
+    # Use a controllable clock so the open→resume gap clears the debounce.
+    clock = {"t": 1000}
+    orig = pygame.time.get_ticks
+    pygame.time.get_ticks = lambda: clock["t"]
+    try:
+        g = _mk_game()
+        g.handle_keydown(_key(pygame.K_ESCAPE))      # open @1000
+        assert g.state == STATE_PAUSE
+        clock["t"] = 1500                            # >250ms later
+        g.handle_keydown(_key(pygame.K_ESCAPE))      # resume
+        assert g.state == STATE_PLAY, g.state
+    finally:
+        pygame.time.get_ticks = orig
     print("  Esc inside menu resumes: OK")
+
+
+def test_repeat_escape_does_not_close():
+    # Auto-repeat (set_repeat 400/50) fires a 2nd Escape right after the
+    # opening press; the menu must stay open (was: flashed open then shut).
+    clock = {"t": 1000}
+    orig = pygame.time.get_ticks
+    pygame.time.get_ticks = lambda: clock["t"]
+    try:
+        g = _mk_game()
+        g.handle_keydown(_key(pygame.K_ESCAPE))      # open @1000
+        clock["t"] = 1080                            # repeat within 250ms
+        g.handle_keydown(_key(pygame.K_ESCAPE))
+        assert g.state == STATE_PAUSE, g.state
+    finally:
+        pygame.time.get_ticks = orig
+    print("  auto-repeat Escape keeps menu open (debounce): OK")
 
 
 def test_actions_route():
@@ -117,6 +143,7 @@ def main():
     test_esc_empty_opens_menu()
     test_esc_with_text_clears_only()
     test_esc_in_menu_resumes()
+    test_repeat_escape_does_not_close()
     test_actions_route()
     test_reseed_keeps_identity_new_seed()
     test_settings_from_pause_returns_to_pause()

@@ -1692,6 +1692,11 @@ class Game:
         from so 'Wróć do gry' returns to it (play vs arena)."""
         self._pause_return_state = self.state
         self.pause_idx = 0
+        # Debounce: key auto-repeat (set_repeat 400/50) fires a 2nd Escape
+        # KEYDOWN shortly after the press that opened the menu, which would
+        # immediately resume — making the menu flash open then closed. Stamp
+        # the open time and ignore the resume-Escape for a short window.
+        self._pause_opened_ms = pygame.time.get_ticks()
         self.state = STATE_PAUSE
 
     def _pause_resume(self) -> None:
@@ -7900,6 +7905,12 @@ class Game:
             n = len(items)
             self._suppress_textinput = True
             if key == pygame.K_ESCAPE:
+                # Ignore the auto-repeat Escape that follows the opening
+                # press (see open_pause_menu); a real second tap (>250 ms
+                # later) still resumes.
+                if pygame.time.get_ticks() - getattr(
+                        self, "_pause_opened_ms", 0) < 250:
+                    return
                 self._pause_resume(); return
             if key in (pygame.K_UP, pygame.K_w):
                 self.pause_idx = (self.pause_idx - 1) % n; return
