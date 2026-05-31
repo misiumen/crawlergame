@@ -156,6 +156,10 @@ class Game:
         self.arena_loadout_weapon_idx = 0
         self.arena_loadout_class_idx = 0
         self.arena_loadout = {}          # final picks: {"weapon", "class"}
+        # Demo (Intake) mode: set while the player is creating a character
+        # for the single-floor playtest, so _creation_commit knows to start
+        # the run in demo mode. Cleared on a normal new game.
+        self._pending_demo = False
         # Command history (lightweight) — Up/Down in text mode walks it.
         self.cmd_history: list[str] = []
         self.cmd_history_idx = -1     # -1 = "current draft (not in history)"
@@ -406,7 +410,8 @@ class Game:
     # ── State transitions ────────────────────────────────────────────────────
 
     def start_new_game(self, name: str, background: str,
-                        species: str = "baseline_human"):
+                        species: str = "baseline_human",
+                        *, seed=None, demo_mode: bool = False):
         """Create a fresh world + character.
 
         P29.34: optional `species` parameter accepts any species key
@@ -414,8 +419,26 @@ class Game:
         baseline_human (the pre-P29.34 behavior). Species bonuses
         get applied AFTER stat-profile + background-loadout so they
         stack on top of the base.
+
+        Demo (Intake) mode: when `demo_mode` is True the run is flagged on
+        `world.flags["demo_mode"]`, Floor 1's biome is pinned to the intake
+        biome, and a fresh `seed` is rolled if none was supplied so each
+        playtest gets a different layout/encounters while staying on the
+        same intake floor. Everything else is the *same* game — demo mode
+        only changes which biome Floor 1 uses and what happens when you
+        clear it (see `_descend_or_win`).
         """
         self.world = WorldState()
+        if demo_mode and seed is None:
+            import random as _r
+            seed = _r.randint(1, 2_000_000_000)
+        if seed is not None:
+            self.world.random_seed = seed
+        if demo_mode:
+            # `flags` is a dynamic attr on the world (like arena_mode),
+            # not a dataclass field — init defensively before writing.
+            self.world.flags = getattr(self.world, "flags", {}) or {}
+            self.world.flags["demo_mode"] = True
         self.world.character.name = name or "Bezimienny"
         self.world.character.background = background
         # P29.34 — species is an extra axis on top of background.
@@ -563,8 +586,12 @@ class Game:
         if background == "opiekun_zwierzaka":
             self._assign_starter_pet()
 
-        # Build Floor 1
-        self.world.current_floor = build_floor_1(self.world)
+        # Build Floor 1. Demo (Intake) mode pins the biome so the floor is
+        # always the intake setting; the seed (rolled above) still varies
+        # rooms / encounters / objectives between playtests.
+        _demo_biome = "intake_industrial" if demo_mode else None
+        self.world.current_floor = build_floor_1(self.world, seed=seed,
+                                                 biome=_demo_biome)
         self.world.floor_number = 1
         # Place the pet in the player's starting room.
         if background == "opiekun_zwierzaka":
@@ -1677,6 +1704,9 @@ class Game:
             # P29.60 — wejście do arena variant picker.
             self.arena_menu_idx = 0
             self.open_arena_menu()
+        elif action_key == "demo_intake":
+            # Single-floor intake playtest.
+            self.enter_demo_intake()
         elif action_key == "settings":
             self._open_settings()
         elif action_key == "quit":
@@ -1704,7 +1734,15 @@ class Game:
 
     def _pause_action(self, action_key: str) -> None:
         """Shared click/keyboard callback for the pause menu rows."""
+        _demo = bool(getattr(self.world, "flags", {}).get("demo_mode")) \
+            if self.world else False
         if action_key == "resume":
+            self._pause_resume()
+        elif action_key in ("save", "load") and _demo:
+            # Demo (Intake) is an ephemeral sandbox with no save slot — saving
+            # would clobber a real slot and loading would drop the demo flag.
+            self.log("Zapis/wczytywanie niedostępne w piętrze próbnym.",
+                     LOG_WARN)
             self._pause_resume()
         elif action_key == "save":
             ok = save_load.save(self.world)
@@ -1745,14 +1783,20 @@ class Game:
         name = getattr(ch, "name", "") or "Bezimienny"
         background = getattr(ch, "background", "unemployed_hustler")
         species = getattr(ch, "species_key", "baseline_human")
+        # Preserve Demo (Intake) mode across a reseed — a playtest reroll
+        # should stay on the intake floor, not silently become a full run.
+        demo = bool(getattr(self.world, "flags", {}).get("demo_mode")) \
+            if self.world else False
         self.run_summary = None
-        self.start_new_game(name, background, species)
-        # Fresh seed so floor generation + rolls differ from the old run.
-        try:
-            import random as _r
-            self.world.random_seed = _r.randint(1, 2_000_000_000)
-        except Exception:
-            pass
+        self.start_new_game(name, background, species, demo_mode=demo)
+        if not demo:
+            # Fresh seed so floor generation + rolls differ from the old run.
+            # (Demo mode already rolled its own fresh seed in start_new_game.)
+            try:
+                import random as _r
+                self.world.random_seed = _r.randint(1, 2_000_000_000)
+            except Exception:
+                pass
         self.state = STATE_PLAY
         self.log("Nowy rozkład: świeże piętra i rzuty. Powodzenia.",
                  LOG_SYSTEM)
@@ -1761,6 +1805,9 @@ class Game:
 
     def _open_slot_picker(self, mode: str) -> None:
         """Enter STATE_SLOTS. `mode` is 'new' or 'load'."""
+        # Normal new/load flow is never a demo — clear any stale flag left
+        # over from backing out of the Demo (Intake) creation screen.
+        self._pending_demo = False
         self.slot_picker_mode = mode if mode in ("new", "load") else "new"
         self.slot_picker_idx = 0
         self.input_text = ""
@@ -1862,7 +1909,9 @@ class Game:
         # _apply_starting_companion (called from start_new_game) reads
         # this attribute. Empty string = no starting companion.
         self._chosen_companion = chosen
-        self.start_new_game(name, bg, species=species)
+        demo = bool(getattr(self, "_pending_demo", False))
+        self._pending_demo = False
+        self.start_new_game(name, bg, species=species, demo_mode=demo)
         self.state = STATE_PLAY
 
     def _create_action(self, action) -> None:
@@ -2966,6 +3015,24 @@ class Game:
         # Reset world — arena nie korzysta z save state
         self.world = None
 
+    # ── Demo (Intake) — single-floor playtest mode ────────────────────────
+
+    def enter_demo_intake(self) -> None:
+        """Title → character creation for the Demo (Intake) playtest.
+
+        Reuses the *exact* same creation flow as a normal new game (so the
+        demo is a faithful excerpt, not a parallel system); we just flag the
+        upcoming run as demo via `_pending_demo`, which `_creation_commit`
+        reads. Demo skips the save-slot picker — it's an ephemeral sandbox
+        like the arena, not tied to a save slot."""
+        self._pending_demo = True
+        self.cc = {"step": "name", "name_input": "",
+                   "selected_bg": 0,
+                   "selected_species": 0,
+                   "selected_companion": 0}
+        self.input_text = ""
+        self.state = STATE_CREATE
+
     def _arena_pick_variant(self, variant_key: str) -> None:
         """Mouse/Enter callback z STATE_ARENA_MENU. Otwiera loadout
         picker dla wybranego wariantu."""
@@ -3063,6 +3130,20 @@ class Game:
         if f is None:
             return
         cur_num = int(f.floor_number or 1)
+        # Demo (Intake) mode: clearing the single floor IS the win. Route to
+        # the same victory screen the full game uses (summary built lazily in
+        # _end_screen), then Enter/Esc returns to the title. We deliberately
+        # do NOT descend or record the run into persistent meta-progression /
+        # history — the demo is an ephemeral sandbox (same stance as arena).
+        if getattr(self.world, "flags", {}).get("demo_mode"):
+            self.log("Piętro próbne zaliczone. Test zakończony.", LOG_SUCCESS)
+            try:
+                from . import run_summary as _rs
+                self.run_summary = _rs.build_run_summary(self.world)
+            except Exception:
+                self.run_summary = None
+            self.state = STATE_VICTORY
+            return
         if cur_num >= self.MAX_FLOORS:
             # Final floor cleared — true victory.
             # P29.15 — final boss / season finalist achievement.
@@ -7842,7 +7923,7 @@ class Game:
             # Arrow-key navigation mirroring the five visible items.
             # P29.60 — arena_menu wstawione przed settings.
             title_actions = ["new_game", "load_game", "arena_menu",
-                             "settings", "quit"]
+                             "demo_intake", "settings", "quit"]
             if key in (pygame.K_UP, pygame.K_w):
                 self.title_idx = (self.title_idx - 1) % len(title_actions)
                 self._suppress_textinput = True
@@ -7865,6 +7946,10 @@ class Game:
                     self._suppress_textinput = True
                     self.arena_menu_idx = 0
                     self.open_arena_menu()
+                elif action == "demo_intake":
+                    # Single-floor intake playtest.
+                    self._suppress_textinput = True
+                    self.enter_demo_intake()
                 elif action == "settings":
                     # Prompt 11: open the settings popup.
                     self._open_settings()
@@ -7886,9 +7971,13 @@ class Game:
                 self.open_arena_menu()
                 return
             if digit == "4":
-                self._open_settings()
+                self._suppress_textinput = True
+                self.enter_demo_intake()
                 return
             if digit == "5":
+                self._open_settings()
+                return
+            if digit == "6":
                 pygame.quit(); raise SystemExit
             if key == pygame.K_l:
                 set_language("en" if get_language() == "pl" else "pl")

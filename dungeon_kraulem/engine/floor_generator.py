@@ -28,16 +28,23 @@ from ..content import content_loader as cl
 
 def generate_floor(world, floor_number: int = 1,
                    seed: Optional[int] = None,
-                   archetype: Optional[str] = None) -> FloorState:
+                   archetype: Optional[str] = None,
+                   biome: Optional[str] = None) -> FloorState:
     """Build a procedural floor. Retries up to FLOOR_GEN_MAX_RETRIES times
     if validation fails. Always returns a FloorState (last attempt wins
-    if all retries fail — better degraded than crashed)."""
+    if all retries fail — better degraded than crashed).
+
+    `biome` (optional) forces a specific biome key (e.g. "intake_industrial")
+    instead of rolling one from the floor's available pool. Used by the
+    Demo (Intake) mode to keep the setting fixed while everything else still
+    varies by seed. Unknown/disabled keys fall back to the normal roll."""
     from ..config import FLOOR_GEN_MAX_RETRIES
     rng = random.Random(seed) if seed is not None else random
     last_floor = None
     last_errors: List[str] = ["never_built"]
     for attempt in range(FLOOR_GEN_MAX_RETRIES):
-        floor = _build_floor_once(world, floor_number, rng, archetype)
+        floor = _build_floor_once(world, floor_number, rng, archetype,
+                                  biome_override=biome)
         errors = validate_floor(floor)
         if not errors:
             return floor
@@ -160,7 +167,8 @@ def validate_floor(floor: FloorState) -> List[str]:
 # ── Build pipeline ───────────────────────────────────────────────────────────
 
 def _build_floor_once(world, floor_number: int, rng: random.Random,
-                      archetype_key: Optional[str]) -> FloorState:
+                      archetype_key: Optional[str],
+                      biome_override: Optional[str] = None) -> FloorState:
     """Run the full 13-step generation pipeline once."""
     # Step 1: archetype
     if archetype_key is None or archetype_key not in FLOOR_ARCHETYPES:
@@ -173,7 +181,7 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
     # nie odblokował, F-out-of-range), zostajemy bez biomu — tytuł
     # idzie z archetypu, generator nie filtruje pokoi.
     from ..content.data.floor_biomes import (
-        available_biomes, FloorBiome)
+        available_biomes, FloorBiome, FLOOR_BIOMES)
     biome_candidates = available_biomes(floor_number, world=world)
     # P29.73 — zakaz tego SAMEGO biomu dwa piętra z rzędu. `world.
     # current_floor` przy zejściu to jeszcze piętro opuszczane (nadpisywane
@@ -190,7 +198,15 @@ def _build_floor_once(world, floor_number: int, rng: random.Random,
         if _filtered:
             biome_candidates = _filtered
     biome: Optional[FloorBiome] = None
-    if biome_candidates:
+    # Demo / debug: a forced biome key short-circuits the roll. We look it
+    # up in the full catalog (not just the floor's available pool) so the
+    # caller can pin any enabled biome; an unknown/disabled key falls
+    # through to the normal weighted roll below.
+    if biome_override:
+        forced = FLOOR_BIOMES.get(biome_override)
+        if forced is not None and forced.enabled:
+            biome = forced
+    if biome is None and biome_candidates:
         weights = [max(1, int(b.weight)) for b in biome_candidates]
         biome = rng.choices(biome_candidates, weights=weights, k=1)[0]
 

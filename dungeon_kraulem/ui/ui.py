@@ -159,11 +159,14 @@ def draw_title(surf, save_exists: bool, selected_idx: int = 0,
          BRIGHT_TEXT if save_exists else DIM_TEXT),
         # P29.60 — Arena testowa: combat-only sandbox dla tuningu walki.
         (t("title_arena",           fallback="[3] ARENA TESTOWA"), BRIGHT_TEXT),
-        (t("title_settings",        fallback="[4] USTAWIENIA"), BRIGHT_TEXT),
-        (t("title_quit",            fallback="[5] WYJDŹ Z TRANSMISJI"), BRIGHT_TEXT),
+        # Demo (Intake): single-floor playtest of the real game on Floor 1.
+        (t("title_demo_intake",     fallback="[4] PIĘTRO PRÓBNE (INTAKE)"), BRIGHT_TEXT),
+        (t("title_settings",        fallback="[5] USTAWIENIA"), BRIGHT_TEXT),
+        (t("title_quit",            fallback="[6] WYJDŹ Z TRANSMISJI"), BRIGHT_TEXT),
     ]
     sel = max(0, min(int(selected_idx or 0), len(items) - 1))
-    action_keys = ["new_game", "load_game", "arena_menu", "settings", "quit"]
+    action_keys = ["new_game", "load_game", "arena_menu", "demo_intake",
+                   "settings", "quit"]
     for i, (label, col) in enumerate(items):
         if i == sel:
             label = "▶  " + label + "  ◀"

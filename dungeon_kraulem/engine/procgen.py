@@ -25,17 +25,24 @@ _TYPE_FOR_SEED = {
 }
 
 
-def build_floor_1(world) -> FloorState:
+def build_floor_1(world, seed=None, biome=None) -> FloorState:
     """Entry point for Floor 1 construction.
 
     Default path: procedural generator (revamp.floor_generator.generate_floor).
     Debug fallback (config.USE_HANDMADE_FLOOR_1 = True): the hand-built
     15-room vertical slice defined below.
+
+    `seed` (optional) makes generation deterministic; when None it falls
+    back to the world's `random_seed` (if any), preserving the previous
+    "random floor per new game" behaviour when neither is set. `biome`
+    (optional) forces a specific biome key — used by Demo (Intake) mode.
     """
+    if seed is None:
+        seed = getattr(world, "random_seed", None)
     from ..config import USE_HANDMADE_FLOOR_1
     if not USE_HANDMADE_FLOOR_1:
         from .floor_generator import generate_floor
-        return generate_floor(world, floor_number=1)
+        return generate_floor(world, floor_number=1, seed=seed, biome=biome)
     return _build_handmade_floor_1(world)
 
 
