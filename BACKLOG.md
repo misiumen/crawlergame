@@ -30,8 +30,26 @@ tekstowy zostaje jako równoległa ścieżka.
 **Powiązane:** UX-7, UX-9 (piny), COMBAT-1 A. Duży redesign — rozbić na
 etapy; iterować w trybie Demo (Intake).
 
-**Pliki:** render akcji/zakładek w `ui/ui.py`, `engine/game.py`
-(action panel build + click routing), `ui/click_registry.py`.
+**Status (2026-05-31): POPOVER DZIAŁA (mysz + klawiatura w otwartym menu).**
+Klik w pin/encję otwiera kontekstowe menu czasowników przy encji
+(`Game.open_entity_popover`, `ui.draw_entity_popover`,
+`ui_nav.action_options_for_entity` — te same czasowniki co panel, zawsze z
+„Sprawdź" na wierzchu). Encja z 1 czasownikiem pomija menu i działa od
+razu. Menu obsługiwane myszą (klik wiersza / klik poza = zamknij) ORAZ
+klawiaturą gdy otwarte (↑↓ / Enter / 1-9 / Esc). Auto-zamyka się gdy encja
+zniknie / zmiana pokoju. Test: `test_entity_popover.py`. Suite 117/117.
+
+**ZOSTAJE (kolejne etapy):**
+- [ ] Klawiaturowe OTWARCIE popovera z pina (np. cyfra pina w trybie nav)
+  — wymaga decyzji o bindzie (konflikt z trybem tekstowym). Na razie
+  klawiaturowy dostęp do akcji encji przez istniejące zakładki Istoty/
+  Środowisko (pełna parzystość możliwości).
+- [ ] Usunięcie zakładek world-interaction (Środowisko/Istoty) gdy popover
+  je w pełni zastąpi — osobny, ryzykowny krok.
+
+**Pliki:** `ui/ui.py` (`draw_entity_popover`, pin cb), `ui/ui_nav.py`
+(`action_options_for_entity`), `engine/game.py` (popover state + open/
+close/activate + mouse/keyboard + draw).
 
 ---
 

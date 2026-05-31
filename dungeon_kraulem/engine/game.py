@@ -211,6 +211,14 @@ class Game:
         # keyword matching on the entity's name (UX-9). Read-once.
         self._forced_intent = None
 
+        # UX-10 — contextual action popover. When set, a floating menu of an
+        # entity's verbs is open (anchored at the clicked pin). Shape:
+        #   {"entity_id": int, "options": [SelectableOption], "idx": int,
+        #    "anchor": (x, y), "rect": (x, y, w, h) | None}
+        # `rect` is filled by the renderer so the mouse handler can detect
+        # clicks outside the menu (→ dismiss). None == no menu open.
+        self.entity_popover = None
+
         # P24.5: full-screen graphical map overlay (M key toggles).
         self.full_map_open = False
 
@@ -2409,6 +2417,72 @@ class Game:
         self._preresolved_target_id = entity_id
         self._forced_intent = {"intent": at, "verb": verb, "targets": [name]}
         self.submit_input()
+
+    # ── UX-10 — contextual action popover ────────────────────────────────
+
+    def open_entity_popover(self, entity_id, anchor=None) -> None:
+        """Open the floating verb menu for an entity (clicked pin / row).
+
+        Builds the entity's verbs via the same logic the action panel uses,
+        so menu and tabs stay in sync. If the entity offers exactly one verb
+        (or none beyond inspect), we skip the menu and act directly — no
+        point making the player click twice for a single option."""
+        if self.world is None or entity_id is None:
+            return
+        ent = self.world.get(entity_id)
+        if ent is None:
+            return
+        room = (self.world.current_floor.current_room()
+                if self.world.current_floor else None)
+        if room is None:
+            return
+        try:
+            from ..ui import ui_nav as _nav
+            opts = _nav.action_options_for_entity(self.world, room, ent)
+        except Exception:
+            opts = []
+        if not opts:
+            # Nothing structured — fall back to a plain inspect.
+            self.dispatch_entity_action(entity_id, "inspect")
+            return
+        if len(opts) == 1:
+            o = opts[0]
+            self.dispatch_entity_action(o.target_id, o.action_type or "inspect")
+            return
+        self.entity_popover = {
+            "entity_id": entity_id,
+            "name": ent.display_name(),
+            "options": opts,
+            "idx": 0,
+            "anchor": anchor,
+            "rect": None,
+        }
+
+    def _close_entity_popover(self) -> None:
+        self.entity_popover = None
+
+    def _entity_popover_move(self, step: int) -> None:
+        pop = self.entity_popover
+        if not pop:
+            return
+        n = len(pop.get("options") or [])
+        if n:
+            pop["idx"] = (int(pop.get("idx", 0)) + step) % n
+
+    def _entity_popover_activate(self, idx=None) -> None:
+        """Run the selected verb, then close the menu."""
+        pop = self.entity_popover
+        if not pop:
+            return
+        opts = pop.get("options") or []
+        i = pop.get("idx", 0) if idx is None else idx
+        self._close_entity_popover()
+        if 0 <= i < len(opts):
+            o = opts[i]
+            if o.target_id is not None and o.action_type:
+                self.dispatch_entity_action(o.target_id, o.action_type)
+            elif o.command:
+                self.submit_generated_command(o.command, target_id=o.target_id)
 
     def _handle_create_input(self, text_val):
         if self.cc.get("step") == "name":
@@ -8338,6 +8412,26 @@ class Game:
         Prompt 10: when the journal overlay is open, hand the keypress
         to `_journal_handle_key` first; if it consumes the event, return.
         """
+        # UX-10 — the contextual entity popover owns input while open.
+        if self.entity_popover is not None:
+            self._suppress_textinput = True
+            if key == pygame.K_ESCAPE:
+                self._close_entity_popover()
+                return
+            if key in (pygame.K_UP, pygame.K_w):
+                self._entity_popover_move(-1); return
+            if key in (pygame.K_DOWN, pygame.K_s):
+                self._entity_popover_move(1); return
+            if key == pygame.K_RETURN:
+                self._entity_popover_activate(); return
+            if digit is not None:
+                idx = int(digit) - 1
+                opts = self.entity_popover.get("options") or []
+                if 0 <= idx < len(opts):
+                    self._entity_popover_activate(idx)
+                return
+            return
+
         # Journal overlay owns input while it's open.
         if self.journal_state.open:
             if self._journal_handle_key(key, shift_held):
@@ -9160,6 +9254,15 @@ class Game:
                 self._box_reveal = None
             return
         mx, my = ev.pos
+        # UX-10 — the entity popover is modal-ish: a click outside it dismisses
+        # the menu; a click on a row is handled by its registered zone below.
+        if self.entity_popover is not None:
+            rect = self.entity_popover.get("rect")
+            if rect is not None:
+                rx, ry, rw, rh = rect
+                if not (rx <= mx < rx + rw and ry <= my < ry + rh):
+                    self._close_entity_popover()
+                    return
         zone = self.click_registry.find(mx, my)
         if zone is None:
             return
@@ -9465,7 +9568,8 @@ class Game:
             ui.draw_room_panel(s, self.world, layout=L,
                                click_registry=self.click_registry,
                                command_cb=self.submit_generated_command,
-                               entity_action_cb=self.dispatch_entity_action)
+                               entity_action_cb=self.dispatch_entity_action,
+                               entity_menu_cb=self.open_entity_popover)
             ui.draw_sidebar(s, self.world, layout=L,
                             click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
@@ -9489,7 +9593,8 @@ class Game:
             ui.draw_room_panel(s, self.world, layout=L,
                                click_registry=self.click_registry,
                                command_cb=self.submit_generated_command,
-                               entity_action_cb=self.dispatch_entity_action)
+                               entity_action_cb=self.dispatch_entity_action,
+                               entity_menu_cb=self.open_entity_popover)
             ui.draw_sidebar(s, self.world, layout=L,
                             click_registry=self.click_registry)
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
@@ -9622,6 +9727,27 @@ class Game:
             self._end_screen(t("victory_title", fallback="ZEJŚCIE ZALICZONE."), True)
         elif self.state == STATE_DEFEAT:
             self._end_screen(t("defeat_title", fallback="ZAWODNIK WYELIMINOWANY."), False)
+        # UX-10 — contextual entity popover floats above the world panels.
+        # Auto-dismiss if its entity vanished or the player left the room.
+        if self.entity_popover is not None and self.state in (
+                STATE_PLAY, STATE_ARENA_PLAY):
+            eid = self.entity_popover.get("entity_id")
+            ent = self.world.get(eid) if self.world else None
+            room = (self.world.current_floor.current_room()
+                    if (self.world and self.world.current_floor) else None)
+            if ent is None or room is None or ent not in room.entities:
+                self.entity_popover = None
+            else:
+                try:
+                    ui.draw_entity_popover(
+                        s, self.entity_popover, layout=self._layout,
+                        click_registry=self.click_registry,
+                        on_select=self._entity_popover_activate)
+                except Exception:
+                    self.entity_popover = None
+        elif self.entity_popover is not None:
+            # Not in a play state any more — drop it.
+            self.entity_popover = None
         # P29.76 / Feature#2 — reveal skrzynki (hybryda VS) rysowany NA WIERZCHU
         # każdego stanu, tuż przed flip.
         if self._box_reveal is not None:

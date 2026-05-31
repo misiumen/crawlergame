@@ -640,6 +640,44 @@ def _flat_object_verbs(world, room) -> List[SelectableOption]:
     return out
 
 
+def action_options_for_entity(world, room, entity) -> List[SelectableOption]:
+    """All verb options for ONE entity (objects + creatures), in display
+    order. Reuses the same per-entity verb logic the action panel uses, so
+    the contextual popover (UX-10 direct interaction) and the tabs can never
+    drift apart. Returns [] when the entity offers nothing actionable."""
+    if entity is None or room is None:
+        return []
+    eid = getattr(entity, "entity_id", None)
+    if eid is None:
+        return []
+    out: List[SelectableOption] = []
+    try:
+        for o in _flat_object_verbs(world, room):
+            if o.target_id == eid:
+                out.append(o)
+    except Exception:
+        pass
+    try:
+        for o in _flat_entity_verbs(world, room):
+            if o.target_id == eid:
+                out.append(o)
+    except Exception:
+        pass
+    # Inspect is always a safe, expected first option in the contextual menu
+    # (the object builder offers it, but the creature builder does not — so a
+    # monster would otherwise jump straight to "attack" on click). Guarantee
+    # one at the front when nothing already covers it.
+    if out and not any(o.action_type == "inspect" for o in out):
+        name = entity.display_name()
+        out.insert(0, SelectableOption(
+            option_id=f"inspect_{eid}",
+            label=f"Sprawdź: {name}",
+            command=f"sprawdź {name}",
+            target_id=eid, action_type="inspect",
+        ))
+    return out
+
+
 def _entity_options(world, room, *,
                     focused: Optional[str] = None) -> List[SelectableOption]:
     """Two-tier (P24.7)."""

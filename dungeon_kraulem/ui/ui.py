@@ -833,7 +833,8 @@ def _floor_biome(world) -> str:
 
 
 def draw_room_panel(surf, world, layout=None, *, click_registry=None,
-                    command_cb=None, entity_action_cb=None):
+                    command_cb=None, entity_action_cb=None,
+                    entity_menu_cb=None):
     """Render the center panel. P24.5: when combat is active in the
     current room, this delegates to draw_combat_arena() so the player
     gets a dedicated tactical surface instead of the normal room view."""
@@ -932,18 +933,21 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
                          cyp - gimg.get_height() // 2))
         if click_registry is not None:
             label = "???" if unknown else e.display_name()
-            def _mk(eid, nm):
+            def _mk(eid, nm, ax, ay):
                 def _cb():
-                    # Direct, parser-free dispatch by entity id (UX-9) so a
-                    # name containing a reserved keyword can't hijack the click.
-                    if entity_action_cb is not None:
+                    # UX-10: click opens the entity's contextual verb menu at
+                    # the pin. Falls back to a direct inspect, then to the
+                    # legacy string command. All parser-free (UX-9).
+                    if entity_menu_cb is not None:
+                        entity_menu_cb(eid, (ax, ay))
+                    elif entity_action_cb is not None:
                         entity_action_cb(eid, "inspect")
                     elif command_cb is not None:
                         command_cb("sprawdz " + nm)
                 return _cb
             click_registry.add((cx - pin_r, cyp - pin_r, pin_r * 2, pin_r * 2),
-                               _mk(e.entity_id, e.display_name()),
-                               tooltip="Sprawdz: " + label,
+                               _mk(e.entity_id, e.display_name(), cx, cyp),
+                               tooltip="Akcje: " + label,
                                category="room_pin")
 
     # ── Bottom description bar ─────────────────────────────────────────
@@ -973,6 +977,70 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
             text(surf, ln, x + 14, bar_y + 8 + j * 17, NORMAL_TEXT,
                  L.font_small - 1)
     return
+
+
+def draw_entity_popover(surf, popover, *, layout=None, click_registry=None,
+                        on_select=None):
+    """UX-10 — floating contextual verb menu for one entity, anchored at the
+    clicked pin. `popover` is the Game.entity_popover dict; this fills its
+    `rect` so the mouse handler can detect outside-clicks. `on_select(idx)`
+    runs the chosen verb. Rows are mouse-clickable AND the current `idx` is
+    highlighted for keyboard parity (arrows/Enter operate it elsewhere)."""
+    if not popover:
+        return
+    opts = popover.get("options") or []
+    if not opts:
+        return
+    L = _resolve_layout(layout)
+    sw, sh = surf.get_size()
+    size = max(14, L.font_small)
+    pad = 10
+    row_h = size + 12
+    title = popover.get("name", "") or ""
+    # Width: widest of title / option labels.
+    fnt = font(size, bold=True)
+    wid = fnt.size("▸ " + title)[0]
+    for o in opts:
+        wid = max(wid, font(size).size("  " + o.label)[0])
+    w = min(sw - 40, wid + pad * 2 + 16)
+    h = pad * 2 + row_h + 6 + row_h * len(opts)
+    # Anchor near the pin; clamp on-screen.
+    ax, ay = popover.get("anchor") or (sw // 2, sh // 2)
+    px = int(ax) + 18
+    py = int(ay) - h // 2
+    px = max(8, min(px, sw - w - 8))
+    py = max(8, min(py, sh - h - 8))
+    popover["rect"] = (px, py, w, h)
+    # Backdrop + frame.
+    shadow = pygame.Surface((w + 6, h + 6), pygame.SRCALPHA)
+    shadow.fill((0, 0, 0, 120))
+    surf.blit(shadow, (px + 3, py + 4))
+    pygame.draw.rect(surf, PANEL_BG, (px, py, w, h))
+    pygame.draw.rect(surf, ACCENT, (px, py, w, h), 2)
+    # Title (entity name).
+    text(surf, title, px + pad, py + pad, BRIGHT_TEXT, size, True)
+    pygame.draw.line(surf, BORDER, (px + pad, py + pad + row_h - 2),
+                     (px + w - pad, py + pad + row_h - 2), 1)
+    sel = int(popover.get("idx", 0))
+    ry0 = py + pad + row_h + 6
+    for i, o in enumerate(opts):
+        ry = ry0 + i * row_h
+        is_sel = (i == sel)
+        if is_sel:
+            pygame.draw.rect(surf, (40, 52, 70), (px + 4, ry - 2, w - 8, row_h))
+        col = ACCENT if is_sel else NORMAL_TEXT
+        prefix = "▸ " if is_sel else "  "
+        text(surf, prefix + o.label, px + pad, ry + 2, col, size,
+             bold=is_sel)
+        if click_registry is not None and on_select is not None:
+            def _mk(idx):
+                def _cb():
+                    on_select(idx)
+                return _cb
+            click_registry.add((px + 4, ry - 2, w - 8, row_h), _mk(i),
+                               tooltip=o.label, category="entity_popover")
+
+
 def _all_status_labels(target):
     """P29.63 — etykiety statusów do HUD: stany walki (conditions, przez
     status_label EN→PL) + statusy SYSTEMOWE (state.systemic_statuses:
