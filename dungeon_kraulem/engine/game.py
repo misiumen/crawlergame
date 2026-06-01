@@ -5951,15 +5951,36 @@ class Game:
                     cs.bands.get(ent.entity_id) == _cmb.BAND_AT_RANGE:
                 dmg = max(0, dmg - 2)
             if cs.player_dodge:
-                # Dodge consumes; halve damage on success roll.
+                # COMBAT-1 Slice B — reading the tell pays off. A dodge timed
+                # against a TELEGRAPHED SPECIAL (the big wind-up the HUD warned
+                # you about) fully negates it on success; an ordinary attack is
+                # only halved. Dodge always consumes (reset at end of round).
                 import random as _r
-                if _r.randint(1,20) + ch.stat_mod("DEX") >= 12:
-                    dmg = max(0, dmg // 2)
-                    self.log(f"Unikasz większej części ataku od {name}.", LOG_NORMAL)
+                if _r.randint(1, 20) + ch.stat_mod("DEX") >= 12:
+                    if is_special:
+                        dmg = 0
+                        self.log(f"Czytasz zamach — robisz unik i {name} "
+                                 f"trafia w próżnię. Specjał spalony!",
+                                 LOG_SUCCESS)
+                    else:
+                        dmg = max(0, dmg // 2)
+                        self.log(f"Unikasz większej części ataku od {name}.",
+                                 LOG_NORMAL)
+                elif is_special:
+                    self.log(f"Próbujesz uniku, ale {name} cię dosięga.",
+                             LOG_WARN)
             # Prompt 23: shield in offhand reduces damage by AC bonus.
             shield_bonus = ch.offhand_ac_bonus(self.world)
             if shield_bonus > 0:
                 dmg = max(0, dmg - shield_bonus)
+            # Slice B — defending against a telegraphed special halves the
+            # remaining hit (on top of the flat block) before the flat
+            # subtraction, so bracing for the big one is meaningfully better
+            # than bracing for a jab.
+            if is_special and cs.player_defend > 0:
+                dmg = max(0, dmg // 2)
+                self.log(f"Zwierasz gardę pod specjał {name} — cios "
+                         f"traci impet.", LOG_NORMAL)
             dmg = max(0, dmg - cs.player_defend)
             if dmg <= 0:
                 self.log(f"{name} atakuje, ale nie robi krzywdy.", LOG_NORMAL)
@@ -6330,6 +6351,21 @@ class Game:
                         audio.play_sfx("limb_broken")
                     except Exception:
                         pass
+            # COMBAT-1 Slice B — interrupt feedback. If this hit just stunned
+            # the target (head shot / heavy) WHILE it was charging a special,
+            # surface that the read paid off. The enemy turn already fizzles a
+            # charged special on stun/prone (see _run_enemy_turn); this just
+            # tells the player their attack-the-windup choice worked.
+            try:
+                from . import enemy_ai as _ai
+                _intent = (cs.enemy_intents or {}).get(target.entity_id) or {}
+                if (_intent.get("category") == _ai.CAT_SPECIAL
+                        and (_cmb.has_status(target, _cmb.STATUS_STUNNED)
+                             or _cmb.has_status(target, _cmb.STATUS_PRONE))):
+                    self.log(f"Trafiasz w zamachu — „{target.display_name()}” "
+                             f"traci szykowany specjał!", LOG_SUCCESS)
+            except Exception:
+                pass
             # P29.55 — ferromanta magnetic_disarm: 25% chance na
             # ściągnięcie broni z metal-armed targetu po hicie.
             try:
