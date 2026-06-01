@@ -632,11 +632,7 @@ def _flat_object_verbs(world, room) -> List[SelectableOption]:
         # tag. Bare terminals + safehouse counters previously offered
         # Użyj that produced zero feedback — pure noise.
         USE_TAGS = {"consumable","wearable","wield","interface","tool",
-                    "powered","button","switch","controllable",
-                    # Keys / keycards / lockpicks ARE usable (open a lock) —
-                    # without these the suspicious_keycard offered no „Użyj"
-                    # and read as a dead item even though `użyj` works.
-                    "key","keycard","lockpick"}
+                    "powered","button","switch","controllable"}
         # P29.50 (#148) — vending_machine + jednorazowe `use`-able obiekty
         # znikają po wykorzystaniu. State flagi ustawione przez handlery
         # (np. vending_used, hacked dla terminala który wymaga use po
