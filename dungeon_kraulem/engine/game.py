@@ -5818,11 +5818,14 @@ class Game:
         except Exception:
             pass
 
-    def _spawn_combat_fx(self, anchor, txt, color, *, big=False, shake=0.0):
-        """P29.65 game-juice: przejściowy efekt walki — pływająca liczba
-        obrażeń + błysk celu + opcjonalny shake. Trzymane na `world.combat_fx`,
-        rysowane przez ui.draw_combat_arena, wygaszane w update(dt). Defensywne —
-        nigdy nie wywala tury. `anchor` = entity_id wroga albo „player"."""
+    def _spawn_combat_fx(self, anchor, txt, color, *, big=False, shake=0.0,
+                         kick=0):
+        """P29.65 / COMBAT-1 P2 game-juice: przejściowy efekt walki —
+        pływająca liczba obrażeń + błysk celu + opcjonalny shake + KICK
+        (odrzut portretu/karty na trafieniu, DD-style). Trzymane na
+        `world.combat_fx`, rysowane przez ui, wygaszane w update(dt).
+        Defensywne — nigdy nie wywala tury. `anchor` = entity_id albo
+        „player". `kick` = px odrzutu (dodatni = w prawo dla wroga)."""
         try:
             w = self.world
             if w is None:
@@ -5840,6 +5843,11 @@ class Game:
                 float(fx.get("flash", {}).get(anchor, 0.0)), 240.0)
             if shake:
                 fx["shake"] = max(float(fx.get("shake", 0.0)), float(shake))
+            if kick:
+                # Per-anchor recoil: {anchor: [offset_px, ttl_ms]}. Decays
+                # toward 0 in update(dt); the renderer shifts the portrait.
+                kd = fx.setdefault("kick", {})
+                kd[anchor] = [float(kick), 220.0]
         except Exception:
             pass
 
@@ -6030,9 +6038,13 @@ class Game:
                 pass
             self.log(f"{name} trafia cię na {dmg} HP "
                      f"(zostało {ch.hp}/{ch.max_hp}).", LOG_DANGER)
-            # P29.65 game-juice: czerwona pływająca liczba + błysk + shake.
+            # P29.65 / P2 game-juice: czerwona liczba + błysk + shake + kick.
+            # Player chip recoils LEFT when hit. Shake values in ms so they
+            # actually persist a few frames (old 3-7 decayed instantly).
             self._spawn_combat_fx("player", f"-{dmg}", (255, 90, 90),
-                                  big=e_crit, shake=(7.0 if e_crit else 3.0))
+                                  big=e_crit,
+                                  shake=(200.0 if e_crit else 110.0),
+                                  kick=(-12 if e_crit else -7))
             # Heavy hits cause bleeding sometimes.
             if dmg >= 5:
                 _cmb.add_status(ch, _cmb.STATUS_WOUNDED, 4)
@@ -6406,6 +6418,10 @@ class Game:
                         self.log(f"Mocne trafienie w {zlabel} — "
                                  f"„{target.display_name()}” się zachwiał!",
                                  LOG_SUCCESS)
+                        try:
+                            audio.play_sfx("stagger")
+                        except Exception:
+                            pass
                         # Head: a heavy crack has a chance to briefly stun.
                         if zone_key == "head" and not _cmb.has_status(
                                 target, _cmb.STATUS_STUNNED):
@@ -6479,8 +6495,12 @@ class Game:
                 _fxcol = (255, 210, 70)
             else:
                 _fxcol = (235, 235, 235)
+            # COMBAT-1 P2 — enemy recoils right when the player lands a hit
+            # (bigger kick on crit). Shake scaled up a touch for punch.
             self._spawn_combat_fx(target.entity_id, f"-{_amt}", _fxcol,
-                                  big=crit, shake=(4.0 if crit else 0.0))
+                                  big=crit,
+                                  shake=(160.0 if crit else 90.0),
+                                  kick=(14 if crit else 8))
             self.log(f"„{target.display_name()}”: "
                      f"-{res['amount_dealt']} HP "
                      f"({type_label}){tag} "
@@ -6502,6 +6522,10 @@ class Game:
                     if flashy:
                         self.log("Widownia ryczy — efektowne wykończenie!",
                                  LOG_SYNDIC)
+                        try:
+                            audio.play_sfx("finisher")
+                        except Exception:
+                            pass
                         # A flashy kill can summon an opportunistic sponsor pod.
                         try:
                             from . import sponsors as _sp_fx
@@ -9657,6 +9681,13 @@ class Game:
                 _ban["age"] = _ban.get("age", 0.0) + dt
                 if _ban["age"] >= _ban.get("ttl", 1100.0):
                     _fx["banner"] = None
+            # COMBAT-1 P2 — recoil kick decay (per anchor).
+            _kick = _fx.get("kick")
+            if _kick:
+                for _k in list(_kick.keys()):
+                    _kick[_k][1] -= dt
+                    if _kick[_k][1] <= 0:
+                        del _kick[_k]
         # Audio routing per state
         try:
             audio.play_music(self._music_key_for_state())

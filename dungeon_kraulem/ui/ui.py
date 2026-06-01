@@ -3236,7 +3236,19 @@ def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
 
     # Silhouette takes the bulk of the panel.
     sil_h = max(180, h - 140)
-    _draw_silhouette(surf, target, plan, x + 6, cy, w - 12, sil_h, L,
+    # COMBAT-1 P2 — recoil kick: shift the portrait by the decaying offset
+    # set on hit (DD-style flinch). Read from world.combat_fx["kick"].
+    _kx = 0
+    try:
+        _kfx = getattr(world, "combat_fx", None)
+        if isinstance(_kfx, dict):
+            _kd = (_kfx.get("kick") or {}).get(target.entity_id)
+            if _kd and _kd[1] > 0:
+                # ease out: offset scales with remaining ttl fraction.
+                _kx = int(_kd[0] * max(0.0, min(1.0, _kd[1] / 220.0)))
+    except Exception:
+        _kx = 0
+    _draw_silhouette(surf, target, plan, x + 6 + _kx, cy, w - 12, sil_h, L,
                      selected_zone, cs=cs,
                      click_registry=click_registry,
                      category_override=f"vats_zone:{target.entity_id}",

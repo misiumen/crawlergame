@@ -297,6 +297,55 @@ def sfx_limb_broken() -> List[float]:
     return _scale(_mix(_scale(crunch, 0.7), _scale(snap, 0.5)), 0.85)
 
 
+# ── COMBAT-1 P2 — extra combat-juice SFX ────────────────────────────────
+
+def sfx_stagger() -> List[float]:
+    """Heavy thud + brief wobble — enemy rocked off balance."""
+    thud = _glide(120, 70, 0.12, shape="triangle")
+    thud = _apply_env(thud, _env_ad(len(thud), 0.02, 0.9))
+    wob = _noise(0.06, seed=11)
+    wob = _apply_env(wob, _env_ad(len(wob), 0.01, 0.95))
+    return _scale(_mix(_scale(thud, 0.8), _scale(wob, 0.3)), 0.85)
+
+
+def sfx_sever() -> List[float]:
+    """Wet slash + snap — a limb cut clean off (slashing weapon)."""
+    slash = _noise(0.08, seed=7)
+    slash = _lowpass(slash, 3500)
+    slash = _apply_env(slash, _env_ad(len(slash), 0.005, 0.7))
+    snap = _glide(220, 50, 0.12, shape="saw")
+    snap = _apply_env(snap, _env_ad(len(snap), 0.02, 0.98))
+    return _scale(_mix(_scale(slash, 0.7), _scale(snap, 0.55)), 0.9)
+
+
+def sfx_zap() -> List[float]:
+    """Electric crackle — shock through water / wiring."""
+    z = _noise(0.18, seed=13)
+    z = _apply_env(z, _env_ad(len(z), 0.005, 0.6))
+    buzz = _square(90, 0.18, duty=0.25)
+    buzz = _apply_env(buzz, _env_ad(len(buzz), 0.01, 0.8))
+    return _scale(_mix(_scale(z, 0.5), _scale(buzz, 0.4)), 0.85)
+
+
+def sfx_ignite() -> List[float]:
+    """Whoosh up — something catches fire."""
+    w = _glide(200, 900, 0.30, shape="saw")
+    w = _lowpass(w, 2200)
+    w = _apply_env(w, _env_ad(len(w), 0.2, 0.8))
+    hiss = _noise(0.30, seed=17)
+    hiss = _apply_env(hiss, _env_ad(len(hiss), 0.25, 0.7))
+    return _scale(_mix(_scale(w, 0.5), _scale(hiss, 0.35)), 0.8)
+
+
+def sfx_finisher() -> List[float]:
+    """Punchy descending stab — the kill blow."""
+    stab = _glide(520, 90, 0.22, shape="square")
+    stab = _apply_env(stab, _env_ad(len(stab), 0.01, 0.9))
+    sub = _sine(70, 0.22)
+    sub = _apply_env(sub, _env_ad(len(sub), 0.02, 0.95))
+    return _scale(_mix(_scale(stab, 0.6), _scale(sub, 0.5)), 0.95)
+
+
 # ── Music tracks ─────────────────────────────────────────────────────────
 #
 # Each track is a single buffer that loops cleanly via mixer.music. We
@@ -486,6 +535,12 @@ SFX_REGISTRY = {
     "attack_miss":     sfx_attack_miss,
     "attack_fumble":   sfx_attack_fumble,
     "limb_broken":     sfx_limb_broken,
+    # COMBAT-1 P2 — combat-juice additions.
+    "stagger":         sfx_stagger,
+    "sever":           sfx_sever,
+    "zap":             sfx_zap,
+    "ignite":          sfx_ignite,
+    "finisher":        sfx_finisher,
 }
 
 MUSIC_REGISTRY = {
