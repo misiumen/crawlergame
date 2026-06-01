@@ -6405,6 +6405,24 @@ class Game:
                         # Ordinary hit — light flinch so it never reads inert.
                         self.log(f"„{target.display_name()}” wzdryga się "
                                  f"od ciosu w {zlabel}.", LOG_NORMAL)
+                    # COMBAT-1 Slice D — the show loves a spectacle. A crit or
+                    # a clean staggering blow gives the crowd a small jolt
+                    # (separate from the bigger on-kill bump below). Reuses the
+                    # audience lever; the band-cross feedback handles its own
+                    # logging.
+                    if big:
+                        try:
+                            from . import audience as _aud_fx
+                            _aud_fx.change_audience(self.world,
+                                                    2 if crit else 1,
+                                                    source="combat_flourish")
+                        except Exception:
+                            pass
+                    # Finisher tell: enemy alive but on its last legs after this
+                    # hit → prompt the player to end it (drama + clarity).
+                    if 0 < target.hp <= max(1, int(target.max_hp or 1) // 5):
+                        self.log(f"„{target.display_name()}” ledwo stoi — "
+                                 f"dokończ go!", LOG_WARN)
             except Exception:
                 pass
             # P29.55 — ferromanta magnetic_disarm: 25% chance na
@@ -6457,6 +6475,29 @@ class Game:
                      LOG_SUCCESS if crit else LOG_NORMAL)
             if target.hp <= 0:
                 self.log(f"„{target.display_name()}” pada.", LOG_SUCCESS)
+                # COMBAT-1 Slice D — a kill is the money shot. Crowd pops, and
+                # a FLASHY kill (crit, or a finishing blow to head/limb) pops
+                # harder and is more likely to draw a sponsor's eye. The
+                # generic enemy_killed sponsor tag still fires below; this is
+                # the audience-meter spectacle on top.
+                try:
+                    from . import audience as _aud_kill
+                    flashy = bool(crit or zone_key in ("head",) or
+                                  zone_dmg_mul >= 1.4)
+                    _aud_kill.change_audience(self.world, 4 if flashy else 2,
+                                              source="combat_kill")
+                    if flashy:
+                        self.log("Widownia ryczy — efektowne wykończenie!",
+                                 LOG_SYNDIC)
+                        # A flashy kill can summon an opportunistic sponsor pod.
+                        try:
+                            from . import sponsors as _sp_fx
+                            _sp_fx.note_player_tag(self.world,
+                                                   "flashy_kill", weight=3)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
                 try:
                     audio.play_sfx("enemy_death")
                 except Exception:
