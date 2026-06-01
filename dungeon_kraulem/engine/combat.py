@@ -238,8 +238,36 @@ def set_combat(room, cs: Optional[CombatState]) -> None:
         room.state["combat"] = cs
 
 
-def alive_hostiles_in(room) -> List:
-    """All hostile, alive entities in the room."""
+def _is_player_hostile(e) -> bool:
+    """Is this creature actually aggressive toward the PLAYER right now?
+    Monsters are always hostile. Crawlers/NPCs only count if their
+    disposition is hostile (or they've been provoked: state['provoked']).
+    A neutral/ignoring/friendly crawler standing in the room is NOT an
+    automatic combatant — attacking a rat shouldn't drag the whole room in
+    (and certainly shouldn't make a neutral captain team up with the rat)."""
+    et = getattr(e, "entity_type", "")
+    if et == "monster":
+        return True
+    if et in ("crawler", "npc"):
+        st = e.state or {}
+        if st.get("provoked"):
+            return True
+        dispo = (getattr(e, "disposition", "") or
+                 st.get("disposition", "") or "neutral").lower()
+        return dispo in ("hostile", "aggressive")
+    return False
+
+
+def alive_hostiles_in(room, *, instigator=None) -> List:
+    """Creatures that should START in combat.
+
+    With NO instigator (arena, threat-enrage): every player-hostile alive
+    creature in the room (monsters + hostile crawlers). Neutral crawlers are
+    left out — they no longer auto-join every fight.
+
+    With an `instigator` (the entity the player just attacked): that target
+    plus any OTHER creature already hostile to the player. The instigator is
+    always included even if neutral — you hit it, so now it fights."""
     out = []
     if room is None:
         return out
@@ -248,20 +276,30 @@ def alive_hostiles_in(room) -> List:
             continue
         if not e.is_alive():
             continue
-        # Friendly relationships (existing data) -> not hostile.
         rel = (e.state or {}).get("relationship", 0)
         if rel > 0:
             continue
-        out.append(e)
+        if instigator is not None and e.entity_id == getattr(
+                instigator, "entity_id", None):
+            out.append(e)
+            continue
+        if _is_player_hostile(e):
+            out.append(e)
     return out
 
 
-def start_combat(room, world, *, triggered_by: str = "player_attack") -> CombatState:
-    """Build a fresh CombatState for the current hostiles in the room."""
+def start_combat(room, world, *, triggered_by: str = "player_attack",
+                 instigator=None) -> CombatState:
+    """Build a fresh CombatState for the current hostiles in the room.
+
+    `instigator` (the entity the player attacked) scopes who joins: that
+    target + creatures already hostile to the player. Neutral bystanders
+    stay out of the fight (they can be provoked later). Without an
+    instigator (arena / threat-enrage) all player-hostile creatures join."""
     # Prompt 19 audit fix S1: drain pending sponsor hunters into this
     # encounter before banding is set, so they participate from round 1.
     _inject_pending_hunters(room, world)
-    hostiles = alive_hostiles_in(room)
+    hostiles = alive_hostiles_in(room, instigator=instigator)
     cs = CombatState(active=True, round=1, side="player")
     cs.participants = [e.entity_id for e in hostiles]
     # Default banding: ranged enemies start at_range; everything else engaged.

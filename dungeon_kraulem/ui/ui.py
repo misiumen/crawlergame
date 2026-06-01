@@ -1410,7 +1410,8 @@ def _draw_enemy_panel(surf, world, target, cs, x, y, w, h, L,
     text(surf, "  ·  ".join(parts), x + 14, cy, ACCENT2,
          L.font_small - 1); cy += 14
     text(surf, f"HP strefy: {zp_hp}/{zp_max}"
-               + ("  [złamana]" if broken else ""),
+               + (("  [odcięta]" if zp.get("severed") else "  [złamana]")
+                  if broken else ""),
          x + 14, cy, DANGER if broken else NORMAL_TEXT,
          L.font_small - 1); cy += 14
 
@@ -3273,7 +3274,8 @@ def _draw_arena_vats_panel(surf, world, target, cs, x, y, w, h, L,
     text(surf, f"  trafienie {z_mod:+d}   obraż. ×{z_mul:.1f}",
          x + 10, cy, NORMAL_TEXT, L.font_small - 1); cy += 13
     text(surf, f"  HP strefy: {zp_hp}/{zp_max}"
-               + ("  [złamana]" if broken else ""),
+               + (("  [odcięta]" if zp.get("severed") else "  [złamana]")
+                  if broken else ""),
          x + 10, cy, DANGER if broken else NORMAL_TEXT, L.font_small - 1); cy += 13
     if maim_label:
         text(surf, f"  uraz: {maim_label}",

@@ -6378,6 +6378,7 @@ class Game:
                     # cut-vs-break system (amputation drops, bleed scaling) is
                     # still CMB-8; this is the readable first cut.
                     _sharp = bool(weapon and "sharp" in (weapon.tags or []))
+                    zp["severed"] = _sharp   # UI shows odcięta vs złamana
                     if _sharp:
                         self.log(t("feedback_zone_severed",
                                    fallback=f"„{target.display_name()}”: "
