@@ -3441,6 +3441,22 @@ def _draw_silhouette(surf, target, plan, x, y, w, h, L,
         b = int(140 * frac + 40)
         return (r, g, b)
 
+    # Mouse pos for hover (touch of "B" — only the hovered limb reveals its
+    # name + a subtle ring; everything else stays clean).
+    try:
+        _mx, _my = pygame.mouse.get_pos()
+    except Exception:
+        _mx, _my = (-9999, -9999)
+
+    def _pip(cx, cy, r, col, *, cross=False, width=2):
+        """A small targeting reticle: ring + optional crosshair ticks."""
+        pygame.draw.circle(surf, col, (cx, cy), r, width)
+        if cross:
+            pygame.draw.line(surf, col, (cx - r - 3, cy), (cx - r + 1, cy), width)
+            pygame.draw.line(surf, col, (cx + r - 1, cy), (cx + r + 3, cy), width)
+            pygame.draw.line(surf, col, (cx, cy - r - 3), (cx, cy - r + 1), width)
+            pygame.draw.line(surf, col, (cx, cy + r - 1), (cx, cy + r + 3), width)
+
     for zone_key, props in plan.items():
         rect = _zone_rect(zone_key)
         if rect is None:
@@ -3450,32 +3466,31 @@ def _draw_silhouette(surf, target, plan, x, y, w, h, L,
         broken = zp.get("broken", False)
         color = _zone_color(zp, broken)
         is_sel = (zone_key == selected_zone)
+        is_hover = (rx <= _mx < rx + rw and ry <= _my < ry + rh)
+        cx, cy = rx + rw // 2, ry + rh // 2
+        wounded = zp.get("hp", 1) < zp.get("max_hp", 1)
         if drew_real:
-            # The PORTRAIT is the body. Zones are clickable OUTLINES traced on
-            # the anatomy — NOT filled blocks (a teal fill over the dark art
-            # read as a paper-doll and hid the portrait). Only fill when a zone
-            # needs to scream: selected (thin), or broken/wounded (red tint).
-            fill_a = 0
-            if is_sel:
-                fill_a = 70
-            elif broken:
-                fill_a = 80
-            elif zp.get("hp", 1) < zp.get("max_hp", 1):
-                fill_a = 40
-            if fill_a > 0:
-                try:
-                    ov = pygame.Surface((rw, rh), pygame.SRCALPHA)
-                    ov.fill((color[0], color[1], color[2], fill_a))
-                    surf.blit(ov, (rx, ry))
-                except Exception:
-                    pass
-            # Outline every zone so the click targets read at a glance.
-            if is_sel:
-                pygame.draw.rect(surf, DANGER, (rx - 1, ry - 1, rw + 2, rh + 2), 2)
-            elif broken:
-                pygame.draw.rect(surf, DANGER, (rx, ry, rw, rh), 1)
+            # OVER ART: no boxes. Each limb is a small targeting RETICLE PIP on
+            # the anatomy (Option A). The portrait stays clean; you read it as
+            # "aim points", not a paper-doll grid.
+            #   default  → faint cyan dot
+            #   wounded  → amber dot
+            #   broken   → red dot (smaller, it's gone)
+            #   selected → larger accent crosshair
+            #   hover    → subtle ring + name (Option B touch)
+            if broken:
+                _pip(cx, cy, 3, (200, 60, 60), width=2)
+            elif is_sel:
+                _pip(cx, cy, 8, ACCENT, cross=True, width=2)
             else:
-                pygame.draw.rect(surf, (130, 190, 210), (rx, ry, rw, rh), 1)
+                base_col = (210, 170, 70) if wounded else (150, 195, 215)
+                _pip(cx, cy, 4, base_col, width=2)
+            if is_hover and not is_sel:
+                # Reveal the hovered limb's extent softly + its name.
+                hov = pygame.Surface((rw, rh), pygame.SRCALPHA)
+                hov.fill((255, 255, 255, 18))
+                surf.blit(hov, (rx, ry))
+                _pip(cx, cy, 7, BRIGHT_TEXT, cross=True, width=1)
         else:
             # No art — keep the solid colored block silhouette + outline.
             try:
@@ -3488,21 +3503,21 @@ def _draw_silhouette(surf, target, plan, x, y, w, h, L,
                 pygame.draw.rect(surf, DANGER, (rx - 1, ry - 1, rw + 2, rh + 2), 2)
             else:
                 pygame.draw.rect(surf, BORDER, (rx, ry, rw, rh), 1)
-        # Labels: over a portrait only the SELECTED zone is labelled (dark
-        # backing strip for legibility) so the art stays clean; the other
-        # zones are identified by hover tooltip + the "Cel:" preview line.
-        # Without art, every block keeps its label.
-        if is_sel or not drew_real:
+        # Labels. Over art: show the SELECTED limb's name, and the HOVERED
+        # one's (Option B). Without art: every block keeps its label.
+        show_label = (not drew_real) or is_sel or is_hover
+        if show_label:
             label = props.get("label_pl", zone_key)
             f_lbl = font(max(9, min(L.font_small - 2, max(9, rh // 3))))
-            if f_lbl.size(label)[0] > rw - 4:
+            if (not drew_real) and f_lbl.size(label)[0] > rw - 4:
                 while label and f_lbl.size(label + "…")[0] > rw - 4:
                     label = label[:-1]
                 label = label + "…"
             img = f_lbl.render(label, True, BRIGHT_TEXT)
-            lx = rx + (rw - img.get_width()) // 2
-            ly = ry + (rh - img.get_height()) // 2
             if drew_real:
+                # Float the name just under the pip with a dark backing strip.
+                lx = cx - img.get_width() // 2
+                ly = min(cy + 10, ry + rh - img.get_height())
                 try:
                     strip = pygame.Surface((img.get_width() + 6,
                                             img.get_height() + 2), pygame.SRCALPHA)
@@ -3510,6 +3525,9 @@ def _draw_silhouette(surf, target, plan, x, y, w, h, L,
                     surf.blit(strip, (lx - 3, ly - 1))
                 except Exception:
                     pass
+            else:
+                lx = rx + (rw - img.get_width()) // 2
+                ly = ry + (rh - img.get_height()) // 2
             surf.blit(img, (lx, ly))
         # Click zone — sets cs.targeted_zone_by_eid for this target.
         # P28 (P27-UX-12): category encodes "<base>:<zone>" so the
