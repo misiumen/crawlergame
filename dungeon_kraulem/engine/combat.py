@@ -281,6 +281,31 @@ def start_combat(room, world, *, triggered_by: str = "player_attack") -> CombatS
         _ai.plan_intents(world, cs)
     except Exception:
         pass
+    # COMBAT-1 Slice A — zero-friction start. Auto-select a target and reveal
+    # the hostiles so the HUD shows name / HP / intent / weakness IMMEDIATELY,
+    # without the player having to `sprawdź` first or open the [Istoty] tab.
+    # Pick the "primary threat": engaged before at-range, then most current HP
+    # (the thing most in your face). Falls back to the first participant.
+    try:
+        def _threat_key(e):
+            band = cs.bands.get(e.entity_id, BAND_ENGAGED)
+            return (0 if band == BAND_ENGAGED else 1, -int(getattr(e, "hp", 0)))
+        ranked = sorted([h for h in hostiles if h.is_alive()], key=_threat_key)
+        if ranked:
+            cs.selected_target_id = ranked[0].entity_id
+    except Exception:
+        if hostiles:
+            cs.selected_target_id = hostiles[0].entity_id
+    # Reveal participants to at least `seen` so the HUD/portrait stop hiding
+    # them behind fog-of-war the instant combat begins (you can see who's
+    # swinging at you). `sprawdź` still upgrades seen→inspected for the full
+    # numeric card; this just removes the silhouette/"???" on engagement.
+    try:
+        from . import visibility as _vis
+        for h in hostiles:
+            _vis.mark_seen(h)
+    except Exception:
+        pass
     return cs
 
 

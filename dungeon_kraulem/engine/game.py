@@ -3072,6 +3072,7 @@ class Game:
                                             triggered_by="player_attack")
                     self.log(t("feedback_combat_start",
                                fallback="Walka się zaczyna."), LOG_WARN)
+                    self._combat_open_briefing(cs2)
                     # P29.12 — tutorial: VATS + threat on first combat.
                     try:
                         from . import tutorial as _tut
@@ -3160,6 +3161,7 @@ class Game:
                                        triggered_by="arena_start")
                 self.log(t("feedback_combat_start",
                            fallback="Walka się zaczyna."), LOG_WARN)
+                self._combat_open_briefing(cs)
                 # P30 — do NOT run an enemy turn here. start_combat already
                 # telegraphs each hostile's intent; the player should act
                 # first and respond to that telegraph, not eat a free hit
@@ -6583,6 +6585,32 @@ class Game:
                    fallback="Przygotowujesz się do uniku."), LOG_SUCCESS)
         cs.last_action = "dodge"
         self._combat_after_player_action(cs)
+
+    def _combat_open_briefing(self, cs) -> None:
+        """COMBAT-1 Slice A — emit a one-line read of the primary target the
+        moment combat opens, so the player isn't forced to spend the `assess`
+        action just to see what they're up against. Shows band, threat,
+        weakness (the lever) and the telegraphed intent (what's coming). Does
+        NOT set cs.assessed — the full `oceń` action still adds the deeper
+        per-enemy breakdown + environment cues."""
+        from . import combat as _cmb
+        tid = getattr(cs, "selected_target_id", None)
+        e = self.world.get(tid) if tid is not None else None
+        if e is None or not e.is_alive():
+            return
+        band = _cmb.describe_band(cs, e)
+        threat = _cmb.describe_threat(e)
+        bits = [band, threat]
+        weak = list(getattr(e, "vulnerable_to", None) or [])
+        if weak:
+            bits.append("słaby na: " + ", ".join(weak))
+        intent = (getattr(cs, "enemy_intents", None) or {}).get(e.entity_id)
+        if intent:
+            label = intent.get("label_pl") or intent.get("category", "")
+            if label:
+                bits.append("zamiar: " + label)
+        self.log(f"Naprzeciw: „{e.display_name()}” — {', '.join(bits)}.",
+                 LOG_WARN)
 
     def _combat_assess(self, intent, cs):
         from . import combat as _cmb
