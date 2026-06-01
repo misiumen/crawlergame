@@ -3558,6 +3558,43 @@ def _draw_silhouette(surf, target, plan, x, y, w, h, L,
             pygame.draw.line(surf, col, (cx, cy - r - 3), (cx, cy - r + 1), width)
             pygame.draw.line(surf, col, (cx, cy + r - 1), (cx, cy + r + 3), width)
 
+    # COMBAT-1 P4 — procedural limb-loss overlay. When a zone is BROKEN the
+    # SPRITE should reflect it (user: "if I destroy a limb I'd like the
+    # sprite to reflect that"). Until per-state art exists (O2: start
+    # procedural, swap later), we paint a dark wound blotch + ragged sever
+    # marks over the broken zone, drawn BEHIND the reticle pips. Only over
+    # real portrait art (the procedural silhouette already recolors zones).
+    if drew_real:
+        import random as _wr
+        for _zk, _zp in (body_parts or {}).items():
+            if not _zp.get("broken"):
+                continue
+            _wrect = _zone_rect(_zk)
+            if _wrect is None:
+                continue
+            wx, wy, ww, wh = _wrect
+            try:
+                # Dark wound wash.
+                wsurf = pygame.Surface((ww, wh), pygame.SRCALPHA)
+                wsurf.fill((20, 4, 6, 150))
+                surf.blit(wsurf, (wx, wy))
+                # A few blood spatter dabs, seeded per-zone for stability.
+                rng = _wr.Random(hash((_zk, ww, wh)) & 0xffff)
+                for _ in range(5):
+                    bx = wx + rng.randint(2, max(2, ww - 2))
+                    by = wy + rng.randint(2, max(2, wh - 2))
+                    pygame.draw.circle(surf, (140, 16, 18),
+                                       (bx, by), rng.randint(1, 3))
+                # Ragged sever cross over the zone center.
+                cxw, cyw = wx + ww // 2, wy + wh // 2
+                r2 = max(5, min(ww, wh) // 3)
+                pygame.draw.line(surf, (180, 30, 30),
+                                 (cxw - r2, cyw - r2), (cxw + r2, cyw + r2), 2)
+                pygame.draw.line(surf, (180, 30, 30),
+                                 (cxw - r2, cyw + r2), (cxw + r2, cyw - r2), 2)
+            except Exception:
+                pass
+
     for zone_key, props in plan.items():
         rect = _zone_rect(zone_key)
         if rect is None:

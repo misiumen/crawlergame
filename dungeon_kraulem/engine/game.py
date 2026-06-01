@@ -6372,17 +6372,37 @@ class Game:
                     if maim:
                         _cmb.add_status(target, maim, 3)
                     zone_label_pl = zone_props.get("label_pl", zone_key)
-                    self.log(t("feedback_zone_broken",
-                               fallback=f"„{target.display_name()}”: "
-                                        f"{zone_label_pl} złamana!",
-                               name=target.display_name(),
-                               zone=zone_label_pl),
-                             LOG_DANGER)
-                    # P34-SFX-1 (P27.5): limb_broken hook.
-                    try:
-                        audio.play_sfx("limb_broken")
-                    except Exception:
-                        pass
+                    # COMBAT-1 P4 / CMB-8 (partial) — sharp weapons SEVER, blunt
+                    # weapons BREAK. A clean sever also briefly staggers/stuns
+                    # (the shock of losing a limb), per the user's note. Full
+                    # cut-vs-break system (amputation drops, bleed scaling) is
+                    # still CMB-8; this is the readable first cut.
+                    _sharp = bool(weapon and "sharp" in (weapon.tags or []))
+                    if _sharp:
+                        self.log(t("feedback_zone_severed",
+                                   fallback=f"„{target.display_name()}”: "
+                                            f"{zone_label_pl} odcięta!",
+                                   name=target.display_name(),
+                                   zone=zone_label_pl),
+                                 LOG_DANGER)
+                        # Shock of the cut — brief stagger.
+                        if not _cmb.has_status(target, _cmb.STATUS_STAGGERED):
+                            _cmb.add_status(target, _cmb.STATUS_STAGGERED, 1)
+                        try:
+                            audio.play_sfx("sever")
+                        except Exception:
+                            pass
+                    else:
+                        self.log(t("feedback_zone_broken",
+                                   fallback=f"„{target.display_name()}”: "
+                                            f"{zone_label_pl} złamana!",
+                                   name=target.display_name(),
+                                   zone=zone_label_pl),
+                                 LOG_DANGER)
+                        try:
+                            audio.play_sfx("limb_broken")
+                        except Exception:
+                            pass
             # COMBAT-1 Slice B — interrupt feedback. If this hit just stunned
             # the target (head shot / heavy) WHILE it was charging a special,
             # surface that the read paid off. The enemy turn already fizzles a
