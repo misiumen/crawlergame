@@ -84,7 +84,8 @@ def test_open_briefing_logs_weakness_and_intent():
     g._combat_open_briefing(cs)
     new = " ".join(str(x) for x in g.world.log[n0:])
     assert "Naprzeciw" in new, f"no briefing line: {new}"
-    assert "słaby na: fire" in new, f"weakness not surfaced: {new}"
+    # P3: weakness keys now render with their PL label (fire → ogień).
+    assert "słaby na: ogień" in new, f"weakness not surfaced: {new}"
     # assess action remains available (briefing must NOT consume it).
     assert cs.assessed is False, "briefing must not set assessed"
     print("  open briefing surfaces weakness + keeps assess: OK")

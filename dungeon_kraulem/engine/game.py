@@ -6766,12 +6766,18 @@ class Game:
         e = self.world.get(tid) if tid is not None else None
         if e is None or not e.is_alive():
             return
+        # Polish-only labels for damage-type keys.
+        try:
+            from .damage import damage_type_label as _dtl
+            def _pl(k): return _dtl(k, "pl")
+        except Exception:
+            def _pl(k): return k
         band = _cmb.describe_band(cs, e)
         threat = _cmb.describe_threat(e)
         bits = [band, threat]
         weak = list(getattr(e, "vulnerable_to", None) or [])
         if weak:
-            bits.append("słaby na: " + ", ".join(weak))
+            bits.append("słaby na: " + ", ".join(_pl(k) for k in weak))
         intent = (getattr(cs, "enemy_intents", None) or {}).get(e.entity_id)
         if intent:
             label = intent.get("label_pl") or intent.get("category", "")
@@ -6779,6 +6785,19 @@ class Game:
                 bits.append("zamiar: " + label)
         self.log(f"Naprzeciw: „{e.display_name()}” — {', '.join(bits)}.",
                  LOG_WARN)
+        # COMBAT-1 P3 — the "thinking" nudge. When the enemy RESISTS physical,
+        # plain attacks are halved (engine/damage), so brute is slow + costly.
+        # Tell the player the lever exists (coat the blade / use the room /
+        # hit the weakness) WITHOUT forcing one method — brute still works.
+        resists = list(getattr(e, "resists", None) or [])
+        if "physical" in resists:
+            lever = []
+            if weak:
+                lever.append("posmaruj broń (" + ", ".join(_pl(k) for k in weak) + ")")
+            lever.append("wykorzystaj otoczenie")
+            self.log("Zwykłe ciosy się ślizgają po tym czymś — "
+                     + " albo ".join(lever) + ". Brute zadziała, ale wolno.",
+                     LOG_SYNDIC)
 
     def _combat_assess(self, intent, cs):
         from . import combat as _cmb
