@@ -35,6 +35,33 @@ CMB-3 (hitboxy z dostarczonych PNG — czeka na art), UX-10 finał
 
 ## Open
 
+### CMB-4 · Cios w kończynę musi MIEĆ ZNACZENIE (combat depth — Slice C/D)
+**Problem (user, playtest):** „złamałem tułów i szczur nawet nie drgnął.
+Walka czuje się płytka." Trafienia w strefy nie dają wyczuwalnego
+feedbacku poza paskiem HP strefy.
+**Diagnoza:** torso z definicji nie ma `maim_status` (to korpus), więc
+złamanie go nic nie robi poza obrażeniami — zgodnie z danymi, ale gracz
+oczekuje reakcji. Brakuje: reakcji wroga na trafienie (flinch/stagger),
+realnego efektu złamania kończyny w jego turze, finisherów.
+**To jest COMBAT-1 Slice C + D** (called-shot rdzeniem + ekonomia akcji /
+dramat). NIE quick-fix. Zrobić jako osobny, świadomy etap:
+- C: klik strefy = atak; głowa→stun, ręce→mniej dmg/disarm, nogi→stop
+  ruchu, ogon→strach; flinch/stagger na każdym solidnym trafieniu.
+- D: ekonomia akcji (2 PA), reakcje widowni, finisher przy niskim HP.
+
+### CMB-5 · Minimapa 3D / nawigacja między warstwami
+**Problem (user):** minimapa ma warstwy (oś Z — ruch w 3 osiach na
+piętrze), ale brak sposobu na przełączanie warstw; trudna w nawigacji.
+Rozważyć minimapę 3D / izometryczną zamiast płaskich warstw.
+**Zakres:** realny redesign UI (osobny task). Pliki: `ui/minimap.py`,
+input handler dla zmiany warstwy.
+
+### ORIGIN-1 · Salvage gated przez origin (note for later)
+User: rozbieranie powinno być może zablokowane dla mniej technicznych
+pochodzeń. Do zrobienia przy refaktorze originów (osobny etap).
+
+
+
 ### DIAL-1 · Głębokie drzewka dialogowe (sojusze / zdrada / romans / stawki)
 **Cel (user):** dużo rozgałęzień, zdrada, sojusze, stawki, romans — jak w
 porządnym RPG — BEZ pisania wszystkiego ręcznie.
