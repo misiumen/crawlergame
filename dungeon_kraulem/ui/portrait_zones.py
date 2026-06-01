@@ -75,23 +75,26 @@ HITBOXES: Dict[str, Dict[str, Box]] = {
         "l_leg": (0.40, 0.60, 0.11, 0.34),
         "r_leg": (0.51, 0.60, 0.11, 0.34),
     },
-    # Rat — side view, facing screen-left, crouched; snout low-left,
-    # haunches hump up-right. Quadruped zones.
+    # Rat — side view, facing screen-LEFT. Re-traced from the art:
+    # toothy red-eyed head low-left; arched back/torso centre; front legs
+    # under the chest; heavy haunches right; long tail sweeping up the
+    # right edge. (fx,fy,fw,fh normalised to the portrait rect.)
     "wrog_intake_tunnel_runt": {
-        "head":  (0.09, 0.48, 0.22, 0.22),
-        "torso": (0.30, 0.40, 0.38, 0.27),
-        "l_leg": (0.28, 0.64, 0.16, 0.29),   # front legs
-        "r_leg": (0.54, 0.62, 0.18, 0.31),   # hind legs
-        "tail":  (0.70, 0.30, 0.24, 0.20),   # long rat tail, upper-right
+        "head":  (0.06, 0.46, 0.25, 0.24),   # snout + skull, bottom-left
+        "torso": (0.32, 0.34, 0.30, 0.26),   # arched back, centre
+        "l_leg": (0.24, 0.62, 0.17, 0.30),   # front legs under chest
+        "r_leg": (0.55, 0.56, 0.20, 0.34),   # hind haunches, right
+        "tail":  (0.74, 0.34, 0.22, 0.26),   # long tail, right edge curling up
     },
-    # Dog-beast — side view, facing screen-left, snarling head low-left,
-    # high hunched shoulders, lunging. Quadruped.
+    # Dog-beast — facing screen-LEFT. Re-traced: open-jaw head low-left;
+    # tall hunched shoulders/back centre; four legs spread along the bottom;
+    # thin curling tail off the right edge at mid-height.
     "wrog_intake_beast_industrial": {
-        "head":  (0.09, 0.42, 0.23, 0.24),
-        "torso": (0.32, 0.30, 0.38, 0.30),
-        "l_leg": (0.24, 0.60, 0.18, 0.34),   # front legs
-        "r_leg": (0.58, 0.58, 0.20, 0.36),   # hind legs
-        "tail":  (0.76, 0.34, 0.18, 0.22),   # beast tail
+        "head":  (0.13, 0.34, 0.21, 0.24),   # jaws + skull, left
+        "torso": (0.34, 0.22, 0.30, 0.34),   # hunched shoulders/back, centre
+        "l_leg": (0.20, 0.58, 0.20, 0.38),   # front legs, lower-left
+        "r_leg": (0.52, 0.58, 0.22, 0.38),   # hind legs, lower-centre/right
+        "tail":  (0.74, 0.40, 0.22, 0.22),   # thin tail curling off right
     },
 }
 

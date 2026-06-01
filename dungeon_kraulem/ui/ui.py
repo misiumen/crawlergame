@@ -877,6 +877,16 @@ _SPENT_STATE_KEYS = ("stripped", "depleted", "destroyed", "hacked",
                      "no_salvage", "searched", "used", "vending_used")
 
 
+# Verbs that actually CHANGE or extract from an object. When none of these
+# remain, the object is inert scenery — only `inspect`/`push` linger, which
+# aren't worth a pin. (A searched-but-not-salvaged shelf still offers
+# `salvage`, so it stays pinned; once salvaged too, nothing meaningful is
+# left → spent.)
+_MEANINGFUL_PIN_ACTIONS = frozenset({
+    "salvage", "strip", "loot", "search", "hack", "use", "open", "harvest",
+})
+
+
 def _pin_is_spent(world, room, e) -> bool:
     if getattr(e, "entity_type", "object") in ("monster", "npc", "crawler"):
         return False
@@ -888,7 +898,8 @@ def _pin_is_spent(world, room, e) -> bool:
         opts = _nav.action_options_for_entity(world, room, e)
     except Exception:
         opts = []
-    return not any((o.action_type or "") not in ("inspect",) for o in opts)
+    return not any((o.action_type or "") in _MEANINGFUL_PIN_ACTIONS
+                   for o in opts)
 
 
 def draw_room_panel(surf, world, layout=None, *, click_registry=None,
@@ -945,51 +956,95 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
     surf.blit(_plate, (x + 10, y + 10))
     text(surf, title_str, x + 20, y + 14, BRIGHT_TEXT, L.font_title - 6, True)
 
-    # ── Object pins on a loose grid inside the art ─────────────────────
-    visible = room.visible_entities()
+    # ── Object / creature pins ─────────────────────────────────────────
+    # FIXED per-room positions: each pin sits in a deterministic slot keyed
+    # by its entity_id, so picking one up / salvaging it does NOT reflow the
+    # rest (they used to shift left like a list). Spent objects are filtered
+    # out entirely (UX-6).
+    visible = [e for e in room.visible_entities()
+               if not _pin_is_spent(world, room, e)]
     bar_h = 64
     pax, pay = x + 24, y + 52
     paw, pah = w - 48, h - 52 - bar_h - 12
     cols = 4
+    rows = 3
+    n_slots = cols * rows
     pin_r = 16
     try:
         mxy = pygame.mouse.get_pos()
     except Exception:
         mxy = None
     hovered = None
-    n_rows = max(1, (len(visible) + cols - 1) // cols)
-    placed = []
-    for idx, e in enumerate(visible):
-        col = idx % cols
-        row = idx // cols
-        cx = pax + int((col + 0.5) * (paw / cols))
-        cyp = pay + int((row + 0.5) * (pah / max(1, n_rows)))
-        cyp = min(cyp, pay + pah - pin_r)
-        placed.append((idx, e, cx, cyp))
 
-    for idx, e, cx, cyp in placed:
+    def _slot_xy(slot):
+        col = slot % cols
+        row = (slot // cols) % rows
+        cxp = pax + int((col + 0.5) * (paw / cols))
+        cyp2 = pay + int((row + 0.5) * (pah / rows))
+        return cxp, min(cyp2, pay + pah - pin_r)
+
+    # Stable slot assignment: primary slot = id % n_slots, probe forward on
+    # collision. Iterating in id order keeps the probe outcome identical
+    # every frame, so a pin never moves unless the room itself changes.
+    used_slots = {}
+    placed = []
+    for e in sorted(visible, key=lambda en: en.entity_id):
+        slot = e.entity_id % n_slots
+        for _ in range(n_slots):
+            if slot not in used_slots:
+                break
+            slot = (slot + 1) % n_slots
+        used_slots[slot] = e.entity_id
+        cx, cyp = _slot_xy(slot)
+        placed.append((e, cx, cyp))
+
+    for e, cx, cyp in placed:
         unknown = (_vis is not None and _vis.is_unknown(e))
         kind = _entity_pin_kind(e)
-        base = (120, 120, 130) if unknown else _PIN_COLORS[kind]
+        is_being = kind in (PIN_ENEMY, PIN_NPC)
+        base = _PIN_COLORS[kind]
+        # Unscouted OBJECTS dim to grey; beings keep their colour (a creature
+        # always reads as a creature, even before you inspect it).
+        if unknown and not is_being:
+            base = (120, 120, 130)
         is_hover = False
         if mxy is not None:
             if (mxy[0] - cx) ** 2 + (mxy[1] - cyp) ** 2 <= (pin_r + 3) ** 2:
                 is_hover = True
-                hovered = idx
-        pygame.draw.circle(surf, (10, 10, 14), (cx, cyp + 1), pin_r + 2)
-        pygame.draw.circle(surf, base, (cx, cyp), pin_r)
-        pygame.draw.circle(surf, BRIGHT_TEXT if is_hover else (20, 20, 26),
-                           (cx, cyp), pin_r, 2)
-        # Enemy pins wear an extra danger halo so a hostile reads instantly,
-        # distinct from the otherwise same-shaped npc/object circles.
-        if kind == PIN_ENEMY and not unknown:
-            pygame.draw.circle(surf, base, (cx, cyp), pin_r + 4, 1)
-        glyph = "?" if unknown else str(idx + 1)
+                hovered = e.entity_id
+        outline = BRIGHT_TEXT if is_hover else (20, 20, 26)
+        if is_being:
+            # Beings are DIAMONDS, not circles — instantly distinct from the
+            # round object pins, even unscouted (no "is it a shelf?" doubt).
+            pts = [(cx, cyp - pin_r - 2), (cx + pin_r + 2, cyp),
+                   (cx, cyp + pin_r + 2), (cx - pin_r - 2, cyp)]
+            pygame.draw.polygon(surf, (10, 10, 14),
+                                [(px, py + 1) for px, py in pts])
+            pygame.draw.polygon(surf, base, pts)
+            pygame.draw.polygon(surf, outline, pts, 2)
+            if kind == PIN_ENEMY:
+                pygame.draw.polygon(surf, base,
+                                    [(cx, cyp - pin_r - 6),
+                                     (cx + pin_r + 6, cyp),
+                                     (cx, cyp + pin_r + 6),
+                                     (cx - pin_r - 6, cyp)], 1)
+        else:
+            pygame.draw.circle(surf, (10, 10, 14), (cx, cyp + 1), pin_r + 2)
+            pygame.draw.circle(surf, base, (cx, cyp), pin_r)
+            pygame.draw.circle(surf, outline, (cx, cyp), pin_r, 2)
+        # Glyph: beings show a creature mark (never a bare "?"); objects show
+        # "?" until scouted, then a neutral dot.
+        if kind == PIN_ENEMY:
+            glyph = "‼"
+        elif kind == PIN_NPC:
+            glyph = "☻"
+        else:
+            glyph = "?" if unknown else "•"
         gimg = font(L.font_small, bold=True).render(glyph, True, (12, 12, 16))
         surf.blit(gimg, (cx - gimg.get_width() // 2,
                          cyp - gimg.get_height() // 2))
         if click_registry is not None:
-            label = "???" if unknown else e.display_name()
+            label = e.display_name() if (is_being or not unknown) else "???"
             def _mk(eid, nm, ax, ay):
                 def _cb():
                     # UX-10: click opens the entity's contextual verb menu at
@@ -1018,13 +1073,20 @@ def draw_room_panel(surf, world, layout=None, *, click_registry=None,
     barsurf.fill((0, 0, 0, 185))
     surf.blit(barsurf, (x, bar_y))
     pygame.draw.line(surf, BORDER, (x, bar_y), (x + w, bar_y), 1)
-    if hovered is not None and hovered < len(visible):
-        e = visible[hovered]
+    _hover_ent = None
+    if hovered is not None:
+        # `hovered` is now an entity_id (pins have stable slots, not list
+        # indices), so resolve it back to the entity in `visible`.
+        _hover_ent = next((en for en in visible
+                           if en.entity_id == hovered), None)
+    if _hover_ent is not None:
+        e = _hover_ent
+        is_being = _entity_pin_kind(e) in (PIN_ENEMY, PIN_NPC)
         unknown = (_vis is not None and _vis.is_unknown(e))
-        nm = "???" if unknown else e.display_name()
-        text(surf, f"{hovered + 1}. {nm}", x + 14, bar_y + 8,
+        nm = e.display_name() if (is_being or not unknown) else "???"
+        text(surf, nm, x + 14, bar_y + 8,
              BRIGHT_TEXT, L.font_small, True)
-        sub = ("Kliknij, aby sprawdzic." if unknown
+        sub = ("Kliknij, aby sprawdzic." if (unknown and not is_being)
                else (getattr(e, "fallback_desc", "")
                      or "Kliknij, aby sprawdzic."))
         for j, ln in enumerate(_soft_wrap(sub, w - 28, L.font_small - 1)[:2]):

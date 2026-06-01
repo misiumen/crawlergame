@@ -708,7 +708,11 @@ def _loot_container(world, room, container, lines) -> None:
     containers print a deadpan "nothing useful" line so the player at
     least knows the search resolved."""
     state = container.state or {}
-    if state.get("depleted") or state.get("stripped"):
+    # COMBAT/UX fix: searching and salvaging are COMPLEMENTARY, not mutually
+    # exclusive — you can strip a shelf for parts after rifling it for loot.
+    # So search only checks/sets its OWN `searched` flag; it no longer reads
+    # or sets `stripped`/`depleted` (those belong to salvage).
+    if state.get("searched"):
         lines.append(t("feedback_container_already_searched",
                        fallback=f"„{container.display_name()}” już jest "
                                 f"przeszukane — nic więcej.",
@@ -784,7 +788,9 @@ def _loot_container(world, room, container, lines) -> None:
         lines.append(t("feedback_container_empty",
                        fallback=f"„{container.display_name()}” — pusto.",
                        name=container.display_name()))
-    container.state["depleted"] = True
+    # Mark searched (loot exhausted). Do NOT set depleted/stripped here —
+    # the object can still be salvaged for parts afterwards.
+    container.state["searched"] = True
 
 
 # ── Prompt 19 audit fix S1: sponsor gift consumer ─────────────────────────
