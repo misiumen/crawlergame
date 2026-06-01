@@ -35,35 +35,45 @@ def _build_default_crawler_tree() -> DialogueTree:
         tree_key="default_crawler",
         start_node="start",
         nodes={
+            # Hub node — the player always returns HERE after a branch (the
+            # branches set next/fail to "start"), so the conversation stays
+            # open until they explicitly leave. Topic options are one_shot:
+            # once asked, they drop off the menu (you don't re-ask the same
+            # thing, and a failed social check can't be re-rolled). When all
+            # topics are spent, only „Skończ rozmowę." remains.
             "start": DialogueNode(
                 node_id="start",
                 speaker="Zawodnik",
                 text=("Mierzy cię od stóp do głów. Zaciska pas, "
-                      "patrzy gdzie masz ręce. „Co masz, czego ja "
-                      "nie mam?"),
+                      "patrzy, gdzie masz ręce. „Co masz, czego ja "
+                      "nie mam?”"),
                 options=[
                     DialogueOption(
                         label="Spytaj, skąd jest i jak długo tu siedzi.",
                         next_node_id="origin",
+                        one_shot=True,
                     ),
                     DialogueOption(
                         label="Spytaj o najbliższy bezpieczny pokój.",
                         next_node_id="safehouse_tip",
+                        one_shot=True,
                     ),
                     DialogueOption(
                         label="Spróbuj wciągnąć go w sojusz. (CHA, TT 11)",
                         skill_check=("CHA", 11),
                         next_node_id="ally_ok",
                         fail_node_id="ally_fail",
+                        one_shot=True,
                     ),
                     DialogueOption(
                         label="Ostrzeż, że masz lepszą broń. (CHA, TT 13)",
                         skill_check=("CHA", 13),
                         next_node_id="intimidate_ok",
                         fail_node_id="intimidate_fail",
+                        one_shot=True,
                     ),
                     DialogueOption(
-                        label="Skiń głową i idź dalej.",
+                        label="Skończ rozmowę.",
                         next_node_id=None,
                         consequences=[{"kind": "end"}],
                     ),
@@ -80,15 +90,11 @@ def _build_default_crawler_tree() -> DialogueTree:
                     DialogueOption(
                         label="Spytaj, czego się tu nauczył.",
                         next_node_id="lesson",
+                        one_shot=True,
                     ),
                     DialogueOption(
-                        label="Wracaj do głównego pytania.",
+                        label="Wróć do rozmowy.",
                         next_node_id="start",
-                    ),
-                    DialogueOption(
-                        label="Zostaw go w spokoju.",
-                        next_node_id=None,
-                        consequences=[{"kind": "end"}],
                     ),
                 ],
             ),
@@ -96,17 +102,16 @@ def _build_default_crawler_tree() -> DialogueTree:
                 node_id="lesson",
                 speaker="Zawodnik",
                 text=("„Nie biegnij na bossa głodny. Nie ufaj "
-                      "automatom przy ścianach. Sponsor mówiący "
-                      "miło to sponsor sprzedający cię niżej.”"),
+                      "automatom przy ścianach. Sponsor, który mówi "
+                      "miło, to sponsor, który sprzedaje cię niżej.”"),
                 on_enter_consequences=[
                     {"kind": "audience", "amount": 1,
                      "source": "dialogue_lesson"},
                 ],
                 options=[
                     DialogueOption(
-                        label="Podziękuj i odejdź.",
-                        next_node_id=None,
-                        consequences=[{"kind": "end"}],
+                        label="Wróć do rozmowy.",
+                        next_node_id="start",
                     ),
                 ],
             ),
@@ -122,32 +127,30 @@ def _build_default_crawler_tree() -> DialogueTree:
                 ],
                 options=[
                     DialogueOption(
-                        label="Skiń i odejdź.",
-                        next_node_id=None,
-                        consequences=[{"kind": "end"}],
+                        label="Wróć do rozmowy.",
+                        next_node_id="start",
                     ),
                 ],
             ),
             "ally_ok": DialogueNode(
                 node_id="ally_ok",
                 speaker="Zawodnik",
-                text=("Wzdycha. „No dobra. Idziesz w lewo, ja "
-                      "w prawo. Jak słyszysz krzyk, to nie ja. "
-                      "Albo ja, ale i tak nie pomożesz.”"),
+                text=("Wzdycha. „No dobra. Ty idziesz w lewo, ja "
+                      "w prawo. Jak usłyszysz krzyk, to nie ja. "
+                      "Albo ja — ale i tak nie zdążysz pomóc.”"),
                 on_enter_consequences=[
                     {"kind": "audience", "amount": 2,
                      "source": "dialogue_ally"},
                     {"kind": "log",
                      "text": "Konferansjer (cicho): „Sojusz. "
-                             "Widownia kocha sojusze. Do pierwszej "
+                             "Widownia kocha sojusze. Aż do pierwszej "
                              "zdrady.”",
                      "severity": "normal"},
                 ],
                 options=[
                     DialogueOption(
-                        label="Rozstać się.",
-                        next_node_id=None,
-                        consequences=[{"kind": "end"}],
+                        label="Wróć do rozmowy.",
+                        next_node_id="start",
                     ),
                 ],
             ),
@@ -155,17 +158,16 @@ def _build_default_crawler_tree() -> DialogueTree:
                 node_id="ally_fail",
                 speaker="Zawodnik",
                 text=("Prycha. „Nie znam cię. Sojusze są dla "
-                      "płaczących. Idź swoim.”"),
+                      "tych, co się boją. Idź swoją drogą.”"),
                 on_enter_consequences=[
                     {"kind": "log",
-                     "text": "Brzmiało gorzej, niż chciałeś.",
+                     "text": "Zabrzmiało gorzej, niż chciałeś.",
                      "severity": "warn"},
                 ],
                 options=[
                     DialogueOption(
-                        label="Odejść.",
-                        next_node_id=None,
-                        consequences=[{"kind": "end"}],
+                        label="Wróć do rozmowy.",
+                        next_node_id="start",
                     ),
                 ],
             ),
@@ -180,26 +182,24 @@ def _build_default_crawler_tree() -> DialogueTree:
                 ],
                 options=[
                     DialogueOption(
-                        label="Pozwolić mu odejść.",
-                        next_node_id=None,
-                        consequences=[{"kind": "end"}],
+                        label="Wróć do rozmowy.",
+                        next_node_id="start",
                     ),
                 ],
             ),
             "intimidate_fail": DialogueNode(
                 node_id="intimidate_fail",
                 speaker="Zawodnik",
-                text=("Śmieje się jednym dźwiękiem. „Lepszą broń? "
-                      "Pokaż.” Nie ruszył się o krok."),
+                text=("Śmieje się jednym krótkim dźwiękiem. „Lepszą "
+                      "broń? To pokaż.” Nie ruszył się ani o krok."),
                 on_enter_consequences=[
                     {"kind": "audience", "amount": -1,
                      "source": "dialogue_intimidate_fail"},
                 ],
                 options=[
                     DialogueOption(
-                        label="Odejść bez słowa.",
-                        next_node_id=None,
-                        consequences=[{"kind": "end"}],
+                        label="Wróć do rozmowy.",
+                        next_node_id="start",
                     ),
                 ],
             ),
