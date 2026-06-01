@@ -5866,6 +5866,13 @@ class Game:
                          LOG_DANGER)
                 _ai.commit_special_used(ent)
             dmg = int(action.damage or 1)
+            # COMBAT-1 Slice C — a STAGGERED enemy (you rocked it last turn)
+            # swings weaker: its outgoing damage is cut by a third. Pays off
+            # the heavy hit beyond raw HP, and reads in the symmetric log.
+            if _cmb.has_status(ent, _cmb.STATUS_STAGGERED):
+                dmg = max(1, (dmg * 2) // 3)
+                self.log(f"{name} wciąż zachwiany — cios słabszy.",
+                         LOG_NORMAL)
             e_crit = False
             # P27.6 (P27-UX-7): symmetric enemy roll log. Player only
             # saw final damage — never knew WHY they got hit or what
@@ -6364,6 +6371,40 @@ class Game:
                              or _cmb.has_status(target, _cmb.STATUS_PRONE))):
                     self.log(f"Trafiasz w zamachu — „{target.display_name()}” "
                              f"traci szykowany specjał!", LOG_SUCCESS)
+            except Exception:
+                pass
+            # COMBAT-1 Slice C — make every solid hit FEEL like it landed.
+            # The "I broke its torso and it didn't react" complaint: a hit
+            # that deals no maim still needs a visible reaction. Rules:
+            #   * any hit that bites (>=1 dmg, target alive) → short flinch line
+            #   * a BIG hit (crit, or >=1/3 of max HP, or a heavy/head zone)
+            #     also STAGGERS: STATUS_STAGGERED for 1 turn (weakens its next
+            #     move; the enemy turn reads it). Head shots additionally roll
+            #     a brief stun. This is reused by the enemy-turn weakening.
+            try:
+                if actual > 0 and target.is_alive():
+                    big = (crit
+                           or actual >= max(1, int(target.max_hp or 1) // 3)
+                           or zone_dmg_mul >= 1.4
+                           or zone_key == "head")
+                    zlabel = zone_props.get("label_pl", zone_key)
+                    if big and not _cmb.has_status(target, _cmb.STATUS_STAGGERED):
+                        _cmb.add_status(target, _cmb.STATUS_STAGGERED, 1)
+                        self.log(f"Mocne trafienie w {zlabel} — "
+                                 f"„{target.display_name()}” się zachwiał!",
+                                 LOG_SUCCESS)
+                        # Head: a heavy crack has a chance to briefly stun.
+                        if zone_key == "head" and not _cmb.has_status(
+                                target, _cmb.STATUS_STUNNED):
+                            if _r.randint(1, 20) + (3 if crit else 0) >= 14:
+                                _cmb.add_status(target, _cmb.STATUS_STUNNED, 1)
+                                self.log(f"Cios w głowę ogłusza "
+                                         f"„{target.display_name()}”!",
+                                         LOG_SUCCESS)
+                    elif not big:
+                        # Ordinary hit — light flinch so it never reads inert.
+                        self.log(f"„{target.display_name()}” wzdryga się "
+                                 f"od ciosu w {zlabel}.", LOG_NORMAL)
             except Exception:
                 pass
             # P29.55 — ferromanta magnetic_disarm: 25% chance na

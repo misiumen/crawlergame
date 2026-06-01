@@ -57,6 +57,11 @@ STATUS_GUARDING     = "guarding"    # enemy braced — +AC, harder to hit
 # P30 — enrage: berserker-type at low HP / broken morale. Boosts its damage
 # output but it stops defending. Cosmetic-ish marker read by enemy_ai.
 STATUS_ENRAGED      = "enraged"
+# COMBAT-1 Slice C — staggered: a solid hit knocked the enemy off-balance.
+# Short-lived (1 turn): its next attack is weaker / its wind-up can break.
+# This is what makes a heavy blow FEEL like it landed even when no limb
+# broke (the "I hit it and it didn't react" complaint).
+STATUS_STAGGERED    = "staggered"
 
 _STATUS_PL = {
     STATUS_PRONE:        "przewrócony",
@@ -75,6 +80,7 @@ _STATUS_PL = {
     STATUS_SLOWED:       "okulały",
     STATUS_GUARDING:     "w gardzie",
     STATUS_ENRAGED:      "rozjuszony",
+    STATUS_STAGGERED:    "zachwiany",
     # P27.5 (P27-UX-10): "shaken" was emitted by intimidate but never
     # had a PL label — leaked as raw English in the enemy panel.
     "shaken":            "roztrzęsiony",
