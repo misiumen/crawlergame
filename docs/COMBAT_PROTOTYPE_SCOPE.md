@@ -1,6 +1,17 @@
 # Combat Prototype — pełny scope (working doc)
 
-> Status: SCOPING do akceptacji. Zero kodu dopóki nie zatwierdzone.
+> Status: ZBUDOWANE (P1-P4 wszystkie wypchnięte, suite zielony na każdym
+> kroku). Reticle pip (A+B) — 47e96cb. P1 surface+transition — ab00d5d.
+> P2 juice (kick/shake/SFX) — db492dd. P3 thinking-loop — 2e8056c.
+> P4 limb-loss (wound overlay + sever/break) — fa026fb.
+> ZOSTAJE (świadomie odłożone): hit-stop + ekonomia 2 PA (CMB-6, wymaga
+> przeróbki turn-flow — z userem), pełny cut-vs-break (CMB-8: amputation
+> drops/bleed), art-warianty limbloss (zamiast proceduralnych nakładek),
+> środowiskowe haczyki wymuszone w layoucie pokoju (P3 dowiedzione na
+> istniejącej treści, nie na bespoke roomie).
+>
+> --- oryginalny scope poniżej ---
+> Status (orig): SCOPING do akceptacji. Zero kodu dopóki nie zatwierdzone.
 > Cel: ZBIEŻYĆ wszystkie nitki tej sesji w JEDNYM pionowym plasterku —
 > animowany combat overlay z jednym „myślącym" starciem — w trybie
 > Demo (Intake). Jeśli ten jeden fight czuje się dobrze, walidujemy
