@@ -269,29 +269,30 @@ def test_vats_draws_without_crash():
 
 # ── Zone keyboard hotkey ───────────────────────────────────────────────
 
-def test_zone_hotkey_picks_via_number():
+def test_combat_digit_fires_bar_action():
+    # COMBAT-1 P1: digits in combat now fire the COMBAT BAR actions, not
+    # body-zone selection (zone targeting moved to the portrait reticle,
+    # covered by test_vats_reticle). '1' = Atak.
     from ..engine.game import Game
+    from ..ui.ui import _COMBAT_BAR_ACTIONS
     pygame.display.set_mode((1280, 720))
     g = Game(screen=pygame.display.get_surface())
     g.start_new_game("Tester", "janitor")
     g.state = "play"
     room = g.world.current_floor.current_room()
-    m = _spawn_humanoid(g.world)
+    m = _spawn_humanoid(g.world, hp=60)
     _cmb.start_combat(room, g.world)
     cs = _cmb.get_combat(room)
     cs.selected_target_id = m.entity_id
-    # Simulate '1' keydown.
+    issued = []
+    g.submit_generated_command = lambda c, target_id=None: issued.append(c)
     class _Ev:  pass
     ev = _Ev(); ev.key = pygame.K_1
     g.input_text = ""
     g.input_mode = "text"
     g.handle_keydown(ev)
-    # Zone with display_order=0 for humanoid is "head".
-    assert cs.targeted_zone_by_eid[m.entity_id] == "head"
-    ev2 = _Ev(); ev2.key = pygame.K_2
-    g.handle_keydown(ev2)
-    assert cs.targeted_zone_by_eid[m.entity_id] == "torso"
-    print("  zone hotkeys 1/2 → head/torso: OK")
+    assert issued and issued[0] == _COMBAT_BAR_ACTIONS[0][1] == "zaatakuj", issued
+    print("  combat digit 1 fires bar action (Atak): OK")
 
 
 # ── Suite ──────────────────────────────────────────────────────────────
@@ -311,7 +312,7 @@ def main():
     test_butcher_intact_head_yields_tooth()
     test_butcher_broken_head_no_tooth_but_bones()
     test_vats_draws_without_crash()
-    test_zone_hotkey_picks_via_number()
+    test_combat_digit_fires_bar_action()
     print("Prompt 26a body-parts + VATS smoke: OK")
 
 

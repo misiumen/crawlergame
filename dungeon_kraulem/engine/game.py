@@ -5521,6 +5521,19 @@ class Game:
 
     # ── Prompt 17: combat v1 ────────────────────────────────────────────────
 
+    def _active_combat(self):
+        """COMBAT-1 P1 — return the active CombatState for the current room,
+        or None. Used by draw() to switch to the dedicated combat surface
+        (combat bar instead of exploration tabs) while a fight is on."""
+        try:
+            from . import combat as _cmb
+            f = self.world.current_floor if self.world else None
+            room = f.current_room() if f else None
+            cs = _cmb.get_combat(room) if room else None
+            return cs if (cs is not None and cs.active) else None
+        except Exception:
+            return None
+
     def _combat_route(self, intent, cs) -> bool:
         """Combat-state dispatch. Returns True iff this intent was consumed
         by the combat layer (don't fall through to the standard pipeline).
@@ -6711,6 +6724,19 @@ class Game:
         weakness (the lever) and the telegraphed intent (what's coming). Does
         NOT set cs.assessed — the full `oceń` action still adds the deeper
         per-enemy breakdown + environment cues."""
+        # COMBAT-1 P1 — fire the "WALKA SIĘ ZACZYNA" transition banner. A
+        # short timed overlay (counted down in update(dt), drawn in
+        # draw_combat_arena) so combat starting is a clear MOMENT, not a
+        # silent slide into a turn.
+        try:
+            fx = getattr(self.world, "combat_fx", None)
+            if not isinstance(fx, dict):
+                fx = {}
+                self.world.combat_fx = fx
+            fx["banner"] = {"text": "WALKA SIĘ ZACZYNA", "ttl": 1100.0,
+                            "age": 0.0}
+        except Exception:
+            pass
         from . import combat as _cmb
         tid = getattr(cs, "selected_target_id", None)
         e = self.world.get(tid) if tid is not None else None
@@ -8663,30 +8689,21 @@ class Game:
             self._suppress_textinput = True
             return
 
-        # P26a: in combat, number keys 1-9 pick the selected target's
-        # body zone (by display_order). Only fires when the input box is
-        # empty so typing numbers in commands still works.
-        if not self.input_text:
-            try:
-                from . import combat as _cmb
-                from ..content.data import body_plans as _bp
-                f = self.world.current_floor if self.world else None
-                room = f.current_room() if f else None
-                cs_zone = _cmb.get_combat(room) if room else None
-                if cs_zone is not None and cs_zone.active and digit is not None:
-                    tgt_id = getattr(cs_zone, "selected_target_id", None)
-                    tgt = self.world.get(tgt_id) if tgt_id is not None else None
-                    if tgt is not None and tgt.is_alive():
-                        plan = _bp.plan_for_entity(tgt)
-                        ordered = _bp.zones_in_display_order(plan)
-                        idx = int(digit) - 1
-                        if 0 <= idx < len(ordered):
-                            zone_key, _props = ordered[idx]
-                            cs_zone.targeted_zone_by_eid[tgt_id] = zone_key
-                            self._suppress_textinput = True
-                            return
-            except Exception:
-                pass
+        # COMBAT-1 P1: in combat, number keys 1-7 fire the COMBAT BAR actions
+        # (Atak / Ostrożny / Mocny / Unik / Obrona / Oceń / Uciekaj). Body
+        # ZONE selection moved to the portrait reticle (mouse) — digits now
+        # drive the action bar, matching the dedicated combat surface. Only
+        # fires when the input box is empty so typed numbers still work.
+        if not self.input_text and digit is not None:
+            cs_bar = self._active_combat()
+            if cs_bar is not None:
+                from ..ui.ui import _COMBAT_BAR_ACTIONS
+                idx = int(digit) - 1
+                if 0 <= idx < len(_COMBAT_BAR_ACTIONS):
+                    _label, _cmd, _hot = _COMBAT_BAR_ACTIONS[idx]
+                    self.submit_generated_command(_cmd)
+                    self._suppress_textinput = True
+                    return
 
         # P24.5: full-screen map. Esc closes if open. M toggles only
         # when the input box is EMPTY (so 'M' as a typed letter still
@@ -9634,6 +9651,12 @@ class Game:
                         del _fla[_k]
             if _fx.get("shake", 0.0) > 0:
                 _fx["shake"] = max(0.0, _fx["shake"] - dt)
+            # COMBAT-1 P1 — combat-start banner countdown.
+            _ban = _fx.get("banner")
+            if _ban:
+                _ban["age"] = _ban.get("age", 0.0) + dt
+                if _ban["age"] >= _ban.get("ttl", 1100.0):
+                    _fx["banner"] = None
         # Audio routing per state
         try:
             audio.play_music(self._music_key_for_state())
@@ -9773,11 +9796,17 @@ class Game:
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
                                   scroll=self.log_scroll,
                                   input_mode=self.input_mode, layout=L)
-            self._ensure_nav_state()
-            ui.draw_nav_panel(s, self.nav_state, self.input_mode, layout=L,
-                              armed=getattr(self, "_nav_selection_armed", False),
-                              click_registry=self.click_registry,
-                              on_option_click=self._on_nav_option_click)
+            _cs_arena = self._active_combat()
+            if _cs_arena is not None:
+                ui.draw_combat_bar(s, self.world, _cs_arena, layout=L,
+                                   click_registry=self.click_registry,
+                                   command_cb=self.submit_generated_command)
+            else:
+                self._ensure_nav_state()
+                ui.draw_nav_panel(s, self.nav_state, self.input_mode, layout=L,
+                                  armed=getattr(self, "_nav_selection_armed", False),
+                                  click_registry=self.click_registry,
+                                  on_option_click=self._on_nav_option_click)
         elif self.state == STATE_PLAY:
             self._refresh_layout()
             L = self._layout
@@ -9798,11 +9827,19 @@ class Game:
             ui.draw_log_and_input(s, self.world.log, self.input_text, self.blink,
                                   scroll=self.log_scroll,
                                   input_mode=self.input_mode, layout=L)
-            self._ensure_nav_state()
-            ui.draw_nav_panel(s, self.nav_state, self.input_mode, layout=L,
-                              armed=getattr(self, "_nav_selection_armed", False),
-                              click_registry=self.click_registry,
-                              on_option_click=self._on_nav_option_click)
+            _cs_play = self._active_combat()
+            if _cs_play is not None:
+                # COMBAT-1 P1 — combat replaces the exploration tabs with a
+                # dedicated action bar (Atak/Unik/Obrona/Oceń/Uciekaj...).
+                ui.draw_combat_bar(s, self.world, _cs_play, layout=L,
+                                   click_registry=self.click_registry,
+                                   command_cb=self.submit_generated_command)
+            else:
+                self._ensure_nav_state()
+                ui.draw_nav_panel(s, self.nav_state, self.input_mode, layout=L,
+                                  armed=getattr(self, "_nav_selection_armed", False),
+                                  click_registry=self.click_registry,
+                                  on_option_click=self._on_nav_option_click)
             # P24.5: full-screen map overlay (above all game UI, below tooltip).
             if getattr(self, "full_map_open", False):
                 ui.draw_full_map_overlay(s, self.world, layout=L,

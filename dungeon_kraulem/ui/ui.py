@@ -2141,6 +2141,72 @@ def draw_log_and_input(surf, log, input_text, blink, scroll=0,
 
 # ── Prompt 08/09: Navigation panel (option groups) ─────────────────────────
 
+# COMBAT-1 P1 — dedicated combat action bar. During a fight the exploration
+# nav-panel (tabs: Akcje/Wyjścia/Środowisko/...) is replaced by THIS: a flat
+# row of the actions that actually matter in combat, each clickable, so the
+# player isn't hunting through tabs and can SEE how to dodge/defend. Each
+# entry is (label_pl, command, hotkey). The command strings route through the
+# combat router in game._combat_route.
+_COMBAT_BAR_ACTIONS = [
+    ("Atak",        "zaatakuj",        "1"),
+    ("Ostrożny",    "ostrożny atak",   "2"),
+    ("Mocny",       "mocny atak",      "3"),
+    ("Unik",        "unik",            "4"),
+    ("Obrona",      "broń się",        "5"),
+    ("Oceń",        "oceń sytuację",   "6"),
+    ("Uciekaj",     "uciekaj",         "7"),
+]
+
+
+def draw_combat_bar(surf, world, cs, layout=None, *, click_registry=None,
+                    command_cb=None):
+    """Flat clickable bar of combat verbs, drawn in the nav rect while a
+    fight is active. Replaces the tabbed exploration panel so combat reads
+    as its own mode. Environment verbs (push/throw/ignite) still work via
+    the room pins; this bar covers the core attack/defend/assess/flee set."""
+    L = _resolve_layout(layout)
+    x, y, w, h = L.nav_rect
+    panel(surf, (x, y, w, h))
+    text(surf, t("ui_combat_bar_header", fallback="WALKA — akcje"),
+         x + 12, y + 6, DANGER, L.font_small, True)
+    # Lay the buttons out across the bar.
+    btn_h = max(28, min(40, h - 40))
+    cy = y + 26
+    cx = x + 12
+    gap = 10
+    for label, cmd, hot in _COMBAT_BAR_ACTIONS:
+        disp = f"[{hot}] {label}"
+        bw = font(L.font_small, bold=True).size(disp)[0] + 22
+        if cx + bw > x + w - 12:
+            break  # don't wrap off-panel; bar is intentionally compact
+        rect = (cx, cy, bw, btn_h)
+        is_hover = False
+        try:
+            mx, my = pygame.mouse.get_pos()
+            is_hover = (cx <= mx < cx + bw and cy <= my < cy + btn_h)
+        except Exception:
+            pass
+        bg = (52, 38, 40) if is_hover else (34, 26, 30)
+        pygame.draw.rect(surf, bg, rect)
+        pygame.draw.rect(surf, DANGER if is_hover else BORDER, rect, 1)
+        img = font(L.font_small, bold=True).render(
+            disp, True, BRIGHT_TEXT if is_hover else NORMAL_TEXT)
+        surf.blit(img, (cx + 11, cy + (btn_h - img.get_height()) // 2))
+        if click_registry is not None and command_cb is not None:
+            def _mk(c):
+                def _cb():
+                    command_cb(c)
+                return _cb
+            click_registry.add(rect, _mk(cmd), tooltip=label,
+                               category="combat_bar")
+        cx += bw + gap
+    # Hint line.
+    text(surf, t("ui_combat_bar_hint",
+                 fallback="Klik akcji lub 1-7. Cel i kończynę wybierasz na "
+                          "portrecie. Otoczenie — przez piny w scenie."),
+         x + 12, y + 26 + btn_h + 6, DIM_TEXT, L.font_small - 1)
+
+
 def draw_nav_panel(surf, nav_state, input_mode="text", layout=None,
                    *, armed: bool = False, click_registry=None,
                    on_option_click=None):
@@ -3057,6 +3123,29 @@ def draw_combat_arena(surf, world, cs, layout=None, *, click_registry=None):
     fx_positions["player"] = (x + 14, chip_y, w - 28, chip_h)
     if isinstance(fx, dict):
         _draw_combat_fx(surf, fx, fx_positions, L)
+    # COMBAT-1 P1 — "WALKA SIĘ ZACZYNA" transition banner. Big centered text
+    # that fades over ~1.1s so combat starting is a felt moment.
+    _ban = fx.get("banner") if isinstance(fx, dict) else None
+    if _ban:
+        age = _ban.get("age", 0.0)
+        ttl = _ban.get("ttl", 1100.0)
+        prog = max(0.0, min(1.0, age / ttl))
+        alpha = int(255 * (1.0 - prog))          # fade out
+        scale = 1.0 + 0.15 * prog                 # slight grow
+        size = max(24, int((L.font_title + 14) * scale))
+        try:
+            bf = font(size, bold=True)
+            timg = bf.render(_ban.get("text", ""), True, DANGER)
+            timg.set_alpha(alpha)
+            # dark wash behind for legibility, also fading
+            wash = pygame.Surface((w, 70), pygame.SRCALPHA)
+            wash.fill((0, 0, 0, int(150 * (1.0 - prog))))
+            by = y + h // 2 - 35
+            surf.blit(wash, (x, by))
+            surf.blit(timg, (x + (w - timg.get_width()) // 2,
+                             by + (70 - timg.get_height()) // 2))
+        except Exception:
+            pass
 
 
 def _draw_combat_fx(surf, fx, positions, L):

@@ -35,6 +35,87 @@ CMB-3 (hitboxy z dostarczonych PNG — czeka na art), UX-10 finał
 
 ## Open
 
+### CMB-7 · Walka jako OSOBNY overlay (nie to samo menu z wrogiem)
+**User (playtest):** „oczekuję, że gdy zaczynam walkę, przechodzę do
+nowego overlaya z TYLKO akcjami bojowymi + środowiskowymi. Teraz to to
+samo menu z wrogiem w środku — underwhelming." Start walki musi być
+WYRAŹNY (czy z mojego wyboru, czy bo wróg zaagrował). Wybór „atak"
+rozgrywa pierwszą turę beze mnie — to się „po prostu dzieje".
+**To duży redesign UI walki** (osobny, świadomy etap; NIE unattended):
+- dedykowany combat overlay: tylko combat + environment actions
+- czytelny „WALKA SIĘ ZACZYNA" moment / transition
+- jasny dostęp do Unik / Obrona (user: „nie wiem jak robić unik/obronę")
+- bez auto-rozegrania pierwszej tury bez decyzji gracza
+Pliki: `engine/game.py` (STATE_COMBAT? render+input), `ui/ui.py`.
+Powiązane z odłożonym CMB-6 (ekonomia 2 PA).
+
+### CMB-8 · Cięcie vs łamanie kończyny (typ broni) + czytelny efekt maima
+**User:** ostrą bronią (nóż) trafienie w kończynę nie powinno „łamać" —
+powinno ODCIĄĆ / ciężko okaleczyć + krótki stun. Nie wiadomo CO robi
+złamanie kończyny. Crippled wróg leżący → łatwiejszy do trafienia.
+**Szkic:** efekt zależny od `damage_type` broni — slashing→amputacja/
+sever (duży maim + bleed + stun), blunt→złamanie/stun, piercing→
+przebicie. Po maimie pokazać KONKRETNY efekt w logu („—2 do ataku",
+„nie może podejść", „leży: +do trafienia"). Powiązane z CMB-4.
+Pliki: `engine/game.py` attack path, `content/data/body_plans.py`
+(per-zone sever vs break), `engine/combat.py`.
+
+### CMB-9 · Inspekcja: słabość/odporność NIE od razu
+**User:** „sprawdź wroga" pokazuje od razu słaby/odporny — powinno być
+nagrodą za głębszy recon / walkę, nie za pierwsze spojrzenie.
+**Szkic:** ukryć resists/vulnerable_to na poziomie `seen`; ujawniać na
+`inspected` (drugi sprawdź) albo po wyprowadzeniu/oberwaniu ciosem danego
+typu. Tier-visibility rework. Plik: `engine/visibility.py`.
+
+### EVT-1 · Eventy losowe to wyróżniony moment, nie linijka w terminalu
+**User (playtest):** event z jinglem automatu („Automat ze snackami
+zaczyna nucić jingle… Snacks tańsze o 5 kredytów") wygląda jak zwykły
+log — łatwo przeoczyć, myli się z wynikiem rzutu kośćmi. Plus polski do
+poprawy („Snacks" zostało po ang., „(jingle to upgrade)" to placeholder).
+**Szkic:** eventy losowe dostają wyróżnioną prezentację (overlay/baner/
+kolor + ikona), oddzieloną od dice-logu. Treść PL dopracowana. Pliki:
+`engine/absurd_events.py` / `engine/mid_floor_events.py`, render w
+`ui/ui.py`.
+
+### CMB-10 · Jedzenie/leczenie w walce nie kosztuje tury
+**User (do rozważenia):** można leczyć się/jeść za darmo — nie zużywa
+tury. Może powinno (decyzja balansowa). Do przemyślenia razem z ekonomią
+akcji (CMB-6). Note-only na teraz.
+
+
+
+### DIAL-2 · Hub-return dla pozostałych drzew + pełny pass polskiego
+**Zrobione:** `default_crawler` przebudowany na HUB — po gałęzi wracasz do
+pełnego drzewa, wyczerpane tematy (one_shot) znikają z menu, wyjście tylko
+przez „Skończ rozmowę"/Esc. Naprawione oczywiste błędy PL (brakujący
+cudzysłów w linii startowej, „Idź swoim" → „Idź swoją drogą", parę
+zdań). 
+**ZOSTAJE:**
+- Ten sam hub-return dla `intake_warden` i `liga_brawurowa_grunt`
+  (prawdopodobnie wciąż kończą się na gałęzi).
+- Pełny pass POLSKIEGO przez wszystkie drzewa + placeholder — user zgłasza
+  „janky polish, needs more attention". Voice wg `docs/CONTENT_BIBLE.md`.
+  Nie chcę hurtowo przepisywać prozy native speakera bez jego oka — do
+  zrobienia z userem albo jako osobny świadomy pass.
+
+
+
+### ART-1 · Portrety crawlerów / NPC (do dialogu + pinów)
+**User (playtest):** dialog full-screen działa, ale brakuje grafik dla
+**crawlerów i NPC** — generyczny „Zawodnik" leci na placeholderze.
+Trzeba przygotować więcej portretów.
+**Stan:** silnik gotowy — `ui.draw_dialogue_screen` + `art.
+draw_enemy_portrait` używają PNG jeśli istnieje (`assets/images/
+wrog_*`, rozwiązywane przez `enemy_art_keys`), inaczej sylwetka
+proceduralna. Czyli wystarczy DOSTARCZYĆ pliki pod właściwe klucze —
+zero zmian w kodzie poza ew. nowymi key-mappingami + hitboxami VATS
+(`ui/portrait_zones.py`, ja obrysuję z dostarczonego PNG, patrz CMB-3).
+**Do ustalenia później (user):** jak generować/organizować te portrety
+— które archetypy crawlerów, nazewnictwo kluczy, ile wariantów. Powiązane
+z CMB-3 (hitboxy z PNG).
+
+
+
 ### CMB-6 · Ekonomia akcji 2 PA/turę (COMBAT-1 Slice D — odłożone)
 **Stan:** ŚWIADOMIE odłożone — za ryzykowne by wpychać bez gracza przy
 ekranie. Reszta COMBAT-1 (A: zero-friction start; B: telegraf/kontry;
