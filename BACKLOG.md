@@ -35,6 +35,19 @@ CMB-3 (hitboxy z dostarczonych PNG — czeka na art), UX-10 finał
 
 ## Open
 
+### CMB-6 · Ekonomia akcji 2 PA/turę (COMBAT-1 Slice D — odłożone)
+**Stan:** ŚWIADOMIE odłożone — za ryzykowne by wpychać bez gracza przy
+ekranie. Reszta COMBAT-1 (A: zero-friction start; B: telegraf/kontry;
+C: flinch/stagger + zone payoffs; D: dramat widowni + finisher) ZROBIONA
+i wypchnięta (commits do 005b455).
+**Co zostało:** zamiana „1 akcja → tura wroga" na sekwencję 2 punktów
+akcji (ruch+cios, finta+ciężki itd.). Dotyka KAŻDEJ akcji bojowej
+(consume-turn) + kadencji `_run_enemy_turn`. Wymaga live-tuningu, nie
+ślepego pusha. Pliki: `CombatState` (nowe pole `action_points`),
+`_combat_after_player_action`, `_run_enemy_turn`, wszystkie `_combat_*`.
+
+
+
 ### CMB-4 · Cios w kończynę musi MIEĆ ZNACZENIE (combat depth — Slice C/D)
 **Problem (user, playtest):** „złamałem tułów i szczur nawet nie drgnął.
 Walka czuje się płytka." Trafienia w strefy nie dają wyczuwalnego
