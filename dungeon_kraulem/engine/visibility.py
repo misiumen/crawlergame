@@ -237,14 +237,27 @@ def build_inspect_block(world, ent) -> list:
         except Exception:
             thr_label = ("spokojny", "wyczulony", "czujny", "wściekły")[
                 min(3, max(0, thr))]
-        lines.append(f"HP {hp}/{max_hp}   AC {ac}   threat: {thr_label}")
-        lines.append(f"Atak: {dd}+{ab} ({dt})")
+        # Polish-only display: translate the damage-type / resist / weakness
+        # keys (physical/fire/cold...) to PL, and use a PL label for threat.
+        try:
+            from .damage import damage_type_label as _dtl
+        except Exception:
+            _dtl = None
+        def _dt_pl(k):
+            try:
+                return _dtl(k, "pl") if _dtl else k
+            except Exception:
+                return k
+        def _dts_pl(keys):
+            return ", ".join(_dt_pl(k) for k in (keys or []))
+        lines.append(f"HP {hp}/{max_hp}   AC {ac}   Zagrożenie: {thr_label}")
+        lines.append(f"Atak: {dd}+{ab} ({_dt_pl(dt)})")
         if ent.resists:
-            lines.append("Odporny:  " + ", ".join(ent.resists))
+            lines.append("Odporny:  " + _dts_pl(ent.resists))
         if ent.vulnerable_to:
-            lines.append("Słaby na: " + ", ".join(ent.vulnerable_to))
+            lines.append("Słaby na: " + _dts_pl(ent.vulnerable_to))
         if ent.immune_to:
-            lines.append("Niewrażliwy: " + ", ".join(ent.immune_to))
+            lines.append("Niewrażliwy: " + _dts_pl(ent.immune_to))
         # Zone status if body parts already initialized
         bp = ent.body_parts or {}
         if bp:
