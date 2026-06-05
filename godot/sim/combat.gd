@@ -127,6 +127,11 @@ func _on_enter_cell(e: CombatEntity) -> Array:
 			evs.append({"type": "status", "target": e.id, "status": "shocked", "turns": 1})
 	return evs
 
+## Public: would an entity standing on cell `c` get shocked? (used by the
+## presentation layer to draw the consequence preview before you commit).
+func would_shock_at(c: Vector2i) -> bool:
+	return board.hazard_at(c) == "water" and _adjacent_live_wire(c)
+
 func _adjacent_live_wire(c: Vector2i) -> bool:
 	for dy in range(-1, 2):
 		for dx in range(-1, 2):
