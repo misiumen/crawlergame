@@ -234,6 +234,14 @@ re-authors rather than translates. The oracle is now real for these modules
 - First juice: `Tween` moves, hit flash, damage floater, screen shake.
 - **Definition of done = §11.** Do not proceed until the single encounter is fun with arrow keys.
 
+✅ **BUILT & VERIFIED (headless).** `sim/board.gd` + `sim/entity.gd` (tiles, tags),
+`sim/combat.gd` (bump-attack, tag damage-gradient, water+wire trap, enemy AI,
+win/lose), `sim/encounters.gd` (the intake setup), `scenes/BoardView.gd` (one-key
+movement, gliding tokens, hit-flash, damage floaters, shake, consequence preview,
+enemy intent telegraph). 36 GDScript checks green (`test_sim`/`test_combat`/
+`test_view`) + main scene boots clean. Run: `Godot --path godot`. **Remaining: the
+§11 fun-gate is subjective — needs a human play session (can't be judged headless).**
+
 ### Phase 2 — Exploration + world-as-resource (L)
 *Maps to `_sys_1_explore.png`, `_sys_2_salvage.png`, `_sys_4_gear.png`.*
 - Multi-room floor; `floorgen.gd` + room JSON; doors/exits; minimap.
