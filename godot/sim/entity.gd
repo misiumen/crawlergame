@@ -28,6 +28,10 @@ var class_key: String = ""       # chosen emergent class, "" = none
 var class_active_used_floor: int = -1  # floor index the active was last spent on
 var next_attack_mult: int = 1    # bruiser charge: next hit damage multiplier
 var next_attack_autohit: bool = false  # ranger: next hit always lands
+# Run tallies (for the end-of-run summary + meta unlocks)
+var run_kills: int = 0
+var run_corpses_salvaged: int = 0
+var run_traps_armed: int = 0
 
 func int_mod() -> int:
 	return int_xp / 5

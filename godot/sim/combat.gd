@@ -163,6 +163,7 @@ func _player_attack(target: CombatEntity) -> Array:
 		aim_zone = ""   # the aim is spent on this swing
 		# Spectacle tags for dead enemies.
 		if not target.is_alive():
+			p.run_kills += 1
 			evs += _note_tag("kill_lethal")
 			evs += _note_tag("combat")
 			var mods := _audience.combat_mods() if _audience else {"audience_on_kill": 1}
@@ -438,6 +439,7 @@ func _salvage(obj: CombatEntity) -> Array:
 	var evs: Array = [{"type": "salvage", "target": obj.id, "gained": gained}]
 	evs += _note_tag("salvage")
 	evs += _change_audience(1, "salvage")
+	player().run_corpses_salvaged += 1
 	_add_affinity("tech", 1)
 	if "wood" in obj.tags or "furniture" in obj.tags:
 		_add_affinity("environment", 1)
@@ -462,6 +464,7 @@ func _on_enter_cell(e: CombatEntity) -> Array:
 						"status": "shocked", "turns": 1})
 		# Environmental kill is spectacular.
 		if not e.is_alive() and e.faction == "enemy":
+			player().run_kills += 1
 			evs += _note_tag("env_kill")
 			evs += _change_audience(5, "env_kill")
 			if e.id != player_id:

@@ -96,6 +96,14 @@ func _initialize() -> void:
 		bv._process(0.016)
 	_ck(true, "30 mixed actions + frames, no crash")
 
+	# end-of-run results screen builds + draws without crash
+	bv._end_run(false)
+	_ck(not bv._summary.is_empty(), "ending the run builds a summary")
+	_ck(not bv._summary_lines.is_empty(), "the results screen has rendered lines")
+	for i in 3:
+		bv._process(0.016)              # draws the full-screen summary
+	_ck(true, "results screen draws without crash")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	bv.free()
 	quit(_f)

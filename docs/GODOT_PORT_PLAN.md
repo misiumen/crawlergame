@@ -293,11 +293,25 @@ enemy intent telegraph). 36 GDScript checks green (`test_sim`/`test_combat`/
   *systemic* embodiment (located breakable bodies driving combat) is complete and
   test-locked (40 GUT checks).
 
-### Phase 5 — The DCC soul (XL, can parallelize)
+### Phase 5 — The DCC soul (XL, can parallelize) ✅ CORE DONE
 *Maps to `_sys_5..9`.*
-- Floor map / route gambling; dialogue (chosen options, social + memetic).
-- `memetics.gd` + seeding UI + propagation view; `classes.gd` emergent-class offer.
-- `consequences.gd`, sponsors/audience HUD, narrator; run-summary + `meta_progression.gd` unlocks.
+- ✅ `classes.gd` + `class_features.gd` — emergent classes: every action bumps a
+  playstyle affinity; when one dominates, the Syndicate offers a 3-candidate
+  class with a passive + a once-per-floor active. 12 classes, full combat wiring.
+- ✅ `narrator.gd` — konferansjer commentary, generated faithfully from the Python
+  locale (24 board categories: kills/env-kill/salvage/craft/audience/offer).
+- ✅ `run_summary.gd` + `meta.gd` — end-of-run results screen (tallies, sponsors,
+  anti-host death lines) + meta-progression: 20 board-evaluable unlocks from
+  `UNLOCK_CATALOG` (closures ported as a condition spec), persisted to
+  `user://meta.json` across runs. [Enter] starts a fresh run.
+- ✅ sponsors/audience HUD already landed in Phase 3.
+- ⏸ **Deferred to Phase 6 (need world surfaces the board doesn't have yet):**
+  `memetics.gd` (needs free-text seeding + rooms-with-terminals/safehouses +
+  in-game-minutes), dialogue trees (need NPCs on the board), floor-map/route
+  gambling (needs the procedural multi-floor run). The faithful Python specs are
+  captured; these layer on once Phase 6 builds their surfaces.
+- The DCC *loop* is complete: scavenge→craft→fight→your-style-becomes-a-class→the
+  host narrates it→the run ends with a recap that unlocks options for next time.
 
 ### Phase 6 — Content migration + ship polish (XL)
 - Full bestiary, room pool, recipes, dialogues, narrator/rumor content via export pipeline.

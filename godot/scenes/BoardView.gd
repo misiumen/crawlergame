@@ -49,6 +49,8 @@ var _part_flash: Dictionary = {}     # "enemyid:zone" -> seconds left, for hit p
 # Emergent-class offer
 var _class_offer: Array = []         # candidate class keys; non-empty = modal open
 var _narr_rng := RandomNumberGenerator.new()   # seeded narrator line picker
+var _summary: Dictionary = {}        # non-empty = end-of-run results screen
+var _summary_lines: Array = []       # rendered Polish lines for the screen
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -120,8 +122,7 @@ func _check_transition() -> void:
 	if r.get("descend", false):
 		_add_banner("ZEJŚCIE NIŻEJ")
 		_log_push("Schodzisz w dół. (Koniec dema.)")
-		_done = true
-		queue_redraw()
+		_end_run(true)
 		return
 	sim = floor.sim
 	_attach_bodies()
@@ -139,6 +140,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	var kc: int = (event as InputEventKey).keycode
+
+	# Results screen: Enter starts a fresh run.
+	if not _summary.is_empty():
+		if kc == KEY_ENTER or kc == KEY_KP_ENTER:
+			_summary = {}; _summary_lines = []; _done = false
+			_build()
+		return
 
 	# Class-offer modal grabs input until a choice is made.
 	if not _class_offer.is_empty():
@@ -319,8 +327,22 @@ func handle_interact() -> void:
 	_animate(sim.player_interact())
 	_advance_floor_turn()
 
+## Build the end-of-run results, record meta unlocks, and switch to the screen.
+func _end_run(victory: bool) -> void:
+	if not _summary.is_empty():
+		return
+	_summary = RunSummary.build(floor, victory, _narr_rng)
+	_summary["new_unlocks"] = Meta.record_run(_summary)
+	_summary_lines = RunSummary.render_lines(_summary)
+	_done = true
+	queue_redraw()
+
 func _advance_floor_turn() -> void:
 	if floor == null: return
+	# Death ends the run -> results screen.
+	if sim.over and sim.outcome == "lose" and _summary.is_empty():
+		_end_run(false)
+		return
 	var new_boxes := floor.advance_turn()
 	for b in new_boxes:
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
@@ -605,6 +627,9 @@ func _process(dt: float) -> void:
 
 func _draw() -> void:
 	if sim == null: return
+	if not _summary.is_empty():
+		_draw_run_summary()
+		return
 	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 	var sh := Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
 	draw_set_transform(sh, 0.0, Vector2.ONE)
@@ -838,6 +863,30 @@ func _draw_hud() -> void:
 		_draw_craft_panel()
 	if not _class_offer.is_empty():
 		_draw_class_offer()
+
+## End-of-run results screen: victory/death header, run tallies, sponsors, and
+## any meta options the season unlocked.
+func _draw_run_summary() -> void:
+	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+	var victory: bool = _summary.get("victory", false)
+	var title := "FINAŁ ODCINKA" if victory else "KONIEC TRANSMISJI"
+	var tcol := COL_GREEN if victory else COL_RED
+	draw_string(_font, Vector2(120, 96), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 46, tcol)
+	var y := 168.0
+	for line in _summary_lines:
+		var col := COL_BRIGHT
+		var ls := str(line)
+		if ls.begins_with("  + "):
+			col = COL_AMBER
+		elif ls.begins_with("Sezon otwiera") or ls.begins_with("Sponsorzy") or ls.begins_with("Klasa"):
+			col = COL_CYAN
+		elif ls.begins_with("Konferansjer") or ls.begins_with("FINAŁ"):
+			col = COL_GREEN if victory else COL_DIM
+		draw_string(_font, Vector2(140, y), ls, HORIZONTAL_ALIGNMENT_LEFT, 1000, 18, col)
+		y += 26.0
+	draw_string(_font, Vector2(140, 690),
+		"Odblokowano łącznie opcji: %d   ·   [Enter] od nowa" % Meta.unlocked_count(),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 
 ## The Syndicate's class pitch: 3 candidates, pick with number keys.
 func _draw_class_offer() -> void:
