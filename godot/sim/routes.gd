@@ -6,37 +6,44 @@ extends RefCounted
 ## Python floor_archetypes. A route is identified by a key so it can be persisted
 ## in the save and reproduced deterministically (the mods derive from the key).
 
-## key -> {label, blurb, enemy_mul, object_mul, trap_mul}
+## key -> {label, blurb, enemy_mul, object_mul, trap_mul, object_tags}.
+## object_tags biases WHICH objects spawn (thematic floors), not just how many.
 const BIOMES: Dictionary = {
 	"sortownia": {
 		"label": "Rozległa Sortownia",
 		"blurb": "Dużo złomu do rozbiórki, umiarkowane ryzyko.",
 		"enemy_mul": 1.0, "object_mul": 1.6, "trap_mul": 1.0,
+		"object_tags": ["furniture", "salvageable", "wood"],
 	},
 	"konflikt": {
 		"label": "Strefa Konfliktu Zawodników",
 		"blurb": "Więcej wrogów — i więcej łupu z trupów.",
 		"enemy_mul": 1.6, "object_mul": 1.0, "trap_mul": 1.0,
+		"object_tags": [],
 	},
 	"pulapki": {
 		"label": "Sektor Pułapek Sponsora",
 		"blurb": "Prąd i kałuże wszędzie. Pozycjonowanie wygrywa.",
 		"enemy_mul": 0.8, "object_mul": 0.8, "trap_mul": 2.2,
+		"object_tags": ["electric", "electrical", "wire", "electronic", "hazard"],
 	},
 	"zamknieta": {
 		"label": "Trasa Zamknięta",
 		"blurb": "Cicho. Mało wrogów, ale i chudo z zasobami.",
 		"enemy_mul": 0.4, "object_mul": 0.7, "trap_mul": 0.6,
+		"object_tags": [],
 	},
 	"serwis": {
 		"label": "Sieć Korytarzy Serwisowych",
 		"blurb": "Ciasno i technicznie. Sporo elektroniki na złom.",
 		"enemy_mul": 1.1, "object_mul": 1.3, "trap_mul": 1.4,
+		"object_tags": ["electronic", "metal", "electric", "fragile"],
 	},
 	"skrot": {
 		"label": "Skrót, którego nie ma na mapie",
 		"blurb": "Nikt nie wie, co tam jest. Hazard.",
 		"enemy_mul": 1.3, "object_mul": 1.3, "trap_mul": 1.3,
+		"object_tags": [],
 	},
 }
 
@@ -59,6 +66,7 @@ static func mods_for(key: String) -> Dictionary:
 		"enemy_mul": float(b.get("enemy_mul", 1.0)),
 		"object_mul": float(b.get("object_mul", 1.0)),
 		"trap_mul": float(b.get("trap_mul", 1.0)),
+		"object_tags": (b.get("object_tags", []) as Array).duplicate(),
 	}
 
 static func label_of(key: String) -> String:

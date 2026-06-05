@@ -14,9 +14,22 @@ func _ck(c: bool, l: String) -> void:
 func _content() -> Dictionary:
 	return {
 		"MON": {"szczur": {"fallback_name": "Szczur", "tags": ["monster", "organic"], "floor_min": 1, "floor_max": 99}},
-		"ENV": {"stol": {"fallback_name": "Stół", "tags": ["furniture", "wood"], "affordances": ["salvage"]}},
+		"ENV": {
+			"stol":   {"fallback_name": "Stół", "tags": ["furniture", "wood", "salvageable"], "affordances": ["salvage"]},
+			"serwer": {"fallback_name": "Serwer", "tags": ["electronic", "electric", "fragile"], "affordances": ["salvage"]},
+			"kabel":  {"fallback_name": "Kable", "tags": ["electrical", "wire", "hazard"], "affordances": ["salvage"]},
+		},
 		"MOB_COMBAT_STATS": {"szczur": [22, "1d6+1", 2, 12]},
 	}
+
+func _count_obj_tag(data: Dictionary, tag: String) -> int:
+	var n := 0
+	for room in data["rooms"]:
+		for id in room["entities"]:
+			var e: CombatEntity = room["entities"][id]
+			if e.faction == "object" and tag in e.tags:
+				n += 1
+	return n
 
 func _count(data: Dictionary, faction: String) -> int:
 	var n := 0
@@ -76,6 +89,18 @@ func _initialize() -> void:
 	var a := _count(FloorGen.generate(4, 999, content, Routes.mods_for("serwis")), "enemy")
 	var b := _count(FloorGen.generate(4, 999, content, Routes.mods_for("serwis")), "enemy")
 	_ck(a == b, "same seed + biome is deterministic")
+
+	# --- content variety: a technical biome favors electronic objects ---
+	var serwis_elec := 0; var sortow_elec := 0
+	for fnum in [2, 3, 4, 5]:
+		serwis_elec += _count_obj_tag(FloorGen.generate(fnum, 321, content, Routes.mods_for("serwis")), "electronic")
+		sortow_elec += _count_obj_tag(FloorGen.generate(fnum, 321, content, Routes.mods_for("sortownia")), "electronic")
+	_ck(serwis_elec > sortow_elec,
+		"the serwis biome spawns more electronic objects than the salvage biome (same seeds)")
+	var sortow_furn := 0
+	for fnum in [2, 3, 4, 5]:
+		sortow_furn += _count_obj_tag(FloorGen.generate(fnum, 321, content, Routes.mods_for("sortownia")), "furniture")
+	_ck(sortow_furn > 0, "the sortownia biome still spawns furniture to dismantle")
 
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

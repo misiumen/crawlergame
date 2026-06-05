@@ -73,6 +73,7 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 	var enemy_mul: float = float(mods.get("enemy_mul", 1.0))
 	var object_mul: float = float(mods.get("object_mul", 1.0))
 	var trap_mul: float = float(mods.get("trap_mul", 1.0))
+	var pref_tags: Array = mods.get("object_tags", [])
 	var w: int = rng.randi_range(MIN_W, MAX_W)
 	var h: int = rng.randi_range(MIN_H, MAX_H)
 	var board := Board.new(w, h)
@@ -92,7 +93,8 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 
 	var entities: Dictionary = {}
 	# Objects to dismantle (1..3).
-	var obj_keys: Array = env.keys()
+	# Bias object selection toward the biome's preferred tags (thematic floors).
+	var obj_keys: Array = _biased_object_keys(env, pref_tags)
 	var n_obj := maxi(0, int(round(rng.randi_range(1, 3) * object_mul)))
 	for _i in n_obj:
 		if obj_keys.is_empty():
@@ -203,6 +205,22 @@ static func _tag_floor_min(tags: Array) -> int:
 		if (t as String).begins_with("floor_min:"):
 			return int((t as String).substr(10))
 	return 1
+
+## A pick-list of ENV keys weighted toward `pref_tags`: a key whose tags overlap
+## the preferred set is added an extra time (so it's likelier without excluding
+## the rest). Empty pref -> every key once.
+static func _biased_object_keys(env: Dictionary, pref_tags: Array) -> Array:
+	var out: Array = []
+	for key in env:
+		out.append(key)
+		if pref_tags.is_empty():
+			continue
+		var tags: Array = env[key].get("tags", [])
+		for pt in pref_tags:
+			if pt in tags:
+				out.append(key); out.append(key)   # ×3 total -> strong bias
+				break
+	return out
 
 # ── Layout helpers ────────────────────────────────────────────────────────────
 
