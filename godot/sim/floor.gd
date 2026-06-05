@@ -17,6 +17,7 @@ var descended: bool = false
 var audience: AudienceState
 var sponsors: SponsorState
 var turn: int = 0
+var class_offered: bool = false   # once we've offered a class, don't nag again
 
 func _init(data: Dictionary) -> void:
 	rooms = data["rooms"]
@@ -54,6 +55,16 @@ func advance_turn() -> Array:
 	for b in new_boxes:
 		boxes.append(b)
 	return new_boxes   # caller can animate box-arrival notification
+
+## If the player's playstyle now warrants a class, return 3 candidate keys to
+## offer (once per run); else []. Presentation shows the picker.
+func check_class_offer() -> Array:
+	if class_offered or player.class_key != "":
+		return []
+	if Classes.should_offer(player, current, turn):
+		class_offered = true
+		return Classes.suggest_classes(player, 3, sim.rng)
+	return []
 
 ## Returns {to, name} or {descend: true} or null.
 func try_transition() -> Variant:

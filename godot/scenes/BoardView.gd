@@ -46,6 +46,9 @@ var _bench_preview: Dictionary = {} # last Crafting.preview result
 var _aim_zone := ""                  # "" = body (no chosen zone); else a part key
 var _part_flash: Dictionary = {}     # "enemyid:zone" -> seconds left, for hit pulse
 
+# Emergent-class offer
+var _class_offer: Array = []         # candidate class keys; non-empty = modal open
+
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
 	_build()
@@ -134,6 +137,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	var kc: int = (event as InputEventKey).keycode
+
+	# Class-offer modal grabs input until a choice is made.
+	if not _class_offer.is_empty():
+		var pick := kc - KEY_1
+		if pick >= 0 and pick < _class_offer.size():
+			_accept_class(pick)
+		return
+
+	# [F] fire the emergent-class active ability
+	if kc == KEY_F:
+		_use_class_active(); return
 
 	# [I] toggles the craft panel
 	if kc == KEY_I:
@@ -309,6 +323,33 @@ func _advance_floor_turn() -> void:
 	for b in new_boxes:
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
 		_add_floater(sim.player_id, "PACZKA!", COL_AMBER)
+	# The Syndicate may now read your style and offer a class.
+	if _class_offer.is_empty():
+		var offer := floor.check_class_offer()
+		if not offer.is_empty():
+			_class_offer = offer
+			var tt := Classes.top_two(floor.player)
+			_log_push("Syndykat patrzy na twój styl (%s) i ma propozycję." %
+				Classes.affinity_label(tt[0]))
+			queue_redraw()
+
+func _accept_class(idx: int) -> void:
+	if idx < 0 or idx >= _class_offer.size():
+		return
+	var key: String = _class_offer[idx]
+	Classes.assign_class(floor.player, key)
+	_class_offer = []
+	_log_push("Zostajesz klasą: %s. %s" % [Classes.name_of(key),
+		ClassFeatures.active_name(key) + " — [F]."])
+	_add_floater(sim.player_id, Classes.name_of(key).to_upper(), COL_AMBER)
+	queue_redraw()
+
+func _use_class_active() -> void:
+	if floor == null or floor.player.class_key == "":
+		return
+	_animate(sim.use_class_active(floor.current))
+	_advance_floor_turn()
+	_check_transition()
 
 # ── Event → animation ─────────────────────────────────────────────────────────
 
@@ -377,6 +418,14 @@ func _animate(evs: Array) -> void:
 				_add_floater(sim.player_id, "+%d HP" % e["amount"], COL_GREEN)
 			"weapon_upgrade":
 				_add_floater(sim.player_id, "+%d obr." % e["bonus"], COL_AMBER)
+			"class_active":
+				_add_floater(sim.player_id, str(e.get("name", "")).to_upper(), COL_AMBER)
+				_log_push("Umiejetnosc: %s." % e.get("name", "?"))
+				_shake = maxf(_shake, 3.0)
+			"buff":
+				_log_push(str(e.get("label", "")))
+			"class_active_blocked":
+				_log_push(str(e.get("reason", "Nie mozna uzyc umiejetnosci.")))
 			"item_used":
 				_add_floater(sim.player_id, "użyto: " + e["name"], COL_BRIGHT)
 			"audience_change":
@@ -671,6 +720,14 @@ func _draw_hud() -> void:
 	# INT stat
 	var int_str := "INT %d (+%d)" % [p.int_xp, p.int_mod()]
 	draw_string(_font, Vector2(40, 98), int_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+	# Class + active readiness
+	if p.class_key != "":
+		var gate := ClassFeatures.can_use_active(p, floor.current)
+		var ready := "gotowa" if bool(gate[0]) else "użyta"
+		var cstr := "Klasa: %s   ·   [F] %s (%s)" % [Classes.name_of(p.class_key),
+			ClassFeatures.active_name(p.class_key), ready]
+		var ccol := COL_AMBER if bool(gate[0]) else COL_DIM
+		draw_string(_font, Vector2(220, 98), cstr, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ccol)
 	# Materials
 	var mats: Array = []
 	for k in sim.materials:
@@ -737,6 +794,44 @@ func _draw_hud() -> void:
 	_draw_body_readout(lx, lw)
 	if _craft_open:
 		_draw_craft_panel()
+	if not _class_offer.is_empty():
+		_draw_class_offer()
+
+## The Syndicate's class pitch: 3 candidates, pick with number keys.
+func _draw_class_offer() -> void:
+	var W := 980.0; var H := 420.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.08, 0.12, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 30), "SYNDYKAT MA PROPOZYCJĘ",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_AMBER)
+	var tt := Classes.top_two(floor.player)
+	draw_string(_font, Vector2(px + 20, py + 54),
+		"Twój styl woła o tożsamość — dominuje: %s. Wybierz klasę:" %
+		Classes.affinity_label(tt[0]),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+	var cy := py + 84.0
+	for i in _class_offer.size():
+		var key: String = _class_offer[i]
+		draw_rect(Rect2(px + 16, cy, W - 32, 96), Color(0.10, 0.12, 0.17, 0.9))
+		draw_rect(Rect2(px + 16, cy, W - 32, 96), COL_GRID, false, 1.0)
+		draw_string(_font, Vector2(px + 28, cy + 26),
+			"[%d]  %s" % [i + 1, Classes.name_of(key)],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_BRIGHT)
+		draw_string(_font, Vector2(px + 28, cy + 48), Classes.desc_of(key),
+			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 14, COL_DIM)
+		var pas := _passive_summary(key)
+		draw_string(_font, Vector2(px + 28, cy + 70),
+			"Pasywka: %s    Umiejętność: %s" % [pas, ClassFeatures.active_name(key)],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 13, COL_CYAN)
+		cy += 104.0
+
+func _passive_summary(key: String) -> String:
+	var parts: Array = []
+	var tbl: Dictionary = ClassFeatures.PASSIVES.get(key, {})
+	for k in tbl:
+		parts.append("%s +%d" % [k, int(tbl[k])])
+	return ", ".join(parts) if not parts.is_empty() else "—"
 
 ## The large combat readout: the focused enemy's procedural body, part by part,
 ## colored by severity, marked with wound icons, with the aimed zone highlighted.

@@ -21,6 +21,8 @@ var discovered_recipes: Array = []  # recipe book, shared ref from Floor
 var _audience: AudienceState        # may be null in headless unit tests
 var _sponsors: SponsorState         # may be null in headless unit tests
 var aim_zone: String = ""           # presentation sets this to aim the next player hit
+var _curse_to_hit: int = 0          # occultist Curse: +AC vs enemies while active
+var _curse_rounds: int = 0          # rounds the curse lasts
 
 var rng := RandomNumberGenerator.new()
 
@@ -133,9 +135,18 @@ func _player_attack(target: CombatEntity) -> Array:
 		hit_bonus += target.body.to_hit_mod_for(zone)
 	var evs: Array = [{"type": "attack", "attacker": player_id, "target": target.id,
 		"aim": zone}]
-	if _roll_hit(hit_bonus, target.ac):
-		var p: CombatEntity = player()
+	var p: CombatEntity = player()
+	_add_affinity("melee", 1)
+	# Ranger's precise shot (active) forces the hit to land.
+	var autohit: bool = p.next_attack_autohit
+	if autohit:
+		p.next_attack_autohit = false
+	if autohit or _roll_hit(hit_bonus, target.ac):
 		var base: int = rng.randi_range(1, 6) + 2 + p.bonus_damage
+		base += ClassFeatures.passive_bonus(p, "unarmed_dmg")   # bruiser/demoman fists
+		if p.next_attack_mult > 1:                               # bruiser charge (active)
+			base *= p.next_attack_mult
+			p.next_attack_mult = 1
 		var dtype: String = DMG_PHYSICAL
 		if p.coating == "electric" and p.coating_charges > 0:
 			dtype = DMG_ELECTRIC
@@ -158,6 +169,7 @@ func _player_attack(target: CombatEntity) -> Array:
 			evs += _change_audience(int(mods.get("audience_on_kill", 1)), "kill")
 			if dtype == DMG_ELECTRIC:
 				evs += _note_tag("env_kill")
+				_add_affinity("environment", 1)
 		if dtype == DMG_ELECTRIC or dtype == DMG_PHYSICAL and base >= 8:
 			evs += _note_tag("crit_hit")
 	else:
@@ -226,9 +238,12 @@ func bench_attempt(slot_names: Array) -> Array:
 			return [{"type": "craft_fail", "reason": "brak materiałów: " + mat}]
 
 	var p := player()
+	# Engineer's crafting passive sweetens the roll alongside INT.
+	var craft_mod := p.int_mod() + ClassFeatures.passive_bonus(p, "crafting")
 	var result := Crafting.attempt(slot_names, materials, discovered_recipes,
-			rng, p.int_mod())
+			rng, craft_mod)
 	p.int_xp += int(result.get("int_xp_gained", 0))
+	_add_affinity("crafting", 2 if result.get("outcome") in ["krytyk", "sukces"] else 1)
 
 	var item: Variant = result.get("item")
 	if item is GameItem:
@@ -298,10 +313,12 @@ func player_use_item(item_idx: int) -> Array:
 			evs.append({"type": "coating_applied", "coating": p.coating,
 						"charges": p.coating_charges})
 		GameItem.CAT_MEDICAL:
-			var heal_amount: int = int(item.effect.get("heal", 8))
+			var heal_amount: int = int(round(int(item.effect.get("heal", 8))
+					* ClassFeatures.heal_multiplier(p)))   # medic doubles healing
 			var actual := mini(heal_amount, p.max_hp - p.hp)
 			p.hp = mini(p.max_hp, p.hp + heal_amount)
 			evs.append({"type": "heal", "target": player_id, "amount": actual})
+			_add_affinity("support", 1)
 		GameItem.CAT_WEAPON:
 			p.bonus_damage += int(item.effect.get("damage_bonus", 0))
 			evs.append({"type": "weapon_upgrade",
@@ -320,6 +337,86 @@ func player_use_item(item_idx: int) -> Array:
 		item.charges -= 1
 	evs += _after_player_action(1)
 	return evs
+
+# ── Class active ability ──────────────────────────────────────────────────────
+
+## Fire the player's emergent-class active (once per floor). Returns events; the
+## ability counts as the player's action, so the enemy turn follows.
+func use_class_active(floor_num: int) -> Array:
+	if over or side != "player":
+		return []
+	var p := player()
+	var gate := ClassFeatures.can_use_active(p, floor_num)
+	if not bool(gate[0]):
+		return [{"type": "class_active_blocked", "reason": gate[1]}]
+	var name_pl := ClassFeatures.active_name(p.class_key)
+	var evs: Array = [{"type": "class_active", "class_key": p.class_key, "name": name_pl}]
+	match p.class_key:
+		"bruiser":
+			p.next_attack_mult = 2
+			evs.append({"type": "buff", "label": "Następny cios x2"})
+		"ranger":
+			p.next_attack_autohit = true
+			evs.append({"type": "buff", "label": "Następny atak trafia na pewno"})
+		"survivor":
+			evs += _heal_player(int(round(p.max_hp * 0.35)), "Drugi oddech")
+		"medic":
+			p.statuses.erase("bleeding")
+			evs += _heal_player(int(round(p.max_hp * 0.60)), "Triage")
+		"engineer":
+			for s in ["disarmed", "slowed", "stunned", "shocked", "poisoned", "burning"]:
+				p.statuses.erase(s)
+			evs += _heal_player(int(round(p.max_hp * 0.20)), "Szybka naprawa")
+		"showman":
+			evs += _change_audience(8, "hype")
+			evs.append({"type": "buff", "label": "+8 widowni"})
+		"negotiator":
+			evs += _change_audience(6, "targi")
+			p.next_attack_mult = maxi(p.next_attack_mult, 1)
+			_add_affinity("diplomacy", 1)
+			evs.append({"type": "buff", "label": "+6 widowni, układy nabite"})
+		"scout":
+			for e in enemies_alive():
+				e.aware = false
+			evs += _change_audience(3, "scout")
+			evs.append({"type": "buff", "label": "Teren rozpoznany"})
+		"trickster":
+			for e in enemies_alive():
+				e.aware = false
+			evs.append({"type": "buff", "label": "Znikasz z pola widzenia"})
+		"occultist":
+			_curse_to_hit = 2
+			_curse_rounds = 3
+			evs.append({"type": "buff", "label": "Klątwa: wrogowie -2 do trafienia (3 rundy)"})
+		"saboteur":
+			var tgt := _nearest_enemy()
+			if tgt != null:
+				tgt.add_status("stunned", 1)
+				evs.append({"type": "status", "target": tgt.id, "status": "stunned", "turns": 1})
+				evs.append({"type": "buff", "label": "Sabotaż: %s oszołomiony" % tgt.name_pl})
+		"demolitionist":
+			for e in enemies_alive():
+				evs += _apply_damage(e, 15, DMG_PHYSICAL)
+			evs.append({"type": "buff", "label": "Wybuch: 15 obrażeń wszystkim"})
+	p.class_active_used_floor = floor_num
+	evs += _after_player_action(2)
+	return evs
+
+func _heal_player(amount: int, _label: String) -> Array:
+	var p := player()
+	var actual := mini(amount, p.max_hp - p.hp)
+	p.hp = mini(p.max_hp, p.hp + amount)
+	return [{"type": "heal", "target": player_id, "amount": actual}]
+
+func _nearest_enemy() -> CombatEntity:
+	var p := player()
+	var best: CombatEntity = null
+	var best_d := 1 << 30
+	for e in enemies_alive():
+		var d: int = maxi(absi(e.cell.x - p.cell.x), absi(e.cell.y - p.cell.y))
+		if d < best_d:
+			best_d = d; best = e
+	return best
 
 # ── Salvage ───────────────────────────────────────────────────────────────────
 
@@ -341,6 +438,9 @@ func _salvage(obj: CombatEntity) -> Array:
 	var evs: Array = [{"type": "salvage", "target": obj.id, "gained": gained}]
 	evs += _note_tag("salvage")
 	evs += _change_audience(1, "salvage")
+	_add_affinity("tech", 1)
+	if "wood" in obj.tags or "furniture" in obj.tags:
+		_add_affinity("environment", 1)
 	evs += _after_player_action(7)
 	return evs
 
@@ -364,6 +464,8 @@ func _on_enter_cell(e: CombatEntity) -> Array:
 		if not e.is_alive() and e.faction == "enemy":
 			evs += _note_tag("env_kill")
 			evs += _change_audience(5, "env_kill")
+			if e.id != player_id:
+				_add_affinity("environment", 2)
 	return evs
 
 func would_shock_at(c: Vector2i) -> bool:
@@ -385,9 +487,15 @@ func _note_tag(tag: String, weight: int = 1) -> Array:
 		return []
 	return _sponsors.note_tag(tag, weight)
 
+func _add_affinity(kind: String, amount: int = 1) -> void:
+	player().add_affinity(kind, amount)
+
 func _change_audience(delta: int, source: String = "") -> Array:
 	if _audience == null:
 		return []
+	# Showman doubles audience gains.
+	if delta > 0:
+		delta = int(round(delta * ClassFeatures.audience_multiplier(player())))
 	var crossing := _audience.change(delta, source)
 	var evs: Array = [{"type": "audience_change", "delta": delta,
 		"rating": _audience.rating, "band": _audience.band(),
@@ -402,6 +510,10 @@ func _change_audience(delta: int, source: String = "") -> Array:
 # ── Turn flow ─────────────────────────────────────────────────────────────────
 
 func _after_player_action(noise_radius: int = 0) -> Array:
+	if _curse_rounds > 0:
+		_curse_rounds -= 1
+		if _curse_rounds <= 0:
+			_curse_to_hit = 0
 	var evs: Array = _check_end()
 	if over:
 		return evs
@@ -442,7 +554,9 @@ func _enemy_turn() -> Array:
 			evs.append({"type": "attack", "attacker": e.id, "target": player_id})
 			# A disarmed (broken-arm) enemy swings weaker.
 			var atk_bonus: int = 0 if e.has_status("disarmed") else 2
-			if _roll_hit(atk_bonus, p.ac):
+			# Survivor's passive + occultist's Curse make the player harder to hit.
+			var pac: int = p.ac + ClassFeatures.passive_bonus(p, "ac") + _curse_to_hit
+			if _roll_hit(atk_bonus, pac):
 				var base: int = rng.randi_range(1, 4) + 1
 				if e.has_status("disarmed"):
 					base = maxi(1, base - 2)

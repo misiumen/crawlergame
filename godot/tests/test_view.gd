@@ -65,6 +65,25 @@ func _initialize() -> void:
 		_ck(true, "enemy has a procedural body attached via the view")
 	bv.sim.aim_zone = "head"
 
+	# class offer: force a dominant playstyle, advance a turn, expect the picker
+	bv.floor.player.affinity = {"melee": 12, "tech": 1}
+	bv.floor.turn = 10
+	bv._advance_floor_turn()
+	_ck(not bv._class_offer.is_empty(), "a dominant playstyle opens the class offer")
+	for i in 2:
+		bv._process(0.016)              # draws the offer modal
+	_ck(true, "class-offer modal draws without crash")
+	bv._accept_class(0)
+	_ck(bv.floor.player.class_key != "", "accepting the offer assigns a class")
+	_ck(bv._class_offer.is_empty(), "offer closes after accepting")
+	# fire the class active (drawn HUD + dispatch)
+	bv._use_class_active()
+	_ck(bv.floor.player.class_active_used_floor == bv.floor.current,
+		"using the active marks the per-floor cooldown")
+	for i in 3:
+		bv._process(0.016)
+	_ck(true, "class HUD + active path run without crash")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)

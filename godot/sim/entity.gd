@@ -22,9 +22,18 @@ var bonus_damage: int = 0        # permanent melee damage bonus
 var int_xp: int = 0              # tinkering experience (dismantling + crafting)
 var body: BodyState = null       # procedural breakable body (null = flat-HP actor)
 var monster_key: String = ""     # content key, for body-plan resolution
+# Emergent-class state (player only)
+var affinity: Dictionary = {}    # playstyle kind -> points
+var class_key: String = ""       # chosen emergent class, "" = none
+var class_active_used_floor: int = -1  # floor index the active was last spent on
+var next_attack_mult: int = 1    # bruiser charge: next hit damage multiplier
+var next_attack_autohit: bool = false  # ranger: next hit always lands
 
 func int_mod() -> int:
 	return int_xp / 5
+
+func add_affinity(kind: String, amount: int = 1) -> void:
+	affinity[kind] = int(affinity.get(kind, 0)) + amount
 
 ## Attach a procedural body resolved from this entity's tags + the plan bundle.
 func attach_body(bundle: Dictionary) -> void:
