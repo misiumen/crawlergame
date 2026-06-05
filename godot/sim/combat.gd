@@ -24,10 +24,12 @@ const DIRS8 := [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN,
 	Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]
 const SIGHT := 4                  # an enemy notices you within this many tiles
 
-func _init(_board: Board, _entities: Dictionary, _player_id: int, seed_value: int = 0) -> void:
+func _init(_board: Board, _entities: Dictionary, _player_id: int, seed_value: int = 0,
+		_materials: Dictionary = {}) -> void:
 	board = _board
 	entities = _entities
 	player_id = _player_id
+	materials = _materials             # shared across rooms when driven by a Floor
 	rng.seed = seed_value
 
 func player() -> CombatEntity:

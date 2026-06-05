@@ -17,6 +17,7 @@ const COL_GAS := Color("f08a46")
 const COL_PLAYER := Color("60cee9")
 const COL_RAT := Color("6c5654")
 const COL_RED := Color("e45656")
+const COL_GREEN := Color("76ce8a")
 const COL_CYAN := Color("60cee9")
 const COL_AMBER := Color("f4c260")
 const COL_DIM := Color("768092")
@@ -34,6 +35,8 @@ var _font: Font
 var _log: Array = []              # recent narration lines (Polish)
 var _hint := ""
 var _craft_open := false
+var floor: Floor
+var _done := false
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -41,17 +44,43 @@ func _ready() -> void:
 	set_process(true)
 
 func _build() -> void:
-	var enc := Encounters.intake()
-	sim = CombatSim.new(enc["board"], enc["entities"], enc["player_id"], 1337)
-	_hint = enc.get("hint", "")
-	_log = ["Wchodzisz do hali. Coś tu śpi."]
+	var data := Encounters.floor()
+	floor = Floor.new(data)
+	sim = floor.sim
+	_hint = data.get("hint", "")
+	_log = ["Wchodzisz do kompleksu. Pierwsze pomieszczenie: magazyn."]
+	_recenter()
+	_reset_visuals()
+
+func _recenter() -> void:
 	var bw: int = sim.board.w * TILE
-	_origin = Vector2((1280 - bw) / 2.0 - 140, 110)   # leave room for the log on the right
+	var bh: int = sim.board.h * TILE
+	_origin = Vector2((1280 - bw) / 2.0 - 140, (720 - bh) / 2.0 + 10)
+
+func _reset_visuals() -> void:
+	_vpos.clear(); _vtarget.clear(); _flash.clear(); _dying.clear(); _floaters.clear()
 	for id in sim.entities:
 		var c: Vector2 = _cell_px(sim.entities[id].cell)
 		_vpos[id] = c
 		_vtarget[id] = c
 	queue_redraw()
+
+func _check_transition() -> void:
+	if floor == null:
+		return
+	var r = floor.try_transition()
+	if r == null:
+		return
+	if r.get("descend", false):
+		_add_banner("ZEJŚCIE NIŻEJ")
+		_log_push("Schodzisz w dół. (Koniec dema.)")
+		_done = true
+		queue_redraw()
+		return
+	sim = floor.sim
+	_recenter()
+	_reset_visuals()
+	_log_push("Przechodzisz do: %s." % r.get("name", "?"))
 
 func _cell_px(c: Vector2i) -> Vector2:
 	return _origin + Vector2(c.x * TILE + TILE / 2.0, c.y * TILE + TILE / 2.0)
@@ -93,7 +122,10 @@ func _do_craft(idx: int) -> void:
 
 # ---------- public action drivers (also called by headless tests) ----------
 func handle_dir(dir: Vector2i) -> void:
+	if _done:
+		return
 	_animate(sim.player_move(dir))
+	_check_transition()
 
 func handle_shove(dir: Vector2i) -> void:
 	_animate(sim.player_shove(dir))
@@ -241,6 +273,7 @@ func _draw() -> void:
 				"water": draw_rect(Rect2(r.position + Vector2(3, 3), Vector2(TILE - 7, TILE - 7)), COL_WATER)
 				"wire": _draw_glyph("|", c, COL_WIRE)
 				"gas": _draw_glyph("G", c, COL_GAS)
+	_draw_exits()
 	# reachable dots around player
 	var p := sim.player()
 	for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN,
@@ -288,6 +321,33 @@ func _draw_rat(pos: Vector2, fade: float, flashing: bool) -> void:
 	draw_line(pos + Vector2(11, 2), pos + Vector2(22, -8), body, 4.0)   # tail
 	_draw_ellipse(pos, 15, 9, body)                                     # body
 	draw_circle(pos + Vector2(-13, 0), 7, body)                         # head
+
+func _draw_exits() -> void:
+	if floor == null:
+		return
+	for cell in floor.rooms[floor.current]["exits"]:
+		var ex: Dictionary = floor.rooms[floor.current]["exits"][cell]
+		if ex.get("descend", false):
+			draw_rect(Rect2(_cell_px(cell) - Vector2(TILE / 2.0 - 3, TILE / 2.0 - 3), Vector2(TILE - 7, TILE - 7)),
+				Color(COL_GREEN, 0.18))
+			_draw_glyph(">", cell, COL_GREEN)
+		else:
+			_draw_glyph("+", cell, COL_AMBER)
+
+func _draw_minimap() -> void:
+	if floor == null:
+		return
+	var n: int = floor.rooms.size()
+	var bx: float = 1280 - 28 - n * 64
+	for i in n:
+		var rx: float = bx + i * 64
+		var col: Color = COL_CYAN if i == floor.current else COL_DIM
+		draw_rect(Rect2(rx, 24, 52, 30), Color(0.10, 0.12, 0.16, 0.92))
+		draw_rect(Rect2(rx, 24, 52, 30), col, false, 2.0)
+		draw_string(_font, Vector2(rx + 8, 44), floor.rooms[i]["name"].substr(0, 5),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
+		if i < n - 1:
+			draw_line(Vector2(rx + 52, 39), Vector2(rx + 64, 39), COL_DIM, 1.0)
 
 func _draw_object(e: CombatEntity, pos: Vector2, fade: float) -> void:
 	var col := Color("8a6a3a") if "wood" in e.tags else Color("6a7280")
@@ -340,8 +400,9 @@ func _draw_preview() -> void:
 
 func _draw_hud() -> void:
 	var p := sim.player()
-	draw_string(_font, Vector2(40, 36), "SORTOWNIA — Hala  ·  Runda %d  ·  tura: %s"
-		% [sim.round_num, "TY" if sim.side == "player" else "wrogowie"],
+	_draw_minimap()
+	draw_string(_font, Vector2(40, 36), "SORTOWNIA — %s  ·  Runda %d  ·  tura: %s"
+		% [floor.current_name() if floor else "?", sim.round_num, "TY" if sim.side == "player" else "wrogowie"],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
 	draw_string(_font, Vector2(40, 60),
 		"HP %d/%d   ·   strzałki/WSAD ruch (wejście=atak)   ·   Shift+ruch pchnij   ·   E rozbierz   ·   Z warsztat   ·   . czekaj"
