@@ -330,9 +330,15 @@ enemy intent telegraph). 36 GDScript checks green (`test_sim`/`test_combat`/
 - ✅ **Save / load** (`sim/save.gd`) — per-floor checkpoint: store seed + depth +
   biome + carried run-state (no room layout — floors regenerate deterministically).
   Resume on boot, autosave on descent, clear on run-end. (`Meta` persists unlocks.)
-- ✅ **NPC dialogue** (`sim/dialogue.gd`) — talkable NPCs on the floor; single-
-  exchange nodes with audience/sponsor/material/flavor effects (board distillation
-  of `dialogue.py`).
+- ✅ **Full dialogue trees** (`sim/dialogue.gd` + `dialogue_trees*.gd`) — faithful
+  port of `engine/dialogue.py`: multi-node branching conversations, skill checks
+  (d20 + player stat_mod vs DC, crit rules), flag gates (requires/forbids),
+  one-shot options, per-NPC relationships, and consequences (audience / sponsor /
+  set_flag / give / log / relationship / threat / end). The 4 authored Python
+  trees are ported verbatim (`tools/gen_dialogues.py`) + 2 deep hand-authored
+  trees (scrap-trader haggling w/ a loyalty flag; cult priest w/ conversion +
+  blessing/curse). Player gains a CHA/INT/WIS/DEX/STR stat block (class-boosted);
+  flags + relationships + stats persist in the save.
 - ✅ **Elemental combat** (`sim/combat.gd`) — fire/acid/cold typed by tags (matter
   rules made real), status DoT (burning/poisoned/corroded) + corroded-AC, and
   **usable thrown/trap items** (the crafting→combat loop was broken: grenades you
@@ -353,10 +359,8 @@ enemy intent telegraph). 36 GDScript checks green (`test_sim`/`test_combat`/
   - **Web export run** — the preset + script ship; needs the Web export templates
     installed in your Godot to actually produce the build.
   - **Balance / playtest feel** — subjective; needs a human at the keyboard.
-  - **Full dialogue trees** (multi-node + skill checks) — the single-exchange
-    version ships; trees are a clean extension.
 
-**Test coverage at end of Phase 6: 380 GUT checks across 15 suites** (sim, combat,
+**Test coverage at end of Phase 6: 405 GUT checks across 15 suites** (sim, combat,
 crafting, body, classes, narrator, meta, floorgen, routes, save, dialogue,
 elements, boss, floor, view). Game boots clean; one-click exe builds.
 

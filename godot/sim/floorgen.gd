@@ -140,8 +140,8 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 			var npc := CombatEntity.new(next_id["v"], "", 1, 10, ["npc", "non_combat"])
 			npc.faction = "npc"
 			npc.affordances = ["talk"]
-			npc.dialogue = Dialogue.random_npc(rng)
-			npc.name_pl = npc.dialogue.get("speaker", "Ktoś")
+			npc.dialogue_tree_key = Dialogue.random_tree_key(rng)
+			npc.name_pl = Dialogue.tree_speaker(npc.dialogue_tree_key)
 			npc.cell = cell
 			board.place(npc.id, cell)
 			entities[npc.id] = npc

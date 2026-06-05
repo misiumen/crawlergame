@@ -22,6 +22,25 @@ const PASSIVES: Dictionary = {
 	"scout":         {"stealth_init": 1, "ranged_hit": 1},
 }
 
+# ── Stat bonuses per class (applied on assign; D&D-ish modifiers) ────────────
+const CLASS_STATS: Dictionary = {
+	"negotiator":    {"CHA": 3},
+	"showman":       {"CHA": 2},
+	"trickster":     {"CHA": 2, "DEX": 1},
+	"occultist":     {"WIS": 2, "CHA": 1},
+	"engineer":      {"INT": 2},
+	"scout":         {"DEX": 2, "WIS": 1},
+	"ranger":        {"DEX": 2},
+	"medic":         {"WIS": 2},
+	"bruiser":       {"STR": 2},
+	"survivor":      {"WIS": 1},
+	"saboteur":      {"INT": 1, "DEX": 1},
+	"demolitionist": {"STR": 1},
+}
+
+static func class_stats_for(class_key: String) -> Dictionary:
+	return CLASS_STATS.get(class_key, {})
+
 # ── Active registry: class_key -> {name_pl, desc_pl} ─────────────────────────
 const ACTIVES: Dictionary = {
 	"bruiser":       {"name_pl": "Brutalna szarża", "desc_pl": "Następny atak zadaje podwójne obrażenia."},

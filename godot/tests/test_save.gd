@@ -43,6 +43,9 @@ func _initialize() -> void:
 	floor.audience.rating = 58
 	floor.audience.peak = 73
 	floor.sponsors.attention = {"novachem_biotech": 8}
+	floor.player.flags = {"bizon_regular": true, "polimer_wierny": true}
+	floor.player.relationships = {"handlarz_szrotu": 2}
+	floor.player.stats["CHA"] = 4
 	var an_item := GameItem.new("Fiolka kwasu", GameItem.CAT_THROWN, Rarity.RARE)
 	an_item.charges = 2
 	an_item.effect = {"dmg_type": "corrosive", "base_dmg": 5}
@@ -79,6 +82,9 @@ func _initialize() -> void:
 	_ck((fl2.items[0] as GameItem).rarity == Rarity.RARE, "item rarity restored")
 	_ck((fl2.items[0] as GameItem).charges == 2, "item charges restored")
 	_ck(fl2.class_offered, "class_offered flag restored")
+	_ck(bool(p2.flags.get("polimer_wierny", false)), "dialogue flags restored")
+	_ck(int(p2.relationships.get("handlarz_szrotu", 0)) == 2, "NPC relationships restored")
+	_ck(int(p2.stats.get("CHA", 0)) == 4, "player stats restored")
 
 	# --- determinism: the rebuilt floor matches a fresh generate of (seed, depth) ---
 	var fresh := FloorGen.generate(3, 12345, content)

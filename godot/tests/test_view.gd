@@ -111,16 +111,20 @@ func _initialize() -> void:
 		bv.handle_dir(Vector2i.RIGHT); bv._process(0.016)
 	_ck(true, "playing on the generated next floor does not crash")
 
-	# dialogue modal: open an NPC exchange, draw it, choose an option
-	var drng := RandomNumberGenerator.new(); drng.seed = 1
-	bv.floor.inv["złom"] = 5            # so any material-gated first option is affordable
-	bv._dialogue = Dialogue.random_npc(drng)
-	_ck(not bv._dialogue.is_empty(), "an NPC exchange opens a dialogue modal")
+	# dialogue tree: open a conversation, draw it, branch, then leave
+	bv._dlg = Dialogue.start(bv.floor, 99, "default_crawler")
+	_ck(not bv._dlg.is_empty(), "starting a dialogue tree opens the conversation")
 	for i in 2:
-		bv._process(0.016)              # draws the dialogue
+		bv._process(0.016)              # draws the dialogue node + options
 	_ck(true, "dialogue modal draws without crash")
-	bv._choose_dialogue(0)
-	_ck(bv._dialogue.is_empty(), "choosing an option closes the dialogue")
+	bv._dlg_advance(0)                   # ask a topic -> sub-node
+	_ck(not bv._dlg.is_empty(), "picking a topic keeps the conversation open")
+	for i in 2:
+		bv._process(0.016)
+	# walk back, then leave via the end option
+	bv._dlg = Dialogue.start(bv.floor, 99, "default_crawler")
+	bv._dlg_advance(4)                   # 'Skończ rozmowę.' -> end
+	_ck(bv._dlg.is_empty(), "the end option closes the conversation")
 
 	# hammer many actions + frames; must never crash
 	for i in 30:

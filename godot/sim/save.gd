@@ -53,6 +53,9 @@ static func _player_dict(p) -> Dictionary:
 		"bonus_damage": p.bonus_damage,
 		"run_kills": p.run_kills, "run_corpses_salvaged": p.run_corpses_salvaged,
 		"run_traps_armed": p.run_traps_armed,
+		"stats": p.stats.duplicate(true),
+		"flags": p.flags.duplicate(true),
+		"relationships": p.relationships.duplicate(true),
 	}
 
 # ── Read ──────────────────────────────────────────────────────────────────────
@@ -95,6 +98,9 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 	p.run_kills = int(pd.get("run_kills", 0))
 	p.run_corpses_salvaged = int(pd.get("run_corpses_salvaged", 0))
 	p.run_traps_armed = int(pd.get("run_traps_armed", 0))
+	if pd.has("stats"): p.stats = (pd["stats"] as Dictionary).duplicate(true)
+	p.flags = (pd.get("flags", {}) as Dictionary).duplicate(true)
+	p.relationships = (pd.get("relationships", {}) as Dictionary).duplicate(true)
 
 	# Carried run state.
 	fdata["inv"] = (save_dict.get("inv", {}) as Dictionary).duplicate(true)

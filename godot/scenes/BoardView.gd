@@ -52,7 +52,8 @@ var _narr_rng := RandomNumberGenerator.new()   # seeded narrator line picker
 var _summary: Dictionary = {}        # non-empty = end-of-run results screen
 var _summary_lines: Array = []       # rendered Polish lines for the screen
 var _route_offer: Array = []         # candidate biome keys at the stairs; non-empty = modal
-var _dialogue: Dictionary = {}       # active NPC exchange; non-empty = modal open
+var _dlg: Dictionary = {}            # active dialogue-tree conversation state; non-empty = open
+var _dlg_info := ""                   # last skill-check result line
 var _title := true                   # title screen shown before a run starts
 
 func _ready() -> void:
@@ -242,13 +243,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			_build()
 		return
 
-	# NPC dialogue grabs input until an option is chosen (Esc walks away).
-	if not _dialogue.is_empty():
+	# NPC dialogue grabs input until you choose or walk away (Esc).
+	if not _dlg.is_empty():
 		if kc == KEY_ESCAPE:
-			_dialogue = {}; queue_redraw(); return
+			_dlg = {}; _dlg_info = ""; queue_redraw(); return
 		var dpick := kc - KEY_1
-		if dpick >= 0 and dpick < (_dialogue.get("options", []) as Array).size():
-			_choose_dialogue(dpick)
+		var avail := Dialogue.available_options(floor, _dlg)
+		if dpick >= 0 and dpick < avail.size():
+			_dlg_advance(int(avail[dpick][0]))
 		return
 
 	# Route-gamble modal at the stairs grabs input until a route is chosen.
@@ -489,30 +491,47 @@ func _use_class_active() -> void:
 
 func _open_dialogue(npc_id: int) -> void:
 	var npc = sim.entities.get(npc_id)
-	if npc == null or npc.dialogue.is_empty():
+	if npc == null or npc.dialogue_tree_key == "":
 		return
-	_dialogue = npc.dialogue
+	_dlg = Dialogue.start(floor, npc_id, npc.dialogue_tree_key)
+	_dlg_info = ""
+	if _dlg.is_empty():
+		return
+	_dlg_events(_dlg.get("events", []))
 	queue_redraw()
 
-func _choose_dialogue(idx: int) -> void:
-	if _dialogue.is_empty():
+## Advance the conversation by picking option `orig_idx`; route events to the log.
+func _dlg_advance(orig_idx: int) -> void:
+	if _dlg.is_empty():
 		return
-	if not Dialogue.option_available(floor, _dialogue, idx):
-		_log_push("Nie stać cię na to.")
-		return
-	var res := Dialogue.choose(floor, _dialogue, idx)
-	var speaker: String = _dialogue.get("speaker", "Ktoś")
-	_dialogue = {}
-	for e in res.get("events", []):
+	var res := Dialogue.pick(floor, _dlg, orig_idx, _narr_rng)
+	_dlg_info = res.get("info", "")
+	if _dlg_info != "":
+		_log_push(_dlg_info)
+	_dlg_events(res.get("events", []))
+	if not res.get("continue", false):
+		_dlg = {}
+	queue_redraw()
+
+## Surface dialogue consequence-events into the log / floaters.
+func _dlg_events(evs: Array) -> void:
+	for e in evs:
 		match e.get("type"):
-			"dialogue_material":
-				var q: int = int(e["qty"])
-				_log_push("%s %s." % ["+%d" % q if q >= 0 else str(q), e["material"]])
 			"dialogue_audience":
 				_add_floater(sim.player_id, "widownia %+d" % int(e["delta"]), COL_AMBER)
-	if res.get("reply", "") != "":
-		_log_push("%s: %s" % [speaker, res["reply"]])
-	queue_redraw()
+			"dialogue_sponsor":
+				_log_push("%s: uwaga %+d." % [e.get("key", "sponsor"), int(e.get("delta", 0))])
+			"dialogue_material", "dialogue_give":
+				var what: String = e.get("material", e.get("item", "?"))
+				_log_push("Dostajesz: %s." % what)
+			"dialogue_log":
+				_log_push(str(e.get("text", "")))
+			"dialogue_relationship":
+				var d: int = int(e.get("delta", 0))
+				_log_push("Relacja %s." % ("poprawia się" if d >= 0 else "psuje się"))
+			"dialogue_threat":
+				if int(e.get("amount", 0)) > 0:
+					_log_push("Hałas budzi wrogów w pobliżu.")
 
 # ── Event → animation ─────────────────────────────────────────────────────────
 
@@ -1069,29 +1088,49 @@ func _draw_hud() -> void:
 		_draw_class_offer()
 	if not _route_offer.is_empty():
 		_draw_route_offer()
-	if not _dialogue.is_empty():
+	if not _dlg.is_empty():
 		_draw_dialogue()
 
-## An NPC exchange: speaker line + numbered options (material gates greyed out).
+## A dialogue-tree conversation: speaker + the node's line + the AVAILABLE options
+## (numbered 1..N; skill options show your modifier vs the TT), plus the last
+## skill-check result line.
 func _draw_dialogue() -> void:
-	var W := 980.0; var H := 340.0
+	var W := 1040.0; var H := 440.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.08, 0.08, 0.11, 0.98))
+	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.07, 0.11, 0.98))
 	draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 30), _dialogue.get("speaker", "Ktoś"),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_PURPLE)
-	draw_string(_font, Vector2(px + 20, py + 58), _dialogue.get("text", ""),
-		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 15, COL_BRIGHT)
-	var cy := py + 110.0
-	var opts: Array = _dialogue.get("options", [])
-	for i in opts.size():
-		var avail: bool = Dialogue.option_available(floor, _dialogue, i)
-		var col := COL_AMBER if avail else COL_DIM
-		draw_string(_font, Vector2(px + 28, cy),
-			"[%d]  %s" % [i + 1, (opts[i] as Dictionary).get("label", "")],
-			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 16, col)
-		cy += 34.0
-	draw_string(_font, Vector2(px + 20, py + H - 18),
+	var n := Dialogue.node(_dlg)
+	# Speaker + relationship standing
+	var tk: String = _dlg.get("tree_key", "")
+	var rel: int = int(floor.player.relationships.get(tk, 0))
+	var head: String = n.get("speaker", "Ktoś")
+	if rel != 0:
+		head += "   (%s)" % ("przyjazny" if rel > 0 else "wrogi")
+	draw_string(_font, Vector2(px + 22, py + 32), head,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_PURPLE)
+	# NPC line
+	draw_string(_font, Vector2(px + 22, py + 64), n.get("text", ""),
+		HORIZONTAL_ALIGNMENT_LEFT, W - 44, 16, COL_BRIGHT)
+	# Available options (numbered by availability), skill ones annotated
+	var avail := Dialogue.available_options(floor, _dlg)
+	var cy := py + 150.0
+	for i in avail.size():
+		var opt: Dictionary = avail[i][1]
+		var label: String = opt.get("label", "")
+		var col := COL_AMBER
+		if opt.has("skill"):
+			var sk: Array = opt["skill"]
+			var mod: int = floor.player.stat_mod(sk[0])
+			label += "   [%s %+d vs TT %d]" % [Dialogue.STAT_PL.get(sk[0], sk[0]), mod, int(sk[1])]
+			col = COL_CYAN
+		draw_string(_font, Vector2(px + 28, cy), "[%d]  %s" % [i + 1, label],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 56, 16, col)
+		cy += 32.0
+	# Last skill-check result
+	if _dlg_info != "":
+		draw_string(_font, Vector2(px + 22, py + H - 44), _dlg_info,
+			HORIZONTAL_ALIGNMENT_LEFT, W - 44, 14, COL_GREEN)
+	draw_string(_font, Vector2(px + 22, py + H - 18),
 		"[cyfra] wybierz   ·   [Esc] odejdź", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## The route gamble at the stairs: pick which biome to descend into.

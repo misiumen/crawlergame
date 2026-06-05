@@ -164,13 +164,18 @@ static func assign_class(player, class_key: String) -> bool:
 	if not CATALOG.has(class_key):
 		return false
 	if player.class_key != "":
+		# Undo the prior class's HP + stat bumps so re-classing stays consistent.
 		var old_hp: int = ClassFeatures.passive_bonus_for(player.class_key, "hp_max")
 		player.max_hp = maxi(1, player.max_hp - old_hp)
 		player.hp = mini(player.hp, player.max_hp)
+		for s in ClassFeatures.class_stats_for(player.class_key):
+			player.stats[s] = int(player.stats.get(s, 0)) - int(ClassFeatures.class_stats_for(player.class_key)[s])
 	player.class_key = class_key
 	var bump: int = ClassFeatures.passive_bonus_for(class_key, "hp_max")
 	player.max_hp += bump
 	player.hp += bump
+	for s in ClassFeatures.class_stats_for(class_key):
+		player.stats[s] = int(player.stats.get(s, 0)) + int(ClassFeatures.class_stats_for(class_key)[s])
 	return true
 
 static func name_of(class_key: String) -> String:

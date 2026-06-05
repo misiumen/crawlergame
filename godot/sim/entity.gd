@@ -24,7 +24,18 @@ var body: BodyState = null       # procedural breakable body (null = flat-HP act
 var monster_key: String = ""     # content key, for body-plan resolution
 var dmg_dice: String = ""        # enemy attack dice from content (e.g. "1d6+2"); "" = default
 var to_hit: int = 2              # enemy attack bonus from content
-var dialogue: Dictionary = {}    # NPCs (faction "npc"): a single-exchange dialogue
+var dialogue_tree_key: String = ""   # NPCs (faction "npc"): which dialogue tree to open
+# RPG stat block (modifiers, D&D-ish). Dialogue skill checks roll d20 + stat_mod.
+var stats: Dictionary = {"CHA": 1, "INT": 0, "WIS": 1, "DEX": 1, "STR": 1}
+var flags: Dictionary = {}       # world/dialogue flags (persist in the run + save)
+var relationships: Dictionary = {}   # tree_key -> standing (persist in the run + save)
+
+## Skill modifier for a stat. INT also rides the tinkering track (int_xp).
+func stat_mod(stat: String) -> int:
+	var m: int = int(stats.get(stat, 0))
+	if stat == "INT":
+		m += int_mod()
+	return m
 # Emergent-class state (player only)
 var affinity: Dictionary = {}    # playstyle kind -> points
 var class_key: String = ""       # chosen emergent class, "" = none
