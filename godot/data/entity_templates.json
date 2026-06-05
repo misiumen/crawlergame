@@ -1,0 +1,4171 @@
+{
+ "DOOR": {},
+ "ENV": {
+  "sponsor_camera": {
+   "name_key": "ent_sponsor_camera_n",
+   "fallback_name": "kamera sponsora",
+   "desc_key": "ent_sponsor_camera_d",
+   "fallback_desc": "Mała kamera na suficie, leniwie się obraca. Diody migają nieprzyjemnie regularnie.",
+   "tags": [
+    "camera",
+    "sponsor",
+    "electronic",
+    "high",
+    "fragile"
+   ],
+   "affordances": [
+    "inspect",
+    "throw_at",
+    "hack",
+    "perform",
+    "break"
+   ]
+  },
+  "sponsor_screen": {
+   "name_key": "ent_sponsor_screen_n",
+   "fallback_name": "ekran sponsorski",
+   "desc_key": "ent_sponsor_screen_d",
+   "fallback_desc": "Płaski ekran z reklamą NovaChem. Dźwięk wyłączony. Łatwo wystąpić przed nim.",
+   "tags": [
+    "screen",
+    "sponsor",
+    "electronic",
+    "fragile"
+   ],
+   "affordances": [
+    "inspect",
+    "perform",
+    "break",
+    "hack"
+   ]
+  },
+  "coffee_machine": {
+   "name_key": "ent_coffee_machine_n",
+   "fallback_name": "automat z kawą",
+   "fallback_desc": "Sykcze. Czerwona dioda mówi 'awaria'. Coś można z tego odzyskać.",
+   "tags": [
+    "machine",
+    "appliance",
+    "electrical",
+    "salvageable",
+    "cafe"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "salvage",
+    "hack",
+    "break"
+   ]
+  },
+  "exposed_wiring": {
+   "name_key": "ent_exposed_wiring_n",
+   "fallback_name": "obnażone kable",
+   "fallback_desc": "Spod tynku wystają w pełnej okazałości. Iskrzą trochę.",
+   "tags": [
+    "electrical",
+    "wire",
+    "salvageable",
+    "hazard"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "push_into",
+    "throw_at"
+   ]
+  },
+  "water_pool": {
+   "name_key": "ent_water_pool_n",
+   "fallback_name": "kałuża wody",
+   "desc_key": "ent_water_pool_d",
+   "fallback_desc": "Stojąca woda. Przewodzi prąd lepiej niż ktokolwiek by chciał.",
+   "tags": [
+    "water",
+    "liquid"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into"
+   ]
+  },
+  "loose_grate": {
+   "name_key": "ent_loose_grate_n",
+   "fallback_name": "luźna krata",
+   "desc_key": "ent_loose_grate_d",
+   "fallback_desc": "Stalowa krata w suficie. Wisi na jednym śrubie.",
+   "tags": [
+    "scrap",
+    "heavy"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "force"
+   ]
+  },
+  "loose_cables": {
+   "name_key": "ent_loose_cables_n",
+   "fallback_name": "luźne kable",
+   "desc_key": "ent_loose_cables_d",
+   "fallback_desc": "Pęk kabli, lekko obnażonych. Łatwo je wyrwać.",
+   "tags": [
+    "electric",
+    "spark",
+    "wire",
+    "craft_material"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "craft",
+    "push_into",
+    "throw_at"
+   ]
+  },
+  "gas_canister": {
+   "name_key": "ent_gas_canister_n",
+   "fallback_name": "butla gazowa",
+   "desc_key": "ent_gas_canister_d",
+   "fallback_desc": "Duża butla z napisem 'NIE OTWIERAĆ PRZY OGNIU'.",
+   "tags": [
+    "gas",
+    "flammable",
+    "heavy",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "throw_at",
+    "force"
+   ]
+  },
+  "server_rack": {
+   "name_key": "ent_server_rack_n",
+   "fallback_name": "szafa serwerowa",
+   "desc_key": "ent_server_rack_d",
+   "fallback_desc": "Wysoka szafa z mrugającymi diodami. Brzęczy.",
+   "tags": [
+    "electronic",
+    "heavy",
+    "fragile"
+   ],
+   "affordances": [
+    "inspect",
+    "hack",
+    "break",
+    "push_into"
+   ]
+  },
+  "furniture_wood": {
+   "name_key": "ent_wood_furn_n",
+   "fallback_name": "drewniane meble",
+   "fallback_desc": "Stary stół, krzesło albo coś z tej rodziny. Trzyma się honoru.",
+   "tags": [
+    "furniture",
+    "wood",
+    "heavy",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "strip",
+    "push_into"
+   ]
+  },
+  "furniture_metal": {
+   "name_key": "ent_metal_furn_n",
+   "fallback_name": "metalowe meble",
+   "fallback_desc": "Spawane, zardzewiałe, zbyt ciężkie żeby przesunąć bez powodu.",
+   "tags": [
+    "furniture",
+    "metal",
+    "heavy",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "strip",
+    "push_into"
+   ]
+  },
+  "loose_chair": {
+   "name_key": "ent_chair_n",
+   "fallback_name": "luźne krzesło",
+   "fallback_desc": "Plastik na metalowych rurkach. Idealne do rozbicia.",
+   "tags": [
+    "furniture",
+    "plastic",
+    "light",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "throw_at"
+   ]
+  },
+  "plastic_table": {
+   "name_key": "ent_plastic_table_n",
+   "fallback_name": "plastikowy stół",
+   "fallback_desc": "Lekki, brudny, na trzech nogach z czterech.",
+   "tags": [
+    "furniture",
+    "plastic",
+    "light",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "push_into"
+   ]
+  },
+  "trash_bin": {
+   "name_key": "ent_trash_bin_n",
+   "fallback_name": "kosz na śmieci",
+   "fallback_desc": "Coś tam jest. Coś tam zawsze jest.",
+   "tags": [
+    "furniture",
+    "container",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "salvage",
+    "loot"
+   ]
+  },
+  "vending_machine": {
+   "name_key": "ent_vending_n",
+   "fallback_name": "automat sponsorski",
+   "fallback_desc": "Reklamuje produkty, których już nie ma. Drzwi się klinują.",
+   "tags": [
+    "machine",
+    "container",
+    "electrical",
+    "salvageable",
+    "sponsor"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "force",
+    "salvage",
+    "hack"
+   ]
+  },
+  "bathroom_fixture": {
+   "name_key": "ent_bath_fixture_n",
+   "fallback_name": "armatura łazienkowa",
+   "fallback_desc": "Ceramika, rury, metal. Coś, czego wyrwanie ma konsekwencje.",
+   "tags": [
+    "bathroom",
+    "ceramic",
+    "structural",
+    "salvageable",
+    "fragile"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "break",
+    "force"
+   ]
+  },
+  "mirror": {
+   "name_key": "ent_mirror_n",
+   "fallback_name": "lustro",
+   "fallback_desc": "Popękane przez środek. Pokazuje cię z opóźnieniem.",
+   "tags": [
+    "bathroom",
+    "glass",
+    "fragile",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "break",
+    "salvage"
+   ]
+  },
+  "sink": {
+   "name_key": "ent_sink_n",
+   "fallback_name": "zlew",
+   "fallback_desc": "Białoszary porcelanowy zlew. Z odpływem coś jest nie tak.",
+   "tags": [
+    "bathroom",
+    "ceramic",
+    "container",
+    "salvageable",
+    "plumbing"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "salvage",
+    "break"
+   ]
+  },
+  "toilet_stall": {
+   "name_key": "ent_stall_n",
+   "fallback_name": "kabina toaletowa",
+   "fallback_desc": "Drzwi zaryglowane od środka. Lub od zewnątrz. Trudno powiedzieć.",
+   "tags": [
+    "bathroom",
+    "privacy",
+    "ceramic",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "force",
+    "salvage",
+    "hide"
+   ]
+  },
+  "pipe_cluster": {
+   "name_key": "ent_pipes_n",
+   "fallback_name": "splot rur",
+   "fallback_desc": "Stalowe rury syczą cicho, gdzieś między ciśnieniem a niedyspozycją.",
+   "tags": [
+    "bathroom",
+    "metal",
+    "plumbing",
+    "salvageable",
+    "mechanical"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "break"
+   ]
+  },
+  "cleaning_cabinet": {
+   "name_key": "ent_clean_cab_n",
+   "fallback_name": "szafka z chemią",
+   "fallback_desc": "Pełna płynów, których nie powinno się wąchać.",
+   "tags": [
+    "bathroom",
+    "chemical",
+    "container",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "loot",
+    "salvage"
+   ]
+  },
+  "medical_cabinet": {
+   "name_key": "ent_med_cab_n",
+   "fallback_name": "szafka medyczna",
+   "fallback_desc": "Wisi krzywo. Środki w środku też.",
+   "tags": [
+    "medical",
+    "container",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "loot",
+    "salvage"
+   ]
+  },
+  "biohazard_bin": {
+   "name_key": "ent_biobin_n",
+   "fallback_name": "kosz biohazardowy",
+   "fallback_desc": "Żółty. Z napisem 'NIE OTWIERAĆ' i kilkoma kreskami obok.",
+   "tags": [
+    "medical",
+    "container",
+    "biohazard",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "salvage"
+   ]
+  },
+  "bandage_box": {
+   "name_key": "ent_bandage_box_n",
+   "fallback_name": "pudełko z bandażami",
+   "fallback_desc": "Półpuste. Ktoś tu już naprawiał sobie albo nadzieję, albo żebra.",
+   "tags": [
+    "medical",
+    "container",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "loot"
+   ]
+  },
+  "disinfectant_shelf": {
+   "name_key": "ent_disinf_shelf_n",
+   "fallback_name": "półka z dezynfekcją",
+   "fallback_desc": "Butelki, krople, instrukcje po angielsku z literówkami.",
+   "tags": [
+    "medical",
+    "chemical",
+    "container",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "loot",
+    "salvage"
+   ]
+  },
+  "broken_monitor": {
+   "name_key": "ent_broken_monitor_n",
+   "fallback_name": "rozbity monitor",
+   "fallback_desc": "Ekran pęknięty od krawędzi do krawędzi. Kabel cudem się trzyma.",
+   "tags": [
+    "electronic",
+    "glass",
+    "fragile",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "break"
+   ]
+  },
+  "broken_terminal": {
+   "name_key": "ent_broken_term_n",
+   "fallback_name": "zepsuty terminal",
+   "fallback_desc": "Klawiatura zalana, wnętrze widoczne, ktoś już tu majstrował.",
+   "tags": [
+    "electronic",
+    "terminal",
+    "mechanical",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "hack",
+    "salvage",
+    "break"
+   ]
+  },
+  "electrical_panel": {
+   "name_key": "ent_elec_panel_n",
+   "fallback_name": "rozdzielnia",
+   "fallback_desc": "Przyciski, lampki, sporo miedzi. Drukowany rok 1997.",
+   "tags": [
+    "electrical",
+    "mechanical",
+    "salvageable",
+    "wire"
+   ],
+   "affordances": [
+    "inspect",
+    "hack",
+    "salvage",
+    "force"
+   ]
+  },
+  "wire_bundle_source": {
+   "name_key": "ent_wires_n",
+   "fallback_name": "zwój kabli",
+   "fallback_desc": "Czysto zwinięte. Ktoś dbał. Już nie.",
+   "tags": [
+    "electrical",
+    "wire",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage"
+   ]
+  },
+  "machine_scrap": {
+   "name_key": "ent_machine_scrap_n",
+   "fallback_name": "złom maszynowy",
+   "fallback_desc": "Stos blachy i części, z których ktoś już wyciągnął najlepsze.",
+   "tags": [
+    "machine",
+    "metal",
+    "scrap",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage"
+   ]
+  },
+  "vent_grate": {
+   "name_key": "ent_vent_grate_n",
+   "fallback_name": "krata wentylacyjna",
+   "fallback_desc": "Pleciony metal. Lekko obluzowany. Wystarczy delikatnie kopnąć.",
+   "tags": [
+    "metal",
+    "structural",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "force",
+    "break"
+   ]
+  },
+  "pressure_valve": {
+   "name_key": "ent_pressure_valve_n",
+   "fallback_name": "zawór ciśnieniowy",
+   "fallback_desc": "Czerwone kółko. Ostrzeżenie po polsku, niemiecku i emoji.",
+   "tags": [
+    "metal",
+    "mechanical",
+    "valve",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "salvage"
+   ]
+  },
+  "loose_shelf": {
+   "name_key": "ent_loose_shelf_n",
+   "fallback_name": "luźna półka",
+   "fallback_desc": "Trzyma się jednym zardzewiałym śrubokrętem honoru.",
+   "tags": [
+    "furniture",
+    "metal",
+    "heavy",
+    "salvageable",
+    "fragile"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage",
+    "push_into",
+    "force"
+   ]
+  },
+  "broken_table": {
+   "name_key": "ent_broken_table_n",
+   "fallback_name": "rozbity stół",
+   "fallback_desc": "Trzy nogi. Każda przydatna na coś innego.",
+   "tags": [
+    "furniture",
+    "wood",
+    "salvageable",
+    "broken"
+   ],
+   "affordances": [
+    "inspect",
+    "salvage"
+   ]
+  },
+  "debris_pile": {
+   "name_key": "ent_debris_n",
+   "fallback_name": "kupa gruzu",
+   "fallback_desc": "Cegły, drut, kawałek czyjegoś hełmu. Standard.",
+   "tags": [
+    "scrap",
+    "mixed",
+    "salvageable",
+    "heavy"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "salvage"
+   ]
+  },
+  "supply_crate": {
+   "name_key": "ent_supply_crate_n",
+   "fallback_name": "skrzynia zaopatrzenia",
+   "fallback_desc": "Pełna albo pusta. Z zewnątrz wygląda tak samo.",
+   "tags": [
+    "container",
+    "wood",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "loot",
+    "force",
+    "salvage"
+   ]
+  },
+  "locker": {
+   "name_key": "ent_locker_n",
+   "fallback_name": "szafka pracownicza",
+   "fallback_desc": "Plakietka 'M.K.' poczerniała od wilgoci.",
+   "tags": [
+    "container",
+    "metal",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "force",
+    "loot",
+    "salvage"
+   ]
+  },
+  "metal_shelf": {
+   "name_key": "ent_metal_shelf_n",
+   "fallback_name": "metalowa półka",
+   "fallback_desc": "Pełna toreb, kartonów i jednego buta. Stoi tylko z przyzwyczajenia.",
+   "tags": [
+    "furniture",
+    "metal",
+    "salvageable",
+    "container"
+   ],
+   "affordances": [
+    "inspect",
+    "search",
+    "salvage",
+    "push_into"
+   ]
+  },
+  "sealed_box": {
+   "name_key": "ent_sealed_box_n",
+   "fallback_name": "zaplombowane pudło",
+   "fallback_desc": "Plomba sponsorska. Drzewko firmowe. Otwarcie = formularz.",
+   "tags": [
+    "container",
+    "sponsor",
+    "sealed",
+    "salvageable"
+   ],
+   "affordances": [
+    "inspect",
+    "force",
+    "hack",
+    "loot"
+   ]
+  }
+ },
+ "HAZ": {
+  "acid_pool": {
+   "name_key": "ent_acid_pool_n",
+   "fallback_name": "kałuża kwasu",
+   "desc_key": "ent_acid_pool_d",
+   "fallback_desc": "Zielonkawy płyn, który zjada metal cicho i z apetytem. Nikt go nie wylał — sam się zorganizował.",
+   "tags": [
+    "acid",
+    "liquid",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "throw_at"
+   ],
+   "damage_type": "acid"
+  },
+  "zwarcie_kablowe": {
+   "name_key": "ent_zwarcie_n",
+   "fallback_name": "zwarcie kablowe",
+   "desc_key": "ent_zwarcie_d",
+   "fallback_desc": "Wiązka kabli wyrwana ze ściany, syczy i strzela iskrami w nierównych odstępach. Cierpliwie czeka, aż ktoś przejdzie przez kałużę obok.",
+   "tags": [
+    "electric",
+    "spark",
+    "wire",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "throw_at",
+    "disable"
+   ],
+   "damage_type": "electric"
+  },
+  "peknieta_rura_pary": {
+   "name_key": "ent_rura_pary_n",
+   "fallback_name": "pęknięta rura pary",
+   "desc_key": "ent_rura_pary_d",
+   "fallback_desc": "Rura wielkości twojego nadgarstka. Pęknięcie świszczy w jednej tonacji, jakby ktoś nucił. Para gotuje ścianę naprzeciwko od trzech tygodni.",
+   "tags": [
+    "fire",
+    "steam",
+    "hazardous",
+    "steampunk_factory"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "throw_at",
+    "seal"
+   ],
+   "damage_type": "fire"
+  },
+  "drut_kolczasty": {
+   "name_key": "ent_drut_kolczasty_n",
+   "fallback_name": "zwój drutu kolczastego",
+   "desc_key": "ent_drut_kolczasty_d",
+   "fallback_desc": "Druty splątane w coś, co kiedyś było obroną obwodu. Teraz raczej ozdoba przemysłowa. Pamiętają smak kilku zmian.",
+   "tags": [
+    "physical",
+    "sharp",
+    "trenches",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "cut",
+    "throw_at"
+   ],
+   "damage_type": "physical"
+  },
+  "ulatniajacy_sie_gaz": {
+   "name_key": "ent_gaz_n",
+   "fallback_name": "ulatniający się gaz",
+   "desc_key": "ent_gaz_d",
+   "fallback_desc": "Powietrze ma kolor, którego powietrze mieć nie powinno. Sponsor zapomniał gdzie postawił butlę. Gaz nie zapomniał, gdzie chce iść.",
+   "tags": [
+    "poison",
+    "gas",
+    "trenches",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "seal",
+    "throw_at"
+   ],
+   "damage_type": "acid"
+  },
+  "stluczone_szklo": {
+   "name_key": "ent_szklo_n",
+   "fallback_name": "warstwa stłuczonego szkła",
+   "desc_key": "ent_szklo_d",
+   "fallback_desc": "Podłoga jak po długiej nocy. Każdy krok brzmi tak, jakby ktoś go już słyszał. Ślady kogoś, kto miał lepsze buty.",
+   "tags": [
+    "sharp",
+    "glass",
+    "bar",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "sweep"
+   ],
+   "damage_type": "physical"
+  },
+  "palaca_kaluza_alkoholu": {
+   "name_key": "ent_paljaca_kaluza_n",
+   "fallback_name": "paląca się kałuża",
+   "desc_key": "ent_paljaca_kaluza_d",
+   "fallback_desc": "Niski, niebieski płomień rozlał się po posadzce jak rozmowa, która nie powinna była się zacząć. Pachnie spirytusem i czyjąś winą.",
+   "tags": [
+    "fire",
+    "liquid",
+    "bar",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "extinguish",
+    "throw_at"
+   ],
+   "damage_type": "fire"
+  },
+  "zarodnikowy_wyrzut": {
+   "name_key": "ent_zarodnikowy_n",
+   "fallback_name": "wyrzut zarodników",
+   "desc_key": "ent_zarodnikowy_d",
+   "fallback_desc": "Worek pleśni wielkości głowy. Pulsuje w rytmie, który chyba próbuje cię zahipnotyzować. Otwiera się raz na minutę. Albo na ciebie.",
+   "tags": [
+    "poison",
+    "spore",
+    "fungal",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "cut",
+    "throw_at"
+   ],
+   "damage_type": "acid"
+  },
+  "lepka_grzybnia": {
+   "name_key": "ent_lepka_grzybnia_n",
+   "fallback_name": "lepka grzybnia",
+   "desc_key": "ent_lepka_grzybnia_d",
+   "fallback_desc": "Ściana z czymś, co ściana mieć nie powinna — śluz, włókna i ten zapach piwnicy babci. Łapie jak komornik, puszcza jak terapeuta.",
+   "tags": [
+    "grapple",
+    "fungal",
+    "sticky",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "cut",
+    "burn"
+   ],
+   "damage_type": "physical"
+  },
+  "pole_radiacji": {
+   "name_key": "ent_radiacja_n",
+   "fallback_name": "strefa skażenia",
+   "desc_key": "ent_radiacja_d",
+   "fallback_desc": "Licznik gdzieś tyka, ale nie ma licznika. Lampka nad drzwiami trzyma zielony, choć powietrze trzyma żółty. Cyfry na ścianie zmieniły kolor.",
+   "tags": [
+    "radiation",
+    "reactor",
+    "invisible",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "throw_at"
+   ],
+   "damage_type": "acid"
+  },
+  "kratka_pod_napieciem": {
+   "name_key": "ent_kratka_n",
+   "fallback_name": "kratka pod napięciem",
+   "desc_key": "ent_kratka_d",
+   "fallback_desc": "Metalowa krata w podłodze. Pod nią mokro. Pod tym kabel. Nad krata reklama: BEZPIECZEŃSTWO TO PODSTAWA NASZEGO PROGRAMU.",
+   "tags": [
+    "electric",
+    "sewers",
+    "floor",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "push_into",
+    "disable"
+   ],
+   "damage_type": "electric"
+  },
+  "miny_pulapki_kontraktowe": {
+   "name_key": "ent_kontraktowe_miny_n",
+   "fallback_name": "miny kontraktowe",
+   "desc_key": "ent_kontraktowe_miny_d",
+   "fallback_desc": "Tabliczka mówi: PRZECHODZENIE OZNACZA AKCEPTACJĘ REGULAMINU. Nie ma żadnej miny widocznej, ale ktoś zostawił bardzo wąskie ślady stóp.",
+   "tags": [
+    "explosive",
+    "trenches",
+    "trap",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "disarm",
+    "throw_at"
+   ],
+   "damage_type": "fire"
+  },
+  "zardzewiale_kolce": {
+   "name_key": "ent_kolce_n",
+   "fallback_name": "zardzewiałe kolce",
+   "desc_key": "ent_kolce_d",
+   "fallback_desc": "Pułapka strzelająca z podłogi. Wystaje już od miesięcy, nikt nie złożył. Sponsor nazwał ją: ATRAKCJA — ZAGADKA TYGODNIA.",
+   "tags": [
+    "physical",
+    "sharp",
+    "trap",
+    "hazardous"
+   ],
+   "affordances": [
+    "inspect",
+    "disarm",
+    "push_into"
+   ],
+   "damage_type": "physical"
+  }
+ },
+ "MOB_COMBAT_STATS": {
+  "indeksowy_robak": [
+   20,
+   "1d4+1",
+   2,
+   10
+  ],
+  "tunnel_runt": [
+   22,
+   "1d4+1",
+   2,
+   10
+  ],
+  "spiker_kanalu": [
+   30,
+   "1d6+2",
+   3,
+   11
+  ],
+  "dzieciak_z_blokowiska": [
+   30,
+   "1d6+2",
+   3,
+   11
+  ],
+  "stadionowy_szaleniec": [
+   35,
+   "1d6+2",
+   3,
+   11
+  ],
+  "bekajacy_paw": [
+   35,
+   "1d6+2",
+   3,
+   11
+  ],
+  "smarownik_pasow": [
+   35,
+   "1d6+2",
+   3,
+   11
+  ],
+  "manometrowiec": [
+   38,
+   "1d6+2",
+   3,
+   11
+  ],
+  "wegielnik_kuzni": [
+   38,
+   "1d6+2",
+   3,
+   11
+  ],
+  "anty_gospodarz": [
+   42,
+   "1d6+2",
+   3,
+   11
+  ],
+  "kibic_zlobiarz": [
+   42,
+   "1d6+2",
+   3,
+   11
+  ],
+  "mutant_szczur": [
+   42,
+   "1d6+2",
+   3,
+   11
+  ],
+  "duch_zwiedzajacego": [
+   42,
+   "1d6+2",
+   3,
+   11
+  ],
+  "drono_sprzatacz": [
+   42,
+   "1d6+2",
+   3,
+   11
+  ],
+  "bibliotekarz_zlowieszczy": [
+   42,
+   "1d6+2",
+   3,
+   11
+  ],
+  "okopowy_grenadier": [
+   46,
+   "1d6+2",
+   3,
+   11
+  ],
+  "koordynator_robotniczy": [
+   49,
+   "1d8+3",
+   4,
+   12
+  ],
+  "pielgrzym_recyklera": [
+   49,
+   "1d8+3",
+   4,
+   12
+  ],
+  "klatkowy_kot": [
+   49,
+   "1d8+3",
+   4,
+   12
+  ],
+  "pijany_crawler": [
+   49,
+   "1d8+3",
+   4,
+   12
+  ],
+  "sanitariuszka_propaganda": [
+   49,
+   "1d8+3",
+   4,
+   12
+  ],
+  "technik_sluzy": [
+   49,
+   "1d8+3",
+   4,
+   12
+  ],
+  "czytelnik_zaginiony": [
+   49,
+   "1d8+3",
+   4,
+   12
+  ],
+  "redaktor_naczelny": [
+   52,
+   "1d8+3",
+   4,
+   12
+  ],
+  "usmiechniety_sasiad": [
+   52,
+   "1d8+3",
+   4,
+   12
+  ],
+  "pasazer_zaginiony": [
+   52,
+   "1d8+3",
+   4,
+   12
+  ],
+  "podkowiarz_polork": [
+   52,
+   "1d8+3",
+   4,
+   12
+  ],
+  "agent_kontroli_jakosci": [
+   56,
+   "1d8+3",
+   4,
+   12
+  ],
+  "ochroniarz_areny": [
+   56,
+   "1d8+3",
+   4,
+   12
+  ],
+  "kostny_kurator": [
+   56,
+   "1d8+3",
+   4,
+   12
+  ],
+  "lokator_baru": [
+   56,
+   "1d8+3",
+   4,
+   12
+  ],
+  "konserwator_kotla": [
+   56,
+   "1d8+3",
+   4,
+   12
+  ],
+  "mlociarz_cechowy": [
+   60,
+   "1d8+3",
+   4,
+   12
+  ],
+  "freezer_carver": [
+   63,
+   "1d8+3",
+   4,
+   12
+  ],
+  "biotech_inspector": [
+   63,
+   "1d8+3",
+   4,
+   12
+  ],
+  "windykator": [
+   63,
+   "1d8+3",
+   4,
+   12
+  ],
+  "asesor_komornika": [
+   63,
+   "1d8+3",
+   4,
+   12
+  ],
+  "kucharka_z_swietlicy": [
+   63,
+   "1d8+3",
+   4,
+   12
+  ],
+  "lazarz_blotny": [
+   63,
+   "1d8+3",
+   4,
+   12
+  ],
+  "kaplan_polimerow": [
+   70,
+   "1d8+3",
+   4,
+   12
+  ],
+  "weteran_trybun": [
+   70,
+   "1d8+3",
+   4,
+   12
+  ],
+  "mechaniczny_strazak": [
+   70,
+   "1d8+3",
+   4,
+   12
+  ],
+  "kantor_pamieci": [
+   70,
+   "1d8+3",
+   4,
+   12
+  ],
+  "egzekutor_ligi": [
+   77,
+   "1d8+3",
+   4,
+   13
+  ],
+  "bramkarz": [
+   77,
+   "1d8+3",
+   4,
+   12
+  ],
+  "kanal_widmo": [
+   77,
+   "1d8+3",
+   4,
+   12
+  ],
+  "ekstremalny_zawodnik": [
+   84,
+   "1d8+3",
+   4,
+   12
+  ],
+  "kwiat_padliny": [
+   84,
+   "1d8+3",
+   4,
+   12
+  ],
+  "zarodnikowiec": [
+   91,
+   "2d6+3",
+   5,
+   12
+  ],
+  "diakon_korpo": [
+   98,
+   "2d6+3",
+   5,
+   12
+  ],
+  "mokry_kolega": [
+   105,
+   "2d6+3",
+   5,
+   12
+  ],
+  "windykator_ostateczny": [
+   133,
+   "2d6+3",
+   5,
+   12
+  ],
+  "anti_host_lite": [
+   154,
+   "2d6+3",
+   5,
+   12
+  ],
+  "trener_szkoleniowiec": [
+   100,
+   "2d6+4",
+   5,
+   13
+  ],
+  "kapitan_druzyny": [
+   110,
+   "2d6+4",
+   5,
+   13
+  ],
+  "nadzorca_sortowni": [
+   120,
+   "2d6+4",
+   5,
+   13
+  ],
+  "miniboss_kartograf_dluznik": [
+   120,
+   "2d6+4",
+   5,
+   13
+  ],
+  "miniboss_alfa_szczur": [
+   125,
+   "2d6+4",
+   5,
+   13
+  ],
+  "miniboss_archiwista_zakazany": [
+   135,
+   "2d6+4",
+   5,
+   13
+  ],
+  "miniboss_oddzialowa": [
+   140,
+   "2d6+4",
+   5,
+   13
+  ],
+  "miniboss_strazak_galerii": [
+   140,
+   "2d6+4",
+   5,
+   13
+  ],
+  "miniboss_kapitan_doku": [
+   140,
+   "2d6+4",
+   5,
+   14
+  ],
+  "miniboss_szef_baru": [
+   150,
+   "2d8+4",
+   5,
+   13
+  ],
+  "miniboss_brygadzista_kuzni": [
+   150,
+   "2d8+4",
+   5,
+   14
+  ],
+  "miniboss_sierzant_blachy": [
+   160,
+   "2d8+4",
+   5,
+   14
+  ],
+  "miniboss_majster_cechu": [
+   160,
+   "2d8+4",
+   5,
+   14
+  ],
+  "miniboss_egzekutor_widowni": [
+   170,
+   "2d8+4",
+   5,
+   13
+  ],
+  "relay_warden": [
+   102,
+   "2d6+5",
+   6,
+   14
+  ],
+  "intake_warden": [
+   150,
+   "2d8+5",
+   6,
+   13
+  ],
+  "arbiter_finalowy": [
+   128,
+   "2d8+5",
+   6,
+   14
+  ],
+  "boss_panicz_zoo": [
+   128,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_konserwator_zbiorow": [
+   128,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_kurator_naczelny": [
+   134,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_komandor_proznii": [
+   134,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_showman": [
+   141,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_palacz_sterling": [
+   141,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_blok_parent": [
+   144,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_kapelmistrz_wojny": [
+   147,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_starszy_cechu": [
+   147,
+   "2d8+5",
+   6,
+   13
+  ],
+  "boss_burmistrz_kanalow": [
+   160,
+   "2d10+5",
+   6,
+   13
+  ],
+  "boss_matka_zarodników": [
+   224,
+   "2d10+5",
+   6,
+   13
+  ],
+  "boss_proboszcz_korpo": [
+   250,
+   "2d10+5",
+   6,
+   13
+  ],
+  "boss_prezes_syndykatu": [
+   312,
+   "3d8+6",
+   7,
+   14
+  ]
+ },
+ "MON": {
+  "tunnel_runt": {
+   "name_key": "ent_tunnel_runt_n",
+   "fallback_name": "Tunelowy Szczurek",
+   "desc_key": "ent_tunnel_runt_d",
+   "fallback_desc": "Niski, mokry, bardzo zły. Chrupie dłoń jeśli mu pozwolisz.",
+   "tags": [
+    "monster",
+    "small",
+    "biting",
+    "flammable",
+    "robactwo",
+    "intake"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "lure",
+    "sneak"
+   ],
+   "hp": 22,
+   "max_hp": 22,
+   "ac": 10,
+   "attack_bonus": 2,
+   "damage_dice": "1d4+1",
+   "vulnerable_to": [
+    "fire",
+    "cold"
+   ]
+  },
+  "freezer_carver": {
+   "name_key": "ent_freezer_carver_n",
+   "fallback_name": "Rzeźnik z Zamrażarki",
+   "desc_key": "ent_freezer_carver_d",
+   "fallback_desc": "Człowiek w fartuchu, z bardzo ostrym nożem i bardzo pustymi oczami.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "sharp",
+    "intake"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "lure",
+    "sneak"
+   ],
+   "hp": 63,
+   "max_hp": 63,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "behavior": "berserker",
+   "vulnerable_to": [
+    "fire"
+   ],
+   "resists": [
+    "cold"
+   ]
+  },
+  "relay_warden": {
+   "name_key": "ent_relay_warden_n",
+   "fallback_name": "Strażnik Przekaźnika",
+   "desc_key": "ent_relay_warden_d",
+   "fallback_desc": "Wysoki, w hełmie, z elektryczną pałką i bardzo dobrym dressingiem.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "armored",
+    "floor_boss"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "bribe",
+    "talk",
+    "sneak"
+   ],
+   "hp": 102,
+   "max_hp": 102,
+   "ac": 14,
+   "attack_bonus": 6,
+   "damage_dice": "2d6+5",
+   "damage_type": "electric",
+   "resists": [
+    "electric",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "acid"
+   ]
+  },
+  "biotech_inspector": {
+   "name_key": "ent_biotech_inspector_n",
+   "fallback_name": "Inspektor NovaChem",
+   "desc_key": "ent_biotech_inspector_d",
+   "fallback_desc": "Hełm z osłoną twarzy, kombinezon, podkładka. Notuje cię.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "corporate",
+    "novachem",
+    "responder",
+    "odraza:robactwo",
+    "intake"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "behavior": "guard",
+   "hp": 63,
+   "max_hp": 63,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "immune_to": [
+    "poison"
+   ],
+   "resists": [
+    "acid",
+    "fire"
+   ],
+   "vulnerable_to": [
+    "electric"
+   ]
+  },
+  "agent_kontroli_jakosci": {
+   "name_key": "ent_qc_agent_n",
+   "fallback_name": "Agent Kontroli Jakości",
+   "desc_key": "ent_qc_agent_d",
+   "fallback_desc": "W białym fartuchu z planszetką. „Subiekcie, proszę nie ruszać się — to dla danych.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "corporate",
+    "novachem",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 56,
+   "max_hp": 56,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "poison",
+   "resists": [
+    "poison",
+    "acid"
+   ],
+   "vulnerable_to": [
+    "fire"
+   ]
+  },
+  "egzekutor_ligi": {
+   "name_key": "ent_league_executor_n",
+   "fallback_name": "Egzekutor Ligi",
+   "desc_key": "ent_league_executor_d",
+   "fallback_desc": "Numerowana tarcza, jednorazowy uśmiech, regulamin 4.2 wytatuowany na pięści.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "armored",
+    "sport",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 77,
+   "max_hp": 77,
+   "ac": 13,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "electric",
+    "cold"
+   ]
+  },
+  "windykator": {
+   "name_key": "ent_collector_n",
+   "fallback_name": "Windykator",
+   "desc_key": "ent_collector_d",
+   "fallback_desc": "Czarny garnitur, czarny notes, czarne pytanie: „Mamy chwilę?”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "cunning",
+    "czarny_rynek",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 63,
+   "max_hp": 63,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "vulnerable_to": [
+    "psychic"
+   ]
+  },
+  "redaktor_naczelny": {
+   "name_key": "ent_chief_editor_n",
+   "fallback_name": "Redaktor Naczelny",
+   "desc_key": "ent_chief_editor_d",
+   "fallback_desc": "Okulary, tablet, dyktafon. „Co właściwie próbujesz powiedzieć tym ludziom?",
+   "tags": [
+    "monster",
+    "humanoid",
+    "memetic",
+    "ministerstwo",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 52,
+   "max_hp": 52,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "acid"
+   ]
+  },
+  "asesor_komornika": {
+   "name_key": "ent_asesor_komornika_n",
+   "fallback_name": "Asesor Komornika",
+   "desc_key": "ent_asesor_komornika_d",
+   "fallback_desc": "Garnitur, teczka, plomby. „Mam tu twoje zaległości i bardzo miłą propozycję — bez prawa wyboru.”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "corporate",
+    "bractwo",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 63,
+   "max_hp": 63,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "fire"
+   ]
+  },
+  "ekstremalny_zawodnik": {
+   "name_key": "ent_ekstremalny_zawodnik_n",
+   "fallback_name": "Ekstremalny Zawodnik",
+   "desc_key": "ent_ekstremalny_zawodnik_d",
+   "fallback_desc": "Kask, kolce, kamerka na czole. Rzuca się z biegu, zwykle w słusznym kierunku.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "brute",
+    "liga_brawurowa",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "lure"
+   ],
+   "hp": 84,
+   "max_hp": 84,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "electric"
+   ]
+  },
+  "koordynator_robotniczy": {
+   "name_key": "ent_koordynator_robotniczy_n",
+   "fallback_name": "Koordynator Robotniczy",
+   "desc_key": "ent_koordynator_robotniczy_d",
+   "fallback_desc": "Kombinezon, broszka spółdzielni, lista uwag. „Towarzyszu, musimy porozmawiać o twojej pracy.”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "cunning",
+    "mrowki",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 49,
+   "max_hp": 49,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "vulnerable_to": [
+    "psychic"
+   ]
+  },
+  "kaplan_polimerow": {
+   "name_key": "ent_kaplan_polimerow_n",
+   "fallback_name": "Kapłan Polimerów",
+   "desc_key": "ent_kaplan_polimerow_d",
+   "fallback_desc": "Szaty z plastiku, kadzielnica z reaktora, oddech rozgrzanego ABS. „Zostań miękki. Zostań.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "chemical",
+    "fungal",
+    "polimery",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 70,
+   "max_hp": 70,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "poison",
+   "resists": [
+    "poison",
+    "acid"
+   ],
+   "vulnerable_to": [
+    "fire"
+   ]
+  },
+  "weteran_trybun": {
+   "name_key": "ent_weteran_trybun_n",
+   "fallback_name": "Weteran Trybun",
+   "desc_key": "ent_weteran_trybun_d",
+   "fallback_desc": "Szalik klubowy, but z metalowym noskiem, megafon. „Dla ojczyzny i ratingów!”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "brute",
+    "stadion",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 70,
+   "max_hp": 70,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "electric"
+   ]
+  },
+  "pielgrzym_recyklera": {
+   "name_key": "ent_recycler_pilgrim_n",
+   "fallback_name": "Pielgrzym Recyklera",
+   "desc_key": "ent_recycler_pilgrim_d",
+   "fallback_desc": "Patchworkowa szata z odzysku, święte koła łańcuchowe, oczy zbyt jasne.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "cult",
+    "recykling",
+    "sponsor_hunter",
+    "flammable"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 49,
+   "max_hp": 49,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "vulnerable_to": [
+    "fire",
+    "psychic"
+   ]
+  },
+  "anty_gospodarz": {
+   "name_key": "ent_antihost_n",
+   "fallback_name": "Konferansjer",
+   "desc_key": "ent_antihost_d",
+   "fallback_desc": "Idealne włosy, mikrofon, uśmiech wycelowany w kamerę, której nie widać.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "spectacle",
+    "kanal_7",
+    "sponsor_hunter"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 42,
+   "max_hp": 42,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "vulnerable_to": [
+    "acid",
+    "psychic"
+   ]
+  },
+  "stadionowy_szaleniec": {
+   "name_key": "ent_stadion_madman_n",
+   "fallback_name": "Stadionowy Szaleniec",
+   "desc_key": "ent_stadion_madman_d",
+   "fallback_desc": "Pomalowana twarz, znicz w dłoni. Krzyczy skandujące hasła do nikogo.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "faction:liga",
+    "floor_min:2",
+    "flammable"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 35,
+   "max_hp": 35,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "vulnerable_to": [
+    "psychic",
+    "cold"
+   ]
+  },
+  "ochroniarz_areny": {
+   "name_key": "ent_arena_security_n",
+   "fallback_name": "Ochroniarz Areny",
+   "desc_key": "ent_arena_security_d",
+   "fallback_desc": "Czarna koszulka „SECURITY”, paralizator. Patrzy na ciebie jak na bilet bez wejścia.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "corporate",
+    "faction:liga",
+    "floor_min:2"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 56,
+   "max_hp": 56,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "electric",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "acid"
+   ]
+  },
+  "kibic_zlobiarz": {
+   "name_key": "ent_hooligan_n",
+   "fallback_name": "Kibic Żłobiarz",
+   "desc_key": "ent_hooligan_d",
+   "fallback_desc": "Szalik, łańcuch, oddech tak gęsty że mógłby stać samodzielnie. Nuci coś groźnego.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "faction:liga",
+    "floor_min:2",
+    "drunk"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 42,
+   "max_hp": 42,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "vulnerable_to": [
+    "psychic"
+   ]
+  },
+  "spiker_kanalu": {
+   "name_key": "ent_announcer_n",
+   "fallback_name": "Spiker Kanału",
+   "desc_key": "ent_announcer_d",
+   "fallback_desc": "Mikrofon, podświetlana kamizelka, oczy z wbudowanym opóźnieniem 0,3 sekundy.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "faction:liga",
+    "floor_min:2",
+    "memetic"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 30,
+   "max_hp": 30,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "psychic",
+   "vulnerable_to": [
+    "physical",
+    "acid"
+   ]
+  },
+  "kapitan_druzyny": {
+   "name_key": "ent_team_captain_n",
+   "fallback_name": "Kapitan Drużyny",
+   "desc_key": "ent_team_captain_d",
+   "fallback_desc": "W kapitanskiej opasce, z głową zwycięzcy i rękami zwykłego zabójcy. Komenderuje swoim klubem.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "faction:liga",
+    "floor_min:2",
+    "miniboss",
+    "mini_boss"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 110,
+   "max_hp": 110,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "psychic"
+   ]
+  },
+  "trener_szkoleniowiec": {
+   "name_key": "ent_coach_n",
+   "fallback_name": "Trener Szkoleniowiec",
+   "desc_key": "ent_coach_d",
+   "fallback_desc": "Dres, gwizdek, tablica taktyczna w jednej ręce, kij baseballowy w drugiej. „Bieg po linii!”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "faction:liga",
+    "floor_min:2",
+    "miniboss",
+    "mini_boss"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 100,
+   "max_hp": 100,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "vulnerable_to": [
+    "acid",
+    "cold"
+   ]
+  },
+  "arbiter_finalowy": {
+   "name_key": "ent_finals_referee_n",
+   "fallback_name": "Arbiter Finałowy",
+   "desc_key": "ent_finals_referee_d",
+   "fallback_desc": "Pasiasta koszulka, megafon, wzrok absolutnej władzy regulaminowej. Za nim — wyjście. Przed nim — ty. „Zawodniku — sprawdzimy faul.”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "faction:liga",
+    "floor_min:2",
+    "floor_boss",
+    "boss",
+    "armored"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk",
+    "bribe"
+   ],
+   "hp": 128,
+   "max_hp": 128,
+   "ac": 14,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "physical",
+   "resists": [
+    "physical",
+    "electric"
+   ],
+   "vulnerable_to": [
+    "acid",
+    "psychic"
+   ]
+  },
+  "mutant_szczur": {
+   "name_key": "ent_mutant_szczur_n",
+   "fallback_name": "zmutowany szczur",
+   "desc_key": "ent_mutant_szczur_d",
+   "fallback_desc": "Dwa razy większy niż powinien. Trzy oczy. Ślina kapie na podłogę i syczy.",
+   "tags": [
+    "monster",
+    "beast",
+    "zoo",
+    "pack",
+    "floor_min:3",
+    "robactwo"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 42,
+   "max_hp": 42,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "physical",
+   "vulnerable_to": [
+    "fire"
+   ],
+   "floor_min": 3,
+   "floor_max": 4
+  },
+  "klatkowy_kot": {
+   "name_key": "ent_klatkowy_kot_n",
+   "fallback_name": "klatkowy kot",
+   "desc_key": "ent_klatkowy_kot_d",
+   "fallback_desc": "Coś między pumą a sponsorem. Cienie pod oczami. Skacze na sygnał klaksonu.",
+   "tags": [
+    "monster",
+    "beast",
+    "zoo",
+    "fast",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 49,
+   "max_hp": 49,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "floor_min": 3,
+   "floor_max": 4
+  },
+  "bekajacy_paw": {
+   "name_key": "ent_bekajacy_paw_n",
+   "fallback_name": "bekający paw",
+   "desc_key": "ent_bekajacy_paw_d",
+   "fallback_desc": "Paw z dodatkową szyją. Wydaje dźwięk podobny do głośnika z zerwanego kabla. Boli tylko z bliska.",
+   "tags": [
+    "monster",
+    "beast",
+    "zoo",
+    "mental",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 35,
+   "max_hp": 35,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "psychic",
+   "vulnerable_to": [
+    "physical"
+   ],
+   "floor_min": 3,
+   "floor_max": 4
+  },
+  "nadzorca_sortowni": {
+   "name_key": "ent_nadzorca_sortowni_n",
+   "fallback_name": "Nadzorca Sortowni",
+   "desc_key": "ent_nadzorca_sortowni_d",
+   "fallback_desc": "Brygadzista w odblaskowej kamizelce, z paralizatorem i planszetką. Na liście odhacza, kto wjeżdża na taśmę, a kto schodzi z obiegu. Twoje nazwisko jest na samym dole. Pancerz na ramionach skrzypi przy każdym ruchu.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "intake",
+    "miniboss",
+    "floor_min:1"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 120,
+   "max_hp": 120,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "damage_type": "electric",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "acid"
+   ],
+   "behavior": "guard",
+   "floor_min": 1,
+   "floor_max": 2
+  },
+  "miniboss_alfa_szczur": {
+   "name_key": "ent_miniboss_alfa_szczur_n",
+   "fallback_name": "Alfa Szczurów",
+   "desc_key": "ent_miniboss_alfa_szczur_d",
+   "fallback_desc": "Tak duży, że ledwo mieści się w korytarzu. Krwawe kółka wokół oczu — ślad obroży, której już nie ma.",
+   "tags": [
+    "monster",
+    "beast",
+    "zoo",
+    "miniboss",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 125,
+   "max_hp": 125,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "damage_type": "physical",
+   "resists": [
+    "physical"
+   ],
+   "floor_min": 3,
+   "floor_max": 3
+  },
+  "boss_panicz_zoo": {
+   "name_key": "ent_boss_panicz_zoo_n",
+   "fallback_name": "Panicz Zoo",
+   "desc_key": "ent_boss_panicz_zoo_d",
+   "fallback_desc": "Egzemplarz numer jeden. Coś między niedźwiedziem a wyłudzonym kontraktem reklamowym. Nienawidzi kamer.",
+   "tags": [
+    "monster",
+    "beast",
+    "zoo",
+    "floor_boss",
+    "boss",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 128,
+   "max_hp": 128,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "physical",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "electric"
+   ],
+   "floor_min": 3,
+   "floor_max": 3
+  },
+  "usmiechniety_sasiad": {
+   "name_key": "ent_usmiechniety_sasiad_n",
+   "fallback_name": "uśmiechnięty sąsiad",
+   "desc_key": "ent_usmiechniety_sasiad_d",
+   "fallback_desc": "Mundur firmowy 'Witamy w Sąsiedztwie'. Uśmiecha się zbyt szeroko. W ręku nóż do steka.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "neighborhood",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 52,
+   "max_hp": 52,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "floor_min": 4,
+   "floor_max": 5
+  },
+  "dzieciak_z_blokowiska": {
+   "name_key": "ent_dzieciak_z_blokowiska_n",
+   "fallback_name": "dzieciak z blokowiska",
+   "desc_key": "ent_dzieciak_z_blokowiska_d",
+   "fallback_desc": "Czapeczka z logo Ministerstwa, kieszenie pełne cegieł. Patrzy ci w oczy bez mrugnięcia.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "neighborhood",
+    "fast",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "throw_at"
+   ],
+   "hp": 30,
+   "max_hp": 30,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "physical",
+   "floor_min": 4,
+   "floor_max": 5
+  },
+  "kucharka_z_swietlicy": {
+   "name_key": "ent_kucharka_z_swietlicy_n",
+   "fallback_name": "kucharka ze świetlicy",
+   "desc_key": "ent_kucharka_z_swietlicy_d",
+   "fallback_desc": "Fartuch w plamach o niejasnym pochodzeniu. Wałek do ciasta wielkości twojej głowy.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "neighborhood",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 63,
+   "max_hp": 63,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "floor_min": 4,
+   "floor_max": 5
+  },
+  "miniboss_oddzialowa": {
+   "name_key": "ent_miniboss_oddzialowa_n",
+   "fallback_name": "Oddziałowa Osiedlowa",
+   "desc_key": "ent_miniboss_oddzialowa_d",
+   "fallback_desc": "Pełen mundur ochrony osiedlowej. Pas z latarką, gwizdkiem i pałką. Wszystko za szybko.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "neighborhood",
+    "miniboss",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 140,
+   "max_hp": 140,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "damage_type": "physical",
+   "resists": [
+    "physical"
+   ],
+   "floor_min": 4,
+   "floor_max": 4
+  },
+  "boss_blok_parent": {
+   "name_key": "ent_boss_blok_parent_n",
+   "fallback_name": "Block Parent",
+   "desc_key": "ent_boss_blok_parent_d",
+   "fallback_desc": "Matka/ojciec osiedla. Klucze do każdych drzwi. Pyta cię o twoje plany na życie i ma odpowiedź gotową, niezależnie od twojej.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "neighborhood",
+    "floor_boss",
+    "boss",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 144,
+   "max_hp": 144,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "physical",
+   "resists": [
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "acid"
+   ],
+   "floor_min": 4,
+   "floor_max": 4
+  },
+  "kostny_kurator": {
+   "name_key": "ent_kostny_kurator_n",
+   "fallback_name": "kostny kurator",
+   "desc_key": "ent_kostny_kurator_d",
+   "fallback_desc": "Zsuszony eksponat ożywiony jakimś żartem kuratora. Krawat, monokl, dziura w czaszce.",
+   "tags": [
+    "monster",
+    "undead",
+    "museum",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 56,
+   "max_hp": 56,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "immune_to": [
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "physical"
+   ],
+   "floor_min": 5,
+   "floor_max": 6
+  },
+  "duch_zwiedzajacego": {
+   "name_key": "ent_duch_zwiedzajacego_n",
+   "fallback_name": "duch zwiedzającego",
+   "desc_key": "ent_duch_zwiedzajacego_d",
+   "fallback_desc": "Półprzezroczysty staruszek w niemodnym płaszczu. Powtarza w kółko: 'GDZIE JEST WYJŚCIE? JA TYLKO PRZYSZEDŁEM ZOBACZYĆ.'",
+   "tags": [
+    "monster",
+    "ghost",
+    "museum",
+    "mental",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk"
+   ],
+   "hp": 42,
+   "max_hp": 42,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "psychic",
+   "immune_to": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "electric"
+   ],
+   "floor_min": 5,
+   "floor_max": 6
+  },
+  "mechaniczny_strazak": {
+   "name_key": "ent_mechaniczny_strazak_n",
+   "fallback_name": "mechaniczny strażak",
+   "desc_key": "ent_mechaniczny_strazak_d",
+   "fallback_desc": "Sprzęt z czasów, gdy gasili pożary. Teraz zrasza wszystko co się rusza. Hose w prawej dłoni, w lewej ostrzeżenie.",
+   "tags": [
+    "monster",
+    "machine",
+    "museum",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "hack"
+   ],
+   "hp": 70,
+   "max_hp": 70,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "acid",
+   "resists": [
+    "fire",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "electric"
+   ],
+   "floor_min": 5,
+   "floor_max": 6
+  },
+  "miniboss_strazak_galerii": {
+   "name_key": "ent_miniboss_strazak_galerii_n",
+   "fallback_name": "Strażak Galerii",
+   "desc_key": "ent_miniboss_strazak_galerii_d",
+   "fallback_desc": "Mundur galeryjny z odznaką naczelnika. Elektryczna pałka pierwszej generacji — bije mocno, ładuje się długo.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "museum",
+    "miniboss",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 140,
+   "max_hp": 140,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "damage_type": "electric",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "psychic"
+   ],
+   "floor_min": 5,
+   "floor_max": 5
+  },
+  "boss_kurator_naczelny": {
+   "name_key": "ent_boss_kurator_naczelny_n",
+   "fallback_name": "Kurator Naczelny",
+   "desc_key": "ent_boss_kurator_naczelny_d",
+   "fallback_desc": "Sześciopalca prawa dłoń, monokl z drugiej strony, szlafrok który nigdy nie zaznał prania. Patrzy na ciebie jak na nową kolekcję.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "museum",
+    "floor_boss",
+    "boss",
+    "occult",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 134,
+   "max_hp": 134,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic",
+    "cold"
+   ],
+   "vulnerable_to": [
+    "physical",
+    "fire"
+   ],
+   "floor_min": 5,
+   "floor_max": 5
+  },
+  "pijany_crawler": {
+   "name_key": "ent_pijany_crawler_n",
+   "fallback_name": "pijany crawler",
+   "desc_key": "ent_pijany_crawler_d",
+   "fallback_desc": "Spóźniony bohater poprzednich pięter. Tatuaż z logo sponsora wyblakły. Pije, póki nie pomyśli.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "crawler",
+    "bar",
+    "floor_min:6"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk"
+   ],
+   "hp": 49,
+   "max_hp": 49,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "floor_min": 6,
+   "floor_max": 8
+  },
+  "lokator_baru": {
+   "name_key": "ent_lokator_baru_n",
+   "fallback_name": "lokator baru",
+   "desc_key": "ent_lokator_baru_d",
+   "fallback_desc": "Pije tu od piętra trzeciego. Wie wszystko. Nic nie powie za darmo. Atakuje tylko gdy go obrażasz.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "crawler",
+    "bar",
+    "social",
+    "floor_min:6"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "bribe"
+   ],
+   "hp": 56,
+   "max_hp": 56,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "floor_min": 6,
+   "floor_max": 8
+  },
+  "bramkarz": {
+   "name_key": "ent_bramkarz_n",
+   "fallback_name": "bramkarz",
+   "desc_key": "ent_bramkarz_d",
+   "fallback_desc": "Czarny garnitur, mała słuchawka w uchu, ręce wielkości twojej głowy. Praca mu się podoba.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "bar",
+    "floor_min:6"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 77,
+   "max_hp": 77,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "physical"
+   ],
+   "floor_min": 6,
+   "floor_max": 8
+  },
+  "miniboss_szef_baru": {
+   "name_key": "ent_miniboss_szef_baru_n",
+   "fallback_name": "Szef Baru",
+   "desc_key": "ent_miniboss_szef_baru_d",
+   "fallback_desc": "Stary crawler, który wygrał trzy razy i wrócił do roboty. W kaburze pod ladą rewolwer z czasów kiedy nie szanowano klientów.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "bar",
+    "miniboss",
+    "floor_min:6"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk",
+    "bribe"
+   ],
+   "hp": 150,
+   "max_hp": 150,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d8+4",
+   "damage_type": "physical",
+   "floor_min": 6,
+   "floor_max": 6
+  },
+  "boss_showman": {
+   "name_key": "ent_boss_showman_n",
+   "fallback_name": "Showman",
+   "desc_key": "ent_boss_showman_d",
+   "fallback_desc": "Smoking, mikrofon, zęby zbyt regularne. Prowadzi skecz Kanału 7 od piętnastu sezonów. Wie, że twoja śmierć podniesie ratingi.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "bar",
+    "floor_boss",
+    "boss",
+    "social",
+    "floor_min:6"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 141,
+   "max_hp": 141,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "physical",
+   "resists": [
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "fire"
+   ],
+   "floor_min": 6,
+   "floor_max": 6
+  },
+  "intake_warden": {
+   "name_key": "ent_intake_warden_n",
+   "fallback_name": "Strażnik Sortowni",
+   "desc_key": "ent_intake_warden_d",
+   "fallback_desc": "Pierwszy mundur, jaki zobaczysz w lochu. Sponsorska opaska na ramieniu, paralizator za pasem, niedopalony papieros w kąciku ust. Pracuje na zmianie od zawsze. Nie pamięta, kto go zatrudnił.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "intake",
+    "floor_boss",
+    "floor_min:1"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "behavior": "guard",
+   "hp": 150,
+   "max_hp": 150,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "electric",
+   "vulnerable_to": [
+    "acid",
+    "fire"
+   ],
+   "floor_min": 1,
+   "floor_max": 1
+  },
+  "miniboss_kartograf_dluznik": {
+   "name_key": "ent_miniboss_kartograf_n",
+   "fallback_name": "Kartograf-Dłużnik",
+   "desc_key": "ent_miniboss_kartograf_d",
+   "fallback_desc": "Płaszcz z naszywkami siedmiu Syndykatów, każda kolejna mniej oficjalna. Pod płaszczem owinięty mapami, jakby trzymały go w pionie. Sprzedaje kierunki temu, kto przeżyje rozmowę.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "miniboss",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "bribe"
+   ],
+   "hp": 120,
+   "max_hp": 120,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "damage_type": "physical",
+   "floor_min": 3,
+   "floor_max": 12
+  },
+  "miniboss_egzekutor_widowni": {
+   "name_key": "ent_miniboss_egzekutor_widowni_n",
+   "fallback_name": "Egzekutor Widowni",
+   "desc_key": "ent_miniboss_egzekutor_widowni_d",
+   "fallback_desc": "Pas zegarków na każdym przegubie — każdy bije tę samą godzinę. Pracuje na premii od tempa Twojej śmierci. Wie, ile masz minut. Liczy.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "miniboss",
+    "floor_min:6"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 170,
+   "max_hp": 170,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d8+4",
+   "damage_type": "physical",
+   "resists": [
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "fire"
+   ],
+   "floor_min": 6,
+   "floor_max": 18
+  },
+  "okopowy_grenadier": {
+   "name_key": "ent_okopowy_grenadier_n",
+   "fallback_name": "okopowy grenadier",
+   "desc_key": "ent_okopowy_grenadier_d",
+   "fallback_desc": "Maska gazowa, hełm w zaschniętym błocie, płaszcz bez guzików. Trzyma granat, jakby trzymał gorącą zupę. Nie pamięta, którą armią dowodzi.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "trenches",
+    "ranged",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 46,
+   "max_hp": 46,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "physical",
+   "vulnerable_to": [
+    "fire"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "lazarz_blotny": {
+   "name_key": "ent_lazarz_blotny_n",
+   "fallback_name": "błotny łazarz",
+   "desc_key": "ent_lazarz_blotny_d",
+   "fallback_desc": "Żołnierz, który utonął w okopie po kostki, potem po pas, potem przestał liczyć. Teraz wynurza się z błota co rano, ciągnie kogoś ze sobą wieczorem. Mokre dłonie. Cierpliwy.",
+   "tags": [
+    "monster",
+    "undead",
+    "trenches",
+    "grappler",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 63,
+   "max_hp": 63,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "physical",
+    "cold"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "electric"
+   ],
+   "floor_min": 4,
+   "floor_max": 8
+  },
+  "sanitariuszka_propaganda": {
+   "name_key": "ent_sanitariuszka_propaganda_n",
+   "fallback_name": "sanitariuszka propagandowa",
+   "desc_key": "ent_sanitariuszka_propaganda_d",
+   "fallback_desc": "Biały fartuch w zaschniętych plamach, opaska z czerwonym kwadratem zamiast krzyża. Trzyma strzykawkę większą, niż ma prawo. Mówi do ciebie głosem matki, której nigdy nie miałeś.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "trenches",
+    "caster",
+    "social",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "bribe"
+   ],
+   "hp": 49,
+   "max_hp": 49,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "acid",
+   "vulnerable_to": [
+    "physical"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "miniboss_sierzant_blachy": {
+   "name_key": "ent_miniboss_sierzant_blachy_n",
+   "fallback_name": "Sierżant Blacha",
+   "desc_key": "ent_miniboss_sierzant_blachy_d",
+   "fallback_desc": "Płyty nitowane do tułowia bezpośrednio. Hełm z rogami z innej epoki. Nie przemawia — wydaje rozkazy świstem przez dziurę w gardle. Posłuszny tylko sponsorowi, który zapłacił ostatni.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "trenches",
+    "miniboss",
+    "armored",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 160,
+   "max_hp": 160,
+   "ac": 14,
+   "attack_bonus": 5,
+   "damage_dice": "2d8+4",
+   "damage_type": "physical",
+   "resists": [
+    "physical",
+    "fire"
+   ],
+   "vulnerable_to": [
+    "electric",
+    "acid"
+   ],
+   "floor_min": 4,
+   "floor_max": 7
+  },
+  "boss_kapelmistrz_wojny": {
+   "name_key": "ent_boss_kapelmistrz_wojny_n",
+   "fallback_name": "Kapelmistrz Wojny",
+   "desc_key": "ent_boss_kapelmistrz_wojny_d",
+   "fallback_desc": "Frak z aksamitu, srebrna pałeczka, mikrofon okopowy zwisa z paska. Dyrygował orkiestrą obozową przez całą wojnę. Wciąż dyryguje. Twoja śmierć ma już zarezerwowaną tonację.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "trenches",
+    "floor_boss",
+    "boss",
+    "social",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 147,
+   "max_hp": 147,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "electric"
+   ],
+   "floor_min": 5,
+   "floor_max": 8
+  },
+  "kanal_widmo": {
+   "name_key": "ent_kanal_widmo_n",
+   "fallback_name": "Kanałowy Widmo",
+   "desc_key": "ent_kanal_widmo_d",
+   "fallback_desc": "Człowiek, który mieszka w kanałach od trzech sezonów. Nie pamięta swojego imienia. Pamięta twoje, jakimś cudem.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "stealth",
+    "floor7",
+    "floor8",
+    "floor9"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "sneak"
+   ],
+   "hp": 77,
+   "max_hp": 77,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "floor_min": 7,
+   "floor_max": 9
+  },
+  "mokry_kolega": {
+   "name_key": "ent_mokry_kolega_n",
+   "fallback_name": "Mokry Kolega",
+   "desc_key": "ent_mokry_kolega_d",
+   "fallback_desc": "Wielki, gruby, pachnie ściekiem. Trzyma w garści rurę zakończoną zaworem. Uśmiecha się.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "brute",
+    "floor7",
+    "floor8",
+    "floor9"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "lure"
+   ],
+   "hp": 105,
+   "max_hp": 105,
+   "ac": 12,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+3",
+   "damage_type": "physical",
+   "resists": [
+    "acid",
+    "poison"
+   ],
+   "vulnerable_to": [
+    "electric"
+   ],
+   "floor_min": 7,
+   "floor_max": 9
+  },
+  "boss_burmistrz_kanalow": {
+   "name_key": "ent_boss_burmistrz_kanalow_n",
+   "fallback_name": "Burmistrz Kanałów",
+   "desc_key": "ent_boss_burmistrz_kanalow_d",
+   "fallback_desc": "Koroniarz w kombinezonie, na głowie hełm z latarką, w dłoni berło z rury kanalizacyjnej. Uważa, że kanały to jego suwerenne terytorium.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "floor_boss",
+    "boss",
+    "cunning",
+    "floor9"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 160,
+   "max_hp": 160,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d10+5",
+   "damage_type": "physical",
+   "resists": [
+    "acid",
+    "poison",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "fire"
+   ],
+   "floor_min": 9,
+   "floor_max": 9
+  },
+  "kwiat_padliny": {
+   "name_key": "ent_kwiat_padliny_n",
+   "fallback_name": "Kwiat Padliny",
+   "desc_key": "ent_kwiat_padliny_d",
+   "fallback_desc": "Mięsisty, gnijący kwiat o średnicy człowieka. Zarodniki opadają jak deszcz. Nie chce ci dobrze.",
+   "tags": [
+    "monster",
+    "plant",
+    "fungal",
+    "novachem_accident",
+    "floor10",
+    "floor11",
+    "floor12"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "push_into"
+   ],
+   "hp": 84,
+   "max_hp": 84,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "poison",
+   "resists": [
+    "poison",
+    "cold"
+   ],
+   "vulnerable_to": [
+    "fire"
+   ],
+   "floor_min": 10,
+   "floor_max": 12
+  },
+  "zarodnikowiec": {
+   "name_key": "ent_zarodnikowiec_n",
+   "fallback_name": "Zarodnikowiec",
+   "desc_key": "ent_zarodnikowiec_d",
+   "fallback_desc": "Człowiekształtny, ale grzybnia rozsadziła mu klatkę piersiową — z pęknięć wystaje masa białych włókien. Wciąż próbuje mówić.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "fungal",
+    "novachem_accident",
+    "floor10",
+    "floor11",
+    "floor12"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "sneak"
+   ],
+   "hp": 91,
+   "max_hp": 91,
+   "ac": 12,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+3",
+   "damage_type": "poison",
+   "resists": [
+    "poison"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "cold"
+   ],
+   "floor_min": 10,
+   "floor_max": 12
+  },
+  "boss_matka_zarodników": {
+   "name_key": "ent_boss_matka_zarodnikow_n",
+   "fallback_name": "Matka Zarodników",
+   "desc_key": "ent_boss_matka_zarodnikow_d",
+   "fallback_desc": "Trzymetrowa kopuła z mięsa, pulsuje, śpiewa głosem dziecka. NovaChem zaprzecza, że to ich wyciek. NovaChem zaprzecza wszystkiemu.",
+   "tags": [
+    "monster",
+    "plant",
+    "fungal",
+    "floor_boss",
+    "boss",
+    "novachem_accident",
+    "floor12"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 224,
+   "max_hp": 224,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d10+5",
+   "damage_type": "poison",
+   "resists": [
+    "poison",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "fire"
+   ],
+   "floor_min": 12,
+   "floor_max": 12
+  },
+  "kantor_pamieci": {
+   "name_key": "ent_kantor_pamieci_n",
+   "fallback_name": "Kantor Pamięci",
+   "desc_key": "ent_kantor_pamieci_d",
+   "fallback_desc": "W szatach z logiem Ministerstwa, oczy zaszyte ekranami. Recytuje statystyki widowni jak modlitwę.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "cult",
+    "memetic",
+    "ministerstwo",
+    "floor13",
+    "floor14",
+    "floor15"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 70,
+   "max_hp": 70,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "acid"
+   ],
+   "floor_min": 13,
+   "floor_max": 15
+  },
+  "diakon_korpo": {
+   "name_key": "ent_diakon_korpo_n",
+   "fallback_name": "Diakon Korpo",
+   "desc_key": "ent_diakon_korpo_d",
+   "fallback_desc": "Garnitur, ornat, tablet. Czyta z niego sponsorską homilię tonem, który dobija wiarę.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "corporate",
+    "cult",
+    "floor13",
+    "floor14",
+    "floor15"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 98,
+   "max_hp": 98,
+   "ac": 12,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+3",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic",
+    "fire"
+   ],
+   "vulnerable_to": [
+    "electric"
+   ],
+   "floor_min": 13,
+   "floor_max": 15
+  },
+  "boss_proboszcz_korpo": {
+   "name_key": "ent_boss_proboszcz_korpo_n",
+   "fallback_name": "Proboszcz Korpo",
+   "desc_key": "ent_boss_proboszcz_korpo_d",
+   "fallback_desc": "W szatach Ministerstwa Pamięci, na ramieniu obraca się serwer z transmisją na żywo. „Twoja widownia czeka na finał. Nie zawiedź jej.”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "floor_boss",
+    "boss",
+    "memetic",
+    "ministerstwo",
+    "floor15"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 250,
+   "max_hp": 250,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d10+5",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic",
+    "fire",
+    "cold"
+   ],
+   "vulnerable_to": [
+    "electric",
+    "acid"
+   ],
+   "floor_min": 15,
+   "floor_max": 15
+  },
+  "windykator_ostateczny": {
+   "name_key": "ent_windykator_ostateczny_n",
+   "fallback_name": "Windykator Ostateczny",
+   "desc_key": "ent_windykator_ostateczny_d",
+   "fallback_desc": "Człowiek-windykator w trzecim cyklu programu. Trzy biczowate ramiona. Tylko jedno przypomina ludzkie. Pyta o twoje rocznice.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "cunning",
+    "syndykat",
+    "floor16",
+    "floor17",
+    "floor18"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 133,
+   "max_hp": 133,
+   "ac": 12,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+3",
+   "damage_type": "physical",
+   "resists": [
+    "physical",
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "acid",
+    "cold"
+   ],
+   "floor_min": 16,
+   "floor_max": 18
+  },
+  "anti_host_lite": {
+   "name_key": "ent_anti_host_lite_n",
+   "fallback_name": "Konferansjer (egzemplarz testowy)",
+   "desc_key": "ent_anti_host_lite_d",
+   "fallback_desc": "Demo wersji bossa z Syndykatu. „Słyszysz mnie w każdym pokoju. Tylko tutaj cię widzę.”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "syndykat",
+    "floor_special",
+    "floor16",
+    "floor17",
+    "floor18"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "sneak"
+   ],
+   "hp": 154,
+   "max_hp": 154,
+   "ac": 12,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+3",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic",
+    "fire",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "electric"
+   ],
+   "floor_min": 16,
+   "floor_max": 18
+  },
+  "boss_prezes_syndykatu": {
+   "name_key": "ent_boss_prezes_syndykatu_n",
+   "fallback_name": "Prezes Syndykatu Rozrywki Wydobywczej",
+   "desc_key": "ent_boss_prezes_syndykatu_d",
+   "fallback_desc": "Garnitur z poprzednich sezonów. Pięć Emmy na biurku. Pyta cię z troską: „A teraz najważniejsze — do której kamery powiesz: dzień dobry?”",
+   "tags": [
+    "monster",
+    "humanoid",
+    "floor_boss",
+    "final_boss",
+    "boss",
+    "syndykat",
+    "floor18"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate",
+    "bribe"
+   ],
+   "hp": 312,
+   "max_hp": 312,
+   "ac": 14,
+   "attack_bonus": 7,
+   "damage_dice": "3d8+6",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic",
+    "fire",
+    "cold",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "acid"
+   ],
+   "floor_min": 18,
+   "floor_max": 18
+  },
+  "konserwator_kotla": {
+   "name_key": "ent_konserwator_kotla_n",
+   "fallback_name": "Konserwator Kotła",
+   "desc_key": "ent_konserwator_kotla_d",
+   "fallback_desc": "Kombinezon polany sadzą, gogle stopione w pół-uśmiech. Klucz nasadowy wielkości twojego przedramienia. Pracuje na trzy zmiany bo dwóch poprzednich już nie ma.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "steampunk_factory",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 56,
+   "max_hp": 56,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "fire"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "electric"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "manometrowiec": {
+   "name_key": "ent_manometrowiec_n",
+   "fallback_name": "Manometrowiec",
+   "desc_key": "ent_manometrowiec_d",
+   "fallback_desc": "Człowiek? Zegar? Trzy ciśnieniomierze wrosły tam, gdzie powinna być twarz. Wskazówki drgają rytmicznie. Czerwona strefa, ciągle.",
+   "tags": [
+    "monster",
+    "aberration",
+    "steampunk_factory",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 38,
+   "max_hp": 38,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "fire",
+   "immune_to": [
+    "fire"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "blunt"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "smarownik_pasow": {
+   "name_key": "ent_smarownik_pasow_n",
+   "fallback_name": "Smarownik Pasów",
+   "desc_key": "ent_smarownik_pasow_d",
+   "fallback_desc": "Posmarowany od stóp do głów, śliski, szybki. W ręku konewka olejowa, w drugiej szmata na stałe wgnieciona w dłoń. Nigdy nie spadł z pasa transmisyjnego.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "steampunk_factory",
+    "fast",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "sneak"
+   ],
+   "hp": 35,
+   "max_hp": 35,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "physical",
+   "vulnerable_to": [
+    "fire"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "miniboss_brygadzista_kuzni": {
+   "name_key": "ent_miniboss_brygadzista_kuzni_n",
+   "fallback_name": "Brygadzista Sterling",
+   "desc_key": "ent_miniboss_brygadzista_kuzni_d",
+   "fallback_desc": "Hełm z rogami zaworów. Brzuch z mosiądzu, stuk-stuk z każdym oddechem. Trzyma rejestr godzin: twoje już zostały wpisane.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "steampunk_factory",
+    "miniboss",
+    "armored",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 150,
+   "max_hp": 150,
+   "ac": 14,
+   "attack_bonus": 5,
+   "damage_dice": "2d8+4",
+   "damage_type": "fire",
+   "resists": [
+    "fire",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "electric"
+   ],
+   "floor_min": 4,
+   "floor_max": 8
+  },
+  "boss_palacz_sterling": {
+   "name_key": "ent_boss_palacz_sterling_n",
+   "fallback_name": "Palacz Sterling",
+   "desc_key": "ent_boss_palacz_sterling_d",
+   "fallback_desc": "Trzy kominy wyrastają mu z pleców. Łopata wielkości człowieka, mosiężny manometr wszyty w czoło. Mówi parą, każde słowo parzy. Nie zna słowa „dość”.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "steampunk_factory",
+    "floor_boss",
+    "boss",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 141,
+   "max_hp": 141,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "fire",
+   "resists": [
+    "fire",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "electric"
+   ],
+   "floor_min": 5,
+   "floor_max": 8
+  },
+  "technik_sluzy": {
+   "name_key": "ent_technik_sluzy_n",
+   "fallback_name": "Technik Śluzy",
+   "desc_key": "ent_technik_sluzy_d",
+   "fallback_desc": "Kombinezon ciśnieniowy, hełm bez przyłbicy. Nieduży klucz dynamometryczny w ręce. Z paska zwisa karta dostępu, wciąż zalaminowana w nic.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "orbital",
+    "corporate",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 49,
+   "max_hp": 49,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "immune_to": [
+    "poison"
+   ],
+   "vulnerable_to": [
+    "electric"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "drono_sprzatacz": {
+   "name_key": "ent_drono_sprzatacz_n",
+   "fallback_name": "Dron Sprzątający",
+   "desc_key": "ent_drono_sprzatacz_d",
+   "fallback_desc": "Kulisty, ze szczotkami zamiast kół, świeci lampką ostrzegawczą o niewłaściwej porze. Wycieczki edukacyjne dawno skończone — drona tego nikt nie odwołał.",
+   "tags": [
+    "monster",
+    "construct",
+    "orbital",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "sneak"
+   ],
+   "hp": 42,
+   "max_hp": 42,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "electric",
+   "immune_to": [
+    "poison"
+   ],
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "acid",
+    "fire"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "pasazer_zaginiony": {
+   "name_key": "ent_pasazer_zaginiony_n",
+   "fallback_name": "Zaginiony Pasażer",
+   "desc_key": "ent_pasazer_zaginiony_d",
+   "fallback_desc": "Skafander turystyczny rozdarty na łokciu. Plakietka „WITAM — STACJA ORBITAL-7”. Próbuje podać ci ulotkę. Ulotka mokra.",
+   "tags": [
+    "monster",
+    "undead",
+    "orbital",
+    "grappler",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk"
+   ],
+   "hp": 52,
+   "max_hp": 52,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "cold",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "electric"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "miniboss_kapitan_doku": {
+   "name_key": "ent_miniboss_kapitan_doku_n",
+   "fallback_name": "Kapitan Doku",
+   "desc_key": "ent_miniboss_kapitan_doku_d",
+   "fallback_desc": "Mundur galowy z odznakami z sezonów, których nie było. Pas z bronią ciśnieniową. Z hełmu wycieka coś, co kiedyś było powietrzem.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "orbital",
+    "miniboss",
+    "armored",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 140,
+   "max_hp": 140,
+   "ac": 14,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "damage_type": "cold",
+   "resists": [
+    "cold",
+    "poison"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "electric"
+   ],
+   "floor_min": 4,
+   "floor_max": 8
+  },
+  "boss_komandor_proznii": {
+   "name_key": "ent_boss_komandor_proznii_n",
+   "fallback_name": "Komandor Próżni",
+   "desc_key": "ent_boss_komandor_proznii_d",
+   "fallback_desc": "Kombinezon ciśnieniowy bez przyłbicy. Twarz tam jest, ale nie do końca. Trzyma dziennik stacji jak miecz. Każda strona to nazwisko kogoś, kto poszedł na spacer.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "orbital",
+    "floor_boss",
+    "boss",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 134,
+   "max_hp": 134,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "cold",
+   "resists": [
+    "cold",
+    "physical",
+    "poison"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "electric"
+   ],
+   "floor_min": 5,
+   "floor_max": 8
+  },
+  "podkowiarz_polork": {
+   "name_key": "ent_podkowiarz_polork_n",
+   "fallback_name": "Podkowiarz Półorków",
+   "desc_key": "ent_podkowiarz_polork_d",
+   "fallback_desc": "Przepasany skórą bydlęcą, młot w jednej dłoni, rozpalona podkowa w drugiej. Cech wymaga trzymania ognia w ręce — żeby pamiętać, kto tu rządzi.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "forge",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 52,
+   "max_hp": 52,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "fire",
+   "resists": [
+    "fire",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "acid"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "wegielnik_kuzni": {
+   "name_key": "ent_wegielnik_kuzni_n",
+   "fallback_name": "Węgielnik",
+   "desc_key": "ent_wegielnik_kuzni_d",
+   "fallback_desc": "Cały w sadzy, oczy świecą czerwono. Niesie wór rozżarzonego węgla na plecach. Wystarczy rzucić — wór zrobi resztę.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "forge",
+    "ranged",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "throw_at"
+   ],
+   "hp": 38,
+   "max_hp": 38,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "fire",
+   "resists": [
+    "fire"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "electric"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "mlociarz_cechowy": {
+   "name_key": "ent_mlociarz_cechowy_n",
+   "fallback_name": "Młociarz Cechowy",
+   "desc_key": "ent_mlociarz_cechowy_d",
+   "fallback_desc": "Półork o kowalskich ramionach. Młot dwuręczny, fartuch z opaską cechu. Każde uderzenie liczone w rejestrze — sponsor zalicza za hałas.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "forge",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate"
+   ],
+   "hp": 60,
+   "max_hp": 60,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "physical"
+   ],
+   "vulnerable_to": [
+    "electric",
+    "cold"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "miniboss_majster_cechu": {
+   "name_key": "ent_miniboss_majster_cechu_n",
+   "fallback_name": "Majster Cechu",
+   "desc_key": "ent_miniboss_majster_cechu_d",
+   "fallback_desc": "Najstarszy półork w kuźni. Skóra spalona od iskier do koloru żelaza. Pierścień cechowy wrośnięty w palec. Każdy nowy uczeń pyta go o radę. Każdy potem milczy.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "forge",
+    "miniboss",
+    "armored",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 160,
+   "max_hp": 160,
+   "ac": 14,
+   "attack_bonus": 5,
+   "damage_dice": "2d8+4",
+   "damage_type": "physical",
+   "resists": [
+    "fire",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "acid"
+   ],
+   "floor_min": 4,
+   "floor_max": 8
+  },
+  "boss_starszy_cechu": {
+   "name_key": "ent_boss_starszy_cechu_n",
+   "fallback_name": "Starszy Cechu",
+   "desc_key": "ent_boss_starszy_cechu_d",
+   "fallback_desc": "Półork z brodą wplecioną w opaskę cechową. Trzy młoty u pasa, jeden cięższy od ciebie. Pamięta każde nazwisko ucznia, który nie dokończył terminowania.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "forge",
+    "floor_boss",
+    "boss",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "intimidate",
+    "talk"
+   ],
+   "hp": 147,
+   "max_hp": 147,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "physical",
+   "resists": [
+    "fire",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "cold",
+    "electric"
+   ],
+   "floor_min": 5,
+   "floor_max": 8
+  },
+  "bibliotekarz_zlowieszczy": {
+   "name_key": "ent_bibliotekarz_zlowieszczy_n",
+   "fallback_name": "Złowieszczy Bibliotekarz",
+   "desc_key": "ent_bibliotekarz_zlowieszczy_d",
+   "fallback_desc": "Sweter zapinany pod brodę, okulary w cienkiej oprawce. Mówi szeptem, który niesie się wszędzie. Stempel „PRZETERMINOWANE” trzyma jak nóż.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "library",
+    "caster",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 42,
+   "max_hp": 42,
+   "ac": 11,
+   "attack_bonus": 3,
+   "damage_dice": "1d6+2",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "physical"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "czytelnik_zaginiony": {
+   "name_key": "ent_czytelnik_zaginiony_n",
+   "fallback_name": "Zaginiony Czytelnik",
+   "desc_key": "ent_czytelnik_zaginiony_d",
+   "fallback_desc": "Książka wrosła mu w dłonie. Strona, którą czyta, jest pusta, ale on jej nie kończy. Ubranie z innej dekady. Spojrzenie z innej publikacji.",
+   "tags": [
+    "monster",
+    "undead",
+    "library",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack"
+   ],
+   "hp": 49,
+   "max_hp": 49,
+   "ac": 12,
+   "attack_bonus": 4,
+   "damage_dice": "1d8+3",
+   "damage_type": "physical",
+   "resists": [
+    "cold",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "electric"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "indeksowy_robak": {
+   "name_key": "ent_indeksowy_robak_n",
+   "fallback_name": "Indeksowy Robak",
+   "desc_key": "ent_indeksowy_robak_d",
+   "fallback_desc": "Robak z papierowymi skrzydłami. Wyjada strony od indeksu w głąb. Tam, gdzie przeszedł, książka ma puste rozdziały. I puste lata.",
+   "tags": [
+    "monster",
+    "beast",
+    "library",
+    "small",
+    "floor_min:3"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "sneak"
+   ],
+   "hp": 20,
+   "max_hp": 20,
+   "ac": 10,
+   "attack_bonus": 2,
+   "damage_dice": "1d4+1",
+   "damage_type": "acid",
+   "vulnerable_to": [
+    "fire",
+    "cold"
+   ],
+   "floor_min": 3,
+   "floor_max": 8
+  },
+  "miniboss_archiwista_zakazany": {
+   "name_key": "ent_miniboss_archiwista_zakazany_n",
+   "fallback_name": "Archiwista Zakazany",
+   "desc_key": "ent_miniboss_archiwista_zakazany_d",
+   "fallback_desc": "Fartuch laboratoryjny, rękawiczki bawełniane. Klucz do magazynu „T” na łańcuszku. Wie, którą książką cię zabić — i którą trzeba ci pokazać, żebyś sam się zabił.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "library",
+    "miniboss",
+    "caster",
+    "floor_min:4"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 135,
+   "max_hp": 135,
+   "ac": 13,
+   "attack_bonus": 5,
+   "damage_dice": "2d6+4",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic",
+    "cold"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "physical"
+   ],
+   "floor_min": 4,
+   "floor_max": 8
+  },
+  "boss_konserwator_zbiorow": {
+   "name_key": "ent_boss_konserwator_zbiorow_n",
+   "fallback_name": "Konserwator Zbiorów Specjalnych",
+   "desc_key": "ent_boss_konserwator_zbiorow_d",
+   "fallback_desc": "Trzy pary okularów, każda na innym dystansie. Klucze do magazynu „T”, „OS” i tego, którego nazwa się nie czyta. Mówi cytatami. Cudzymi.",
+   "tags": [
+    "monster",
+    "humanoid",
+    "library",
+    "floor_boss",
+    "boss",
+    "caster",
+    "floor_min:5"
+   ],
+   "affordances": [
+    "inspect",
+    "attack",
+    "talk",
+    "intimidate"
+   ],
+   "hp": 128,
+   "max_hp": 128,
+   "ac": 13,
+   "attack_bonus": 6,
+   "damage_dice": "2d8+5",
+   "damage_type": "psychic",
+   "resists": [
+    "psychic",
+    "cold",
+    "physical"
+   ],
+   "vulnerable_to": [
+    "fire",
+    "acid"
+   ],
+   "floor_min": 5,
+   "floor_max": 8
+  }
+ },
+ "SVC": {
+  "coffee_counter": {
+   "name_key": "ent_coffee_counter_n",
+   "fallback_name": "lada kafejki",
+   "desc_key": "ent_coffee_counter_d",
+   "fallback_desc": "Lada z napisem 'KASA'. Za nią zmęczony zawodnik w fartuchu.",
+   "tags": [
+    "safehouse",
+    "service",
+    "cafe"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "talk"
+   ]
+  },
+  "mirror": {
+   "name_key": "ent_mirror_n",
+   "fallback_name": "lustro",
+   "desc_key": "ent_mirror_d",
+   "fallback_desc": "Lustro pęknięte przez środek. Pokazuje cię z lekkim opóźnieniem.",
+   "tags": [
+    "safehouse",
+    "service",
+    "bathroom",
+    "glass",
+    "fragile"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "break"
+   ]
+  },
+  "sponsor_kiosk": {
+   "name_key": "ent_kiosk_n",
+   "fallback_name": "kiosk sponsorski",
+   "desc_key": "ent_kiosk_d",
+   "fallback_desc": "Okienko z napisem 'INFO • REKLAMA • CIEKAWE OFERTY'.",
+   "tags": [
+    "safehouse",
+    "service",
+    "sponsor"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "talk"
+   ]
+  },
+  "clinic_counter": {
+   "name_key": "ent_clinic_counter_n",
+   "fallback_name": "recepcja kliniki",
+   "desc_key": "ent_clinic_counter_d",
+   "fallback_desc": "Recepcja kliniki obsługiwana przez automat. Cennik wisi z boku.",
+   "tags": [
+    "safehouse",
+    "service",
+    "clinic"
+   ],
+   "affordances": [
+    "inspect",
+    "use",
+    "talk"
+   ]
+  }
+ },
+ "TERM": {
+  "storage_terminal": {
+   "name_key": "ent_storage_term_n",
+   "fallback_name": "terminal zaplecza",
+   "desc_key": "ent_storage_term_d",
+   "fallback_desc": "Stary terminal. Login miga. Pachnie kawą.",
+   "tags": [
+    "terminal",
+    "electronic"
+   ],
+   "affordances": [
+    "inspect",
+    "hack",
+    "use"
+   ]
+  },
+  "office_terminal": {
+   "name_key": "ent_office_term_n",
+   "fallback_name": "terminal biurowy",
+   "desc_key": "ent_office_term_d",
+   "fallback_desc": "Monitor mruga. Klawiatura zalana czymś nieokreślonym.",
+   "tags": [
+    "terminal",
+    "electronic"
+   ],
+   "affordances": [
+    "inspect",
+    "hack",
+    "use",
+    "repair"
+   ]
+  }
+ }
+}

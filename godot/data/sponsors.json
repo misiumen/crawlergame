@@ -1,0 +1,392 @@
+{
+ "SPONSORS": {
+  "novachem_biotech": {
+   "key": "novachem_biotech",
+   "name_key": "sponsor_novachem_name",
+   "name_fallback": "NovaChem Biotech",
+   "tagline_key": "sponsor_novachem_tagline",
+   "tagline_fallback": "Działa. Boli. Sprzedaje się.",
+   "tone": "klinicznie sarkastyczny",
+   "likes_tags": [
+    "crafting",
+    "salvage",
+    "chemical",
+    "clever_craft",
+    "consumable_used",
+    "first_aid"
+   ],
+   "dislikes_tags": [
+    "theft",
+    "sponsor_property_damage",
+    "brute_force",
+    "rebel_speech"
+   ],
+   "gift_pool": [
+    "bandage",
+    "stimpak",
+    "antidote",
+    "chem_reagent"
+   ],
+   "hunter_key": "agent_kontroli_jakosci",
+   "heckle_keys": [
+    "sponsor_novachem_heckle_1",
+    "sponsor_novachem_heckle_2",
+    "sponsor_novachem_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "sponsor_bezpieczenstwa_sportu": {
+   "key": "sponsor_bezpieczenstwa_sportu",
+   "name_key": "sponsor_sport_name",
+   "name_fallback": "Sponsor Bezpieczeństwa Sportu",
+   "tagline_key": "sponsor_sport_tagline",
+   "tagline_fallback": "Widowiskowość zgodna z regulaminem 4.2.",
+   "tone": "bezduszny korporacyjny biurokrata",
+   "likes_tags": [
+    "combat",
+    "crit_hit",
+    "env_kill",
+    "heavy_attack_hit",
+    "spectacle",
+    "kill_lethal"
+   ],
+   "dislikes_tags": [
+    "flee",
+    "hide",
+    "negotiate",
+    "non_lethal",
+    "stealth_takedown"
+   ],
+   "gift_pool": [
+    "weapon_part",
+    "kevlar_scrap",
+    "adrenaline",
+    "ammo_box"
+   ],
+   "hunter_key": "egzekutor_ligi",
+   "heckle_keys": [
+    "sponsor_sport_heckle_1",
+    "sponsor_sport_heckle_2",
+    "sponsor_sport_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "czarny_rynek_plus": {
+   "key": "czarny_rynek_plus",
+   "name_key": "sponsor_czarny_rynek_name",
+   "name_fallback": "Czarny Rynek Plus",
+   "tagline_key": "sponsor_czarny_rynek_tagline",
+   "tagline_fallback": "Wszystko ma cenę. Dwie ceny.",
+   "tone": "konspiracyjnie życzliwy",
+   "likes_tags": [
+    "theft",
+    "lockpicking",
+    "salvage_sponsor_property",
+    "memetic_mischief",
+    "black_market_use",
+    "sponsor_property_damage"
+   ],
+   "dislikes_tags": [
+    "compliance",
+    "report_to_authority",
+    "quiet_resolution",
+    "pro_state_dialogue"
+   ],
+   "gift_pool": [
+    "lockpick",
+    "ammo_box",
+    "cash_voucher",
+    "fence_loot"
+   ],
+   "hunter_key": "windykator",
+   "heckle_keys": [
+    "sponsor_czarny_rynek_heckle_1",
+    "sponsor_czarny_rynek_heckle_2",
+    "sponsor_czarny_rynek_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "ministerstwo_pamieci": {
+   "key": "ministerstwo_pamieci",
+   "name_key": "sponsor_ministerstwo_name",
+   "name_fallback": "Ministerstwo Pamięci",
+   "tagline_key": "sponsor_ministerstwo_tagline",
+   "tagline_fallback": "Pamiętaj prawidłowo.",
+   "tone": "monotonny i niepokojąco uprzejmy",
+   "likes_tags": [
+    "memetic_seed",
+    "belief_invocation",
+    "pro_state_dialogue",
+    "conform",
+    "propaganda_recite"
+   ],
+   "dislikes_tags": [
+    "contradict_state",
+    "rebel_speech",
+    "truth_leak",
+    "theft",
+    "memetic_mischief"
+   ],
+   "gift_pool": [
+    "forged_id",
+    "propaganda_zine",
+    "authorized_stim",
+    "ration_pack"
+   ],
+   "hunter_key": "redaktor_naczelny",
+   "heckle_keys": [
+    "sponsor_ministerstwo_heckle_1",
+    "sponsor_ministerstwo_heckle_2",
+    "sponsor_ministerstwo_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "kult_recyklingu": {
+   "key": "kult_recyklingu",
+   "name_key": "sponsor_recykling_name",
+   "name_fallback": "Kult Recyklingu",
+   "tagline_key": "sponsor_recykling_tagline",
+   "tagline_fallback": "Wszystko wraca do obwodu.",
+   "tone": "zacietrzewienie kaznodziei na targu",
+   "likes_tags": [
+    "mass_salvage",
+    "break_obj_then_salvage",
+    "give_to_cycle",
+    "clear_floor_clean",
+    "salvage",
+    "sponsor_property_damage"
+   ],
+   "dislikes_tags": [
+    "hoarding",
+    "waste",
+    "kill_without_salvage",
+    "unused_consumable"
+   ],
+   "gift_pool": [
+    "scrap_bundle",
+    "jury_tool",
+    "blessed_amulet",
+    "bandage"
+   ],
+   "hunter_key": "pielgrzym_recyklera",
+   "heckle_keys": [
+    "sponsor_recykling_heckle_1",
+    "sponsor_recykling_heckle_2",
+    "sponsor_recykling_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "kanal_7_krawedz": {
+   "key": "kanal_7_krawedz",
+   "name_key": "sponsor_kanal7_name",
+   "name_fallback": "Kanał 7: Krawędź",
+   "tagline_key": "sponsor_kanal7_tagline",
+   "tagline_fallback": "Pozostań po reklamach.",
+   "tone": "napięty, telewizyjny, ironiczny",
+   "likes_tags": [
+    "crit_success",
+    "env_kill",
+    "near_death_recovery",
+    "dramatic_save",
+    "audience_high_band",
+    "spectacle"
+   ],
+   "dislikes_tags": [
+    "quiet_play",
+    "hide",
+    "long_idle",
+    "wait_spam"
+   ],
+   "gift_pool": [
+    "camera_drone",
+    "premium_painkiller",
+    "branded_armor",
+    "stimpak"
+   ],
+   "hunter_key": "anty_gospodarz",
+   "heckle_keys": [
+    "sponsor_kanal7_heckle_1",
+    "sponsor_kanal7_heckle_2",
+    "sponsor_kanal7_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "bractwo_komornika": {
+   "key": "bractwo_komornika",
+   "name_key": "sponsor_bractwo_name",
+   "name_fallback": "Bractwo Komornika",
+   "tagline_key": "sponsor_bractwo_tagline",
+   "tagline_fallback": "Każdy dług ma piękną formę.",
+   "tone": "sadystycznie kurtuazyjny",
+   "likes_tags": [
+    "bribe",
+    "intimidate",
+    "sponsor_property_damage",
+    "theft",
+    "credit_spent",
+    "extortion"
+   ],
+   "dislikes_tags": [
+    "charity",
+    "free_giveaway",
+    "amnesty",
+    "negotiate_kindly",
+    "quiet_resolution"
+   ],
+   "gift_pool": [
+    "debt_collector_baton",
+    "blank_iou_pad",
+    "stim_wytrzymalosci",
+    "cash_voucher"
+   ],
+   "hunter_key": "asesor_komornika",
+   "heckle_keys": [
+    "sponsor_bractwo_heckle_1",
+    "sponsor_bractwo_heckle_2",
+    "sponsor_bractwo_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "liga_brawurowa": {
+   "key": "liga_brawurowa",
+   "name_key": "sponsor_liga_brawur_name",
+   "name_fallback": "Liga Brawurowa",
+   "tagline_key": "sponsor_liga_brawur_tagline",
+   "tagline_fallback": "Skacz, zanim pomyślisz. Filmuj, póki spadasz.",
+   "tone": "ekstatycznie głośny komentator stuntów",
+   "likes_tags": [
+    "heavy_attack_hit",
+    "env_kill",
+    "dramatic_save",
+    "fall_damage_self",
+    "spectacle",
+    "near_death_recovery"
+   ],
+   "dislikes_tags": [
+    "careful_attack",
+    "wait_spam",
+    "long_idle",
+    "stealth_takedown"
+   ],
+   "gift_pool": [
+    "liga_helmet",
+    "rampage_stim",
+    "improvised_spear",
+    "premium_painkiller"
+   ],
+   "hunter_key": "ekstremalny_zawodnik",
+   "heckle_keys": [
+    "sponsor_liga_brawur_heckle_1",
+    "sponsor_liga_brawur_heckle_2",
+    "sponsor_liga_brawur_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "spoldzielnia_mrowek": {
+   "key": "spoldzielnia_mrowek",
+   "name_key": "sponsor_mrowki_name",
+   "name_fallback": "Spółdzielnia Mrówek",
+   "tagline_key": "sponsor_mrowki_tagline",
+   "tagline_fallback": "Mała stopa, wielki nacisk grupowy.",
+   "tone": "społecznikowski, naiwnie idealistyczny",
+   "likes_tags": [
+    "stealth_takedown",
+    "non_lethal",
+    "negotiate_kindly",
+    "quiet_resolution",
+    "stealth",
+    "free_giveaway"
+   ],
+   "dislikes_tags": [
+    "kill_lethal",
+    "spectacle",
+    "crit_hit",
+    "extortion",
+    "intimidate"
+   ],
+   "gift_pool": [
+    "lockpick",
+    "smoke_bottle",
+    "bandage",
+    "rope_bundle"
+   ],
+   "hunter_key": "koordynator_robotniczy",
+   "heckle_keys": [
+    "sponsor_mrowki_heckle_1",
+    "sponsor_mrowki_heckle_2",
+    "sponsor_mrowki_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "bog_polimerow": {
+   "key": "bog_polimerow",
+   "name_key": "sponsor_polimery_name",
+   "name_fallback": "Bóg Polimerów",
+   "tagline_key": "sponsor_polimery_tagline",
+   "tagline_fallback": "Wszystko miękkie, miękkie, MIĘKKIE.",
+   "tone": "syntetyczna ekstaza, oddech reaktora",
+   "likes_tags": [
+    "chemical",
+    "fungal",
+    "fungal_kill",
+    "mutate_self",
+    "consumable_used",
+    "novachem_accident"
+   ],
+   "dislikes_tags": [
+    "fire_damage_dealt",
+    "burn_organic",
+    "anti_chemical",
+    "sterile_kill"
+   ],
+   "gift_pool": [
+    "fungal_pill",
+    "polymer_balm",
+    "weapon_poison_coat",
+    "antidote"
+   ],
+   "hunter_key": "kaplan_polimerow",
+   "heckle_keys": [
+    "sponsor_polimery_heckle_1",
+    "sponsor_polimery_heckle_2",
+    "sponsor_polimery_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  },
+  "stadion_wolnosci": {
+   "key": "stadion_wolnosci",
+   "name_key": "sponsor_stadion_name",
+   "name_fallback": "Stadion Wolności",
+   "tagline_key": "sponsor_stadion_tagline",
+   "tagline_fallback": "Krzycz głośniej, żeby studio słyszało.",
+   "tone": "populistyczny, fanowski, transmisyjny",
+   "likes_tags": [
+    "rebel_speech",
+    "mass_kill",
+    "audience_high_band",
+    "dramatic_save",
+    "crit_hit",
+    "spectacle"
+   ],
+   "dislikes_tags": [
+    "compliance",
+    "pro_state_dialogue",
+    "report_to_authority",
+    "quiet_resolution"
+   ],
+   "gift_pool": [
+    "megafon_propaganda",
+    "fan_throwable",
+    "improvised_club",
+    "morale_brew"
+   ],
+   "hunter_key": "weteran_trybun",
+   "heckle_keys": [
+    "sponsor_stadion_heckle_1",
+    "sponsor_stadion_heckle_2",
+    "sponsor_stadion_heckle_3"
+   ],
+   "intervention_cooldown_minutes": 120
+  }
+ }
+}

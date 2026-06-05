@@ -1,0 +1,350 @@
+{
+ "PETS_FLAVOR": [
+  {
+   "species_key": "pies",
+   "display_name_pl": "Pies"
+  },
+  {
+   "species_key": "fretka",
+   "display_name_pl": "Fretka"
+  },
+  {
+   "species_key": "jaszczurka",
+   "display_name_pl": "Jaszczurka"
+  },
+  {
+   "species_key": "zolw",
+   "display_name_pl": "Żółw"
+  },
+  {
+   "species_key": "krolik",
+   "display_name_pl": "Królik"
+  },
+  {
+   "species_key": "jez",
+   "display_name_pl": "Jeż"
+  },
+  {
+   "species_key": "gekon",
+   "display_name_pl": "Gekon"
+  },
+  {
+   "species_key": "koza_miniaturowa",
+   "display_name_pl": "Koza miniaturowa"
+  },
+  {
+   "species_key": "golab",
+   "display_name_pl": "Gołąb"
+  },
+  {
+   "species_key": "aksolotl",
+   "display_name_pl": "Aksolotl w przenośnym pojemniku"
+  },
+  {
+   "species_key": "kura_bojowa",
+   "display_name_pl": "Kura bojowa"
+  },
+  {
+   "species_key": "chomik",
+   "display_name_pl": "Chomik"
+  },
+  {
+   "species_key": "pajak",
+   "display_name_pl": "Pająk w pudełku"
+  },
+  {
+   "species_key": "kanarek",
+   "display_name_pl": "Kanarek"
+  },
+  {
+   "species_key": "kaczka",
+   "display_name_pl": "Kaczka"
+  },
+  {
+   "species_key": "miniaturowa_swinia",
+   "display_name_pl": "Miniaturowa świnia"
+  },
+  {
+   "species_key": "skorpion",
+   "display_name_pl": "Skorpion w terrarium"
+  },
+  {
+   "species_key": "ropucha",
+   "display_name_pl": "Ropucha"
+  },
+  {
+   "species_key": "szczur_laboratoryjny",
+   "display_name_pl": "Szczur laboratoryjny"
+  },
+  {
+   "species_key": "nietoperz_owocowy",
+   "display_name_pl": "Nietoperz owocowy"
+  }
+ ],
+ "PETS_V1": [
+  {
+   "species_key": "gees",
+   "display_name_pl": "Gęś",
+   "name_aliases_pl": [
+    "gęsi",
+    "gęsią",
+    "gęsiom",
+    "gęś"
+   ],
+   "temperament": "wojowniczo skupiona",
+   "role": "chaos i zastraszanie",
+   "need": "jedzenie i osobista wyższość",
+   "risk": "atakuje nie tych, co trzeba, hałasuje",
+   "abilities": [
+    "distract_weak",
+    "intimidate"
+   ],
+   "risk_tags": [
+    "noise",
+    "wrong_target"
+   ],
+   "sponsor_likes": [
+    "spectacle"
+   ],
+   "intro_line_pl": "Idzie z tobą gęś. Nie zaprzeczaj. Ona już to ustaliła.",
+   "description_pl": "Duża, biała, oburzona istnieniem reszty świata."
+  },
+  {
+   "species_key": "szczur",
+   "display_name_pl": "Szczur",
+   "name_aliases_pl": [
+    "szczura",
+    "szczurem",
+    "szczurze",
+    "szczurów"
+   ],
+   "temperament": "praktyczny, podejrzliwy",
+   "role": "zwiad w wąskich miejscach, znajdowanie złomu",
+   "need": "jedzenie, schowek, ciepło",
+   "risk": "kradnie błyskotki, przyciąga drapieżniki",
+   "abilities": [
+    "scout_tight",
+    "find_scrap"
+   ],
+   "risk_tags": [
+    "steals_shiny",
+    "attracts_predator"
+   ],
+   "sponsor_likes": [
+    "lockpicking"
+   ],
+   "intro_line_pl": "Szczur ocenia cię chłodno. Decyzję podejmie później.",
+   "description_pl": "Inteligentny, zbyt dużo wie o tobie po dwóch godzinach."
+  },
+  {
+   "species_key": "papuga",
+   "display_name_pl": "Papuga",
+   "name_aliases_pl": [
+    "papugi",
+    "papugą",
+    "papugę",
+    "papugach"
+   ],
+   "temperament": "głośna, towarzyska, niedyskretna",
+   "role": "mimikra, plotki, propaganda",
+   "need": "uwaga i okno",
+   "risk": "powtarza sekrety i niebezpieczne frazy",
+   "abilities": [
+    "repeat_phrase",
+    "distract_weak"
+   ],
+   "risk_tags": [
+    "leaks_secret",
+    "noise"
+   ],
+   "sponsor_likes": [
+    "propaganda_recite",
+    "memetic_seed"
+   ],
+   "intro_line_pl": "Papuga już wie, jak masz na imię. Powie to każdemu.",
+   "description_pl": "Zielona, błyskotliwa, kiepska w utrzymaniu tajemnic."
+  },
+  {
+   "species_key": "waz",
+   "display_name_pl": "Wąż",
+   "name_aliases_pl": [
+    "węża",
+    "wężem",
+    "węży",
+    "wężu"
+   ],
+   "temperament": "powolny, obojętny, cierpliwy",
+   "role": "zwiad w ciasnych miejscach, zastraszanie",
+   "need": "ciepło i ciemność",
+   "risk": "panikuje w zimnie, wywołuje histerię u NPC",
+   "abilities": [
+    "scout_tight",
+    "intimidate"
+   ],
+   "risk_tags": [
+    "panics_cold"
+   ],
+   "sponsor_likes": [
+    "spectacle"
+   ],
+   "intro_line_pl": "Wąż owija się wokół twojego ramienia. Nie szuka kłopotów. Ale je znajdzie.",
+   "description_pl": "Szary, suchy, niepokojąco logiczny."
+  },
+  {
+   "species_key": "kot",
+   "display_name_pl": "Kot",
+   "name_aliases_pl": [
+    "kota",
+    "kotem",
+    "kocie",
+    "kotów"
+   ],
+   "temperament": "obojętny, samowystarczalny",
+   "role": "cichy towarzysz, ostrzeganie przed niebezpieczeństwem",
+   "need": "spokój i sucha kanapa",
+   "risk": "ignoruje rozkazy w połowie przypadków",
+   "abilities": [
+    "warn_danger",
+    "reduce_noise"
+   ],
+   "risk_tags": [
+    "aloof"
+   ],
+   "sponsor_likes": [],
+   "intro_line_pl": "Kot wchodzi do twojego plecaka. Decyzja zapadła bez ciebie.",
+   "description_pl": "Czarny, z jednym uchem nadgryzionym. Wie więcej niż mówi."
+  },
+  {
+   "species_key": "kruk",
+   "display_name_pl": "Kruk",
+   "name_aliases_pl": [
+    "kruka",
+    "krukiem",
+    "kruku"
+   ],
+   "temperament": "obserwujący, mściwy",
+   "role": "zwiad z powietrza, znaki",
+   "need": "wysokość i błyszczące rzeczy",
+   "risk": "zwraca uwagę nie tych, co trzeba",
+   "abilities": [
+    "scout_aerial",
+    "warn_danger"
+   ],
+   "risk_tags": [
+    "steals_shiny",
+    "noise"
+   ],
+   "sponsor_likes": [
+    "spectacle"
+   ],
+   "intro_line_pl": "Kruk siada ci na ramieniu. Patrzy. Niczego nie obiecuje.",
+   "description_pl": "Czarny, bystry, wyraźnie odgrywa rolę przed widownią."
+  },
+  {
+   "species_key": "rybka_w_sloju",
+   "display_name_pl": "Rybka w słoiku",
+   "name_aliases_pl": [
+    "rybki",
+    "rybką",
+    "rybce",
+    "rybkę"
+   ],
+   "temperament": "obecna, znacząca, niedostępna",
+   "role": "talizman, czujka chemiczna",
+   "need": "woda, chłód, ochrona",
+   "risk": "krucha, niewygodna do noszenia",
+   "abilities": [
+    "detect_chemical",
+    "morale_boost"
+   ],
+   "risk_tags": [
+    "fragile"
+   ],
+   "sponsor_likes": [
+    "chemical"
+   ],
+   "intro_line_pl": "Bierzesz słoik. Rybka patrzy na ciebie. Wiesz już, że to ważne.",
+   "description_pl": "Pomarańczowa, w litrowym słoiku. Wie coś, czego ty nie wiesz."
+  },
+  {
+   "species_key": "swinka_morska",
+   "display_name_pl": "Świnka morska",
+   "name_aliases_pl": [
+    "świnki",
+    "świnką",
+    "świnkę",
+    "świnek"
+   ],
+   "temperament": "łagodna, paniczna, ciepła",
+   "role": "morale, sympatia widowni",
+   "need": "marchewka, dużo siana",
+   "risk": "nieprzydatna w walce, zbyt głośno piszczy",
+   "abilities": [
+    "morale_boost",
+    "reduce_noise"
+   ],
+   "risk_tags": [
+    "noise",
+    "fragile"
+   ],
+   "sponsor_likes": [
+    "spectacle"
+   ],
+   "intro_line_pl": "Świnka morska wchodzi ci za pazuchę. Widownia natychmiast ją lubi.",
+   "description_pl": "Brązowo-biała, ciepła, nieprzeciętnie wzruszająca."
+  },
+  {
+   "species_key": "slimak_bojowy",
+   "display_name_pl": "Ślimak bojowy",
+   "name_aliases_pl": [
+    "ślimaka",
+    "ślimakiem",
+    "ślimaku"
+   ],
+   "temperament": "spokojny do absurdu",
+   "role": "absurdalna wytrwałość, znakowanie tras",
+   "need": "wilgoć i czas",
+   "risk": "potwornie powolny — każda akcja trwa 5× dłużej",
+   "abilities": [
+    "mark_trail",
+    "morale_boost"
+   ],
+   "risk_tags": [
+    "painfully_slow"
+   ],
+   "sponsor_likes": [
+    "spectacle"
+   ],
+   "intro_line_pl": "Ślimak ma na pancerzu wymalowaną gwiazdkę. Idzie z tobą. Powoli.",
+   "description_pl": "Większy niż powinien być. Z gwiazdką. Z planem na życie."
+  },
+  {
+   "species_key": "szop",
+   "display_name_pl": "Szop pracz",
+   "name_aliases_pl": [
+    "szopa",
+    "szopem",
+    "szopie",
+    "szopów"
+   ],
+   "temperament": "zwinny, oportunistyczny",
+   "role": "pomoc przy zamkach, drobna kradzież",
+   "need": "ruch i błyskotki",
+   "risk": "kradnie tobie",
+   "abilities": [
+    "unlock_assist",
+    "find_scrap"
+   ],
+   "risk_tags": [
+    "steals_from_player",
+    "noise"
+   ],
+   "sponsor_likes": [
+    "theft",
+    "lockpicking"
+   ],
+   "intro_line_pl": "Szop pracz wybiera ciebie. Już zerka na twoje kieszenie.",
+   "description_pl": "Mały, w masce, ze stażem w przestępczości zorganizowanej."
+  }
+ ]
+}

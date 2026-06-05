@@ -1,0 +1,27 @@
+; Dungeon Kraulem — Godot 4 project (port scaffold, Phase 0)
+; Verify on first open in the Godot editor; this file is hand-authored.
+
+config_version=5
+
+[application]
+
+config/name="Dungeon Kraulem"
+run/main_scene="res://scenes/Boot.tscn"
+config/features=PackedStringArray("4.3")
+
+[autoload]
+
+Events="*res://autoload/Events.gd"
+Rng="*res://autoload/rng.gd"
+Data="*res://autoload/Data.gd"
+Game="*res://autoload/Game.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+
+[internationalization]
+
+locale/test="pl"

@@ -1,0 +1,4393 @@
+{
+ "EXPERIMENTAL_RECIPES": [
+  {
+   "key": "weapon_acid_coat",
+   "name_pl": "olej żrący",
+   "desc_pl": "Wyciek z butelki wybielacza + chłonny materiał. Rdzewieje wszystko czego dotknie.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "acid",
+     1
+    ],
+    [
+     "absorbent",
+     1
+    ],
+    [
+     "liquid",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "acid",
+     "hits_remaining": 4,
+     "extra_damage": 1
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_acid_coat_amped",
+   "name_pl": "smoła trawiąca",
+   "desc_pl": "Wybielacz + smoła + rdza. Pulsuje. Dwa razy gorzej niż zwykły olej żrący.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "acid",
+     1
+    ],
+    [
+     "sticky",
+     1
+    ],
+    [
+     "metal",
+     1
+    ],
+    [
+     "hazard",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "acid",
+     "hits_remaining": 6,
+     "extra_damage": 2
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_fire_coat",
+   "name_pl": "olej zapalający",
+   "desc_pl": "Fosfor zmieszany z naftą. Płonie w kontakcie z powietrzem.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "incendiary",
+     1
+    ],
+    [
+     "flammable",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "fire",
+     "hits_remaining": 4,
+     "extra_damage": 1
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "ignite_self",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_fire_coat_amped",
+   "name_pl": "napalm rzemieślniczy",
+   "desc_pl": "Żel + paliwo + smoła. Lepi się i pali aż do dna.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "flammable",
+     2
+    ],
+    [
+     "sticky",
+     1
+    ],
+    [
+     "incendiary",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "fire",
+     "hits_remaining": 6,
+     "extra_damage": 2
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "ignite_self",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_shock_coat",
+   "name_pl": "powłoka piorunowa",
+   "desc_pl": "Cewka miedziana + bateria + przewody. Kropi iskrami.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "electrical",
+     2
+    ],
+    [
+     "metal",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "electric",
+     "hits_remaining": 3,
+     "extra_damage": 1
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "shock_self",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_shock_coat_amped",
+   "name_pl": "kondensator bólu",
+   "desc_pl": "Pełny obwód z magnesem. Każdy cios rozładowuje kondensator.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electrical",
+     2
+    ],
+    [
+     "magnetic",
+     1
+    ],
+    [
+     "power",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "electric",
+     "hits_remaining": 5,
+     "extra_damage": 2
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "shock_self",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_frost_coat",
+   "name_pl": "powłoka mrożąca",
+   "desc_pl": "Chłodziwo + sól + szmaty. Przyciemnia stal mrozem.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "cold",
+     1
+    ],
+    [
+     "chemical",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "cold",
+     "hits_remaining": 4,
+     "extra_damage": 1
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_frost_coat_amped",
+   "name_pl": "ostrze zimnej zorzy",
+   "desc_pl": "Chłodziwo + szkło pryzmatyczne + olej. Każdy cios szrony.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "cold",
+     1
+    ],
+    [
+     "optical",
+     1
+    ],
+    [
+     "liquid",
+     1
+    ],
+    [
+     "sparkle",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "cold",
+     "hits_remaining": 6,
+     "extra_damage": 2
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_psychic_coat",
+   "name_pl": "kalambur szeptu",
+   "desc_pl": "Próbka mutacji + włókno grzybni + sól. Słychać szept z ostrza, kiedy zbliżasz je do ofiary.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "weird",
+     1
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "preservative",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "psychic",
+     "hits_remaining": 3,
+     "extra_damage": 2
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_void_jadwiga",
+   "name_pl": "powłoka pustki",
+   "desc_pl": "Czarne szkło + osad pustki + smoła. Cios znika i wraca z innej strony.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "weird",
+     2
+    ],
+    [
+     "sticky",
+     1
+    ],
+    [
+     "sharp",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "psychic",
+     "hits_remaining": 4,
+     "extra_damage": 3
+    }
+   },
+   "base_rarity": "epic",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "reality_glitch",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_acid_fire_hybrid",
+   "name_pl": "termit",
+   "desc_pl": "Kwas + fosfor + glina. Najpierw boli, potem płonie.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "acid",
+     1
+    ],
+    [
+     "incendiary",
+     1
+    ],
+    [
+     "powder",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "acid",
+     "hits_remaining": 3,
+     "extra_damage": 3
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "ignite_self",
+   "audience_create": 4
+  },
+  {
+   "key": "weapon_frost_shock_hybrid",
+   "name_pl": "promień zimnej iskry",
+   "desc_pl": "Chłodziwo + ogniwo + lustrzane szkło. Mrozi i rozłada.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "cold",
+     1
+    ],
+    [
+     "electrical",
+     1
+    ],
+    [
+     "optical",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "cold",
+     "hits_remaining": 4,
+     "extra_damage": 2
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "shock_self",
+   "audience_create": 4
+  },
+  {
+   "key": "weapon_recoil_dampener",
+   "name_pl": "tłumik odrzutu",
+   "desc_pl": "Sprężyna + guma + taśma. Cięższy chwyt, ale łatwiej trafić.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "spring",
+     1
+    ],
+    [
+     "rubber",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "attack_bonus": 1,
+     "tag_add": "stable"
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_weighted_pommel",
+   "name_pl": "wyważona głowica",
+   "desc_pl": "Mosiężna łuska + ołów + tarcia. Cios pewniejszy.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "metal",
+     2
+    ],
+    [
+     "handle",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "damage_bonus": 1,
+     "tag_add": "heavy"
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_serrated_edge",
+   "name_pl": "ząbkowany brzeg",
+   "desc_pl": "Pilnik + olej + szlif. Rany się nie zamykają.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "sharp",
+     1
+    ],
+    [
+     "slick",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "damage_bonus": 1,
+     "tag_add": "serrated"
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 3
+  },
+  {
+   "key": "weapon_kanal7_branding",
+   "name_pl": "branding Kanału 7",
+   "desc_pl": "Logo sponsora wypalone w kolbie. Audience love.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "sponsor",
+     1
+    ],
+    [
+     "metal",
+     1
+    ],
+    [
+     "optical",
+     1
+    ],
+    [
+     "handle",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "tag_add": "sponsored",
+     "audience_on_hit": 1
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "tinker",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 5
+  },
+  {
+   "key": "weapon_bonded_grip",
+   "name_pl": "wiązany chwyt",
+   "desc_pl": "Skóra + ścięgno + smoła. Broń się nie wyślizgnie.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "leather",
+     1
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "sticky",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "tag_add": "bonded",
+     "no_disarm": true
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_silenced_action",
+   "name_pl": "wytłumiony mechanizm",
+   "desc_pl": "Wełna + olej + szmaty. Cios bez echa.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "cloth",
+     2
+    ],
+    [
+     "slick",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "tag_add": "silent"
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_telescoping",
+   "name_pl": "teleskopowa rękojeść",
+   "desc_pl": "Trzy rurki + sprężyna + magnes. Zasięg +1 band.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     2
+    ],
+    [
+     "spring",
+     1
+    ],
+    [
+     "magnetic",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "tag_add": "extended_reach"
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_anti_armor_pick",
+   "name_pl": "kolec anty-pancerny",
+   "desc_pl": "Wąski stalowy kolec dospawany do trzonu. Ignoruje 2 AC.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     2
+    ],
+    [
+     "sharp",
+     2
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "tag_add": "armor_piercing",
+     "ac_pierce": 2
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_thermal_blade",
+   "name_pl": "ostrze termiczne",
+   "desc_pl": "Fosfor wtopiony w stal. Cios parzy.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "incendiary",
+     1
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "flammable",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d8",
+    "damage_type": "fire",
+    "tags": [
+     "weapon",
+     "sharp",
+     "melee",
+     "one_handed",
+     "incendiary"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_acid_dagger",
+   "name_pl": "kwasowy sztylet",
+   "desc_pl": "Ostrze maczane w wybielaczu. Pamięta każdą krew którą widziało.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "sharp",
+     1
+    ],
+    [
+     "acid",
+     1
+    ],
+    [
+     "handle",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d6+1",
+    "damage_type": "acid",
+    "tags": [
+     "weapon",
+     "sharp",
+     "melee",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_railgun_stick",
+   "name_pl": "kij gauss",
+   "desc_pl": "Cewka + ogniwo + pręt. Strzela szybko, ale jednorazowo na hit.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "metal",
+     2
+    ],
+    [
+     "electrical",
+     2
+    ],
+    [
+     "power",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d10",
+    "damage_type": "electric",
+    "tags": [
+     "weapon",
+     "ranged",
+     "two_handed",
+     "electrical"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_frost_pick",
+   "name_pl": "lodowy kilof",
+   "desc_pl": "Chłodziwo w stalowej tubie. Cios mrozi punkt.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "cold",
+     1
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "sharp",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d6+2",
+    "damage_type": "cold",
+    "tags": [
+     "weapon",
+     "sharp",
+     "melee",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_psychic_focus",
+   "name_pl": "psychiczny fokus",
+   "desc_pl": "Próbka mutacji + szkło pryzmatyczne. Cios w głowę = afraid.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "weird",
+     1
+    ],
+    [
+     "optical",
+     1
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "precise",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d4",
+    "damage_type": "psychic",
+    "tags": [
+     "weapon",
+     "melee",
+     "one_handed",
+     "psychic"
+    ]
+   },
+   "base_rarity": "epic",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_chemspray_pistol",
+   "name_pl": "pistolet chemikalia-spray",
+   "desc_pl": "Pusta puszka graffiti + rura + zapalniczka. Strzela mgłą.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "container",
+     1
+    ],
+    [
+     "spray",
+     1
+    ],
+    [
+     "chemical",
+     1
+    ],
+    [
+     "metal",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d6",
+    "damage_type": "acid",
+    "tags": [
+     "weapon",
+     "ranged",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_bone_club",
+   "name_pl": "kostny maczug",
+   "desc_pl": "Większa kość + ścięgno + skóra. Działa.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "bone",
+     1
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d6+1",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "blunt",
+     "melee",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_brass_knuckles",
+   "name_pl": "kastet mosiężny",
+   "desc_pl": "Łuski + skóra + tarcia. Pięść z dodatkiem.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "small",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d4+2",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "blunt",
+     "melee",
+     "one_handed",
+     "subtle"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_thrown_spike",
+   "name_pl": "rzucany kolec",
+   "desc_pl": "Lotka + grot + ścięgno. Jednorazowy.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "sharp",
+     1
+    ],
+    [
+     "light",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d4",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "ranged",
+     "throwable",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_void_whisper_blade",
+   "name_pl": "ostrze szeptu pustki",
+   "desc_pl": "Czarne szkło + osad pustki + ścięgno + lustrzany szard. Ostrze nie odbija światła.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "weird",
+     2
+    ],
+    [
+     "sharp",
+     1
+    ],
+    [
+     "optical",
+     1
+    ],
+    [
+     "organic",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d8+2",
+    "damage_type": "psychic",
+    "tags": [
+     "weapon",
+     "sharp",
+     "melee",
+     "one_handed",
+     "unique"
+    ]
+   },
+   "base_rarity": "epic",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_trench_bayonet",
+   "name_pl": "okopowy bagnet",
+   "desc_pl": "Zardzewiały bagnet + nowy uchwyt + ostrzony brzeg. Historię zostawia w przeciwniku.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "sharp",
+     1
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "biome:okopy_frontowe",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d8",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "sharp",
+     "melee",
+     "two_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": "okopy_frontowe",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_zoo_taser",
+   "name_pl": "ZOO-taser",
+   "desc_pl": "Obroża + bateria + kij. Hodowca by się ucieszył.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electrical",
+     1
+    ],
+    [
+     "metal",
+     1
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "biome:zoo_korporacyjne",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d6",
+    "damage_type": "electric",
+    "tags": [
+     "weapon",
+     "melee",
+     "one_handed",
+     "electrical"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": "zoo_korporacyjne",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_film_garrote",
+   "name_pl": "garota z taśmy filmowej",
+   "desc_pl": "Trzy metry błyszczącej taśmy + dwa drewniane uchwyty. Cicha.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "plastic",
+     1
+    ],
+    [
+     "flammable",
+     1
+    ],
+    [
+     "biome:muzeum_spektakli",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d4+1",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "silent",
+     "melee",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": "muzeum_spektakli",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_brass_tap_mace",
+   "name_pl": "buława z kranu",
+   "desc_pl": "Mosiężny kran + drewno + cocktail pick. Maczuga w stylu lokalu.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "biome:bar_skurczybyk",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d6+1",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "blunt",
+     "melee",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": "bar_skurczybyk",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_brick_sling",
+   "name_pl": "proca z cegły",
+   "desc_pl": "Cegła + pasek skóry + kij. Rzut z miłością do bloku.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "ceramic",
+     1
+    ],
+    [
+     "heavy",
+     1
+    ],
+    [
+     "binding",
+     1
+    ],
+    [
+     "biome:intake_industrial",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d6+2",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "ranged",
+     "blunt",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": "intake_industrial",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_pipe_wrench_hammer",
+   "name_pl": "klucz palacza",
+   "desc_pl": "Klucz nasadowy + ołowiana nakładka + olej smarowniczy. Cięży jak zmiana, parzy jak premia.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     2
+    ],
+    [
+     "heavy",
+     1
+    ],
+    [
+     "biome:fabryka_pary",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d8",
+    "damage_type": "fire",
+    "tags": [
+     "weapon",
+     "blunt",
+     "melee",
+     "two_handed"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": "fabryka_pary",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_pressure_lance",
+   "name_pl": "lanca ciśnieniowa",
+   "desc_pl": "Rura ciśnieniowa + zawór + spust. Wyrzuca powietrze szybciej niż próżnia chce je z powrotem.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "electrical",
+     1
+    ],
+    [
+     "biome:stacja_orbital",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d6+2",
+    "damage_type": "cold",
+    "tags": [
+     "weapon",
+     "ranged",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": "stacja_orbital",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_guild_hammer",
+   "name_pl": "młot cechowy",
+   "desc_pl": "Drewniana rękojeść + obuch kuty na trzech kowadłach + opaska z pieczęcią cechu. Bije rytmicznie.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     2
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "biome:kuznia_polorkow",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "2d6",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "blunt",
+     "melee",
+     "two_handed"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": "kuznia_polorkow",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "crafted_marginalia_dagger",
+   "name_pl": "marginalny sztylet",
+   "desc_pl": "Oprawa książki + zaostrzony grzbiet + pasek ze skóry. Tnie zdania, czasem zdaniem.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "paper",
+     1
+    ],
+    [
+     "sharp",
+     1
+    ],
+    [
+     "biome:biblioteka_miejska",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d4+1",
+    "damage_type": "psychic",
+    "tags": [
+     "weapon",
+     "sharp",
+     "melee",
+     "one_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "bio",
+   "biome_lock": "biblioteka_miejska",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "trap_acid_pit",
+   "name_pl": "fosa kwasu",
+   "desc_pl": "Kanister + wybielacz + płótno. Otwiera się pod stopą wroga.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "acid",
+     2
+    ],
+    [
+     "container",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 6,
+     "damage_type": "acid",
+     "status": "corroded",
+     "duration": 8,
+     "extra_tags": [
+      "acid"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "acid"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "tinker",
+   "biome_lock": null,
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_napalm_brick",
+   "name_pl": "cegła napalmowa",
+   "desc_pl": "Cegła + fosfor + olej. Wybucha pod ciężarem.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "incendiary",
+     1
+    ],
+    [
+     "heavy",
+     1
+    ],
+    [
+     "flammable",
+     2
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 8,
+     "damage_type": "fire",
+     "status": "burning",
+     "duration": 3,
+     "extra_tags": [
+      "fire",
+      "explosive"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "fire",
+     "explosive"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "tinker",
+   "biome_lock": null,
+   "fumble_hazard": "ignite_self",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_static_loop",
+   "name_pl": "pętla statyczna",
+   "desc_pl": "Cewka + bateria + przewody + magnes. Aktywuje się na ruchu.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electrical",
+     2
+    ],
+    [
+     "magnetic",
+     1
+    ],
+    [
+     "power",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 5,
+     "damage_type": "electric",
+     "status": "shocked",
+     "duration": 2,
+     "extra_tags": [
+      "electric"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "electric"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_frost_mine",
+   "name_pl": "mina mrozu",
+   "desc_pl": "Chłodziwo + sprężyna + płyta. Trzaska zimno na trafionego.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "cold",
+     1
+    ],
+    [
+     "spring",
+     1
+    ],
+    [
+     "metal",
+     1
+    ],
+    [
+     "liquid",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 4,
+     "damage_type": "cold",
+     "status": "chilled",
+     "duration": 3,
+     "extra_tags": [
+      "cold"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "cold"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "tinker",
+   "biome_lock": null,
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_glue_net",
+   "name_pl": "siatka kleju",
+   "desc_pl": "Płótno + smoła + chemia. Łapie i unieruchamia.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "cloth",
+     1
+    ],
+    [
+     "sticky",
+     2
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 1,
+     "damage_type": "physical",
+     "status": "grappled",
+     "duration": 4,
+     "extra_tags": [
+      "restraint"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "restraint"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "tinker",
+   "biome_lock": null,
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_pheromone_lure",
+   "name_pl": "wabik feromonowy",
+   "desc_pl": "Fiolka + płótno + bait. Przyciąga inne moby ze sąsiednich pokoi.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "smell",
+     1
+    ],
+    [
+     "bait",
+     1
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "biome:zoo_korporacyjne",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "lure_extra_mob",
+     "duration": 0,
+     "extra_tags": [
+      "lure"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "lure"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "tinker",
+   "biome_lock": "zoo_korporacyjne",
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_artillery_marker",
+   "name_pl": "marker artyleryjski",
+   "desc_pl": "Łuska + flara + drut. Wskazuje wrogowi cel z góry.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "incendiary",
+     1
+    ],
+    [
+     "biome:okopy_frontowe",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "delayed_damage",
+     "damage": 10,
+     "delay_turns": 2,
+     "damage_type": "fire",
+     "extra_tags": [
+      "fire",
+      "explosive"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "fire",
+     "explosive"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "tinker",
+   "biome_lock": "okopy_frontowe",
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_film_flash",
+   "name_pl": "flesz filmowy",
+   "desc_pl": "Rolka taśmy + bateria + soczewka. Oślepia i daje audience.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "flammable",
+     1
+    ],
+    [
+     "optical",
+     1
+    ],
+    [
+     "power",
+     1
+    ],
+    [
+     "biome:muzeum_spektakli",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 2,
+     "damage_type": "fire",
+     "status": "blinded",
+     "duration": 3,
+     "extra_tags": [
+      "fire",
+      "light"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "fire",
+     "light"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "tinker",
+   "biome_lock": "muzeum_spektakli",
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 5
+  },
+  {
+   "key": "trap_drunk_glasses",
+   "name_pl": "rozsypane szklanki",
+   "desc_pl": "Kosz szklanek + smoła + tap. Rozsypuje się.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "glass",
+     1
+    ],
+    [
+     "sticky",
+     1
+    ],
+    [
+     "biome:bar_skurczybyk",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 3,
+     "damage_type": "physical",
+     "status": "bleeding",
+     "duration": 4,
+     "extra_tags": [
+      "sharp"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "sharp"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "tinker",
+   "biome_lock": "bar_skurczybyk",
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_pigeon_swarm",
+   "name_pl": "rój gołębi",
+   "desc_pl": "Karma + feromon + cegła. Gołębie zaatakują pierwszego wroga.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "organic",
+     2
+    ],
+    [
+     "bait",
+     1
+    ],
+    [
+     "biome:intake_industrial",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 3,
+     "damage_type": "physical",
+     "status": "blinded",
+     "duration": 2,
+     "extra_tags": [
+      "swarm"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "swarm"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "tinker",
+   "biome_lock": "intake_industrial",
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_spring_caltrops",
+   "name_pl": "sprężynowe gwoździe",
+   "desc_pl": "Sprężyna + gwoździe + metal. Strzelają na trafionego.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "metal",
+     2
+    ],
+    [
+     "spring",
+     1
+    ],
+    [
+     "sharp",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 4,
+     "damage_type": "physical",
+     "status": "slowed",
+     "duration": 3,
+     "extra_tags": [
+      "sharp"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "sharp"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "tinker",
+   "biome_lock": null,
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "trap_void_silence_zone",
+   "name_pl": "strefa cichej pustki",
+   "desc_pl": "Osad pustki + woskowa figurka + sól. Negatywna aura: −audience −threat.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "weird",
+     2
+    ],
+    [
+     "preservative",
+     1
+    ],
+    [
+     "wax",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "zone",
+     "audience_drain": 2,
+     "threat_drain": 3,
+     "duration": 5,
+     "extra_tags": [
+      "weird"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "weird"
+    ]
+   },
+   "base_rarity": "epic",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 4
+  },
+  {
+   "key": "throwable_acid_flask_mk2",
+   "name_pl": "ulepszona fiolka żrąca",
+   "desc_pl": "Wybielacz + kwas + szkło. Bryzga i rdzewieje co dotknie.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "acid",
+     2
+    ],
+    [
+     "glass",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "aoe",
+     "damage": 5,
+     "damage_type": "acid",
+     "status": "corroded",
+     "radius": 1,
+     "extra_tags": [
+      "acid"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "acid"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_smoke_blackout",
+   "name_pl": "dym pełnej ciemności",
+   "desc_pl": "Fosfor + płótno + chemical. Cały pokój blind.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "powder",
+     1
+    ],
+    [
+     "flammable",
+     1
+    ],
+    [
+     "cloth",
+     1
+    ],
+    [
+     "reactive",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "room_blind",
+     "duration": 4,
+     "extra_tags": [
+      "smoke"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "smoke"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_frost_grenade",
+   "name_pl": "granat mrozu",
+   "desc_pl": "Chłodziwo + container + sprężyna. AOE chilled.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "cold",
+     1
+    ],
+    [
+     "container",
+     1
+    ],
+    [
+     "spring",
+     1
+    ],
+    [
+     "liquid",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "aoe",
+     "damage": 3,
+     "damage_type": "cold",
+     "status": "chilled",
+     "radius": 1,
+     "extra_tags": [
+      "cold"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "cold"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_emp_grenade",
+   "name_pl": "granat EMP",
+   "desc_pl": "Bateria + cewka + ogniwo + magnes. Rozwala elektronikę.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "electrical",
+     2
+    ],
+    [
+     "power",
+     1
+    ],
+    [
+     "magnetic",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "aoe_electronic",
+     "damage": 6,
+     "damage_type": "electric",
+     "status": "shocked",
+     "radius": 1,
+     "extra_tags": [
+      "electric"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "electric"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_psychic_chime",
+   "name_pl": "psychiczny dzwonek",
+   "desc_pl": "Próbka mutacji + dzwonek + pióro. Wszyscy w pokoju afraid.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "weird",
+     1
+    ],
+    [
+     "metal",
+     1
+    ],
+    [
+     "light",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "room_status",
+     "status": "afraid",
+     "duration": 3,
+     "extra_tags": [
+      "weird",
+      "psychic"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "weird",
+     "psychic"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 4
+  },
+  {
+   "key": "throwable_bottle_grenade",
+   "name_pl": "butelka eksplozywna",
+   "desc_pl": "Sód + woda + szkło. Eksploduje przy kontakcie z wilgocią.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "explosive",
+     1
+    ],
+    [
+     "glass",
+     1
+    ],
+    [
+     "reactive",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "aoe",
+     "damage": 7,
+     "damage_type": "fire",
+     "radius": 1,
+     "extra_tags": [
+      "explosive"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "explosive"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "explode_self",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_glue_bomb",
+   "name_pl": "klejowa bomba",
+   "desc_pl": "Smoła + płótno + spoiwo. Wszyscy w pokoju grappled.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "sticky",
+     2
+    ],
+    [
+     "cloth",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "room_status",
+     "status": "grappled",
+     "duration": 3,
+     "extra_tags": [
+      "restraint"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "restraint"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_distraction_firecracker",
+   "name_pl": "petarda odwracająca",
+   "desc_pl": "Sód + papier + płótno. Świni cały threat zegar.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "reactive",
+     1
+    ],
+    [
+     "paper",
+     1
+    ],
+    [
+     "flammable",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "threat_reset",
+     "audience_gain": 3,
+     "extra_tags": [
+      "spectacle"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "spectacle"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_gas_canister_lob",
+   "name_pl": "rzut gazem",
+   "desc_pl": "Kanister gazu + sprężyna. Bryzga kwasem, dusi kaszlem.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "gas",
+     1
+    ],
+    [
+     "container",
+     1
+    ],
+    [
+     "hazard",
+     1
+    ],
+    [
+     "biome:okopy_frontowe",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "aoe",
+     "damage": 4,
+     "damage_type": "acid",
+     "status": "poisoned",
+     "radius": 2,
+     "extra_tags": [
+      "gas",
+      "biome:okopy_frontowe"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "gas",
+     "biome:okopy_frontowe"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": "okopy_frontowe",
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_pheromone_grenade",
+   "name_pl": "granat feromonowy",
+   "desc_pl": "Fiolka feromonów + sprężyna + płótno. Wciąga moby z sąsiednich pokoi.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "smell",
+     1
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "spring",
+     1
+    ],
+    [
+     "biome:zoo_korporacyjne",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "lure_extra_mob",
+     "duration": 0,
+     "extra_tags": [
+      "lure",
+      "biome:zoo_korporacyjne"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "lure",
+     "biome:zoo_korporacyjne"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": "zoo_korporacyjne",
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "armor_chitin_plating",
+   "name_pl": "chitynowa płyta",
+   "desc_pl": "Pancerz potwora + ścięgno + szmaty. +2 AC.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "hide",
+     1
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "ac_bonus": 2,
+     "tag_add": "reinforced"
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "armor_acid_lining_mk2",
+   "name_pl": "wzmocnione wyłożenie kwasoodporne",
+   "desc_pl": "Guma + guma + chemical. Imuno na acid statusy.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "rubber",
+     2
+    ],
+    [
+     "chemical",
+     1
+    ],
+    [
+     "insulator",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "ac_bonus": 1,
+     "tag_add": "acid_proof",
+     "status_immune": "corroded"
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "armor_insulated_jacket",
+   "name_pl": "izolowana kurtka",
+   "desc_pl": "Guma + skóra + drut mesh. Imuno na shock.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "rubber",
+     1
+    ],
+    [
+     "leather",
+     1
+    ],
+    [
+     "insulator",
+     1
+    ],
+    [
+     "wire",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "ac_bonus": 1,
+     "tag_add": "insulated",
+     "status_immune": "shocked"
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "armor_fire_resistant_robe",
+   "name_pl": "ognioodporna szata",
+   "desc_pl": "Sól + płótno + glina. Tłumi płomień o połowę.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "preservative",
+     1
+    ],
+    [
+     "cloth",
+     2
+    ],
+    [
+     "powder",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "ac_bonus": 1,
+     "tag_add": "fire_resistant",
+     "resist": "fire"
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "armor_kanal7_jersey",
+   "name_pl": "koszulka Kanału 7",
+   "desc_pl": "Logo sponsora wszyte. Audience x1.1 na hit.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "cloth",
+     1
+    ],
+    [
+     "sponsor",
+     1
+    ],
+    [
+     "identity",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "tag_add": "sponsored",
+     "audience_mul": 1.1
+    }
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 4
+  },
+  {
+   "key": "armor_void_cloak",
+   "name_pl": "płaszcz z osadu pustki",
+   "desc_pl": "Osad pustki + wosk figurka + płótno. 25% szans na auto-evade vs ranged.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "weird",
+     1
+    ],
+    [
+     "wax",
+     1
+    ],
+    [
+     "cloth",
+     2
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "tag_add": "void_cloaked",
+     "ranged_evade_pct": 25
+    }
+   },
+   "base_rarity": "epic",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 4
+  },
+  {
+   "key": "armor_trench_overcoat",
+   "name_pl": "okopowy płaszcz",
+   "desc_pl": "Glina + skóra + szmaty. +1 AC + warmth.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "organic",
+     1
+    ],
+    [
+     "leather",
+     1
+    ],
+    [
+     "biome:okopy_frontowe",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "ac_bonus": 1,
+     "tag_add": "warm"
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": "okopy_frontowe",
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "armor_bar_apron",
+   "name_pl": "barmański fartuch",
+   "desc_pl": "Płótno + smoła + mosiądz. Pryska drinkami, ale zostaje suchy.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "cloth",
+     1
+    ],
+    [
+     "sticky",
+     1
+    ],
+    [
+     "biome:bar_skurczybyk",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "ac_bonus": 1,
+     "tag_add": "drinkproof"
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": "bar_skurczybyk",
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "food_rat_soup",
+   "name_pl": "zupa szczura",
+   "desc_pl": "Szczur + woda + sól + ogień. Trzyma morale.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "organic",
+     1
+    ],
+    [
+     "food",
+     1
+    ],
+    [
+     "preservative",
+     1
+    ],
+    [
+     "flammable",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 5,
+    "buff_status": "warmed_up",
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "common",
+   "discipline": "culinary",
+   "biome_lock": null,
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 1
+  },
+  {
+   "key": "food_bone_broth",
+   "name_pl": "wywar kostny",
+   "desc_pl": "Kości + sól + woda + glina. Krytyczny minimum.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "bone",
+     1
+    ],
+    [
+     "preservative",
+     1
+    ],
+    [
+     "organic",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 4,
+    "buff_status": null,
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "common",
+   "discipline": "culinary",
+   "biome_lock": null,
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 1
+  },
+  {
+   "key": "food_synth_protein_bar",
+   "name_pl": "syntetyczny baton białkowy",
+   "desc_pl": "Karma + smoła + płótno wrapper. Smakuje obrzydliwie. Działa.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "food",
+     1
+    ],
+    [
+     "sticky",
+     1
+    ],
+    [
+     "cloth",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 6,
+    "buff_status": "energy_burst",
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "common",
+   "discipline": "culinary",
+   "biome_lock": null,
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 2
+  },
+  {
+   "key": "food_mushroom_stew",
+   "name_pl": "gulasz grzybowy",
+   "desc_pl": "Glow moss + fungal włókno + sól + olej. +1 audience na dłuższy czas.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "fungal",
+     2
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "preservative",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 4,
+    "buff_status": "audience_streamer",
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "culinary",
+   "biome_lock": null,
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 3
+  },
+  {
+   "key": "food_anomaly_truffle",
+   "name_pl": "anomalny trufla",
+   "desc_pl": "Anomalny pył + grzyb + smoła. Może dać +1 do INT na piętro.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "weird",
+     1
+    ],
+    [
+     "fungal",
+     1
+    ],
+    [
+     "sticky",
+     1
+    ],
+    [
+     "powder",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 2,
+    "buff_status": "int_boost",
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 4
+  },
+  {
+   "key": "food_beer_pretzel",
+   "name_pl": "piwny precel",
+   "desc_pl": "Drożdże + sól + mąka. +2 audience za bycie miejscowym.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "fungal",
+     1
+    ],
+    [
+     "preservative",
+     1
+    ],
+    [
+     "biome:bar_skurczybyk",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 3,
+    "buff_status": "audience_streamer",
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "common",
+   "discipline": "culinary",
+   "biome_lock": "bar_skurczybyk",
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 3
+  },
+  {
+   "key": "food_pigeon_pie",
+   "name_pl": "gołębi placek",
+   "desc_pl": "Gołąb + glina + cegła. Smak ulicy.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "organic",
+     1
+    ],
+    [
+     "ceramic",
+     1
+    ],
+    [
+     "biome:intake_industrial",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 5,
+    "buff_status": null,
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "common",
+   "discipline": "culinary",
+   "biome_lock": "intake_industrial",
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 1
+  },
+  {
+   "key": "food_zoo_critter_skewer",
+   "name_pl": "zoo-szaszłyk",
+   "desc_pl": "Karma + krew + drewno + ogień. Smakuje jak menedżer.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "organic",
+     2
+    ],
+    [
+     "flammable",
+     1
+    ],
+    [
+     "biome:zoo_korporacyjne",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 6,
+    "buff_status": "warmed_up",
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "culinary",
+   "biome_lock": "zoo_korporacyjne",
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 1
+  },
+  {
+   "key": "med_clean_bandage",
+   "name_pl": "czysty opatrunek",
+   "desc_pl": "Alkohol + płótno + taśma. Zatrzymuje krwawienie.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "medical",
+     1
+    ],
+    [
+     "cloth",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 8,
+    "cures_statuses": [
+     "bleeding"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "bio",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "med_antitoxin_kit",
+   "name_pl": "zestaw antytoksyn",
+   "desc_pl": "Środek odkażający + kwas + organika. Imuno trucizn na turę.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "medical",
+     1
+    ],
+    [
+     "chemical",
+     1
+    ],
+    [
+     "organic",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 4,
+    "cures_statuses": [
+     "poisoned",
+     "corroded"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "bio",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "med_warming_balm",
+   "name_pl": "balsam rozgrzewający",
+   "desc_pl": "Alkohol + chłodziwo (odwrotnie) + tłuszcz. Curuje chilled.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "medical",
+     1
+    ],
+    [
+     "chemical",
+     1
+    ],
+    [
+     "liquid",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 3,
+    "cures_statuses": [
+     "chilled"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "bio",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "med_burn_salve",
+   "name_pl": "maść na oparzenia",
+   "desc_pl": "Olej + płótno + woda. Curuje burning + ból.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "medical",
+     1
+    ],
+    [
+     "slick",
+     1
+    ],
+    [
+     "absorbent",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 4,
+    "cures_statuses": [
+     "burning"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "bio",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "med_emergency_stim",
+   "name_pl": "awaryjny stim",
+   "desc_pl": "Bateria + chemikalia + igła. Wskakuje na 1 HP zamiast 0.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "medical",
+     1
+    ],
+    [
+     "power",
+     1
+    ],
+    [
+     "reactive",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 12,
+    "cures_statuses": [],
+    "buff_status": "prevent_death",
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "med_shock_paddle",
+   "name_pl": "doraźny defibrylator",
+   "desc_pl": "Cewka + ogniwo + drut + skóra. Resuscytuje (leczy +20 jeśli HP<10).",
+   "tier": 5,
+   "material_tags": [
+    [
+     "electrical",
+     2
+    ],
+    [
+     "medical",
+     1
+    ],
+    [
+     "power",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 20,
+    "cures_statuses": [
+     "shocked"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "epic",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "med_field_painkiller",
+   "name_pl": "polowy lek bólu",
+   "desc_pl": "Fosfor + płótno + organika. Koi ból ran.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "medical",
+     1
+    ],
+    [
+     "powder",
+     1
+    ],
+    [
+     "cloth",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 2,
+    "cures_statuses": [
+     "wounded",
+     "afraid"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "bio",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "med_void_serum",
+   "name_pl": "serum pustki",
+   "desc_pl": "Osad pustki + krew + sól. Wskakuje +25 HP, ale lose 2 INT.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "weird",
+     1
+    ],
+    [
+     "medical",
+     1
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "preservative",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 25,
+    "cures_statuses": [],
+    "buff_status": "int_drain",
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "epic",
+   "discipline": "alchemy",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 5
+  },
+  {
+   "key": "tool_advanced_lockpick",
+   "name_pl": "wytrychy pierwszej kategorii",
+   "desc_pl": "Sprężyna + cienki metal + olej. +5 do hack/lock checków.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "spring",
+     1
+    ],
+    [
+     "slick",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "lockpick",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "tool_signal_jammer",
+   "name_pl": "zagłuszacz",
+   "desc_pl": "Bateria + cewka + ogniwo + magnes. Wyłącza kamerę/sensor w pokoju.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electrical",
+     2
+    ],
+    [
+     "magnetic",
+     1
+    ],
+    [
+     "power",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "jammer",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "tool_camera_drone",
+   "name_pl": "drobny dron-kamera",
+   "desc_pl": "Soczewka + motor + bateria + screen. Scout sąsiedniego pokoju.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "optical",
+     1
+    ],
+    [
+     "electronic",
+     2
+    ],
+    [
+     "power",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "scout_drone",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "tool_field_kit",
+   "name_pl": "polowy zestaw narzędzi",
+   "desc_pl": "Taśma + śrubki + skóra + drut. Daje +1 do craftingu przez piętro.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     1
+    ],
+    [
+     "binding",
+     2
+    ],
+    [
+     "leather",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "craft_bonus",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "tinker",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "tool_decoder_ring",
+   "name_pl": "pierścień dekoderski",
+   "desc_pl": "Chip + soczewka + mosiądz. Odczytuje sponsor data.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electronic",
+     1
+    ],
+    [
+     "optical",
+     1
+    ],
+    [
+     "data",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "decoder",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "tool_makeshift_radio",
+   "name_pl": "doraźne radio",
+   "desc_pl": "Drut + bateria + sprężyna + screen. Słyszysz sąsiednie pokoje.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electrical",
+     1
+    ],
+    [
+     "electronic",
+     1
+    ],
+    [
+     "power",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "radio",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "tool_pheromone_compass",
+   "name_pl": "feromonowy kompas",
+   "desc_pl": "Feromony + sensor + soczewka + biome material. Wskazuje boss room.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "smell",
+     1
+    ],
+    [
+     "sensor",
+     1
+    ],
+    [
+     "optical",
+     1
+    ],
+    [
+     "biome:zoo_korporacyjne",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "boss_locator",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "epic",
+   "discipline": "electronics",
+   "biome_lock": "zoo_korporacyjne",
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "tool_archive_lens",
+   "name_pl": "soczewka archiwalna",
+   "desc_pl": "Prism + taśma filmowa + screen. Pokazuje historię pokoju.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "optical",
+     2
+    ],
+    [
+     "data",
+     1
+    ],
+    [
+     "biome:muzeum_spektakli",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "history_lens",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": "muzeum_spektakli",
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "weapon_okopy_acid_mud",
+   "name_pl": "okopowa glina kwasowa",
+   "desc_pl": "Trench mud + acid + płótno. Rdzewieje stal w okopach.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "biome:okopy_frontowe",
+     1
+    ],
+    [
+     "acid",
+     1
+    ],
+    [
+     "cloth",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "acid",
+     "hits_remaining": 4,
+     "extra_damage": 2
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": "okopy_frontowe",
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_zoo_collar_bomb",
+   "name_pl": "obrożowa bomba",
+   "desc_pl": "Escape obroża + bateria + sprężyna. Wybucha na metal-armed mobach.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electronic",
+     1
+    ],
+    [
+     "magnetic",
+     1
+    ],
+    [
+     "biome:zoo_korporacyjne",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "aoe",
+     "damage": 8,
+     "damage_type": "electric",
+     "radius": 1,
+     "extra_tags": [
+      "explosive"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "explosive"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": "zoo_korporacyjne",
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_intake_brick_bomb",
+   "name_pl": "wybuchowa cegła",
+   "desc_pl": "Cegła + puszka graffiti + sprężyna. Spada, ląduje, robi huk.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "ceramic",
+     1
+    ],
+    [
+     "explosive",
+     1
+    ],
+    [
+     "biome:intake_industrial",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "aoe",
+     "damage": 6,
+     "damage_type": "physical",
+     "radius": 1,
+     "extra_tags": [
+      "explosive"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "explosive"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": "intake_industrial",
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "weapon_spore_coat",
+   "name_pl": "powłoka zarodnikowa",
+   "desc_pl": "Kapsuła zarodników + warkocz grzybni + olej. Każdy cios rozprasza zarodniki.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "biome:grzybica_bloom",
+     1
+    ],
+    [
+     "fungal",
+     1
+    ],
+    [
+     "slick",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "poison",
+     "hits_remaining": 5,
+     "extra_damage": 1
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "bio",
+   "biome_lock": "grzybica_bloom",
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_spore_bomb",
+   "name_pl": "bomba zarodnikowa",
+   "desc_pl": "Zarodniki + kapsuła + sprężyna. Cały pokój zatruty na 3 tury.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "biome:grzybica_bloom",
+     1
+    ],
+    [
+     "fungal",
+     1
+    ],
+    [
+     "powder",
+     1
+    ],
+    [
+     "spring",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "room_status",
+     "status": "poisoned",
+     "duration": 3,
+     "extra_tags": [
+      "fungal"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "fungal"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "bio",
+   "biome_lock": "grzybica_bloom",
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "food_glow_cap_stew",
+   "name_pl": "gulasz świecącego kapelusza",
+   "desc_pl": "Luminous cap + sól + olej + chłodziwo. Nocne widzenie na piętro.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "biome:grzybica_bloom",
+     1
+    ],
+    [
+     "light",
+     1
+    ],
+    [
+     "organic",
+     1
+    ],
+    [
+     "preservative",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 5,
+    "buff_status": "low_light_buff",
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "culinary",
+   "biome_lock": "grzybica_bloom",
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 1
+  },
+  {
+   "key": "med_blackrot_antitoxin",
+   "name_pl": "antytoksyna z czarnej zgnilizny",
+   "desc_pl": "Blackrot + alkohol + płótno. Curuje poisoned + corroded jednocześnie.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "biome:grzybica_bloom",
+     1
+    ],
+    [
+     "medical",
+     1
+    ],
+    [
+     "organic",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 6,
+    "cures_statuses": [
+     "poisoned",
+     "corroded"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "bio",
+   "biome_lock": "grzybica_bloom",
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "crafted_intake_pipe_mace",
+   "name_pl": "intake'owa rura uderzeniowa",
+   "desc_pl": "Intake zbrojenie + smar + skórzany chwyt. Brzęczy przy każdym ciosie.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "biome:intake_industrial",
+     1
+    ],
+    [
+     "metal",
+     1
+    ],
+    [
+     "handle",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d8",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "blunt",
+     "melee",
+     "two_handed"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": "intake_industrial",
+   "fumble_hazard": "flawed_item",
+   "audience_create": 2
+  },
+  {
+   "key": "weapon_grease_slick",
+   "name_pl": "smar industrialny",
+   "desc_pl": "Smar + płótno + binding. Cios w nogi = prone wroga.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "biome:intake_industrial",
+     1
+    ],
+    [
+     "slick",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "coating",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "coating": {
+     "damage_type": "physical",
+     "hits_remaining": 3,
+     "extra_damage": 0
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": "intake_industrial",
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 2
+  },
+  {
+   "key": "trap_intake_oil_slick",
+   "name_pl": "rozlany smar",
+   "desc_pl": "Smar przemysłowy + płótno + plastik. Cały pokój prone.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "biome:intake_industrial",
+     1
+    ],
+    [
+     "slick",
+     1
+    ],
+    [
+     "cloth",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 1,
+     "damage_type": "physical",
+     "status": "prone",
+     "duration": 3,
+     "extra_tags": [
+      "slip"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "slip"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "tinker",
+   "biome_lock": "intake_industrial",
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "throwable_smoke_screen",
+   "name_pl": "zasłona dymna",
+   "desc_pl": "Fosfor + płótno + container. Pokój za zasłoną.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "powder",
+     1
+    ],
+    [
+     "flammable",
+     1
+    ],
+    [
+     "container",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "room_blind",
+     "duration": 2,
+     "extra_tags": [
+      "smoke"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "smoke"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 3
+  },
+  {
+   "key": "food_protein_loaf",
+   "name_pl": "mięsny placek",
+   "desc_pl": "Mięso + sól + drewno + ogień. Po prostu.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "organic",
+     1
+    ],
+    [
+     "preservative",
+     1
+    ],
+    [
+     "flammable",
+     1
+    ],
+    [
+     "handle",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "food",
+    "heal": 5,
+    "buff_status": null,
+    "tags": [
+     "food",
+     "consumable"
+    ]
+   },
+   "base_rarity": "common",
+   "discipline": "culinary",
+   "biome_lock": null,
+   "fumble_hazard": "food_poisoning",
+   "audience_create": 1
+  },
+  {
+   "key": "tool_thermal_scanner",
+   "name_pl": "skaner termiczny",
+   "desc_pl": "Bateria + soczewka + chip + dioda. Pokazuje ciepłe ciała za ścianą.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electronic",
+     1
+    ],
+    [
+     "optical",
+     1
+    ],
+    [
+     "power",
+     1
+    ],
+    [
+     "light",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "thermal_scout",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 1
+  },
+  {
+   "key": "weapon_static_grip",
+   "name_pl": "statyczny chwyt",
+   "desc_pl": "Magnetyczny pasek + skóra + taśma. Broń sama wraca do dłoni.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "magnetic",
+     1
+    ],
+    [
+     "leather",
+     1
+    ],
+    [
+     "binding",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "weapon"
+    ],
+    "permanent": {
+     "tag_add": "magnetic_return",
+     "no_disarm": true
+    }
+   },
+   "base_rarity": "uncommon",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 2
+  },
+  {
+   "key": "med_quickseal_foam",
+   "name_pl": "piana szybkozasklepiająca",
+   "desc_pl": "Fosfor + płótno + chemical. Leczy 6 + curuje bleeding + wounded.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "powder",
+     1
+    ],
+    [
+     "absorbent",
+     1
+    ],
+    [
+     "reactive",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 6,
+    "cures_statuses": [
+     "bleeding",
+     "wounded"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "bio",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 1
+  },
+  {
+   "key": "med_nova_chem_xpack",
+   "name_pl": "NovaChem X-pack",
+   "desc_pl": "Środek odkażający + odczynnik + chemikalia + organika. Kuruje wszystko + audience +5.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "medical",
+     2
+    ],
+    [
+     "chemical",
+     1
+    ],
+    [
+     "organic",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "medical",
+    "heal": 15,
+    "cures_statuses": [
+     "bleeding",
+     "poisoned",
+     "burning",
+     "corroded"
+    ],
+    "buff_status": null,
+    "tags": [
+     "medical",
+     "consumable"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "bio",
+   "biome_lock": null,
+   "fumble_hazard": "contamination",
+   "audience_create": 5
+  },
+  {
+   "key": "crafted_liga_bat",
+   "name_pl": "bita Ligi Brawurowej",
+   "desc_pl": "Heavy metal + handle + sponsor logo. +2 audience na hit.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "metal",
+     2
+    ],
+    [
+     "handle",
+     1
+    ],
+    [
+     "sponsor",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "weapon",
+    "damage_dice": "1d8+2",
+    "damage_type": "physical",
+    "tags": [
+     "weapon",
+     "blunt",
+     "melee",
+     "two_handed",
+     "sponsored"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "flawed_item",
+   "audience_create": 4
+  },
+  {
+   "key": "tool_kanal7_microphone_mk2",
+   "name_pl": "ulepszony mikrofon Kanału 7",
+   "desc_pl": "Sensor + circuit + drut + chip. Audience x1.25 na każdej rozmowie.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "electronic",
+     2
+    ],
+    [
+     "data",
+     1
+    ],
+    [
+     "sponsor",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "tool",
+    "tool_kind": "audience_amp",
+    "tags": [
+     "tool"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "electronics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 4
+  },
+  {
+   "key": "trap_czarny_rynek_snare",
+   "name_pl": "sidła Czarnego Rynku",
+   "desc_pl": "Taśma + drut + kość + sprężyna. Grapple + +1 credit per turn trapped.",
+   "tier": 3,
+   "material_tags": [
+    [
+     "binding",
+     1
+    ],
+    [
+     "spring",
+     1
+    ],
+    [
+     "bone",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "trap",
+    "payload": {
+     "type": "damage_and_status",
+     "damage": 2,
+     "damage_type": "physical",
+     "status": "grappled",
+     "duration": 4,
+     "extra_tags": [
+      "sponsor"
+     ]
+    },
+    "tags": [
+     "trap",
+     "deployable",
+     "sponsor"
+    ]
+   },
+   "base_rarity": "uncommon",
+   "discipline": "tinker",
+   "biome_lock": null,
+   "fumble_hazard": "trap_misfire",
+   "audience_create": 3
+  },
+  {
+   "key": "armor_sponsor_vest_amped",
+   "name_pl": "ulepszona kamizelka sponsorska",
+   "desc_pl": "Kamizelka + sponsor logo + chip + camera. Audience x1.15 floor-wide.",
+   "tier": 5,
+   "material_tags": [
+    [
+     "cloth",
+     1
+    ],
+    [
+     "sponsor",
+     2
+    ],
+    [
+     "electronic",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "permanent",
+    "applies_to_tags": [
+     "armor",
+     "clothing"
+    ],
+    "permanent": {
+     "ac_bonus": 1,
+     "audience_mul": 1.15,
+     "tag_add": "sponsored_amp"
+    }
+   },
+   "base_rarity": "epic",
+   "discipline": "mechanics",
+   "biome_lock": null,
+   "fumble_hazard": "waste_materials",
+   "audience_create": 6
+  },
+  {
+   "key": "throwable_propaganda_zine",
+   "name_pl": "propagandowy zin",
+   "desc_pl": "Papier + atrament + logo sponsora + chemikalia. Widownia +10 i strach w pokoju.",
+   "tier": 4,
+   "material_tags": [
+    [
+     "paper",
+     1
+    ],
+    [
+     "sponsor",
+     1
+    ],
+    [
+     "chemical",
+     1
+    ],
+    [
+     "powder",
+     1
+    ]
+   ],
+   "result": {
+    "effect": "throwable",
+    "payload": {
+     "type": "room_status",
+     "status": "afraid",
+     "duration": 2,
+     "audience_gain": 10,
+     "extra_tags": [
+      "spectacle"
+     ]
+    },
+    "tags": [
+     "throwable",
+     "consumable",
+     "spectacle"
+    ]
+   },
+   "base_rarity": "rare",
+   "discipline": "chemistry",
+   "biome_lock": null,
+   "fumble_hazard": "chemical_splash",
+   "audience_create": 5
+  }
+ ],
+ "UNIQUE_AFFIXES_PL": [
+  [
+   "Niepamiętane",
+   "audience_on_kill",
+   1
+  ],
+  [
+   "Krwiopijcze",
+   "extra_bleed_chance",
+   0.15
+  ],
+  [
+   "Bezsenne",
+   "no_rest_required",
+   true
+  ],
+  [
+   "Złoconej Krawędzi",
+   "rarity_aura",
+   "legendary"
+  ],
+  [
+   "Pamięci Sezonu",
+   "audience_on_hit",
+   1
+  ],
+  [
+   "Konferansjera",
+   "social_bonus",
+   2
+  ],
+  [
+   "Świateł Studyjnych",
+   "to_hit_bonus",
+   1
+  ],
+  [
+   "Cienia Showrunnera",
+   "stealth_bonus",
+   2
+  ],
+  [
+   "Ciszy Loch'a",
+   "silent",
+   true
+  ],
+  [
+   "Niezatapialne",
+   "ranged_evade_pct",
+   10
+  ]
+ ]
+}
