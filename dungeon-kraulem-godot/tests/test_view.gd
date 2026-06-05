@@ -14,6 +14,7 @@ func _ck(c: bool, l: String) -> void:
 func _initialize() -> void:
 	print("=== view tests ===")
 	Save.clear()                         # start from a clean slate, not a leftover save
+	Achievements.reset()
 	var bv = preload("res://scenes/BoardView.gd").new()
 	bv._font = ThemeDB.fallback_font
 	bv._build()                          # (_ready is deferred under -s; call directly)
@@ -182,7 +183,26 @@ func _initialize() -> void:
 	bv._box_anim_advance()              # collect
 	_ck(bv._box_anim.is_empty(), "collecting closes the reveal")
 	_ck(bv.floor.boxes.is_empty(), "the box is consumed on collect")
-	_ck(int(bv.sim.materials.get("złom", 0)) == zlom0 + 3, "the loot lands in the run on collect")
+	_ck(int(bv.sim.materials.get("złom", 0)) >= zlom0 + 3, "the loot lands in the run on collect (+bonus)")
+
+	# achievements: unlocking pops a VS-style toast; the gallery opens + draws
+	Achievements.reset()
+	bv._toasts.clear()                  # drop any toasts queued by earlier play
+	bv._unlock_ach("pierwsza_krew")
+	_ck(bv._toasts.size() == 1, "unlocking an achievement queues a toast")
+	bv._unlock_ach("pierwsza_krew")
+	_ck(bv._toasts.size() == 1, "a repeat unlock does not re-toast")
+	bv._ach_descend(5)
+	_ck(Achievements.is_unlocked("piaty_set"), "reaching floor 5 unlocks 'Piąty set'")
+	for i in 3:
+		bv._process(0.30)               # toasts age + slide
+	_ck(true, "toasts animate without crash")
+	bv._ach_screen = true
+	for i in 2:
+		bv._process(0.016)              # draws the achievements gallery
+	_ck(true, "achievements gallery draws without crash")
+	bv._dispatch_zone({"kind": "ach_back"})
+	_ck(not bv._ach_screen, "closing the gallery works")
 
 	# hammer many actions + frames; must never crash
 	for i in 30:

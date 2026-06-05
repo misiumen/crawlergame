@@ -59,9 +59,13 @@ var _click_zones: Array = []         # per-frame clickable UI rects (rebuilt in 
 var _mouse: Vector2 = Vector2.ZERO   # last known mouse position (for hover)
 var _sponsor_noticed: Dictionary = {} # sponsors whose "took interest" line already fired
 var _box_anim: Dictionary = {}       # active lootbox-opening reveal (non-empty = overlay)
+var _toasts: Array = []              # achievement-unlock toasts (VS-style)
+var _ach_screen := false             # achievements gallery overlay (from title)
+var _env_kills := 0                  # environment kills this run (for an achievement)
 const BOX_SPIN := 1.8                 # reel spin seconds
 const BOX_POP := 0.55                 # snap-flash seconds
 const BOX_REVEAL_STEP := 0.30         # seconds between each loot piece popping in
+const BOX_BONUS_MATS := ["złom", "drewno", "szmata", "przewód", "plastik", "bateria", "rurka"]
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -75,6 +79,7 @@ var _run_seed: int = 20260605
 func _build() -> void:
 	_title = false
 	_sponsor_noticed.clear()
+	_env_kills = 0
 	var content := _content_bundle()
 	_narr_rng.seed = 9001
 	# Resume from a checkpoint if one exists.
@@ -159,6 +164,7 @@ func _descend_into(biome_key: String) -> void:
 	_recenter()
 	_reset_visuals()
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
+	_ach_descend(next_depth)
 	Save.write(floor, _run_seed)   # checkpoint at each new floor
 
 ## Reach the Data autoload via /root (BoardView is a Node, so this is safe and
@@ -262,8 +268,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var kc: int = (event as InputEventKey).keycode
 
-	# Title screen: Enter continues a save (or starts fresh), N forces a new run.
+	# Achievements gallery (opened from the title): Esc/back returns.
+	if _ach_screen:
+		if kc == KEY_ESCAPE or kc == KEY_A:
+			_ach_screen = false; queue_redraw()
+		return
+
+	# Title screen: Enter continues a save (or starts fresh), N forces a new run,
+	# A opens the achievements gallery.
 	if _title:
+		if kc == KEY_A:
+			_ach_screen = true; queue_redraw(); return
 		if kc == KEY_N:
 			Save.clear()
 		if kc == KEY_ENTER or kc == KEY_KP_ENTER or kc == KEY_N or kc == KEY_SPACE:
@@ -422,6 +437,8 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"item_use":          _item_use(i)
 		"box_open":          _open_box(i); queue_redraw()
 		"aim_part":          _set_aim(z.get("s", ""))
+		"ach_open":          _ach_screen = true; queue_redraw()
+		"ach_back":          _ach_screen = false; queue_redraw()
 
 ## The enemy whose body we read out + aim at: the nearest aware living enemy,
 ## else the nearest living enemy.
@@ -539,6 +556,91 @@ func _box_anim_advance() -> void:
 		_box_anim = {}
 		_commit_box_entries(box, entries)
 	queue_redraw()
+
+# ── Achievements ──────────────────────────────────────────────────────────────
+
+## Try to unlock an achievement; on a NEW unlock, pop a toast + log + floater.
+func _unlock_ach(key: String) -> void:
+	var d := Achievements.unlock(key)
+	if d.is_empty():
+		return
+	_toasts.append({"name": d.get("name", key), "desc": d.get("desc", ""),
+		"category": d.get("category", "general"), "t": 0.0, "ttl": 5.0})
+	_log_push("OSIĄGNIĘCIE: " + d.get("name", key) + "!")
+	_add_floater(sim.player_id, "★ " + d.get("name", key), COL_AMBER)
+	_shake = maxf(_shake, 2.0)
+
+func _ach_cat_color(cat: String) -> Color:
+	match cat:
+		"combat":      return COL_RED
+		"salvage", "harvest": return COL_AMBER
+		"craft":       return COL_CYAN
+		"loot":        return COL_PURPLE
+		"audience", "sponsor": return COL_GAS
+		"floor", "exploration": return COL_GREEN
+	return COL_BRIGHT
+
+## Scan an event batch + current run state for achievement conditions.
+func _ach_scan(evs: Array) -> void:
+	var p := floor.player
+	var sys_electric := false
+	var enemy_died := false
+	for e in evs:
+		match e.get("type"):
+			"salvage":
+				if p.run_corpses_salvaged >= 1: _unlock_ach("wszystko_jest_surowcem")
+				if p.run_corpses_salvaged >= 5: _unlock_ach("recykling_agresywny")
+				if p.run_corpses_salvaged >= 10: _unlock_ach("ekonomia_przetrwania")
+				var g: Dictionary = e.get("gained", {})
+				if g.has("drewno"): _unlock_ach("meble_tez_krwawia")
+				if g.has("przewód") or g.has("złom"): _unlock_ach("technicznie_to_loot")
+			"craft_attempt":
+				var oc: String = e.get("outcome", "")
+				if oc == "sukces" or oc == "krytyk": _unlock_ach("rzemieslnik_z_paniki")
+				if oc == "krytyk": _unlock_ach("dzielo_mistrzowskie")
+				if oc == "backfire": _unlock_ach("inzynieria_odwagi")
+				if oc == "czesciowy": _unlock_ach("obrzydliwe_ale_dziala")
+			"trap_armed":
+				_unlock_ach("pulapka_z_niczego")
+			"death":
+				if p.run_kills >= 1: _unlock_ach("pierwsza_krew")
+				var t = sim.entities.get(e.get("target"))
+				if t != null and t.faction == "enemy":
+					enemy_died = true
+					if "boss" in t.tags: _unlock_ach("boss_padl_pierwszy")
+					elif "miniboss" in t.tags: _unlock_ach("klepacz_minibossow")
+			"systemic":
+				if e.get("element") == "electric": sys_electric = true
+			"audience_band_crossed":
+				if e.get("to_band") == "hot": _unlock_ach("widownia_gorzej_bije")
+				if e.get("to_band") == "viral": _unlock_ach("kult_jednostki")
+			"sponsor_gift":
+				_unlock_ach("pakiet_z_sufitu")
+	if sys_electric and enemy_died:
+		_env_kills += 1
+		_unlock_ach("czystka_srodowiska")
+	if not floor.discovered_recipes.is_empty():
+		_unlock_ach("przepis_jaki_przepis")
+	# loot in your pocket
+	for it in floor.items:
+		if (it as GameItem).rarity == Rarity.LEGENDARY: _unlock_ach("widzialem_legende")
+		elif (it as GameItem).rarity == Rarity.EPIC: _unlock_ach("niezwykly_zbieracz")
+		if (it as GameItem).category == GameItem.CAT_MEDICAL: _unlock_ach("apteka_w_plecaku")
+	# a sponsor really likes you
+	if floor.sponsors != null:
+		for k in floor.sponsors.all_keys():
+			if floor.sponsors.get_attention(k) >= 10:
+				_unlock_ach("markowy_uczestnik"); break
+
+func _ach_descend(depth: int) -> void:
+	if depth >= 2: _unlock_ach("dno_jeszcze_dalej")
+	if depth >= 5: _unlock_ach("piaty_set")
+	if depth >= 10: _unlock_ach("dziesiate_pietro")
+
+func _ach_run_end(victory: bool) -> void:
+	if victory: _unlock_ach("finalista_sezonu")
+	if floor.player.run_kills == 0: _unlock_ach("brak_zwlok_brak_problemu")
+	if floor.audience != null and floor.audience.peak >= 80: _unlock_ach("kult_jednostki")
 	queue_redraw()
 
 ## Resolve a box's contents into reveal entries WITHOUT adding them to the run
@@ -589,20 +691,34 @@ func _open_box(idx: int) -> void:
 	var box: GameBox = floor.boxes[idx]
 	_craft_open = false
 	var entries := _resolve_box(box)
-	# Build a slot reel of rarity-colored tiles that lands on the box's tier.
-	var reel: Array = []
-	for r in Rarity.ALL:
-		reel.append(r)
+
+	# ── Lucky multiplier: like Vampire Survivors' 1/3/5 chests, roll for bonus
+	# pieces. Better box tiers roll fatter. Tier 3/5 add extra scrap + more flash.
+	var ro := Rarity.order(box.rarity)             # 0..4
+	var roll := _narr_rng.randf()
+	var tier := 1
+	if roll < 0.10 + ro * 0.05: tier = 5
+	elif roll < 0.34 + ro * 0.07: tier = 3
+	var bonus := tier - 1                           # 0 / 2 / 4 extra pieces
+	for _i in bonus:
+		var mat: String = BOX_BONUS_MATS[_narr_rng.randi_range(0, BOX_BONUS_MATS.size() - 1)]
+		var qty := _narr_rng.randi_range(1, 3)
+		entries.append({"type": "material", "key": mat, "qty": qty,
+			"label": "%s x%d  (bonus)" % [mat, qty], "color": COL_GREEN})
+
+	# Build a slot reel of rarity-colored tiles that lands on the box's tier, with a
+	# near-miss tease: a higher tier sits just past the marker so the reel "almost"
+	# hits it before settling.
 	var n := 26
 	var strip: Array = []
 	for i in n:
-		# bias toward lower tiers, with the odd tease of a high one
-		var pick: String = Rarity.ALL[mini(_narr_rng.randi_range(0, 5), Rarity.ALL.size() - 1)]
-		strip.append(pick)
+		strip.append(Rarity.ALL[mini(_narr_rng.randi_range(0, 5), Rarity.ALL.size() - 1)])
 	var land := n - 4
-	strip[land] = box.rarity                      # the reel SNAPS onto the real tier
+	strip[land] = box.rarity                        # the SNAP target
+	if land + 1 < n:
+		strip[land + 1] = Rarity.ALL[mini(ro + 1, Rarity.ALL.size() - 1)]   # the tease
 	_box_anim = {
-		"box": box, "entries": entries, "strip": strip, "land": land,
+		"box": box, "entries": entries, "strip": strip, "land": land, "tier": tier,
 		"t": 0.0, "phase": "spin", "reveal_n": 0, "committed": false,
 	}
 	_shake = maxf(_shake, 1.0)
@@ -632,6 +748,7 @@ func handle_interact() -> void:
 func _end_run(victory: bool) -> void:
 	if not _summary.is_empty():
 		return
+	_ach_run_end(victory)
 	_summary = RunSummary.build(floor, victory, _narr_rng)
 	_summary["new_unlocks"] = Meta.record_run(_summary)
 	_summary_lines = RunSummary.render_lines(_summary)
@@ -726,6 +843,7 @@ func _dlg_events(evs: Array) -> void:
 
 func _animate(evs: Array) -> void:
 	_narrate_batch(evs)
+	_ach_scan(evs)
 	for e in evs:
 		match e.get("type"):
 			"move":
@@ -982,6 +1100,9 @@ func _process(dt: float) -> void:
 	_floaters = _floaters.filter(func(f): return f["age"] < f["ttl"])
 	_shake = maxf(0.0, _shake - dt * 24.0)
 	_tick_box_anim(dt)
+	for to in _toasts:
+		to["t"] = float(to["t"]) + dt
+	_toasts = _toasts.filter(func(x): return float(x["t"]) < float(x["ttl"]))
 	queue_redraw()
 
 ## Advance the lootbox-opening reveal through its phases.
@@ -1010,12 +1131,18 @@ func _tick_box_anim(dt: float) -> void:
 
 func _draw() -> void:
 	_click_zones.clear()   # rebuilt below to match exactly what's drawn this frame
+	if _ach_screen:
+		_draw_ach_screen()
+		_draw_toasts()
+		return
 	if _title:
 		_draw_title()
+		_draw_toasts()
 		return
 	if sim == null: return
 	if not _summary.is_empty():
 		_draw_run_summary()
+		_draw_toasts()
 		return
 	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 	var sh := Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
@@ -1099,8 +1226,13 @@ func _draw_title() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
 		_zone(Rect2(176, y - 24, 520, 34), "title_start")
 		y += 38
+	# Achievements gallery entry
+	draw_string(_font, Vector2(184, y + 22),
+		"🏆  Osiągnięcia  (%d / %d)   [A]" % [Achievements.count_unlocked(), Achievements.total()],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_AMBER)
+	_zone(Rect2(176, y - 2, 520, 32), "ach_open")
 	# Meta progress
-	draw_string(_font, Vector2(184, y + 24),
+	draw_string(_font, Vector2(184, y + 54),
 		"Odblokowane opcje na przyszłe biegi: %d" % Meta.unlocked_count(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_GREEN)
 	# Controls primer (mouse-first)
@@ -1324,6 +1456,65 @@ func _draw_hud() -> void:
 		_draw_dialogue()
 	if not _box_anim.is_empty():
 		_draw_box_open()
+	_draw_toasts()
+
+## VS-style achievement toasts: small panels that slide in from the right edge,
+## stack, and slide back out. Non-interactive; always drawn on top.
+func _draw_toasts() -> void:
+	var W := 380.0; var H := 60.0
+	for i in _toasts.size():
+		var to: Dictionary = _toasts[i]
+		var t: float = to["t"]; var ttl: float = to["ttl"]
+		var s := 1.0
+		if t < 0.35: s = t / 0.35
+		elif t > ttl - 0.45: s = (ttl - t) / 0.45
+		s = clampf(s, 0.0, 1.0)
+		var ease := 1.0 - pow(1.0 - s, 3.0)
+		var x := 1280.0 - (W + 16.0) * ease
+		var y := 92.0 + i * (H + 10.0)
+		var ccol := _ach_cat_color(to["category"])
+		draw_rect(Rect2(x, y, W, H), Color(0.05, 0.05, 0.08, 0.96 * s))
+		draw_rect(Rect2(x, y, W, H), Color(ccol, s), false, 2.0)
+		draw_string(_font, Vector2(x + 14, y + 22), "🏆 OSIĄGNIĘCIE",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(ccol, s))
+		draw_string(_font, Vector2(x + 14, y + 44), to["name"],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 24, 17, Color(COL_BRIGHT, s))
+
+## The achievements gallery (DCC-style list to chase), opened from the title.
+func _draw_ach_screen() -> void:
+	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+	draw_string(_font, Vector2(60, 70), "OSIĄGNIĘCIA  —  %d / %d" %
+		[Achievements.count_unlocked(), Achievements.total()],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 32, COL_AMBER)
+	var cols := 3
+	var cw := 380.0; var ch := 70.0
+	var x0 := 60.0; var y0 := 110.0
+	var i := 0
+	for key in AchievementsCatalog.ORDER:
+		var a: Dictionary = AchievementsCatalog.CATALOG[key]
+		var got := Achievements.is_unlocked(key)
+		var col := i % cols; var row := i / cols
+		var x := x0 + col * (cw + 12)
+		var y := y0 + row * (ch + 8)
+		var ccol := _ach_cat_color(a.get("category", "general"))
+		draw_rect(Rect2(x, y, cw, ch), Color(0.09, 0.10, 0.13, 0.95) if got else Color(0.05, 0.05, 0.07, 0.9))
+		draw_rect(Rect2(x, y, cw, ch), ccol if got else COL_GRID, false, 2.0 if got else 1.0)
+		if got:
+			draw_string(_font, Vector2(x + 12, y + 24), "★ " + a.get("name", key),
+				HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 15, COL_BRIGHT)
+			draw_string(_font, Vector2(x + 12, y + 46), a.get("desc", ""),
+				HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 12, COL_DIM)
+		else:
+			var nm: String = "???" if a.get("hidden", false) else a.get("name", key)
+			draw_string(_font, Vector2(x + 12, y + 24), "☐ " + nm,
+				HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 15, COL_DIM)
+			if not a.get("hidden", false):
+				draw_string(_font, Vector2(x + 12, y + 46), a.get("desc", ""),
+					HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 12, Color(COL_DIM, 0.5))
+		i += 1
+	draw_string(_font, Vector2(60, 700), "[Esc] / klik — powrót",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+	_zone(Rect2(40, 690, 300, 28), "ach_back")
 
 ## Vampire-Survivors-style lootbox reveal: a slot reel of rarity tiles spins and
 ## decelerates, SNAPS onto the box's tier with a flash, then the loot pops in.
@@ -1372,10 +1563,12 @@ func _draw_box_open() -> void:
 	draw_rect(Rect2(cx - 52, reel_y - 60, 104, 120), Color(rcol, 0.0), false, 2.0)
 	draw_string(_font, Vector2(cx - 10, reel_y - 66), "▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
 
-	# ── The snap flash ──
+	# ── The snap flash (bigger for a lucky 3/5) ──
+	var tier: int = int(_box_anim.get("tier", 1))
 	if phase == "pop":
 		var a := clampf(1.0 - t / BOX_POP, 0.0, 1.0)
-		draw_rect(Rect2(0, 0, 1280, 720), Color(rcol, a * 0.55))
+		var flash_mul := 0.55 + (0.2 if tier >= 3 else 0.0) + (0.2 if tier >= 5 else 0.0)
+		draw_rect(Rect2(0, 0, 1280, 720), Color(rcol, a * flash_mul))
 		var sc := 30 + int((1.0 - a) * 26)
 		draw_string(_font, Vector2(cx - 300, reel_y + 8), Rarity.label(box.rarity).to_upper(),
 			HORIZONTAL_ALIGNMENT_CENTER, 600, sc, rcol)
@@ -1384,7 +1577,12 @@ func _draw_box_open() -> void:
 	if phase == "reveal" or phase == "done":
 		var entries: Array = _box_anim["entries"]
 		var shown: int = int(_box_anim["reveal_n"])
-		draw_string(_font, Vector2(cx - 300, 360), "ZDOBYWASZ:",
+		var header := "ZDOBYWASZ:"
+		if tier >= 3:
+			var tcol := COL_AMBER if tier == 3 else COL_GAS
+			draw_string(_font, Vector2(cx - 300, 322),
+				"SZCZĘŚCIE! ×%d" % tier, HORIZONTAL_ALIGNMENT_CENTER, 600, 30, tcol)
+		draw_string(_font, Vector2(cx - 300, 360), header,
 			HORIZONTAL_ALIGNMENT_CENTER, 600, 20, COL_BRIGHT)
 		var y := 400.0
 		for i in mini(shown, entries.size()):
