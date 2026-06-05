@@ -53,16 +53,19 @@ var _summary: Dictionary = {}        # non-empty = end-of-run results screen
 var _summary_lines: Array = []       # rendered Polish lines for the screen
 var _route_offer: Array = []         # candidate biome keys at the stairs; non-empty = modal
 var _dialogue: Dictionary = {}       # active NPC exchange; non-empty = modal open
+var _title := true                   # title screen shown before a run starts
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
-	_build()
+	set_process(true)
+	queue_redraw()                   # show the title; a run starts on a keypress
 	set_process(true)
 
 const FINAL_FLOOR := 6   # descending from here wins the run
 var _run_seed: int = 20260605
 
 func _build() -> void:
+	_title = false
 	var content := _content_bundle()
 	_narr_rng.seed = 9001
 	# Resume from a checkpoint if one exists.
@@ -223,6 +226,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	var kc: int = (event as InputEventKey).keycode
+
+	# Title screen: Enter continues a save (or starts fresh), N forces a new run.
+	if _title:
+		if kc == KEY_N:
+			Save.clear()
+		if kc == KEY_ENTER or kc == KEY_KP_ENTER or kc == KEY_N or kc == KEY_SPACE:
+			_build()
+		return
 
 	# Results screen: Enter starts a fresh run.
 	if not _summary.is_empty():
@@ -765,6 +776,9 @@ func _process(dt: float) -> void:
 # ── Drawing ───────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
+	if _title:
+		_draw_title()
+		return
 	if sim == null: return
 	if not _summary.is_empty():
 		_draw_run_summary()
@@ -827,6 +841,35 @@ func _draw_player(pos: Vector2, fade: float) -> void:
 	draw_arc(pos, 16, 0, TAU, 24, col, 2.0)
 	draw_circle(pos + Vector2(0, -3), 9, Color(0.23, 0.70, 0.82, fade))
 	draw_line(pos + Vector2(-11, 6), pos + Vector2(-18, -10), Color(COL_BRIGHT, fade), 3.0)
+
+func _draw_title() -> void:
+	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+	# Title
+	draw_string(_font, Vector2(180, 230), "DUNGEON KRAULEM",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 72, COL_CYAN)
+	draw_string(_font, Vector2(184, 274), "galaktyczne reality show z lochów",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_DIM)
+	# Options
+	var has_save := Save.has_save()
+	var y := 380.0
+	if has_save:
+		draw_string(_font, Vector2(184, y), "[Enter]  Kontynuuj zjazd",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
+		draw_string(_font, Vector2(184, y + 38), "[N]  Nowy bieg (porzuca zapis)",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_AMBER)
+		y += 76
+	else:
+		draw_string(_font, Vector2(184, y), "[Enter]  Zacznij bieg",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
+		y += 38
+	# Meta progress
+	draw_string(_font, Vector2(184, y + 24),
+		"Odblokowane opcje na przyszłe biegi: %d" % Meta.unlocked_count(),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_GREEN)
+	# Controls primer
+	draw_string(_font, Vector2(184, 660),
+		"strzałki ruch/atak · Shift pchnij · T celuj · E rozbierz/rozmawiaj · I warsztat · F umiejętność",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 
 func _draw_boss(pos: Vector2, fade: float, flashing: bool) -> void:
 	var body := COL_RED if flashing else COL_PURPLE

@@ -333,22 +333,32 @@ enemy intent telegraph). 36 GDScript checks green (`test_sim`/`test_combat`/
 - ✅ **NPC dialogue** (`sim/dialogue.gd`) — talkable NPCs on the floor; single-
   exchange nodes with audience/sponsor/material/flavor effects (board distillation
   of `dialogue.py`).
+- ✅ **Elemental combat** (`sim/combat.gd`) — fire/acid/cold typed by tags (matter
+  rules made real), status DoT (burning/poisoned/corroded) + corroded-AC, and
+  **usable thrown/trap items** (the crafting→combat loop was broken: grenades you
+  couldn't throw). Fire tiles ignite the stepper.
+- ✅ **Boss finale** (`sim/floorgen.gd`) — `FINAL_FLOOR` is a gated boss arena;
+  bosses/minibosses (previously excluded everywhere) finally appear; the exit only
+  opens once the arena is cleared.
+- ✅ **Title screen + web export config** — front-end (continue / new run / unlock
+  count); `export_presets.cfg` Web preset + `build-web.bat` (you install the Web
+  templates once, then one-click).
 - ✅ **Fix exposed by procgen:** clearing a room no longer locks the player out of
   moving — only death is terminal (`_check_end` reworked).
-- **Genuinely out of scope here (documented, not done):**
-  - **Memetics** — needs free-text seeding + in-game-minute propagation + rooms
-    with terminals/safehouses; doesn't fit the hotkey board. Spec captured; revisit
-    if/when a text-input surface exists.
-  - **Audio / particles / lighting** — needs authored assets + scene work; the
-    immediate-mode board already has juice (tweens, flash, shake, floaters).
-  - **Web export** — a config change, but needs the Web export templates installed
-    in the Godot environment.
-  - **Full dialogue trees** (multi-node + skill checks) — the lightweight single-
-    exchange version ships; trees are an extension.
+- **Genuinely needs YOU (not code):**
+  - **Memetics** — needs a free-text input surface + in-game-minute propagation;
+    doesn't fit the hotkey board. Faithful spec captured; a design call.
+  - **Audio / art assets** — music/SFX/sprites; the immediate-mode board has juice
+    (tweens, flash, shake, floaters, fire tiles) but no authored audio/art.
+  - **Web export run** — the preset + script ship; needs the Web export templates
+    installed in your Godot to actually produce the build.
+  - **Balance / playtest feel** — subjective; needs a human at the keyboard.
+  - **Full dialogue trees** (multi-node + skill checks) — the single-exchange
+    version ships; trees are a clean extension.
 
-**Test coverage at end of Phase 6 core: 349 GUT checks across 13 suites** (sim,
-combat, crafting, body, classes, narrator, meta, floorgen, routes, save, dialogue,
-floor, view). Game boots clean; one-click exe builds.
+**Test coverage at end of Phase 6: 380 GUT checks across 15 suites** (sim, combat,
+crafting, body, classes, narrator, meta, floorgen, routes, save, dialogue,
+elements, boss, floor, view). Game boots clean; one-click exe builds.
 
 ---
 
