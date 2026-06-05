@@ -120,7 +120,8 @@ func _descend_into(biome_key: String) -> void:
 	_route_offer = []
 	var next_depth: int = floor.depth + 1
 	var mods := Routes.mods_for(biome_key)
-	var data := FloorGen.generate(next_depth, _run_seed, _content_bundle(), mods)
+	var is_boss: bool = next_depth == FINAL_FLOOR    # the finale floor is a boss arena
+	var data := FloorGen.generate(next_depth, _run_seed, _content_bundle(), mods, is_boss)
 	# Carry the run forward: keep the same player + accumulated state.
 	floor.player.cell = data["start_cell"]
 	floor.player.class_active_used_floor = -1   # active recharges each floor
@@ -198,6 +199,9 @@ func _check_transition() -> void:
 		return
 	var r = floor.try_transition()
 	if r == null:
+		return
+	if r.get("blocked", "") == "boss":
+		_log_push("Boss blokuje wyjście. Najpierw go pokonaj.")
 		return
 	if r.get("descend", false):
 		_add_banner("ZEJŚCIE NIŻEJ")
@@ -804,6 +808,7 @@ func _draw() -> void:
 		if e.faction == "player":      _draw_player(pos, fade)
 		elif e.faction == "object":    _draw_object(e, pos, fade)
 		elif e.faction == "npc":       _draw_npc(pos, fade)
+		elif "boss" in e.tags:         _draw_boss(pos, fade, flashing)
 		else:                          _draw_rat(pos, fade, flashing)
 	for f in _floaters:
 		var a: float = 1.0 - float(f["age"]) / float(f["ttl"])
@@ -822,6 +827,15 @@ func _draw_player(pos: Vector2, fade: float) -> void:
 	draw_arc(pos, 16, 0, TAU, 24, col, 2.0)
 	draw_circle(pos + Vector2(0, -3), 9, Color(0.23, 0.70, 0.82, fade))
 	draw_line(pos + Vector2(-11, 6), pos + Vector2(-18, -10), Color(COL_BRIGHT, fade), 3.0)
+
+func _draw_boss(pos: Vector2, fade: float, flashing: bool) -> void:
+	var body := COL_RED if flashing else COL_PURPLE
+	body.a = fade
+	# bigger, menacing, with a crown
+	draw_circle(pos, 21, Color(0.20, 0.06, 0.10, fade))
+	draw_arc(pos, 21, 0, TAU, 28, body, 3.0)
+	draw_circle(pos + Vector2(0, -2), 12, Color(0.62, 0.20, 0.28, fade))
+	draw_string(_font, pos + Vector2(-8, -20), "♛", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_AMBER)
 
 func _draw_npc(pos: Vector2, fade: float) -> void:
 	var col := COL_PURPLE; col.a = fade

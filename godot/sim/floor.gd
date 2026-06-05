@@ -76,12 +76,15 @@ func check_class_offer() -> Array:
 		return Classes.suggest_classes(player, 3, sim.rng)
 	return []
 
-## Returns {to, name} or {descend: true} or null.
+## Returns {to, name} or {descend: true} or {blocked: "boss"} or null.
 func try_transition() -> Variant:
 	var ex = exit_at(player.cell)
 	if ex == null:
 		return null
 	if ex.get("descend", false):
+		# A gated exit (boss arena) won't open until the room is cleared.
+		if ex.get("requires_clear", false) and not sim.enemies_alive().is_empty():
+			return {"blocked": "boss"}
 		descended = true
 		return {"descend": true}
 	enter(int(ex["to"]), ex["at"])

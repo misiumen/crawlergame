@@ -31,20 +31,24 @@ const FALLBACK_ENV := {
 ## `mods` is an optional route-biome bias {enemy_mul, object_mul, trap_mul,
 ## biome_key, label} — Routes.mods_for(key).
 static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
-		mods: Dictionary = {}) -> Dictionary:
+		mods: Dictionary = {}, is_boss: bool = false) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value + floor_num * 100003
 	var mon: Dictionary = content.get("MON", FALLBACK_MON)
 	var env: Dictionary = content.get("ENV", FALLBACK_ENV)
 	var stats: Dictionary = content.get("MOB_COMBAT_STATS", {})
 
-	var room_count: int = clampi(2 + (floor_num - 1) / 2, 2, 4)
 	var next_id := {"v": 2}   # 1 = player; entities count up from 2
-
 	var rooms: Array = []
-	for i in room_count:
-		rooms.append(_gen_room(rng, floor_num, i, room_count, mon, env, stats, next_id, mods))
-	_link_rooms(rooms)
+
+	if is_boss:
+		# A single arena, one boss, the exit (= victory) gated until it falls.
+		rooms.append(_gen_boss_room(rng, floor_num, mon, env, stats, next_id, mods))
+	else:
+		var room_count: int = clampi(2 + (floor_num - 1) / 2, 2, 4)
+		for i in room_count:
+			rooms.append(_gen_room(rng, floor_num, i, room_count, mon, env, stats, next_id, mods))
+		_link_rooms(rooms)
 
 	var player := CombatEntity.new(1, "Bezimienny", 100, 14, ["humanoid"])
 	player.faction = "player"
@@ -219,6 +223,77 @@ static func _tag_floor_min(tags: Array) -> int:
 		if (t as String).begins_with("floor_min:"):
 			return int((t as String).substr(10))
 	return 1
+
+## Choose a boss for the finale: prefer a 'boss', then a 'miniboss', then anything.
+static func _pick_boss(mon: Dictionary, floor_num: int, rng: RandomNumberGenerator) -> String:
+	var bosses: Array = []
+	var minis: Array = []
+	for key in mon:
+		var tags: Array = mon[key].get("tags", [])
+		if "boss" in tags or key.begins_with("boss_"):
+			bosses.append(key)
+		elif "miniboss" in tags or key.begins_with("miniboss_"):
+			minis.append(key)
+	if not bosses.is_empty():
+		return bosses[rng.randi_range(0, bosses.size() - 1)]
+	if not minis.is_empty():
+		return minis[rng.randi_range(0, minis.size() - 1)]
+	var any: Array = mon.keys()
+	return any[rng.randi_range(0, any.size() - 1)] if not any.is_empty() else "szczur"
+
+## The finale arena: one beefed-up boss (+ a couple of minions), and an exit that
+## only opens — i.e. only counts as victory — once the room is cleared.
+static func _gen_boss_room(rng: RandomNumberGenerator, floor_num: int,
+		mon: Dictionary, env: Dictionary, stats: Dictionary, next_id: Dictionary,
+		mods: Dictionary) -> Dictionary:
+	var w := rng.randi_range(13, 15)
+	var h := 9
+	var board := Board.new(w, h)
+	for x in w:
+		board.set_wall(Vector2i(x, 0)); board.set_wall(Vector2i(x, h - 1))
+	for y in h:
+		board.set_wall(Vector2i(0, y)); board.set_wall(Vector2i(w - 1, y))
+	var entry := Vector2i(1, h / 2)
+	var door := Vector2i(w - 2, h / 2)
+	var entities: Dictionary = {}
+
+	# The boss — extra HP, awake, centre stage.
+	var bkey := _pick_boss(mon, floor_num, rng)
+	var boss := _make_mob(bkey, mon[bkey], stats.get(bkey), next_id["v"], floor_num)
+	boss.max_hp = int(round(boss.max_hp * 1.4))
+	boss.hp = boss.max_hp
+	boss.aware = true
+	boss.cell = Vector2i(w / 2 + 1, h / 2)
+	board.place(boss.id, boss.cell)
+	entities[boss.id] = boss
+	next_id["v"] += 1
+
+	# A couple of normal minions flanking.
+	var eligible := _eligible_mobs(mon, floor_num, false)
+	for _i in 2:
+		if eligible.is_empty():
+			break
+		var cell := _free_interior(board, rng, entry, door)
+		if cell == Vector2i(-1, -1):
+			break
+		var mkey: String = eligible[rng.randi_range(0, eligible.size() - 1)]
+		var foe := _make_mob(mkey, mon[mkey], stats.get(mkey), next_id["v"], floor_num)
+		foe.aware = true
+		foe.cell = cell
+		board.place(foe.id, cell)
+		entities[foe.id] = foe
+		next_id["v"] += 1
+
+	return {
+		"name": "ARENA — %s" % boss.name_pl,
+		"board": board,
+		"entities": entities,
+		"entry": entry,
+		"door": door,
+		"is_last": true,
+		"exits": {door: {"descend": true, "requires_clear": true}},
+		"boss": true,
+	}
 
 ## A pick-list of ENV keys weighted toward `pref_tags`: a key whose tags overlap
 ## the preferred set is added an extra time (so it's likelier without excluding
