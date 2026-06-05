@@ -107,23 +107,33 @@ func _initialize() -> void:
 	_ck(css.materials.size() > 0, "dismantling yields materials")
 	_ck(not obj.is_alive(), "dismantled object is removed")
 
-	# --- crafting: materials -> electric coating -> attacks bypass thick hide ---
+	# --- crafting (bench API): electric+binding tags -> electric coating -> attacks bypass thick hide ---
+	# przewód=[conductive,electric] + szmata=[binding,soft] → matches rule electric+binding → DC 10
+	# int_xp=50 → int_mod=10, min roll=11, always sukces or krytyk — deterministic on this seed.
 	var bc := Board.from_ascii(["####", "#..#", "####"])
 	var pc := CombatEntity.new(1, "Ty", 100, 14, []); pc.faction = "player"; pc.cell = Vector2i(1, 1)
-	var rc := CombatEntity.new(2, "Szczur", 60, 1, ["organic", "thick_hide", "shock_weak"])
-	rc.faction = "enemy"; rc.cell = Vector2i(2, 1); rc.aware = true     # ac 1 = always hit (test determinism)
+	var rc := CombatEntity.new(2, "Szczur", 200, 1, ["organic", "thick_hide", "shock_weak"])
+	rc.faction = "enemy"; rc.cell = Vector2i(2, 1); rc.aware = true     # ac 1 = always hit, 200 HP = no early kill
 	var csc := CombatSim.new(bc, {1: pc, 2: rc}, 1, 11); bc.place(1, pc.cell); bc.place(2, rc.cell)
-	csc.materials = {"przewód": 1, "złom": 2}
-	_ck(csc.craftables().size() >= 2, "recipes are available")
-	var evc := csc.craft("coat_electric")
-	_ck(_has_event(evc, "craft"), "craft emits a craft event")
-	_ck(pc.coating == "electric" and pc.coating_charges == 3, "electric coating applied (3 charges)")
-	_ck(not csc.materials.has("przewód"), "crafting spent the materials")
+	pc.int_xp = 50  # int_mod = 10, guarantees sukces on DC 10
+	csc.materials = {"przewód": 1, "szmata": 1}
+	var prev := csc.bench_preview(["przewód", "szmata"])
+	_ck(prev.get("rule") != null, "bench preview matches electric+binding rule")
+	_ck(prev.get("dc") == 10, "bench DC = 10 (12 base - 2 binding bonus)")
+	var evc := csc.bench_attempt(["przewód", "szmata"])
+	_ck(_has_event(evc, "craft_attempt"), "bench_attempt emits craft_attempt event")
+	_ck(csc.items.size() == 1, "crafted item added to items list")
+	_ck((csc.items[0] as GameItem).category == "coating", "crafted item is a coating")
+	_ck(not csc.materials.has("szmata"), "bench_attempt spent the szmata material")
+	var evuse := csc.player_use_item(0)
+	_ck(_has_event(evuse, "coating_applied"), "player_use_item applies coating to weapon")
+	_ck(pc.coating == "electric", "electric coating wired to player weapon")
+	_ck(pc.coating_charges == 3, "coating grants 3 hit charges")
 	var eva := csc.player_move(Vector2i.RIGHT)                          # coated bump-attack
-	_ck(_has_event(eva, "damage", "dmg_type", "electric"), "coated attack deals electric (bypasses hide)")
-	_ck(pc.coating_charges == 2, "coating charge consumed on hit")
-	var evf := csc.craft("coat_electric")
-	_ck(_has_event(evf, "craft_fail"), "crafting without materials fails gracefully")
+	_ck(_has_event(eva, "damage", "dmg_type", "electric"), "coated attack deals electric (bypasses thick hide)")
+	_ck(pc.coating_charges == 2, "one coating charge consumed on hit")
+	var evf := csc.bench_attempt(["przewód", "szmata"])
+	_ck(_has_event(evf, "craft_fail"), "bench_attempt without materials fails gracefully")
 
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

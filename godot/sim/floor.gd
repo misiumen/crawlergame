@@ -8,14 +8,22 @@ extends RefCounted
 var rooms: Array = []             # [{name, board, entities(no player), exits, ...}]
 var player: CombatEntity
 var inv: Dictionary = {}          # run materials, shared across rooms
+var items: Array = []             # GameItem list — crafted or found
+var boxes: Array = []             # GameBox list — unopened lootboxes
+var discovered_recipes: Array = []# [{tags, name, times}] — recipe book
 var current: int = -1
 var sim: CombatSim
 var descended: bool = false
+var audience: AudienceState
+var sponsors: SponsorState
+var turn: int = 0
 
 func _init(data: Dictionary) -> void:
 	rooms = data["rooms"]
 	player = data["player"]
 	inv = data.get("inv", {})
+	audience = AudienceState.new()
+	sponsors = SponsorState.new()
 	enter(int(data.get("start", 0)), data["start_cell"])
 
 func current_name() -> String:
@@ -35,10 +43,19 @@ func enter(idx: int, entry: Vector2i) -> void:
 	var ents: Dictionary = {player.id: player}
 	for id in room["entities"]:
 		ents[id] = room["entities"][id]
-	sim = CombatSim.new(board, ents, player.id, 1337 + idx, inv)
+	sim = CombatSim.new(board, ents, player.id, 1337 + idx,
+			inv, items, discovered_recipes, audience, sponsors)
 
-## Returns true if the player is standing on a door, and performs the move.
-## "descend" exits set `descended` and do not change rooms.
+## Advance one turn: tick audience idle decay, drain any sponsor boxes.
+func advance_turn() -> Array:
+	turn += 1
+	audience.tick(1)
+	var new_boxes := sponsors.drain_boxes()
+	for b in new_boxes:
+		boxes.append(b)
+	return new_boxes   # caller can animate box-arrival notification
+
+## Returns {to, name} or {descend: true} or null.
 func try_transition() -> Variant:
 	var ex = exit_at(player.cell)
 	if ex == null:
