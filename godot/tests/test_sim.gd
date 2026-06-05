@@ -41,12 +41,49 @@ func _initialize() -> void:
 	_check(b.occupant_at(Vector2i(3, 2)) == 1 and b.occupant_at(Vector2i(3, 1)) == -1,
 		"move updates occupancy")
 
-	# --- tag-driven systemic properties ---
+	# --- tag-driven systemic properties (full inference table port) ---
 	_check(rat.has_property("flammable"), "organic implies flammable")
 	_check(rat.has_property("bleeds"), "organic implies bleeds")
 	var bot := CombatEntity.new(2, "Robot", 30, 14, ["robot"])
 	_check(bot.has_property("metal") and bot.has_property("conductive"),
 		"robot implies metal + conductive")
+	# new inference entries
+	_check(Tags.has_property(["machine"], "conductive"), "machine implies conductive")
+	_check(Tags.has_property(["wire"], "conductive"), "wire implies conductive")
+	_check(Tags.has_property(["plastic"], "flammable"), "plastic implies flammable")
+	_check(Tags.has_property(["furniture"], "flammable"), "furniture implies flammable")
+	_check(Tags.has_property(["ceramic"], "fragile"), "ceramic implies fragile")
+	_check(Tags.has_property(["glass"], "fragile"), "glass implies fragile")
+	_check(Tags.has_property(["water"], "wet") and Tags.has_property(["water"], "conductive"),
+		"water implies wet + conductive")
+	_check(Tags.has_property(["metal"], "conductive"), "metal alias implies conductive")
+	# narrowness: a plain creature does NOT spuriously gain properties
+	_check(not Tags.has_property(["humanoid"], "flammable"), "humanoid does not imply flammable")
+	_check(not Tags.has_property(["wire"], "metal"), "wire conducts but is not metal")
+
+	# --- element source tags (active emitters vs passive conductors) ---
+	_check(Tags.element_source(["acid", "caustic"]) == "acid", "acid tag is an acid source")
+	_check(Tags.element_source(["burning"]) == "fire", "burning tag is a fire source")
+	_check(Tags.element_source(["frost"]) == "cold", "frost tag is a cold source")
+	_check(Tags.element_source(["wire"]) == "", "passive wire is NOT an element source")
+	_check(Tags.element_source(["metal"]) == "", "passive metal is NOT an element source")
+
+	# --- impact + damage->element mapping ---
+	_check(Tags.is_impact(["heavy", "blunt"]), "heavy/blunt is an impact source")
+	_check(not Tags.is_impact(["edge"]), "an edge weapon is not impact")
+	_check(Tags.element_for_damage("electric") == "electric", "electric damage -> electric element")
+	_check(Tags.element_for_damage("physical") == "", "physical damage -> no matter element")
+
+	# --- matter rules: element x property -> effect ---
+	var r_fire = Tags.match_matter_rule("fire", ["wood"])
+	_check(r_fire != null and r_fire["effect"] == "pożar", "fire + flammable -> pożar")
+	var r_acid = Tags.match_matter_rule("acid", ["robot"])
+	_check(r_acid != null and r_acid["effect"] == "korozja", "acid + metal(robot) -> korozja")
+	var r_cold = Tags.match_matter_rule("cold", ["water"])
+	_check(r_cold != null and r_cold["effect"] == "zamrożenie", "cold + wet(water) -> zamrożenie")
+	var r_none = Tags.match_matter_rule("fire", ["metal"])
+	_check(r_none == null, "fire + non-flammable -> no rule")
+	_check(Tags.element_label("electric") == "prąd", "element label is Polish for the log")
 
 	# --- damage + statuses + death ---
 	rat.add_status("bleeding", 3)

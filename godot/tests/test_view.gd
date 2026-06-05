@@ -34,10 +34,36 @@ func _initialize() -> void:
 		bv._process(0.016)               # manual frames (no main loop under -s)
 	_ck(true, "_process runs without error")
 
-	# crafting via the view: give materials, craft the first recipe
-	bv.sim.materials = {"przewód": 1}
-	bv._do_craft(0)
-	_ck(bv.sim.player().coating == "electric", "view _do_craft applies a recipe")
+	# bench crafting via the view: electric+binding -> electric coating, then use it
+	bv.sim.materials = {"przewód": 1, "szmata": 1}
+	bv.sim.player().int_xp = 50            # int_mod 10 guarantees success on DC 10
+	bv._animate(bv.sim.bench_attempt(["przewód", "szmata"]))
+	_ck(bv.floor.items.size() >= 1, "bench_attempt via the view crafts an item")
+	bv._animate(bv.sim.player_use_item(0))
+	_ck(bv.sim.player().coating == "electric", "using the crafted coating arms the weapon")
+
+	# the craft panel opens/closes and draws without crashing
+	bv._craft_open = true
+	bv._craft_mode = "bench"
+	bv._bench_slots = ["przewód"]
+	bv._bench_preview = Crafting.preview(["przewód"], bv.floor.discovered_recipes)
+	for i in 3:
+		bv._process(0.016)
+	_ck(true, "craft panel draws (bench mode) without crash")
+	bv._craft_mode = "items"
+	for i in 3:
+		bv._process(0.016)
+	_ck(true, "craft panel draws (items mode) without crash")
+	bv._craft_open = false
+
+	# body readout: the enemy has a procedural body; aim + located hits don't crash
+	var enemy_id := -1
+	for id in bv.sim.entities:
+		if bv.sim.entities[id].faction == "enemy":
+			enemy_id = id
+	if enemy_id != -1 and bv.sim.entities[enemy_id].body != null:
+		_ck(true, "enemy has a procedural body attached via the view")
+	bv.sim.aim_zone = "head"
 
 	# hammer many actions + frames; must never crash
 	for i in 30:

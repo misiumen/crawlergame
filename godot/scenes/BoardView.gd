@@ -42,6 +42,10 @@ var _craft_mode := "bench"          # "bench" | "items"
 var _bench_slots: Array = []        # material names on the bench
 var _bench_preview: Dictionary = {} # last Crafting.preview result
 
+# Body targeting
+var _aim_zone := ""                  # "" = body (no chosen zone); else a part key
+var _part_flash: Dictionary = {}     # "enemyid:zone" -> seconds left, for hit pulse
+
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
 	_build()
@@ -53,8 +57,41 @@ func _build() -> void:
 	sim = floor.sim
 	_hint = data.get("hint", "")
 	_log = ["Wchodzisz do kompleksu. Pierwsze pomieszczenie: magazyn."]
+	_attach_bodies()
 	_recenter()
 	_reset_visuals()
+
+## Reach the Data autoload via /root (BoardView is a Node, so this is safe and
+## avoids the bare `Data` identifier that won't compile under headless -s/--import).
+func _data_group(bundle: String, name: String) -> Variant:
+	# Via the main-loop root (works even before this node is in the tree, e.g.
+	# under headless -s), not an absolute get_node path.
+	var loop := Engine.get_main_loop()
+	if not (loop is SceneTree):
+		return null
+	var node := (loop as SceneTree).root.get_node_or_null("Data")
+	if node == null or not node.has_method("group"):
+		return null
+	return node.call("group", bundle, name)
+
+## Give every enemy in the current room a procedural body from body_plans.json.
+func _attach_bodies() -> void:
+	var bundle: Variant = _data_group("body_plans", "PLANS")
+	if not (bundle is Dictionary):
+		return
+	# from_bundle wants the WHOLE body_plans bundle (PLANS + PLAN_BY_TAG + ...).
+	# NB: `x or {}` returns a BOOL in GDScript — must use explicit type guards.
+	var by_key: Variant = _data_group("body_plans", "PLANS_BY_MONSTER_KEY")
+	var by_tag: Variant = _data_group("body_plans", "PLAN_BY_TAG")
+	var full := {
+		"PLANS": bundle,
+		"PLANS_BY_MONSTER_KEY": by_key if by_key is Dictionary else {},
+		"PLAN_BY_TAG": by_tag if by_tag is Array else [],
+	}
+	for id in sim.entities:
+		var e: CombatEntity = sim.entities[id]
+		if e.faction == "enemy" and e.body == null:
+			e.attach_body(full)
 
 func _recenter() -> void:
 	var bw: int = sim.board.w * TILE
@@ -82,6 +119,8 @@ func _check_transition() -> void:
 		queue_redraw()
 		return
 	sim = floor.sim
+	_attach_bodies()
+	_aim_zone = ""; sim.aim_zone = ""
 	_recenter()
 	_reset_visuals()
 	_log_push("Przechodzisz do: %s." % r.get("name", "?"))
@@ -108,6 +147,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _craft_open:
 		_handle_craft_input(kc); return
 
+	# [T] cycle the aimed body zone of the focused enemy (-> harder hit, your pick)
+	if kc == KEY_T:
+		_cycle_aim(); return
+
 	var shove := Input.is_key_pressed(KEY_SHIFT)
 	var dir := Vector2i.ZERO
 	match kc:
@@ -120,6 +163,42 @@ func _unhandled_input(event: InputEvent) -> void:
 		_: return
 	if shove: handle_shove(dir)
 	else:     handle_dir(dir)
+
+## The enemy whose body we read out + aim at: the nearest aware living enemy,
+## else the nearest living enemy.
+func _focused_enemy() -> CombatEntity:
+	var p := sim.player()
+	var best: CombatEntity = null
+	var best_d := 1 << 30
+	for id in sim.entities:
+		var e: CombatEntity = sim.entities[id]
+		if e.faction != "enemy" or not e.is_alive():
+			continue
+		var d: int = maxi(absi(e.cell.x - p.cell.x), absi(e.cell.y - p.cell.y))
+		if e.aware:
+			d -= 1000   # strongly prefer aware enemies
+		if d < best_d:
+			best_d = d; best = e
+	return best
+
+## Cycle aim through the focused enemy's intact parts, then back to "" (body).
+func _cycle_aim() -> void:
+	var e := _focused_enemy()
+	if e == null or e.body == null:
+		_aim_zone = ""; sim.aim_zone = ""; queue_redraw(); return
+	var choices: Array = [""]
+	for pkey in e.body.order:
+		if not e.body.part(pkey)["severed"]:
+			choices.append(pkey)
+	var i := choices.find(_aim_zone)
+	_aim_zone = choices[(i + 1) % choices.size()]
+	sim.aim_zone = _aim_zone
+	if _aim_zone != "":
+		var lbl: String = e.body.part(_aim_zone)["label_pl"]
+		_log_push("Bierzesz na cel: %s." % lbl)
+	else:
+		_log_push("Celujesz w korpus (bez wyboru strefy).")
+	queue_redraw()
 
 func _handle_craft_input(kc: int) -> void:
 	if kc == KEY_ESCAPE:
@@ -134,7 +213,7 @@ func _handle_craft_input(kc: int) -> void:
 				_bench_slots.pop_back()
 				_bench_preview = Crafting.preview(_bench_slots, floor.discovered_recipes)
 			queue_redraw(); return
-		if kc == KEY_RETURN or kc == KEY_KP_ENTER:
+		if kc == KEY_ENTER or kc == KEY_KP_ENTER:
 			if not _bench_slots.is_empty():
 				_animate(sim.bench_attempt(_bench_slots))
 				# Drain sponsor boxes after crafting.
@@ -156,7 +235,7 @@ func _handle_craft_input(kc: int) -> void:
 			queue_redraw(); return
 
 	elif _craft_mode == "items":
-		if kc == KEY_RETURN or kc == KEY_KP_ENTER:
+		if kc == KEY_ENTER or kc == KEY_KP_ENTER:
 			# Open first box if any.
 			if not floor.boxes.is_empty():
 				_open_box(0)
@@ -179,7 +258,7 @@ func _open_box(idx: int) -> void:
 	for entry in box.contents:
 		match entry.get("type"):
 			"item_key":
-				var templates: Variant = Data.group("item_templates", "ITEM_TEMPLATES")
+				var templates: Variant = _data_group("item_templates", "ITEM_TEMPLATES")
 				if templates is Dictionary and templates.has(entry["key"]):
 					var t: Dictionary = templates[entry["key"]]
 					var found_item := GameItem.new(
@@ -187,7 +266,8 @@ func _open_box(idx: int) -> void:
 						t.get("type", "tool"),
 						t.get("rarity", Rarity.COMMON)
 					)
-					found_item.tags = (t.get("tags") or []).duplicate()
+					var tg: Variant = t.get("tags", [])
+					found_item.tags = (tg if tg is Array else []).duplicate()
 					found_item.origin = box.source
 					floor.items.append(found_item)
 					spawned.append(found_item.name_pl)
@@ -243,6 +323,22 @@ func _animate(evs: Array) -> void:
 				var col: Color = COL_CYAN if e.get("dmg_type") == "electric" else COL_RED
 				_add_floater(tid, "-%d" % e["amount"], col)
 				_shake = maxf(_shake, 5.0 if e["amount"] >= 12 else 2.5)
+				if e.get("zone", "") != "":
+					_part_flash["%d:%s" % [tid, e["zone"]]] = 0.4
+			"body_hit":
+				var wound: String = e.get("wound", "")
+				if e.get("severed", false):
+					_add_floater(e["target"], "AMPUTACJA: " + e.get("label", ""), COL_RED)
+					_shake = maxf(_shake, 7.0)
+				elif wound != "":
+					_add_floater(e["target"],
+						BodyState.WOUND_PL.get(wound, wound) + " — " + e.get("label", ""),
+						_wound_color(wound))
+			"maim":
+				var verb := "ODCIĘTA" if e.get("severed", false) else "ZNISZCZONA"
+				_add_floater(e["target"], (e.get("label", "") + " " + verb).to_upper(), COL_RED)
+				_shake = maxf(_shake, 5.0)
+				_log_push(_maim_line(e))
 			"systemic":
 				if e.get("element") == "electric":
 					_add_floater(e["target"], "PRĄD!", COL_CYAN)
@@ -298,6 +394,37 @@ func _animate(evs: Array) -> void:
 func _name(id: int) -> String:
 	var e = sim.entities.get(id)
 	return e.name_pl if e != null else "?"
+
+func _wound_color(wound: String) -> Color:
+	match wound:
+		"burn":    return COL_GAS
+		"shock":   return COL_CYAN
+		"corrode": return COL_GREEN
+		"freeze":  return Color(0.6, 0.85, 1.0)
+		"bleed":   return COL_RED
+		"sever":   return COL_RED
+	return COL_DIM
+
+## Polish label of a target's body zone (or "" if it has no body / no zone).
+func _zone_label(id: int, zone: String) -> String:
+	var e = sim.entities.get(id)
+	if e == null or e.body == null or zone == "":
+		return ""
+	var p: Dictionary = e.body.part(zone)
+	return p.get("label_pl", "") if not p.is_empty() else ""
+
+## Build the dramatic Polish line for a maim event (ASCII-safe content).
+func _maim_line(e: Dictionary) -> String:
+	var nm := _name(e["target"])
+	var lbl: String = e.get("label", "?")
+	if e.get("severed", false):
+		return "Odcinasz %s u %s!" % [lbl, nm]
+	match e.get("status"):
+		"stunned":  return "Roztrzaskujesz %s — %s oszolomiony, traci ture!" % [lbl, nm]
+		"slowed":   return "Lamiesz %s — %s kuleje i nie dogoni cie." % [lbl, nm]
+		"disarmed": return "Miazdzysz %s — %s slabiej uderza." % [lbl, nm]
+		"blinded":  return "Niszczysz %s — %s oslepiony." % [lbl, nm]
+	return "%s u %s peka." % [lbl, nm]
 
 func _log_push(line: String) -> void:
 	_log.append(line)
@@ -374,6 +501,9 @@ func _process(dt: float) -> void:
 	for id in _dying.keys():
 		_dying[id] = _dying[id] - dt * 1.5
 		if _dying[id] <= 0: _dying.erase(id)
+	for k in _part_flash.keys():
+		_part_flash[k] = _part_flash[k] - dt
+		if _part_flash[k] <= 0: _part_flash.erase(k)
 	for f in _floaters:
 		f["age"] += dt
 	_floaters = _floaters.filter(func(f): return f["age"] < f["ttl"])
@@ -530,7 +660,7 @@ func _draw_hud() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
 	# Controls hint
 	draw_string(_font, Vector2(40, 60),
-		"strzałki ruch (=atak)  ·  Shift pchnij  ·  E rozbierz  ·  I warsztat  ·  . czekaj",
+		"strzałki ruch (=atak)  ·  Shift pchnij  ·  T celuj w strefę  ·  E rozbierz  ·  I warsztat  ·  . czekaj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Weapon / coating
 	var wln := "Broń: nóż"
@@ -604,8 +734,91 @@ func _draw_hud() -> void:
 	if _banner != "":
 		draw_string(_font, Vector2(_origin.x + 120, _origin.y + 160), _banner,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, COL_BRIGHT)
+	_draw_body_readout(lx, lw)
 	if _craft_open:
 		_draw_craft_panel()
+
+## The large combat readout: the focused enemy's procedural body, part by part,
+## colored by severity, marked with wound icons, with the aimed zone highlighted.
+func _draw_body_readout(lx: float, lw: float) -> void:
+	var e := _focused_enemy()
+	var top := 484.0
+	draw_rect(Rect2(lx, top, lw, 224), Color(0.08, 0.10, 0.13, 0.9))
+	draw_rect(Rect2(lx, top, lw, 224), COL_GRID, false, 1.0)
+	if e == null:
+		draw_string(_font, Vector2(lx + 12, top + 24), "CIAŁO — brak celu",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+		return
+	var st := "śpi" if not e.aware else "ściga cię"
+	draw_string(_font, Vector2(lx + 12, top + 22),
+		"CIAŁO: %s  ·  HP %d/%d  ·  %s" % [e.name_pl, e.hp, e.max_hp, st],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
+	if e.body == null:
+		draw_string(_font, Vector2(lx + 12, top + 46),
+			"(prosta istota — brak stref trafień)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+		return
+	var y := top + 48.0
+	for pkey in e.body.order:
+		var p: Dictionary = e.body.part(pkey)
+		var sev: String = p["severity"]
+		var col := _severity_color(sev)
+		var aimed: bool = (pkey == _aim_zone)
+		var flashing: bool = _part_flash.has("%d:%s" % [e.id, pkey])
+		# Aim highlight box
+		if aimed:
+			draw_rect(Rect2(lx + 8, y - 13, lw - 16, 20), Color(COL_AMBER, 0.16))
+		# Part name + severity
+		var prefix := "» " if aimed else "  "
+		var sev_pl: String = BodyState.SEVERITY_PL.get(sev, sev)
+		var sev_txt := "—" if sev == BodyState.SEV_INTACT else sev_pl
+		if p["severed"]:
+			sev_txt = "odcięte"
+		draw_string(_font, Vector2(lx + 12, y + 2), prefix + p["label_pl"],
+			HORIZONTAL_ALIGNMENT_LEFT, 150, 13, COL_BRIGHT if not flashing else COL_RED)
+		draw_string(_font, Vector2(lx + 150, y + 2), sev_txt,
+			HORIZONTAL_ALIGNMENT_LEFT, 120, 13, col)
+		# HP pip bar for the part
+		var bx := lx + lw - 150.0
+		var bw := 96.0
+		var frac := float(p["hp"]) / float(maxi(1, int(p["max_hp"])))
+		draw_rect(Rect2(bx, y - 9, bw, 10), Color(0.15, 0.15, 0.18))
+		if not p["severed"]:
+			draw_rect(Rect2(bx, y - 9, bw * clampf(frac, 0.0, 1.0), 10), col)
+		# Wound icons
+		var wx := bx + bw + 8.0
+		for w in p["wounds"]:
+			draw_string(_font, Vector2(wx, y + 2), _wound_glyph(w),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, _wound_color(w))
+			wx += 16.0
+		y += 22.0
+	# Aim hint
+	draw_string(_font, Vector2(lx + 12, top + 210),
+		"[T] celuj w strefę (teraz: %s)" % (_aim_zone_label(e)),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_AMBER)
+
+func _severity_color(sev: String) -> Color:
+	match sev:
+		BodyState.SEV_INTACT:   return COL_GREEN
+		BodyState.SEV_DAMAGED:  return COL_AMBER
+		BodyState.SEV_CRIPPLED: return COL_GAS
+		BodyState.SEV_BROKEN:   return COL_RED
+	return COL_DIM
+
+func _wound_glyph(wound: String) -> String:
+	match wound:
+		"burn":    return "▲"
+		"shock":   return "ϟ"
+		"corrode": return "≈"
+		"freeze":  return "❄"
+		"bleed":   return "✦"
+		"sever":   return "✂"
+	return "•"
+
+func _aim_zone_label(e: CombatEntity) -> String:
+	if _aim_zone == "" or e.body == null:
+		return "korpus"
+	var p: Dictionary = e.body.part(_aim_zone)
+	return p.get("label_pl", "korpus") if not p.is_empty() else "korpus"
 
 # ── Craft panel ───────────────────────────────────────────────────────────────
 

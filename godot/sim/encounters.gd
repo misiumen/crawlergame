@@ -27,6 +27,7 @@ static func intake() -> Dictionary:
 	var rat := CombatEntity.new(2, "Tunelowy Szczur", 22, 13,
 		["organic", "quadruped", "thick_hide", "shock_weak"])
 	rat.faction = "enemy"
+	rat.monster_key = "tunnel_runt"                     # -> small_quadruped body plan
 	rat.cell = Vector2i(10, 7)
 	rat.aware = false                                   # asleep until it notices you
 
@@ -91,7 +92,8 @@ static func floor() -> Dictionary:
 	])
 	var rat := CombatEntity.new(2, "Tunelowy Szczur", 22, 13,
 		["organic", "quadruped", "thick_hide", "shock_weak"])
-	rat.faction = "enemy"; rat.cell = Vector2i(10, 3); rat.aware = false
+	rat.faction = "enemy"; rat.monster_key = "tunnel_runt"
+	rat.cell = Vector2i(10, 3); rat.aware = false
 	bb.place(2, rat.cell)
 	var room_b := {
 		"name": "Hala", "board": bb, "entities": {2: rat},

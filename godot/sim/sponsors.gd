@@ -17,9 +17,18 @@ var pending_hunters: Array = []     # hunter_key strings for next combat room
 # ── Data access ──────────────────────────────────────────────────────────────
 
 func _sponsors() -> Dictionary:
-	if not Engine.has_singleton("Data"):
+	# Reach the Data autoload via the scene-tree root rather than the bare global
+	# identifier: works in-game AND avoids a compile-time "Identifier not found"
+	# during headless --import (where autoload globals aren't injected).
+	# (Engine.has_singleton is for native singletons, NOT autoloads — it is always
+	# false here, which is why this used to silently no-op in the real game.)
+	var loop := Engine.get_main_loop()
+	if not (loop is SceneTree):
 		return {}
-	var raw: Variant = Data.group("sponsors", "SPONSORS")
+	var data_node := (loop as SceneTree).root.get_node_or_null("Data")
+	if data_node == null or not data_node.has_method("group"):
+		return {}
+	var raw: Variant = data_node.call("group", "sponsors", "SPONSORS")
 	return raw if raw is Dictionary else {}
 
 func all_keys() -> Array:
@@ -73,9 +82,11 @@ func note_tag(tag: String, weight: int = 1, floor_num: int = 1) -> Array:
 	for skey in sponsors:
 		var sdata: Dictionary = sponsors[skey]
 		var bump := 0
-		if tag in (sdata.get("likes_tags") or []):
+		var likes: Variant = sdata.get("likes_tags", [])
+		var dislikes: Variant = sdata.get("dislikes_tags", [])
+		if likes is Array and tag in likes:
 			bump += weight
-		if tag in (sdata.get("dislikes_tags") or []):
+		if dislikes is Array and tag in dislikes:
 			bump -= weight
 		if bump == 0:
 			continue
@@ -118,7 +129,8 @@ func _check_gift_thresholds(floor_num: int) -> Array:
 
 func _make_sponsor_box(skey: String, sdata: Dictionary,
 		floor_num: int, second: bool) -> GameBox:
-	var pool: Array = sdata.get("gift_pool") or []
+	var pool_v: Variant = sdata.get("gift_pool", [])
+	var pool: Array = pool_v if pool_v is Array else []
 	if pool.is_empty():
 		return null
 	var idx := 1 if (second and pool.size() >= 2) else 0

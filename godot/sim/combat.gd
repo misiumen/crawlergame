@@ -20,6 +20,7 @@ var items: Array = []               # GameItem list, shared ref from Floor
 var discovered_recipes: Array = []  # recipe book, shared ref from Floor
 var _audience: AudienceState        # may be null in headless unit tests
 var _sponsors: SponsorState         # may be null in headless unit tests
+var aim_zone: String = ""           # presentation sets this to aim the next player hit
 
 var rng := RandomNumberGenerator.new()
 
@@ -62,11 +63,34 @@ func effective_damage(target: CombatEntity, base: int, dmg_type: String) -> int:
 		dmg = dmg * 2
 	return maxi(1, dmg)
 
-func _apply_damage(target: CombatEntity, base: int, dmg_type: String, zone := "") -> Array:
+## Apply damage. If the target carries a procedural body, the blow is LOCATED:
+## a zone is chosen (or the aimed one used), the part's damage multiplier scales
+## the hit, and a wound/maim/sever is recorded — emitted as a `body_hit` event.
+## Flat-HP actors (player, objects) keep the simple path, so older tests hold.
+func _apply_damage(target: CombatEntity, base: int, dmg_type: String,
+		zone := "", heavy := false) -> Array:
 	var dmg: int = effective_damage(target, base, dmg_type)
+	var evs: Array = []
+	var hit: Dictionary = {}
+	if target.body != null:
+		if zone == "":
+			zone = target.body.pick_zone(rng, "")
+		dmg = maxi(1, int(round(dmg * target.body.damage_mul_for(zone))))
+		hit = target.body.apply_hit(zone, dmg, dmg_type,
+				target.has_property("bleeds"), heavy)
 	target.take_damage(dmg)
-	var evs: Array = [{"type": "damage", "target": target.id, "amount": dmg,
-		"dmg_type": dmg_type, "zone": zone}]
+	evs.append({"type": "damage", "target": target.id, "amount": dmg,
+		"dmg_type": dmg_type, "zone": zone})
+	if not hit.is_empty():
+		evs.append({"type": "body_hit", "target": target.id, "zone": hit["zone"],
+			"label": hit["label_pl"], "wound": hit.get("wound", ""),
+			"severity": hit["severity"], "severed": hit.get("severed", false),
+			"maim": hit.get("maim_status")})
+		if hit.get("maim_status") != null and target.is_alive():
+			target.add_status(hit["maim_status"], 3)
+			evs.append({"type": "maim", "target": target.id,
+				"status": hit["maim_status"], "label": hit["label_pl"],
+				"severed": hit.get("severed", false)})
 	if not target.is_alive():
 		board.clear(target.cell)
 		evs.append({"type": "death", "target": target.id})
@@ -102,8 +126,14 @@ func player_move(dir: Vector2i) -> Array:
 
 func _player_attack(target: CombatEntity) -> Array:
 	target.aware = true
-	var evs: Array = [{"type": "attack", "attacker": player_id, "target": target.id}]
-	if _roll_hit(3, target.ac):
+	# Aiming a small zone (head/limb) is harder to land but hits where you want.
+	var zone: String = aim_zone
+	var hit_bonus: int = 3
+	if zone != "" and target.body != null:
+		hit_bonus += target.body.to_hit_mod_for(zone)
+	var evs: Array = [{"type": "attack", "attacker": player_id, "target": target.id,
+		"aim": zone}]
+	if _roll_hit(hit_bonus, target.ac):
 		var p: CombatEntity = player()
 		var base: int = rng.randi_range(1, 6) + 2 + p.bonus_damage
 		var dtype: String = DMG_PHYSICAL
@@ -116,7 +146,10 @@ func _player_attack(target: CombatEntity) -> Array:
 			p.coating_charges -= 1
 			if p.coating_charges <= 0:
 				p.coating = ""
-		evs += _apply_damage(target, base, dtype)
+		# A strong physical cut can sever a limb.
+		var heavy: bool = dtype == DMG_PHYSICAL and base >= 9
+		evs += _apply_damage(target, base, dtype, zone, heavy)
+		aim_zone = ""   # the aim is spent on this swing
 		# Spectacle tags for dead enemies.
 		if not target.is_alive():
 			evs += _note_tag("kill_lethal")
@@ -400,16 +433,28 @@ func _enemy_turn() -> Array:
 	for e in enemies_alive():
 		if not e.aware:
 			continue
-		if e.has_status("shocked"):
-			evs.append({"type": "skip", "id": e.id, "reason": "shocked"})
+		# A shocked or head-stunned enemy loses its turn entirely.
+		if e.has_status("shocked") or e.has_status("stunned"):
+			var why: String = "stunned" if e.has_status("stunned") else "shocked"
+			evs.append({"type": "skip", "id": e.id, "reason": why})
 			continue
 		if board.is_adjacent(e.cell, p.cell):
 			evs.append({"type": "attack", "attacker": e.id, "target": player_id})
-			if _roll_hit(2, p.ac):
+			# A disarmed (broken-arm) enemy swings weaker.
+			var atk_bonus: int = 0 if e.has_status("disarmed") else 2
+			if _roll_hit(atk_bonus, p.ac):
 				var base: int = rng.randi_range(1, 4) + 1
+				if e.has_status("disarmed"):
+					base = maxi(1, base - 2)
 				evs += _apply_damage(p, base, DMG_PHYSICAL)
 			else:
 				evs.append({"type": "miss", "attacker": e.id, "target": player_id})
+		elif not e.can_move():
+			# Locomotion destroyed — it can't close the gap, only thrash in place.
+			evs.append({"type": "skip", "id": e.id, "reason": "crippled"})
+		elif e.is_hobbled() or e.has_status("slowed"):
+			# One broken leg: it can't chase at speed — kite it.
+			evs.append({"type": "skip", "id": e.id, "reason": "hobbled"})
 		else:
 			var step: Vector2i = _step_toward(e.cell, p.cell)
 			if step != e.cell and board.is_free(step):

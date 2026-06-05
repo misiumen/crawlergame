@@ -20,9 +20,24 @@ var coating: String = ""         # player weapon coating: "" | "electric" | "poi
 var coating_charges: int = 0     # hits remaining on the coating
 var bonus_damage: int = 0        # permanent melee damage bonus
 var int_xp: int = 0              # tinkering experience (dismantling + crafting)
+var body: BodyState = null       # procedural breakable body (null = flat-HP actor)
+var monster_key: String = ""     # content key, for body-plan resolution
 
 func int_mod() -> int:
 	return int_xp / 5
+
+## Attach a procedural body resolved from this entity's tags + the plan bundle.
+func attach_body(bundle: Dictionary) -> void:
+	body = BodyState.from_bundle(tags, monster_key, max_hp, bundle)
+
+## Can this actor still relocate? Flat-HP actors always can; bodied ones lose it
+## when their locomotion is destroyed (broken legs / propulsion).
+func can_move() -> bool:
+	return body == null or body.can_move()
+
+## Hobbled = at least one locomotion part broken (slowed, no charge/flee).
+func is_hobbled() -> bool:
+	return body != null and body.is_hobbled()
 
 func _init(_id: int = 0, _name: String = "", _hp: int = 1, _ac: int = 10, _tags: Array = []) -> void:
 	id = _id
