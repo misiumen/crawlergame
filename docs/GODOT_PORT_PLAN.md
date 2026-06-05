@@ -242,12 +242,21 @@ enemy intent telegraph). 36 GDScript checks green (`test_sim`/`test_combat`/
 `test_view`) + main scene boots clean. Run: `Godot --path godot`. **Remaining: the
 §11 fun-gate is subjective — needs a human play session (can't be judged headless).**
 
-### Phase 2 — Exploration + world-as-resource (L)
+### Phase 2 — Exploration + world-as-resource (L) ✅ DONE
 *Maps to `_sys_1_explore.png`, `_sys_2_salvage.png`, `_sys_4_gear.png`.*
-- Multi-room floor; `floorgen.gd` + room JSON; doors/exits; minimap.
-- Affordance interaction (inspect/salvage/break/push) via hover popover.
-- Salvage/dismantle screen + `monster_salvage`/`salvage_tables` data.
-- Inventory / equipment / weapon-coating panel.
+- ✅ Multi-room floor (`sim/floor.gd`): storage + hall, doors/exits, minimap, room
+  transitions; player + run inventory + per-room state persist across rooms.
+- ✅ Affordance interaction: dismantle objects ([E]) → materials; objects block movement.
+- ✅ Enemy **awareness** (sleeping/noise/sight) → a real explore→engage beat.
+- ✅ Crafting ([Z] warsztat): materials → electric weapon coating / damage upgrade
+  (pulled forward from Phase 3 to close the salvage→power loop).
+- ✅ Narration **DZIENNIK** log + materials/weapon/objective HUD (the readability fix).
+- ⏸ **Deferred:** procedural `floorgen.gd` from room JSON — the floor is hand-authored
+  for now; porting the full Python `floor_generator` is a later content-phase task.
+  The exploration *experience* (rooms, doors, scavenge→craft→fight→descend) is complete.
+
+**Verified:** 66 GDScript checks green (`test_sim`/`combat`/`view`/`floor`); main scene
++ exported exe boot clean.
 
 ### Phase 3 — Crafting + power compounding (M)
 *Maps to `_sys_3_craft.png`.*
