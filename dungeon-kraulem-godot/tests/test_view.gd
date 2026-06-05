@@ -166,6 +166,24 @@ func _initialize() -> void:
 		bv._click_primary(foe.cell)
 		_ck(foe.hp <= hp0, "left-clicking an adjacent enemy attacks it")
 
+	# lootbox opening: start the reveal, it defers loot until you collect
+	var lb := GameBox.new("sponsor", "NovaChem", Rarity.RARE)
+	lb.contents.append({"type": "material", "key": "złom", "qty": 3})
+	bv.floor.boxes = [lb]
+	var zlom0 := int(bv.sim.materials.get("złom", 0))
+	bv._open_box(0)
+	_ck(not bv._box_anim.is_empty(), "opening a box starts the reveal animation")
+	_ck(bv.floor.boxes.size() == 1, "the box is NOT consumed until the reveal is collected")
+	_ck(int(bv.sim.materials.get("złom", 0)) == zlom0, "loot is withheld during the spin")
+	for i in 8:
+		bv._process(0.30)               # spin through the phases
+	_ck(true, "reveal animation advances without crash")
+	bv._box_anim_advance()              # skip to the end if not there yet
+	bv._box_anim_advance()              # collect
+	_ck(bv._box_anim.is_empty(), "collecting closes the reveal")
+	_ck(bv.floor.boxes.is_empty(), "the box is consumed on collect")
+	_ck(int(bv.sim.materials.get("złom", 0)) == zlom0 + 3, "the loot lands in the run on collect")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)

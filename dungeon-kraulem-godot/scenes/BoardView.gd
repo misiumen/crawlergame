@@ -58,6 +58,10 @@ var _title := true                   # title screen shown before a run starts
 var _click_zones: Array = []         # per-frame clickable UI rects (rebuilt in _draw)
 var _mouse: Vector2 = Vector2.ZERO   # last known mouse position (for hover)
 var _sponsor_noticed: Dictionary = {} # sponsors whose "took interest" line already fired
+var _box_anim: Dictionary = {}       # active lootbox-opening reveal (non-empty = overlay)
+const BOX_SPIN := 1.8                 # reel spin seconds
+const BOX_POP := 0.55                 # snap-flash seconds
+const BOX_REVEAL_STEP := 0.30         # seconds between each loot piece popping in
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -232,6 +236,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_mouse = (event as InputEventMouseMotion).position
 		queue_redraw()
 		return
+	# Lootbox reveal grabs all input: a click/key skips the spin or collects the loot.
+	if not _box_anim.is_empty():
+		if (event is InputEventMouseButton and event.pressed) \
+				or (event is InputEventKey and event.pressed and not event.echo):
+			_box_anim_advance()
+		return
 	# ── Mouse: LMB acts (UI option, or board attack/talk/move), RMB shoves ──
 	if event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
@@ -329,7 +339,7 @@ func _unhandled_input(event: InputEvent) -> void:
 ## True only during normal board play (no modal/overlay grabbing input).
 func _can_take_board_input() -> bool:
 	return not _title and not _done and sim != null \
-		and _summary.is_empty() and _dlg.is_empty() \
+		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open
 
 ## Viewport pixel -> board cell.
@@ -515,40 +525,87 @@ func _set_aim(pkey: String) -> void:
 	var e := _focused_enemy()
 	if e != null and e.body != null and e.body.parts.has(pkey):
 		_log_push("Bierzesz na cel: %s." % e.body.part(pkey)["label_pl"])
+
+## Click/key during the lootbox reveal: skip the spin, then collect the loot.
+func _box_anim_advance() -> void:
+	if _box_anim.is_empty():
+		return
+	if _box_anim["phase"] != "done":
+		_box_anim["phase"] = "done"; _box_anim["t"] = 0.0
+		_box_anim["reveal_n"] = (_box_anim["entries"] as Array).size()
+	else:
+		var box: GameBox = _box_anim["box"]
+		var entries: Array = _box_anim["entries"]
+		_box_anim = {}
+		_commit_box_entries(box, entries)
+	queue_redraw()
 	queue_redraw()
 
-func _open_box(idx: int) -> void:
-	if idx < 0 or idx >= floor.boxes.size():
-		return
-	var box: GameBox = floor.boxes[idx]
-	box.opened = true
-	var spawned: Array = []
+## Resolve a box's contents into reveal entries WITHOUT adding them to the run
+## (so the opening animation can show them, then commit on the payoff beat).
+func _resolve_box(box: GameBox) -> Array:
+	var out: Array = []
 	for entry in box.contents:
 		match entry.get("type"):
 			"item_key":
 				var templates: Variant = _data_group("item_templates", "ITEM_TEMPLATES")
 				if templates is Dictionary and templates.has(entry["key"]):
 					var t: Dictionary = templates[entry["key"]]
-					var found_item := GameItem.new(
-						t.get("fallback_name", entry["key"]),
-						t.get("type", "tool"),
-						t.get("rarity", Rarity.COMMON)
-					)
+					var it := GameItem.new(t.get("fallback_name", entry["key"]),
+						t.get("type", "tool"), t.get("rarity", Rarity.COMMON))
 					var tg: Variant = t.get("tags", [])
-					found_item.tags = (tg if tg is Array else []).duplicate()
-					found_item.origin = box.source
-					floor.items.append(found_item)
-					spawned.append(found_item.name_pl)
+					it.tags = (tg if tg is Array else []).duplicate()
+					it.origin = box.source
+					out.append({"type": "item", "item": it, "label": it.display_name(),
+						"color": it.rarity_color()})
 			"material":
 				var mat: String = entry.get("key", "")
 				var qty: int = int(entry.get("qty", 1))
-				if mat:
-					sim.materials[mat] = int(sim.materials.get(mat, 0)) + qty
-					spawned.append("%s x%d" % [mat, qty])
-	floor.boxes.remove_at(idx)
+				if mat != "":
+					out.append({"type": "material", "key": mat, "qty": qty,
+						"label": "%s x%d" % [mat, qty], "color": COL_AMBER})
+	return out
+
+## Add resolved entries to the run, drop the box, and log the reveal flavor.
+func _commit_box_entries(box: GameBox, entries: Array) -> void:
+	var spawned: Array = []
+	for e in entries:
+		if e["type"] == "item":
+			floor.items.append(e["item"])
+			spawned.append(e["item"].name_pl)
+		else:
+			sim.materials[e["key"]] = int(sim.materials.get(e["key"], 0)) + int(e["qty"])
+			spawned.append(e["label"])
+	box.opened = true
+	floor.boxes.erase(box)
 	var contents_line := "  → " + (", ".join(spawned) if not spawned.is_empty() else "(pusto)")
 	for line in box.reveal_lines(contents_line):
 		_log_push(line)
+
+## Kick off the animated, Vampire-Survivors-style opening of box `idx`.
+func _open_box(idx: int) -> void:
+	if idx < 0 or idx >= floor.boxes.size():
+		return
+	var box: GameBox = floor.boxes[idx]
+	_craft_open = false
+	var entries := _resolve_box(box)
+	# Build a slot reel of rarity-colored tiles that lands on the box's tier.
+	var reel: Array = []
+	for r in Rarity.ALL:
+		reel.append(r)
+	var n := 26
+	var strip: Array = []
+	for i in n:
+		# bias toward lower tiers, with the odd tease of a high one
+		var pick: String = Rarity.ALL[mini(_narr_rng.randi_range(0, 5), Rarity.ALL.size() - 1)]
+		strip.append(pick)
+	var land := n - 4
+	strip[land] = box.rarity                      # the reel SNAPS onto the real tier
+	_box_anim = {
+		"box": box, "entries": entries, "strip": strip, "land": land,
+		"t": 0.0, "phase": "spin", "reveal_n": 0, "committed": false,
+	}
+	_shake = maxf(_shake, 1.0)
 	queue_redraw()
 
 # ── Public action drivers ─────────────────────────────────────────────────────
@@ -924,7 +981,30 @@ func _process(dt: float) -> void:
 		f["age"] += dt
 	_floaters = _floaters.filter(func(f): return f["age"] < f["ttl"])
 	_shake = maxf(0.0, _shake - dt * 24.0)
+	_tick_box_anim(dt)
 	queue_redraw()
+
+## Advance the lootbox-opening reveal through its phases.
+func _tick_box_anim(dt: float) -> void:
+	if _box_anim.is_empty():
+		return
+	_box_anim["t"] = float(_box_anim["t"]) + dt
+	var t: float = _box_anim["t"]
+	match _box_anim["phase"]:
+		"spin":
+			if t >= BOX_SPIN:
+				_box_anim["phase"] = "pop"; _box_anim["t"] = 0.0
+				_shake = maxf(_shake, 9.0)        # the SNAP
+		"pop":
+			if t >= BOX_POP:
+				_box_anim["phase"] = "reveal"; _box_anim["t"] = 0.0
+		"reveal":
+			var entries: Array = _box_anim["entries"]
+			_box_anim["reveal_n"] = mini(int(t / BOX_REVEAL_STEP) + 1, entries.size())
+			if int(_box_anim["reveal_n"]) >= entries.size() and t > entries.size() * BOX_REVEAL_STEP + 0.3:
+				_box_anim["phase"] = "done"; _box_anim["t"] = 0.0
+		"done":
+			pass
 
 # ── Drawing ───────────────────────────────────────────────────────────────────
 
@@ -1242,6 +1322,90 @@ func _draw_hud() -> void:
 		_draw_route_offer()
 	if not _dlg.is_empty():
 		_draw_dialogue()
+	if not _box_anim.is_empty():
+		_draw_box_open()
+
+## Vampire-Survivors-style lootbox reveal: a slot reel of rarity tiles spins and
+## decelerates, SNAPS onto the box's tier with a flash, then the loot pops in.
+func _draw_box_open() -> void:
+	# Dim everything behind the reveal.
+	draw_rect(Rect2(0, 0, 1280, 720), Color(0.02, 0.02, 0.04, 0.82))
+	var box: GameBox = _box_anim["box"]
+	var phase: String = _box_anim["phase"]
+	var t: float = _box_anim["t"]
+	var strip: Array = _box_anim["strip"]
+	var land: int = _box_anim["land"]
+	var rcol := Rarity.color(box.rarity)
+	var cx := 640.0
+	var reel_y := 250.0
+	var tile_w := 92.0
+	var tile_h := 92.0
+
+	# Header
+	draw_string(_font, Vector2(cx - 200, 150), box.tier_label(),
+		HORIZONTAL_ALIGNMENT_CENTER, 400, 30, rcol)
+	draw_string(_font, Vector2(cx - 200, 182), "od: " + box.source_name,
+		HORIZONTAL_ALIGNMENT_CENTER, 400, 14, COL_DIM)
+
+	# ── The reel ──
+	# Ease-out cubic so it screams in then crawls to a stop on `land`.
+	var p := clampf(t / BOX_SPIN, 0.0, 1.0) if phase == "spin" else 1.0
+	var ease := 1.0 - pow(1.0 - p, 3.0)
+	var off := land * tile_w * ease
+	# light "settle" wobble at the very end of the spin
+	if phase == "spin" and p > 0.93:
+		off += sin(t * 40.0) * 3.0 * (1.0 - p) * 30.0
+	for i in strip.size():
+		var x := cx - off + i * tile_w
+		if x < -tile_w or x > 1280:
+			continue
+		var col := Rarity.color(strip[i])
+		var centered: bool = absf(x - cx) < tile_w * 0.5
+		var th := tile_h * (1.12 if centered else 0.9)
+		var r := Rect2(x - tile_w * 0.5 + 6, reel_y - th * 0.5, tile_w - 12, th)
+		draw_rect(r, Color(col, 0.9 if centered else 0.5))
+		draw_rect(r, COL_BRIGHT if centered else Color(col, 0.7), false, 3.0 if centered else 1.0)
+		draw_string(_font, Vector2(r.position.x, reel_y + 4),
+			Rarity.label(strip[i]).substr(0, 3), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 14,
+			COL_BG if centered else Color(0, 0, 0, 0.5))
+	# centre marker
+	draw_rect(Rect2(cx - 52, reel_y - 60, 104, 120), Color(rcol, 0.0), false, 2.0)
+	draw_string(_font, Vector2(cx - 10, reel_y - 66), "▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
+
+	# ── The snap flash ──
+	if phase == "pop":
+		var a := clampf(1.0 - t / BOX_POP, 0.0, 1.0)
+		draw_rect(Rect2(0, 0, 1280, 720), Color(rcol, a * 0.55))
+		var sc := 30 + int((1.0 - a) * 26)
+		draw_string(_font, Vector2(cx - 300, reel_y + 8), Rarity.label(box.rarity).to_upper(),
+			HORIZONTAL_ALIGNMENT_CENTER, 600, sc, rcol)
+
+	# ── The loot ──
+	if phase == "reveal" or phase == "done":
+		var entries: Array = _box_anim["entries"]
+		var shown: int = int(_box_anim["reveal_n"])
+		draw_string(_font, Vector2(cx - 300, 360), "ZDOBYWASZ:",
+			HORIZONTAL_ALIGNMENT_CENTER, 600, 20, COL_BRIGHT)
+		var y := 400.0
+		for i in mini(shown, entries.size()):
+			var e: Dictionary = entries[i]
+			# pop-in scale for the most-recent piece
+			var age := t - i * BOX_REVEAL_STEP
+			var pop := clampf(age / 0.2, 0.0, 1.0)
+			var ecol: Color = e["color"]; ecol.a = pop
+			var rowy := y + i * 34
+			draw_rect(Rect2(cx - 250, rowy - 16, 500 * pop, 28), Color(e["color"], 0.14 * pop))
+			draw_string(_font, Vector2(cx - 240, rowy + 4), "✦  " + str(e["label"]),
+				HORIZONTAL_ALIGNMENT_LEFT, 480, 18, ecol)
+		if entries.is_empty():
+			draw_string(_font, Vector2(cx - 200, 410), "(pusto — pech)",
+				HORIZONTAL_ALIGNMENT_CENTER, 400, 16, COL_DIM)
+	if phase == "done":
+		draw_string(_font, Vector2(cx - 200, 660), "kliknij — odbierz",
+			HORIZONTAL_ALIGNMENT_CENTER, 400, 16, COL_AMBER)
+	else:
+		draw_string(_font, Vector2(cx - 200, 660), "(kliknij — pomiń)",
+			HORIZONTAL_ALIGNMENT_CENTER, 400, 13, COL_DIM)
 
 ## A dialogue-tree conversation: speaker + the node's line + the AVAILABLE options
 ## (numbered 1..N; skill options show your modifier vs the TT), plus the last
