@@ -57,6 +57,7 @@ var _dlg_info := ""                   # last skill-check result line
 var _title := true                   # title screen shown before a run starts
 var _click_zones: Array = []         # per-frame clickable UI rects (rebuilt in _draw)
 var _mouse: Vector2 = Vector2.ZERO   # last known mouse position (for hover)
+var _sponsor_noticed: Dictionary = {} # sponsors whose "took interest" line already fired
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -69,6 +70,7 @@ var _run_seed: int = 20260605
 
 func _build() -> void:
 	_title = false
+	_sponsor_noticed.clear()
 	var content := _content_bundle()
 	_narr_rng.seed = 9001
 	# Resume from a checkpoint if one exists.
@@ -372,6 +374,25 @@ func _zone(r: Rect2, kind: String, i: int = 0, s: String = "") -> void:
 
 func _hover(r: Rect2) -> bool:
 	return r.has_point(_mouse)
+
+## Surface a sponsor's shifting attention (throttled): the first time one warms to
+## you, say so + what it likes — so the gift box later reads as EARNED, not random.
+func _sponsor_reaction(e: Dictionary) -> void:
+	var key: String = e.get("key", "")
+	var val: int = int(e.get("val", 0))
+	var prev: int = val - int(e.get("delta", 0))
+	if prev < 1 and val >= 1 and not _sponsor_noticed.has(key):
+		_sponsor_noticed[key] = true
+		var nm: String = e.get("name", key)
+		_add_floater(sim.player_id, nm + " patrzy", COL_PURPLE)
+		var likes := floor.sponsors.likes_summary(key)
+		if likes != "":
+			_log_push("%s zaczyna cię obserwować (lubi: %s)." % [nm, likes])
+		else:
+			_log_push("%s zaczyna cię obserwować." % nm)
+	elif prev > -3 and val <= -3 and not _sponsor_noticed.has("h_" + key):
+		_sponsor_noticed["h_" + key] = true
+		_log_push("%s ma cię na oku — i nie w dobrym sensie." % e.get("name", key))
 
 func _dispatch_zone(z: Dictionary) -> void:
 	var i: int = int(z.get("i", 0))
@@ -749,6 +770,8 @@ func _animate(evs: Array) -> void:
 			"audience_change":
 				if e.get("crossed", false):
 					_log_push("Widownia — %s!" % e.get("band", "").to_upper())
+			"sponsor_attention":
+				_sponsor_reaction(e)
 			"sponsor_gift":
 				_log_push("%s zauważył cię. Paczka!" % e.get("name", "Sponsor"))
 			"combat_end":
@@ -1131,7 +1154,8 @@ func _draw_hud() -> void:
 	# INT stat
 	var int_str := "INT %d (+%d)" % [p.int_xp, p.int_mod()]
 	draw_string(_font, Vector2(40, 98), int_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	# Class + active readiness
+	# Class + active readiness — or, before you have one, your building playstyle
+	# (so the eventual class offer is visibly EARNED, not a random pop-up).
 	if p.class_key != "":
 		var gate := ClassFeatures.can_use_active(p, floor.depth)
 		var ready := "gotowa" if bool(gate[0]) else "użyta"
@@ -1139,6 +1163,10 @@ func _draw_hud() -> void:
 			ClassFeatures.active_name(p.class_key), ready]
 		var ccol := COL_AMBER if bool(gate[0]) else COL_DIM
 		draw_string(_font, Vector2(220, 98), cstr, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ccol)
+	else:
+		draw_string(_font, Vector2(220, 98),
+			"Styl: %s   (→ klasa)" % Classes.style_summary(p, 3),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Materials
 	var mats: Array = []
 	for k in sim.materials:
@@ -1172,8 +1200,11 @@ func _draw_hud() -> void:
 			var parts2: Array = []
 			for skey in top:
 				var sdata := floor.sponsors.get_sponsor(skey)
-				parts2.append("%s: %s" % [sdata.get("name_fallback", skey).substr(0, 12),
-					floor.sponsors.mood(skey)])
+				var nm: String = sdata.get("name_fallback", skey).substr(0, 12)
+				var gp := floor.sponsors.gift_progress(skey)
+				# Show attention + progress to next gift, so you SEE the box coming.
+				var prog := "  %d→%d📦" % [int(gp[0]), int(gp[1])] if int(gp[1]) > 0 else "  (max)"
+				parts2.append("%s %s%s" % [nm, floor.sponsors.mood(skey), prog])
 			draw_string(_font, Vector2(40, 168), "Sponsorzy: " + " | ".join(parts2),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 	# Target readout
@@ -1311,21 +1342,20 @@ func _draw_run_summary() -> void:
 
 ## The Syndicate's class pitch: 3 candidates, pick with number keys.
 func _draw_class_offer() -> void:
-	var W := 980.0; var H := 420.0
+	var W := 980.0; var H := 500.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
 	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.08, 0.12, 0.98))
 	draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
 	draw_string(_font, Vector2(px + 20, py + 30), "SYNDYKAT MA PROPOZYCJĘ",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_AMBER)
-	var tt := Classes.top_two(floor.player)
 	draw_string(_font, Vector2(px + 20, py + 54),
-		"Twój styl woła o tożsamość — dominuje: %s. Wybierz klasę:" %
-		Classes.affinity_label(tt[0]),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+		"Tak grałeś: %s.  Te klasy pasują najlepiej — wybierz:" %
+		Classes.style_summary(floor.player, 3),
+		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 14, COL_DIM)
 	var cy := py + 84.0
 	for i in _class_offer.size():
 		var key: String = _class_offer[i]
-		var box := Rect2(px + 16, cy, W - 32, 96)
+		var box := Rect2(px + 16, cy, W - 32, 118)
 		var hot := _hover(box)
 		draw_rect(box, Color(0.16, 0.14, 0.10, 0.95) if hot else Color(0.10, 0.12, 0.17, 0.9))
 		draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
@@ -1334,12 +1364,15 @@ func _draw_class_offer() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_BRIGHT)
 		draw_string(_font, Vector2(px + 28, cy + 48), Classes.desc_of(key),
 			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 14, COL_DIM)
-		var pas := _passive_summary(key)
 		draw_string(_font, Vector2(px + 28, cy + 70),
+			"Pasuje, bo: %s" % Classes.fit_reason(floor.player, key),
+			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 13, COL_GREEN)
+		var pas := _passive_summary(key)
+		draw_string(_font, Vector2(px + 28, cy + 92),
 			"Pasywka: %s    Umiejętność: %s" % [pas, ClassFeatures.active_name(key)],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 13, COL_CYAN)
 		_zone(box, "class", i)
-		cy += 104.0
+		cy += 126.0
 
 func _passive_summary(key: String) -> String:
 	var parts: Array = []

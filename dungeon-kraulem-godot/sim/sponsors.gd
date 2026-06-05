@@ -72,6 +72,22 @@ func mood(key: String) -> String:
 	if att >= -4: return "wkurzony"
 	return "wrogi"
 
+## Progress toward this sponsor's next gift: [current_attention, next_threshold].
+## next_threshold is 0 once both gifts have been sent (nothing left to earn).
+func gift_progress(key: String) -> Array:
+	var att := get_attention(key)
+	if not flags.get("gift1_" + key, false):
+		return [att, GIFT_THRESHOLD_FIRST]
+	if not flags.get("gift2_" + key, false):
+		return [att, GIFT_THRESHOLD_SECOND]
+	return [att, 0]
+
+## What this sponsor likes (comma list) — for showing WHY it watches you.
+func likes_summary(key: String) -> String:
+	var sd := get_sponsor(key)
+	var likes: Variant = sd.get("likes_tags", [])
+	return ", ".join(likes) if likes is Array else ""
+
 # ── Tag routing ───────────────────────────────────────────────────────────────
 
 ## Route a gameplay tag to all sponsors. Returns list of event dicts.

@@ -36,6 +36,11 @@ func _initialize() -> void:
 	var top3 := Classes.suggest_classes(p, 3, rng)
 	_ck(top3.size() == 3, "suggest_classes returns 3 candidates")
 	_ck("bruiser" in top3, "melee build's top suggestions include bruiser")
+	# deterministic best-fit (no wildcard): same player -> same ranking, top is bruiser
+	_ck(Classes.suggest_classes(p, 3, rng)[0] == "bruiser", "top suggestion is the best fit, every time")
+	# legibility helpers
+	_ck(Classes.style_summary(p, 2).begins_with("walka wręcz 9"), "style_summary leads with your top affinity")
+	_ck(Classes.fit_reason(p, "bruiser").contains("walka wręcz 9"), "fit_reason explains why a class fits")
 
 	# --- offer thresholds ---
 	var q := _make_player()
@@ -43,9 +48,15 @@ func _initialize() -> void:
 	_ck(not Classes.should_offer(q, 1, 20), "weak/spread affinity does not trigger an offer")
 	q.affinity = {"melee": 9, "tech": 1}
 	_ck(Classes.should_offer(q, 1, 10), "dominant melee (9 vs 1, total 10) past turn 8 triggers an offer")
+	# A heavily-invested run with a lead (not 2x) still offers — but only past the
+	# turn gate, and only when there's a genuine TOP style.
 	var r := _make_player()
-	r.affinity = {"melee": 6, "tech": 5, "survival": 5}   # total 16, no dominance
-	_ck(Classes.should_offer(r, 1, 4), "high total (>=16) forces an offer even without dominance")
+	r.affinity = {"melee": 7, "tech": 5, "survival": 5}   # total 17, melee leads
+	_ck(not Classes.should_offer(r, 1, 4), "no offer before the turn gate even at high total")
+	_ck(Classes.should_offer(r, 1, 10), "high total + a clear lead offers past the turn gate")
+	var rg := _make_player()
+	rg.affinity = {"melee": 5, "tech": 5, "survival": 4}  # tied top — no real style
+	_ck(not Classes.should_offer(rg, 1, 12), "a tied generalist with no top style is NOT offered")
 	var s := _make_player()
 	s.class_key = "bruiser"
 	s.affinity = {"melee": 30}

@@ -114,17 +114,41 @@ static func class_score(player, class_key: String, rng: RandomNumberGenerator) -
 	score += rng.randf() * 0.01   # break ties without changing ordering meaningfully
 	return score
 
-## Top-N class keys by fit, with a 20% chance the last pick is a wildcard
-## (discovery — you might be nudged toward a class you didn't grind for).
+## The N classes that best fit how you've actually played — deterministic, no
+## wildcard. Scored purely on your affinities, so the offer always reflects you.
 static func suggest_classes(player, n: int, rng: RandomNumberGenerator) -> Array:
 	var ranked: Array = CATALOG.keys()
 	ranked.sort_custom(func(a, b):
 		return class_score(player, a, rng) > class_score(player, b, rng))
-	var top: Array = ranked.slice(0, mini(n, ranked.size()))
-	if rng.randf() < 0.2 and ranked.size() > n:
-		var wild: String = ranked[rng.randi_range(n, ranked.size() - 1)]
-		top[top.size() - 1] = wild
-	return top
+	return ranked.slice(0, mini(n, ranked.size()))
+
+## The affinities a class draws on that you actually have points in, as a short
+## "walka 12 · przetrwanie 3" string — shown in the offer so the fit is legible.
+static func fit_reason(player, class_key: String) -> String:
+	var weights: Dictionary = CATALOG[class_key]["weights"]
+	var pairs: Array = []
+	for kind in weights:
+		var v: int = int(player.affinity.get(kind, 0))
+		if v > 0:
+			pairs.append([affinity_label(kind), v])
+	pairs.sort_custom(func(a, b): return a[1] > b[1])
+	var parts: Array = []
+	for p in pairs:
+		parts.append("%s %d" % [p[0], p[1]])
+	return " · ".join(parts) if not parts.is_empty() else "twój dotychczasowy styl"
+
+## Top playstyle affinities as a compact HUD string ("walka 12 · rzemiosło 5").
+static func style_summary(player, n: int = 3) -> String:
+	var pairs: Array = []
+	for k in player.affinity:
+		var v: int = int(player.affinity[k])
+		if v > 0:
+			pairs.append([affinity_label(k), v])
+	pairs.sort_custom(func(a, b): return a[1] > b[1])
+	var parts: Array = []
+	for i in mini(n, pairs.size()):
+		parts.append("%s %d" % [pairs[i][0], pairs[i][1]])
+	return " · ".join(parts) if not parts.is_empty() else "jeszcze się kształtuje"
 
 # ── Offer logic ───────────────────────────────────────────────────────────────
 
@@ -152,9 +176,13 @@ static func should_offer(player, _floor_num: int, turn: int) -> bool:
 	var total := total_affinity(player)
 	var tt := top_two(player)
 	var top: int = tt[1]; var second: int = tt[2]
-	if total >= FORCED_TOTAL:
-		return true
-	return total >= EARNED_TOTAL and top >= EARNED_TOP and top >= 2 * second and turn >= EARNED_TURN
+	# Always require a genuine TOP style, so the offer reflects how you played —
+	# never a random pop-up. Clear dominance (2x runner-up) qualifies early; a mere
+	# lead qualifies only once you've invested a lot (so generalists still get
+	# their best-fit classes eventually, but it's still their actual top style).
+	if total < EARNED_TOTAL or turn < EARNED_TURN or top < EARNED_TOP:
+		return false
+	return top >= 2 * second or (total >= FORCED_TOTAL and top > second)
 
 # ── Assignment ────────────────────────────────────────────────────────────────
 
