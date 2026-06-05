@@ -90,12 +90,20 @@ func _initialize() -> void:
 		bv._process(0.016)
 	_ck(true, "class HUD + active path run without crash")
 
-	# descent: generate the next floor, carrying the whole run forward
+	# descent: gamble a route, then descend, carrying the whole run forward
 	var d0: int = bv.floor.depth
 	var cls: String = bv.floor.player.class_key
 	bv.floor.player.run_kills = 3
-	bv._descend()
+	bv._offer_routes()
+	_ck(not bv._route_offer.is_empty(), "the stairs offer route choices")
+	for i in 2:
+		bv._process(0.016)              # draws the route modal
+	_ck(true, "route-offer modal draws without crash")
+	var chosen: String = bv._route_offer[0]
+	bv._descend_into(chosen)
+	_ck(bv._route_offer.is_empty(), "picking a route closes the modal")
 	_ck(bv.floor.depth == d0 + 1, "descending advances the floor depth")
+	_ck(bv.floor.biome == chosen, "the new floor records its chosen biome")
 	_ck(bv.floor.player.class_key == cls, "the class carries to the next floor")
 	_ck(bv.floor.player.run_kills == 3, "run tallies carry to the next floor")
 	_ck(bv.floor.player.class_active_used_floor == -1, "the class active recharges on the new floor")

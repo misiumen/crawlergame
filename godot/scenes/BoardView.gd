@@ -51,6 +51,7 @@ var _class_offer: Array = []         # candidate class keys; non-empty = modal o
 var _narr_rng := RandomNumberGenerator.new()   # seeded narrator line picker
 var _summary: Dictionary = {}        # non-empty = end-of-run results screen
 var _summary_lines: Array = []       # rendered Polish lines for the screen
+var _route_offer: Array = []         # candidate biome keys at the stairs; non-empty = modal
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -102,14 +103,23 @@ func _content_bundle() -> Dictionary:
 	if stats is Dictionary: out["MOB_COMBAT_STATS"] = stats
 	return out
 
-## Generate the next floor down, carrying the whole run forward (player, kit,
-## audience, sponsors, recipes). Death is the only thing that ends a run early.
-func _descend() -> void:
-	var next_depth: int = floor.depth + 1
-	if next_depth > FINAL_FLOOR:
+## At the stairs you GAMBLE A ROUTE: pick one of a few biomes for the next floor
+## (or win if the next floor is past the finale).
+func _offer_routes() -> void:
+	if floor.depth + 1 > FINAL_FLOOR:
 		_end_run(true)
 		return
-	var data := FloorGen.generate(next_depth, _run_seed, _content_bundle())
+	_route_offer = Routes.offer(_narr_rng, 3)
+	_log_push("Stoisz przy schodach. Którędy w dół?")
+	queue_redraw()
+
+## Descend into the chosen route's biome, carrying the whole run forward (player,
+## kit, audience, sponsors, recipes). Death is the only thing that ends a run early.
+func _descend_into(biome_key: String) -> void:
+	_route_offer = []
+	var next_depth: int = floor.depth + 1
+	var mods := Routes.mods_for(biome_key)
+	var data := FloorGen.generate(next_depth, _run_seed, _content_bundle(), mods)
 	# Carry the run forward: keep the same player + accumulated state.
 	floor.player.cell = data["start_cell"]
 	floor.player.class_active_used_floor = -1   # active recharges each floor
@@ -128,7 +138,7 @@ func _descend() -> void:
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
-	_log_push("Schodzisz na piętro %d. Robi się ciaśniej." % next_depth)
+	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
 	Save.write(floor, _run_seed)   # checkpoint at each new floor
 
 ## Reach the Data autoload via /root (BoardView is a Node, so this is safe and
@@ -184,7 +194,7 @@ func _check_transition() -> void:
 		return
 	if r.get("descend", false):
 		_add_banner("ZEJŚCIE NIŻEJ")
-		_descend()
+		_offer_routes()
 		return
 	sim = floor.sim
 	_attach_bodies()
@@ -208,6 +218,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if kc == KEY_ENTER or kc == KEY_KP_ENTER:
 			_summary = {}; _summary_lines = []; _done = false
 			_build()
+		return
+
+	# Route-gamble modal at the stairs grabs input until a route is chosen.
+	if not _route_offer.is_empty():
+		var rpick := kc - KEY_1
+		if rpick >= 0 and rpick < _route_offer.size():
+			_descend_into(_route_offer[rpick])
 		return
 
 	# Class-offer modal grabs input until a choice is made.
@@ -926,6 +943,31 @@ func _draw_hud() -> void:
 		_draw_craft_panel()
 	if not _class_offer.is_empty():
 		_draw_class_offer()
+	if not _route_offer.is_empty():
+		_draw_route_offer()
+
+## The route gamble at the stairs: pick which biome to descend into.
+func _draw_route_offer() -> void:
+	var W := 1000.0; var H := 360.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.09, 0.12, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_GREEN, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 30), "SCHODY W DÓŁ — WYBIERZ TRASĘ",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GREEN)
+	draw_string(_font, Vector2(px + 20, py + 54),
+		"Każda trasa to inne piętro. Wybierasz raz — i schodzisz.",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+	var cy := py + 84.0
+	for i in _route_offer.size():
+		var key: String = _route_offer[i]
+		draw_rect(Rect2(px + 16, cy, W - 32, 76), Color(0.10, 0.13, 0.17, 0.9))
+		draw_rect(Rect2(px + 16, cy, W - 32, 76), COL_GRID, false, 1.0)
+		draw_string(_font, Vector2(px + 28, cy + 28),
+			"[%d]  %s" % [i + 1, Routes.label_of(key)],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_BRIGHT)
+		draw_string(_font, Vector2(px + 28, cy + 52), Routes.blurb_of(key),
+			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 14, COL_AMBER)
+		cy += 84.0
 
 ## End-of-run results screen: victory/death header, run tallies, sponsors, and
 ## any meta options the season unlocked.

@@ -20,12 +20,14 @@ var turn: int = 0
 var class_offered: bool = false   # once we've offered a class, don't nag again
 
 var depth: int = 1                 # how many floors deep this run is (1-based)
+var biome: String = ""             # the route-biome this floor was generated with
 
 func _init(data: Dictionary) -> void:
 	rooms = data["rooms"]
 	player = data["player"]
 	inv = data.get("inv", {})
 	depth = int(data.get("depth", data.get("floor_num", 1)))
+	biome = data.get("biome", "")
 	# Run state can be CARRIED FORWARD across floors (descent) or freshly made.
 	items = data.get("items", [])
 	boxes = data.get("boxes", [])

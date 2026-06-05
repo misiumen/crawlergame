@@ -28,7 +28,10 @@ const FALLBACK_ENV := {
 
 ## Build floor `floor_num` (1-based) from `seed`. `content` is the entity bundle
 ## {"MON": {...}, "ENV": {...}, "MOB_COMBAT_STATS": {...}} (pass {} for fallback).
-static func generate(floor_num: int, seed_value: int, content: Dictionary = {}) -> Dictionary:
+## `mods` is an optional route-biome bias {enemy_mul, object_mul, trap_mul,
+## biome_key, label} — Routes.mods_for(key).
+static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
+		mods: Dictionary = {}) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value + floor_num * 100003
 	var mon: Dictionary = content.get("MON", FALLBACK_MON)
@@ -40,11 +43,16 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {}) 
 
 	var rooms: Array = []
 	for i in room_count:
-		rooms.append(_gen_room(rng, floor_num, i, room_count, mon, env, stats, next_id))
+		rooms.append(_gen_room(rng, floor_num, i, room_count, mon, env, stats, next_id, mods))
 	_link_rooms(rooms)
 
 	var player := CombatEntity.new(1, "Bezimienny", 100, 14, ["humanoid"])
 	player.faction = "player"
+
+	var biome_label: String = mods.get("label", "")
+	var hint := "Piętro %d. Przejdź pokoje (+), zejdź po schodach (>). Rozbieraj, kuj, walcz." % floor_num
+	if biome_label != "":
+		hint = "Piętro %d — %s. Schodź po schodach (>)." % [floor_num, biome_label]
 
 	return {
 		"rooms": rooms,
@@ -53,13 +61,18 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {}) 
 		"start": 0,
 		"start_cell": rooms[0]["entry"],
 		"floor_num": floor_num,
-		"hint": "Piętro %d. Przejdź pokoje (+), zejdź po schodach (>). Rozbieraj, kuj, walcz." % floor_num,
+		"biome": mods.get("biome_key", ""),
+		"hint": hint,
 	}
 
 # ── Room generation ───────────────────────────────────────────────────────────
 
 static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, total: int,
-		mon: Dictionary, env: Dictionary, stats: Dictionary, next_id: Dictionary) -> Dictionary:
+		mon: Dictionary, env: Dictionary, stats: Dictionary, next_id: Dictionary,
+		mods: Dictionary = {}) -> Dictionary:
+	var enemy_mul: float = float(mods.get("enemy_mul", 1.0))
+	var object_mul: float = float(mods.get("object_mul", 1.0))
+	var trap_mul: float = float(mods.get("trap_mul", 1.0))
 	var w: int = rng.randi_range(MIN_W, MAX_W)
 	var h: int = rng.randi_range(MIN_H, MAX_H)
 	var board := Board.new(w, h)
@@ -73,14 +86,14 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 	var door := Vector2i(w - 2, h / 2)          # east doorway (interior, near wall)
 	var is_last := idx == total - 1
 
-	# A conductive trap appears more often deeper. Keep it off the entry/door row.
-	if rng.randf() < minf(0.3 + floor_num * 0.08, 0.7):
+	# A conductive trap appears more often deeper (and per the route's trap bias).
+	if rng.randf() < minf((0.3 + floor_num * 0.08) * trap_mul, 0.95):
 		_place_trap(board, rng, entry, door)
 
 	var entities: Dictionary = {}
 	# Objects to dismantle (1..3).
 	var obj_keys: Array = env.keys()
-	var n_obj := rng.randi_range(1, 3)
+	var n_obj := maxi(0, int(round(rng.randi_range(1, 3) * object_mul)))
 	for _i in n_obj:
 		if obj_keys.is_empty():
 			break
@@ -96,7 +109,7 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 
 	# Enemies (deeper floors = more, harder). Room 0 a touch lighter.
 	var eligible := _eligible_mobs(mon, floor_num, false)
-	var n_enemy: int = clampi(floor_num / 2 + idx, 0, 3)
+	var n_enemy: int = clampi(int(round((floor_num / 2 + idx) * enemy_mul)), 0, 4)
 	if idx == 0:
 		n_enemy = maxi(0, n_enemy - 1)
 	for _i in n_enemy:

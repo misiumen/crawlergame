@@ -25,6 +25,7 @@ static func write(floor, seed_value: int) -> void:
 	var data := {
 		"seed": seed_value,
 		"depth": floor.depth,
+		"biome": floor.biome,
 		"turn": floor.turn,
 		"class_offered": floor.class_offered,
 		"player": _player_dict(p),
@@ -73,7 +74,9 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 		return null
 	var seed_value := int(save_dict.get("seed", 0))
 	var depth := int(save_dict.get("depth", 1))
-	var fdata: Dictionary = FloorGen.generate(depth, seed_value, content)
+	var biome := str(save_dict.get("biome", ""))
+	var mods: Dictionary = Routes.mods_for(biome) if biome != "" else {}
+	var fdata: Dictionary = FloorGen.generate(depth, seed_value, content, mods)
 
 	# Re-apply the saved player stats onto the freshly generated player. We set
 	# class_key + max_hp DIRECTLY (no assign_class) — the passive hp bump is
