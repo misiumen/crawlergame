@@ -589,6 +589,16 @@ func _animate(evs: Array) -> void:
 				_log_push(str(e.get("reason", "Nie mozna uzyc umiejetnosci.")))
 			"talk":
 				_open_dialogue(int(e.get("npc_id", -1)))
+			"throw":
+				_add_floater(sim.player_id, "RZUT", COL_AMBER)
+				_log_push("Rzucasz: %s!" % e.get("name", "?"))
+				_shake = maxf(_shake, 3.0)
+			"status_tick":
+				_add_floater(int(e.get("target", 0)), str(e.get("status", "")), COL_GAS)
+			"hazard_placed":
+				_log_push("Rozlewa się: %s." % e.get("kind", "?"))
+			"trap_armed":
+				_log_push("Pułapka rozstawiona (%s)." % e.get("kind", "?"))
 			"item_used":
 				_add_floater(sim.player_id, "użyto: " + e["name"], COL_BRIGHT)
 			"audience_change":
@@ -773,6 +783,9 @@ func _draw() -> void:
 				"water": draw_rect(Rect2(r.position + Vector2(3, 3), Vector2(TILE - 7, TILE - 7)), COL_WATER)
 				"wire":  _draw_glyph("|", c, COL_WIRE)
 				"gas":   _draw_glyph("G", c, COL_GAS)
+				"fire":
+					draw_rect(Rect2(r.position + Vector2(4, 4), Vector2(TILE - 9, TILE - 9)), Color(0.55, 0.18, 0.06, 0.6))
+					_draw_glyph("^", c, COL_RED)
 	_draw_exits()
 	var p := sim.player()
 	for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN,

@@ -6,6 +6,9 @@ extends RefCounted
 
 const DMG_PHYSICAL := "physical"
 const DMG_ELECTRIC := "electric"
+const DMG_FIRE := "fire"
+const DMG_ACID := "acid"
+const DMG_COLD := "cold"
 
 var board: Board
 var entities: Dictionary = {}
@@ -61,12 +64,33 @@ func enemies_alive() -> Array:
 # ── Damage model ──────────────────────────────────────────────────────────────
 
 func effective_damage(target: CombatEntity, base: int, dmg_type: String) -> int:
-	var dmg: int = base
+	var dmg: float = float(base)
+	# Physical: thick hide tanks it.
 	if dmg_type == DMG_PHYSICAL and target.has_property("thick_hide"):
-		dmg = int(dmg / 2.0)
-	if dmg_type == DMG_ELECTRIC and target.has_property("shock_weak"):
-		dmg = dmg * 2
-	return maxi(1, dmg)
+		dmg *= 0.5
+	# Electric: explicit shock-weakness, or conductive matter conducts it.
+	if dmg_type == DMG_ELECTRIC:
+		if target.has_property("shock_weak"): dmg *= 2.0
+		elif target.has_property("conductive"): dmg *= 1.5
+	# Fire: flammable matter (organic/wood/cloth/...) burns hotter; wet resists.
+	if dmg_type == DMG_FIRE:
+		if target.has_property("flammable"): dmg *= 1.75
+		if target.has_property("wet"): dmg *= 0.5
+	# Acid: eats metal.
+	if dmg_type == DMG_ACID and target.has_property("metal"):
+		dmg *= 1.6
+	# Cold: brittle once wet/frozen; fire creatures resist.
+	if dmg_type == DMG_COLD:
+		if target.has_property("wet"): dmg *= 1.5
+		if target.has_property("flammable"): dmg *= 0.75
+	return maxi(1, int(round(dmg)))
+
+## Status effects shorthand: which DoT a status deals per turn, by type.
+const STATUS_DOT := {"burning": [3, "fire"], "poisoned": [2, "physical"], "corroded": [1, "acid"]}
+
+## Effective AC, reduced while the target is corroded (armor eaten away).
+func _eff_ac(target: CombatEntity) -> int:
+	return target.ac - (2 if target.has_status("corroded") else 0)
 
 ## Apply damage. If the target carries a procedural body, the blow is LOCATED:
 ## a zone is chosen (or the aimed one used), the part's damage multiplier scales
@@ -146,7 +170,7 @@ func _player_attack(target: CombatEntity) -> Array:
 	var autohit: bool = p.next_attack_autohit
 	if autohit:
 		p.next_attack_autohit = false
-	if autohit or _roll_hit(hit_bonus, target.ac):
+	if autohit or _roll_hit(hit_bonus, _eff_ac(target)):
 		var base: int = rng.randi_range(1, 6) + 2 + p.bonus_damage
 		base += ClassFeatures.passive_bonus(p, "unarmed_dmg")   # bruiser/demoman fists
 		if p.next_attack_mult > 1:                               # bruiser charge (active)
@@ -315,6 +339,9 @@ func player_use_item(item_idx: int) -> Array:
 		return [{"type": "none", "action": "use_item"}]
 	var item := items[item_idx] as GameItem
 	var p := player()
+	# A thrown weapon needs something to throw at — don't waste it on an empty room.
+	if item.category == GameItem.CAT_THROWN and enemies_alive().is_empty():
+		return [{"type": "none", "action": "throw"}]
 	var evs: Array = [{"type": "item_used", "uid": item.uid, "name": item.name_pl,
 		"category": item.category, "rarity": item.rarity}]
 	match item.category:
@@ -339,6 +366,10 @@ func player_use_item(item_idx: int) -> Array:
 				p.coating_charges += int(item.effect["recharge_coating"])
 				evs.append({"type": "coating_recharged",
 							"charges": p.coating_charges})
+		GameItem.CAT_THROWN:
+			evs += _throw_item(item)
+		GameItem.CAT_TRAP:
+			evs += _deploy_trap(item)
 	# Consume or keep.
 	if item.charges == 0:
 		pass   # permanent upgrade — stays in items list
@@ -347,6 +378,58 @@ func player_use_item(item_idx: int) -> Array:
 	else:
 		item.charges -= 1
 	evs += _after_player_action(1)
+	return evs
+
+# ── Thrown weapons + traps ────────────────────────────────────────────────────
+
+## Hurl a thrown item at the nearest enemy: element damage (+ a splash if the
+## item rolled an AoE affix), an optional lingering status, and an optional hazard
+## tile left under the target (e.g. fire). Spectacle the audience loves.
+func _throw_item(item: GameItem) -> Array:
+	var evs: Array = []
+	var fx: Dictionary = item.effect
+	var dmg_type: String = fx.get("dmg_type", DMG_PHYSICAL)
+	if dmg_type == "corrosive": dmg_type = DMG_ACID   # crafting's name -> damage model's
+	var base: int = int(fx.get("base_dmg", 5))
+	var target := _nearest_enemy()
+	if target == null:
+		return evs
+	evs.append({"type": "throw", "name": item.name_pl, "target": target.id,
+		"dmg_type": dmg_type})
+	var hits: Array = [target]
+	if fx.get("aoe", false):
+		for e in enemies_alive():
+			if e != target and board.is_adjacent(e.cell, target.cell):
+				hits.append(e)
+	for h in hits:
+		evs += _apply_damage(h, base, dmg_type)
+		if fx.has("status") and h.is_alive():
+			h.add_status(fx["status"], int(fx.get("status_turns", 2)))
+			evs.append({"type": "status", "target": h.id, "status": fx["status"],
+				"turns": int(fx.get("status_turns", 2))})
+	# A hazard tile under the impact (fire pool, gas...).
+	if fx.has("hazard") and board.in_bounds(target.cell):
+		board.set_hazard(target.cell, fx["hazard"])
+		evs.append({"type": "hazard_placed", "cell": target.cell, "kind": fx["hazard"]})
+	evs += _note_tag("clever_action")
+	evs += _change_audience(2, "throw")
+	_add_affinity("ranged", 1)
+	return evs
+
+## Arm a trap on a free adjacent cell (a hazard the next stepper triggers).
+func _deploy_trap(item: GameItem) -> Array:
+	var evs: Array = []
+	var kind: String = item.effect.get("hazard", "wire")
+	var p := player()
+	for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+		var c: Vector2i = p.cell + d
+		if board.is_free(c) and board.hazard_at(c) == "":
+			board.set_hazard(c, kind)
+			p.run_traps_armed += 1
+			_add_affinity("trap", 1)
+			evs.append({"type": "trap_armed", "cell": c, "kind": kind})
+			return evs
+	evs.append({"type": "none", "action": "trap"})
 	return evs
 
 # ── Class active ability ──────────────────────────────────────────────────────
@@ -479,6 +562,17 @@ func _on_enter_cell(e: CombatEntity) -> Array:
 			evs += _change_audience(5, "env_kill")
 			if e.id != player_id:
 				_add_affinity("environment", 2)
+	# Fire tile: ignites whoever steps in (flammable matter burns harder).
+	elif board.hazard_at(e.cell) == "fire":
+		evs.append({"type": "systemic", "element": "fire", "target": e.id, "via": "fire_tile"})
+		evs += _apply_damage(e, rng.randi_range(3, 7), DMG_FIRE)
+		if e.is_alive():
+			e.add_status("burning", 2)
+			evs.append({"type": "status", "target": e.id, "status": "burning", "turns": 2})
+		elif e.faction == "enemy":
+			player().run_kills += 1
+			evs += _note_tag("env_kill")
+			evs += _change_audience(4, "env_kill")
 	return evs
 
 func would_shock_at(c: Vector2i) -> bool:
@@ -595,8 +689,27 @@ func _enemy_turn() -> Array:
 				evs += _on_enter_cell(e)
 		if not p.is_alive():
 			break
+	evs += _tick_dots()
 	for id in entities:
 		(entities[id] as CombatEntity).tick_statuses()
+	return evs
+
+## Apply damage-over-time from lingering statuses (burning/poisoned/corroded) to
+## every living entity, then return the events. Runs once per round.
+func _tick_dots() -> Array:
+	var evs: Array = []
+	for id in entities.keys():
+		var e: CombatEntity = entities[id]
+		if not e.is_alive():
+			continue
+		for status in STATUS_DOT:
+			if e.has_status(status):
+				var spec: Array = STATUS_DOT[status]
+				evs.append({"type": "status_tick", "target": e.id, "status": status,
+					"amount": spec[0]})
+				evs += _apply_damage(e, int(spec[0]), str(spec[1]))
+				if not e.is_alive():
+					break
 	return evs
 
 func _step_toward(frm: Vector2i, to: Vector2i) -> Vector2i:
