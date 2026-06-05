@@ -124,6 +124,12 @@ func _descend_into(biome_key: String) -> void:
 	# Carry the run forward: keep the same player + accumulated state.
 	floor.player.cell = data["start_cell"]
 	floor.player.class_active_used_floor = -1   # active recharges each floor
+	# A breather between floors: heal 15% max HP (keeps a 6-floor run winnable).
+	var rest := int(round(floor.player.max_hp * 0.15))
+	var healed := mini(rest, floor.player.max_hp - floor.player.hp)
+	floor.player.hp = mini(floor.player.max_hp, floor.player.hp + rest)
+	if healed > 0:
+		_log_push("Łapiesz oddech na schodach: +%d HP." % healed)
 	data["player"] = floor.player
 	data["inv"] = floor.inv
 	data["items"] = floor.items
