@@ -58,17 +58,38 @@ func _ready() -> void:
 	set_process(true)
 
 const FINAL_FLOOR := 6   # descending from here wins the run
+var _run_seed: int = 20260605
 
 func _build() -> void:
-	var data := FloorGen.generate(1, 20260605, _content_bundle())
+	var content := _content_bundle()
+	_narr_rng.seed = 9001
+	# Resume from a checkpoint if one exists.
+	if Save.has_save():
+		var sd := Save.read()
+		var fl = Save.rebuild_floor(sd, content)
+		if fl != null:
+			floor = fl
+			_run_seed = int(sd.get("seed", _run_seed))
+			sim = floor.sim
+			_hint = floor.rooms[floor.current].get("name", "")
+			_log = ["Wczytano zapis. Kontynuujesz zjazd — piętro %d." % floor.depth]
+			_attach_bodies(); _recenter(); _reset_visuals()
+			return
+	# Fresh run.
+	_run_seed = _new_seed()
+	var data := FloorGen.generate(1, _run_seed, content)
 	floor = Floor.new(data)
 	sim = floor.sim
 	_hint = data.get("hint", "")
 	_log = ["Piętro 1. Zaczynasz zjazd. Rozbieraj, kuj, walcz — i schodź głębiej."]
-	_narr_rng.seed = 9001
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
+	Save.write(floor, _run_seed)   # checkpoint at the start
+
+func _new_seed() -> int:
+	# Varies per launch (Math.random/argless Date are unavailable in this harness).
+	return int(Time.get_ticks_usec()) & 0x7fffffff
 
 ## Entity content pulled from the Data autoload (empty -> FloorGen fallback).
 func _content_bundle() -> Dictionary:
@@ -88,7 +109,7 @@ func _descend() -> void:
 	if next_depth > FINAL_FLOOR:
 		_end_run(true)
 		return
-	var data := FloorGen.generate(next_depth, 20260605, _content_bundle())
+	var data := FloorGen.generate(next_depth, _run_seed, _content_bundle())
 	# Carry the run forward: keep the same player + accumulated state.
 	floor.player.cell = data["start_cell"]
 	floor.player.class_active_used_floor = -1   # active recharges each floor
@@ -108,6 +129,7 @@ func _descend() -> void:
 	_recenter()
 	_reset_visuals()
 	_log_push("Schodzisz na piętro %d. Robi się ciaśniej." % next_depth)
+	Save.write(floor, _run_seed)   # checkpoint at each new floor
 
 ## Reach the Data autoload via /root (BoardView is a Node, so this is safe and
 ## avoids the bare `Data` identifier that won't compile under headless -s/--import).
@@ -374,6 +396,7 @@ func _end_run(victory: bool) -> void:
 	_summary = RunSummary.build(floor, victory, _narr_rng)
 	_summary["new_unlocks"] = Meta.record_run(_summary)
 	_summary_lines = RunSummary.render_lines(_summary)
+	Save.clear()   # the run is over; next launch starts fresh
 	_done = true
 	queue_redraw()
 

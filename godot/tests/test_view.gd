@@ -13,6 +13,7 @@ func _ck(c: bool, l: String) -> void:
 
 func _initialize() -> void:
 	print("=== view tests ===")
+	Save.clear()                         # start from a clean slate, not a leftover save
 	var bv = preload("res://scenes/BoardView.gd").new()
 	bv._font = ThemeDB.fallback_font
 	bv._build()                          # (_ready is deferred under -s; call directly)
@@ -117,6 +118,7 @@ func _initialize() -> void:
 		bv._process(0.016)              # draws the full-screen summary
 	_ck(true, "results screen draws without crash")
 
+	Save.clear()                         # don't leave a save behind for other tests
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	bv.free()
 	quit(_f)

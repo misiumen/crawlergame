@@ -52,3 +52,24 @@ func short_desc() -> String:
 		CAT_TOOL:     return "narzędzie"
 		CAT_SCROLL:   return "receptura"
 		_:            return category
+
+# ── Serialization (save/load) ─────────────────────────────────────────────────
+
+func to_dict() -> Dictionary:
+	return {
+		"name_pl": name_pl, "category": category, "rarity": rarity,
+		"tags": tags.duplicate(), "affixes": affixes.duplicate(),
+		"affix_names_pl": affix_names_pl.duplicate(), "charges": charges,
+		"effect": effect.duplicate(), "origin": origin, "wadliwy": wadliwy,
+	}
+
+static func from_dict(d: Dictionary) -> GameItem:
+	var it := GameItem.new(d.get("name_pl", ""), d.get("category", ""), d.get("rarity", Rarity.COMMON))
+	it.tags = (d.get("tags", []) as Array).duplicate()
+	it.affixes = (d.get("affixes", []) as Array).duplicate()
+	it.affix_names_pl = (d.get("affix_names_pl", []) as Array).duplicate()
+	it.charges = int(d.get("charges", 1))
+	it.effect = (d.get("effect", {}) as Dictionary).duplicate()
+	it.origin = d.get("origin", "")
+	it.wadliwy = bool(d.get("wadliwy", false))
+	return it
