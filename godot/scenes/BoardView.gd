@@ -57,16 +57,57 @@ func _ready() -> void:
 	_build()
 	set_process(true)
 
+const FINAL_FLOOR := 6   # descending from here wins the run
+
 func _build() -> void:
-	var data := Encounters.floor()
+	var data := FloorGen.generate(1, 20260605, _content_bundle())
 	floor = Floor.new(data)
 	sim = floor.sim
 	_hint = data.get("hint", "")
-	_log = ["Wchodzisz do kompleksu. Pierwsze pomieszczenie: magazyn."]
+	_log = ["Piętro 1. Zaczynasz zjazd. Rozbieraj, kuj, walcz — i schodź głębiej."]
 	_narr_rng.seed = 9001
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
+
+## Entity content pulled from the Data autoload (empty -> FloorGen fallback).
+func _content_bundle() -> Dictionary:
+	var mon: Variant = _data_group("entity_templates", "MON")
+	var env: Variant = _data_group("entity_templates", "ENV")
+	var stats: Variant = _data_group("entity_templates", "MOB_COMBAT_STATS")
+	var out: Dictionary = {}
+	if mon is Dictionary: out["MON"] = mon
+	if env is Dictionary: out["ENV"] = env
+	if stats is Dictionary: out["MOB_COMBAT_STATS"] = stats
+	return out
+
+## Generate the next floor down, carrying the whole run forward (player, kit,
+## audience, sponsors, recipes). Death is the only thing that ends a run early.
+func _descend() -> void:
+	var next_depth: int = floor.depth + 1
+	if next_depth > FINAL_FLOOR:
+		_end_run(true)
+		return
+	var data := FloorGen.generate(next_depth, 20260605, _content_bundle())
+	# Carry the run forward: keep the same player + accumulated state.
+	floor.player.cell = data["start_cell"]
+	floor.player.class_active_used_floor = -1   # active recharges each floor
+	data["player"] = floor.player
+	data["inv"] = floor.inv
+	data["items"] = floor.items
+	data["boxes"] = floor.boxes
+	data["discovered"] = floor.discovered_recipes
+	data["audience"] = floor.audience
+	data["sponsors"] = floor.sponsors
+	data["class_offered"] = floor.class_offered
+	floor = Floor.new(data)
+	sim = floor.sim
+	_hint = data.get("hint", "")
+	_aim_zone = ""; sim.aim_zone = ""
+	_attach_bodies()
+	_recenter()
+	_reset_visuals()
+	_log_push("Schodzisz na piętro %d. Robi się ciaśniej." % next_depth)
 
 ## Reach the Data autoload via /root (BoardView is a Node, so this is safe and
 ## avoids the bare `Data` identifier that won't compile under headless -s/--import).
@@ -121,8 +162,7 @@ func _check_transition() -> void:
 		return
 	if r.get("descend", false):
 		_add_banner("ZEJŚCIE NIŻEJ")
-		_log_push("Schodzisz w dół. (Koniec dema.)")
-		_end_run(true)
+		_descend()
 		return
 	sim = floor.sim
 	_attach_bodies()
@@ -372,7 +412,7 @@ func _accept_class(idx: int) -> void:
 func _use_class_active() -> void:
 	if floor == null or floor.player.class_key == "":
 		return
-	_animate(sim.use_class_active(floor.current))
+	_animate(sim.use_class_active(floor.depth))
 	_advance_floor_turn()
 	_check_transition()
 
@@ -770,8 +810,8 @@ func _draw_hud() -> void:
 	_draw_minimap()
 	# Title bar
 	draw_string(_font, Vector2(40, 36),
-		"SORTOWNIA — %s  ·  Runda %d  ·  tura: %s"
-		% [floor.current_name() if floor else "?", sim.round_num,
+		"PIĘTRO %d — %s  ·  Runda %d  ·  tura: %s"
+		% [floor.depth if floor else 1, floor.current_name() if floor else "?", sim.round_num,
 		   "TY" if sim.side == "player" else "wrogowie"],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
 	# Controls hint
@@ -789,7 +829,7 @@ func _draw_hud() -> void:
 	draw_string(_font, Vector2(40, 98), int_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Class + active readiness
 	if p.class_key != "":
-		var gate := ClassFeatures.can_use_active(p, floor.current)
+		var gate := ClassFeatures.can_use_active(p, floor.depth)
 		var ready := "gotowa" if bool(gate[0]) else "użyta"
 		var cstr := "Klasa: %s   ·   [F] %s (%s)" % [Classes.name_of(p.class_key),
 			ClassFeatures.active_name(p.class_key), ready]

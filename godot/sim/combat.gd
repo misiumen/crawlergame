@@ -12,8 +12,10 @@ var entities: Dictionary = {}
 var player_id: int = 0
 var round_num: int = 1
 var side: String = "player"
-var over: bool = false
+var over: bool = false       # terminally over (player dead) — blocks input
+var cleared: bool = false    # this room's enemies are all down (exploration continues)
 var outcome: String = ""
+var _had_enemies: bool = false
 
 var materials: Dictionary = {}      # run materials, shared ref from Floor
 var items: Array = []               # GameItem list, shared ref from Floor
@@ -43,6 +45,7 @@ func _init(_board: Board, _entities: Dictionary, _player_id: int,
 	_audience = _audience_ref
 	_sponsors = _sponsors_ref
 	rng.seed = seed_value
+	_had_enemies = not enemies_alive().is_empty()
 
 func player() -> CombatEntity:
 	return entities[player_id]
@@ -559,8 +562,12 @@ func _enemy_turn() -> Array:
 			var atk_bonus: int = 0 if e.has_status("disarmed") else 2
 			# Survivor's passive + occultist's Curse make the player harder to hit.
 			var pac: int = p.ac + ClassFeatures.passive_bonus(p, "ac") + _curse_to_hit
-			if _roll_hit(atk_bonus, pac):
-				var base: int = rng.randi_range(1, 4) + 1
+			# Content-driven enemies carry their own to-hit; fall back to the default.
+			var eatk: int = (e.to_hit if e.dmg_dice != "" else atk_bonus)
+			if e.has_status("disarmed"):
+				eatk -= 2
+			if _roll_hit(eatk, pac):
+				var base: int = Dice.roll(e.dmg_dice, rng) if e.dmg_dice != "" else rng.randi_range(1, 4) + 1
 				if e.has_status("disarmed"):
 					base = maxi(1, base - 2)
 				evs += _apply_damage(p, base, DMG_PHYSICAL)
@@ -589,10 +596,13 @@ func _step_toward(frm: Vector2i, to: Vector2i) -> Vector2i:
 	return frm + Vector2i(signi(to.x - frm.x), signi(to.y - frm.y))
 
 func _check_end() -> Array:
+	# Only DEATH terminally ends play. Clearing a room's enemies does NOT lock the
+	# player out — you still walk to the exit and descend. The "win" event fires
+	# once, when the last enemy of a room that HAD enemies falls.
 	if not player().is_alive():
 		over = true; outcome = "lose"
 		return [{"type": "combat_end", "outcome": "lose"}]
-	if enemies_alive().is_empty():
-		over = true; outcome = "win"
+	if _had_enemies and not cleared and enemies_alive().is_empty():
+		cleared = true; outcome = "win"
 		return [{"type": "combat_end", "outcome": "win"}]
 	return []

@@ -19,12 +19,20 @@ var sponsors: SponsorState
 var turn: int = 0
 var class_offered: bool = false   # once we've offered a class, don't nag again
 
+var depth: int = 1                 # how many floors deep this run is (1-based)
+
 func _init(data: Dictionary) -> void:
 	rooms = data["rooms"]
 	player = data["player"]
 	inv = data.get("inv", {})
-	audience = AudienceState.new()
-	sponsors = SponsorState.new()
+	depth = int(data.get("depth", data.get("floor_num", 1)))
+	# Run state can be CARRIED FORWARD across floors (descent) or freshly made.
+	items = data.get("items", [])
+	boxes = data.get("boxes", [])
+	discovered_recipes = data.get("discovered", [])
+	audience = data.get("audience", null) if data.get("audience", null) is AudienceState else AudienceState.new()
+	sponsors = data.get("sponsors", null) if data.get("sponsors", null) is SponsorState else SponsorState.new()
+	class_offered = bool(data.get("class_offered", false))
 	enter(int(data.get("start", 0)), data["start_cell"])
 
 func current_name() -> String:
@@ -61,7 +69,7 @@ func advance_turn() -> Array:
 func check_class_offer() -> Array:
 	if class_offered or player.class_key != "":
 		return []
-	if Classes.should_offer(player, current, turn):
+	if Classes.should_offer(player, depth, turn):
 		class_offered = true
 		return Classes.suggest_classes(player, 3, sim.rng)
 	return []

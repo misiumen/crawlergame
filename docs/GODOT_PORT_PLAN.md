@@ -313,10 +313,23 @@ enemy intent telegraph). 36 GDScript checks green (`test_sim`/`test_combat`/
 - The DCC *loop* is complete: scavenge→craft→fight→your-style-becomes-a-class→the
   host narrates it→the run ends with a recap that unlocks options for next time.
 
-### Phase 6 — Content migration + ship polish (XL)
-- Full bestiary, room pool, recipes, dialogues, narrator/rumor content via export pipeline.
-- Lighting, particles, audio buses, scene transitions, controller support.
-- Save/load (new JSON schema). Export Windows/web; balance pass (FTL scarcity).
+### Phase 6 — Procedural floors + content migration + ship polish (XL) ⏳ IN PROGRESS
+- ✅ **Procedural floor generation** (`sim/floorgen.gd`) — board-native rewrite of
+  `floor_generator.py` (not a literal port): seeded determinism, a validation
+  retry loop (entry→door reachability past placed objects, guaranteed descent),
+  role-mixed rooms, difficulty scaling with depth. Returns the Floor data shape.
+- ✅ **Content from templates** — enemies pulled from `entity_templates.MON` +
+  `MOB_COMBAT_STATS` (hp/dice/to-hit/AC, floor-range gated, bosses excluded from
+  normal rooms), objects from `ENV`; `sim/dice.gd` rolls content damage strings.
+- ✅ **Multi-floor descent** — descending generates the next floor and carries the
+  whole run forward (player, class, kit, recipes, audience, sponsors); the class
+  active recharges each floor; death is the only early end; floor `FINAL_FLOOR`
+  wins. Depth shown in the HUD; meta floor-reached unlocks now actually fire.
+- ✅ **Fix exposed by procgen:** clearing a room's enemies no longer locks the
+  player out of moving (only death is terminal) — `_check_end` reworked.
+- ⏳ **Remaining:** full bestiary/room-pool variety pass, dialogues + rumor
+  content, the deferred Phase-5 systems (memetics, dialogue trees, floor-map),
+  audio/particles/lighting, save/load schema, web export, balance pass.
 
 ---
 

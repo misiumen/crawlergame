@@ -83,11 +83,24 @@ func _initialize() -> void:
 	_ck(bv._class_offer.is_empty(), "offer closes after accepting")
 	# fire the class active (drawn HUD + dispatch)
 	bv._use_class_active()
-	_ck(bv.floor.player.class_active_used_floor == bv.floor.current,
+	_ck(bv.floor.player.class_active_used_floor == bv.floor.depth,
 		"using the active marks the per-floor cooldown")
 	for i in 3:
 		bv._process(0.016)
 	_ck(true, "class HUD + active path run without crash")
+
+	# descent: generate the next floor, carrying the whole run forward
+	var d0: int = bv.floor.depth
+	var cls: String = bv.floor.player.class_key
+	bv.floor.player.run_kills = 3
+	bv._descend()
+	_ck(bv.floor.depth == d0 + 1, "descending advances the floor depth")
+	_ck(bv.floor.player.class_key == cls, "the class carries to the next floor")
+	_ck(bv.floor.player.run_kills == 3, "run tallies carry to the next floor")
+	_ck(bv.floor.player.class_active_used_floor == -1, "the class active recharges on the new floor")
+	for i in 5:
+		bv.handle_dir(Vector2i.RIGHT); bv._process(0.016)
+	_ck(true, "playing on the generated next floor does not crash")
 
 	# hammer many actions + frames; must never crash
 	for i in 30:
