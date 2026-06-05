@@ -126,6 +126,46 @@ func _initialize() -> void:
 	bv._dlg_advance(4)                   # 'Skończ rozmowę.' -> end
 	_ck(bv._dlg.is_empty(), "the end option closes the conversation")
 
+	# ── Mouse / click-zone dispatch (handlers called directly) ──
+	# craft panel: click a material onto the bench, then click WYTWÓRZ
+	bv.sim.materials = {"przewód": 1, "szmata": 1}
+	bv.sim.player().int_xp = 50
+	bv._craft_open = true; bv._craft_mode = "bench"; bv._bench_slots = []
+	bv._dispatch_zone({"kind": "bench_mat", "i": 0})
+	_ck(bv._bench_slots.size() == 1, "clicking a material adds it to the bench")
+	bv._dispatch_zone({"kind": "bench_remove", "i": 0})
+	_ck(bv._bench_slots.is_empty(), "clicking a bench slot removes it")
+	bv._dispatch_zone({"kind": "bench_mat", "i": 0})
+	bv._dispatch_zone({"kind": "bench_attempt"})
+	_ck(not bv._craft_open and bv.floor.items.size() >= 1, "clicking WYTWÓRZ crafts + closes")
+
+	# tab switch + item use via click
+	bv._craft_open = true; bv._craft_mode = "bench"
+	bv._dispatch_zone({"kind": "tab_items"})
+	_ck(bv._craft_mode == "items", "clicking the Kieszeń tab switches mode")
+	bv._dispatch_zone({"kind": "item_use", "i": 0})
+	_ck(true, "clicking an item uses it without crash")
+	bv._craft_open = false
+
+	# dialogue option via click (dispatch 'dlg' with an original index)
+	bv._dlg = Dialogue.start(bv.floor, 99, "default_crawler")
+	bv._dispatch_zone({"kind": "dlg", "i": 4})           # the 'leave' option
+	_ck(bv._dlg.is_empty(), "clicking a dialogue option resolves it")
+
+	# board: left-click on an adjacent enemy attacks (advances the round)
+	var foe_id := -1
+	for id in bv.sim.entities:
+		if bv.sim.entities[id].faction == "enemy" and bv.sim.entities[id].is_alive():
+			foe_id = id
+	if foe_id != -1:
+		var foe: CombatEntity = bv.sim.entities[foe_id]
+		# place the player next to it and click it
+		bv.sim.player().cell = foe.cell + Vector2i.LEFT
+		bv.sim.board.place(bv.sim.player_id, bv.sim.player().cell)
+		var hp0 := foe.hp
+		bv._click_primary(foe.cell)
+		_ck(foe.hp <= hp0, "left-clicking an adjacent enemy attacks it")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)

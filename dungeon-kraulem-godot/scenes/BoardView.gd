@@ -55,6 +55,8 @@ var _route_offer: Array = []         # candidate biome keys at the stairs; non-e
 var _dlg: Dictionary = {}            # active dialogue-tree conversation state; non-empty = open
 var _dlg_info := ""                   # last skill-check result line
 var _title := true                   # title screen shown before a run starts
+var _click_zones: Array = []         # per-frame clickable UI rects (rebuilt in _draw)
+var _mouse: Vector2 = Vector2.ZERO   # last known mouse position (for hover)
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -224,6 +226,26 @@ func _cell_px(c: Vector2i) -> Vector2:
 # ── Input ─────────────────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_mouse = (event as InputEventMouseMotion).position
+		queue_redraw()
+		return
+	# ── Mouse: LMB acts (UI option, or board attack/talk/move), RMB shoves ──
+	if event is InputEventMouseButton and event.pressed:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			# On-screen buttons/options first. Reverse order so panels drawn LAST
+			# (modals on top) win over board-HUD zones underneath them.
+			for j in range(_click_zones.size() - 1, -1, -1):
+				if (_click_zones[j]["rect"] as Rect2).has_point(mb.position):
+					_dispatch_zone(_click_zones[j])
+					return
+			if _can_take_board_input():
+				_click_primary(_cell_from_mouse(mb.position))
+		elif mb.button_index == MOUSE_BUTTON_RIGHT:
+			if _can_take_board_input():
+				_click_shove(_cell_from_mouse(mb.position))
+		return
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	var kc: int = (event as InputEventKey).keycode
@@ -294,11 +316,81 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_RIGHT, KEY_D: dir = Vector2i.RIGHT
 		KEY_UP,    KEY_W: dir = Vector2i.UP
 		KEY_DOWN,  KEY_S: dir = Vector2i.DOWN
-		KEY_PERIOD: handle_wait(); return
+		KEY_SPACE, KEY_PERIOD: handle_wait(); return   # Space = pass the turn
 		KEY_E:      handle_interact(); return
 		_: return
 	if shove: handle_shove(dir)
 	else:     handle_dir(dir)
+
+# ── Mouse + dedicated-attack helpers ──────────────────────────────────────────
+
+## True only during normal board play (no modal/overlay grabbing input).
+func _can_take_board_input() -> bool:
+	return not _title and not _done and sim != null \
+		and _summary.is_empty() and _dlg.is_empty() \
+		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open
+
+## Viewport pixel -> board cell.
+func _cell_from_mouse(pos: Vector2) -> Vector2i:
+	var local := pos - _origin
+	return Vector2i(int(floor(local.x / TILE)), int(floor(local.y / TILE)))
+
+## LMB on the board is fully contextual: an adjacent enemy → attack (honoring the
+## aimed zone), an adjacent NPC → talk, an adjacent salvageable object → dismantle,
+## an empty adjacent tile → move, a distant tile → step toward it, yourself → wait.
+func _click_primary(cell: Vector2i) -> void:
+	if sim == null or not sim.board.in_bounds(cell):
+		return
+	var p := sim.player()
+	var d: Vector2i = cell - p.cell
+	var cheb: int = maxi(absi(d.x), absi(d.y))
+	if cheb == 0:
+		handle_wait()
+	elif cheb == 1:
+		var occ: int = sim.board.occupant_at(cell)
+		if occ != -1 and occ != p.id:
+			var t: CombatEntity = sim.entities[occ]
+			if t.faction == "object" and "salvage" in t.affordances:
+				handle_interact()   # dismantle the gear you clicked
+				return
+		handle_dir(d)               # enemy attack / npc talk / move / blocked
+	else:
+		handle_dir(Vector2i(signi(d.x), signi(d.y)))   # click-to-move one step
+
+## RMB: shove the clicked adjacent enemy (push it — best used into a hazard).
+func _click_shove(cell: Vector2i) -> void:
+	if sim == null:
+		return
+	var d: Vector2i = cell - sim.player().cell
+	if maxi(absi(d.x), absi(d.y)) == 1:
+		handle_shove(d)
+
+# ── Clickable UI zones (registered by _draw_* each frame, hit-tested on LMB) ───
+
+func _zone(r: Rect2, kind: String, i: int = 0, s: String = "") -> void:
+	_click_zones.append({"rect": r, "kind": kind, "i": i, "s": s})
+
+func _hover(r: Rect2) -> bool:
+	return r.has_point(_mouse)
+
+func _dispatch_zone(z: Dictionary) -> void:
+	var i: int = int(z.get("i", 0))
+	match z.get("kind", ""):
+		"title_continue", "title_start": _build()
+		"title_new":         Save.clear(); _build()
+		"summary_continue":  _summary = {}; _summary_lines = []; _done = false; _build()
+		"dlg":               _dlg_advance(i)
+		"route":             if i < _route_offer.size(): _descend_into(_route_offer[i])
+		"class":             _accept_class(i)
+		"tab_bench":         _craft_mode = "bench"; queue_redraw()
+		"tab_items":         _craft_mode = "items"; queue_redraw()
+		"craft_close":       _craft_open = false; queue_redraw()
+		"bench_mat":         _bench_add_material(i)
+		"bench_remove":      _bench_remove_at(i)
+		"bench_attempt":     _bench_attempt_now()
+		"item_use":          _item_use(i)
+		"box_open":          _open_box(i); queue_redraw()
+		"aim_part":          _set_aim(z.get("s", ""))
 
 ## The enemy whose body we read out + aim at: the nearest aware living enemy,
 ## else the nearest living enemy.
@@ -342,48 +434,67 @@ func _handle_craft_input(kc: int) -> void:
 	if kc == KEY_TAB:
 		_craft_mode = "items" if _craft_mode == "bench" else "bench"
 		queue_redraw(); return
-
 	if _craft_mode == "bench":
 		if kc == KEY_BACKSPACE:
-			if not _bench_slots.is_empty():
-				_bench_slots.pop_back()
-				_bench_preview = Crafting.preview(_bench_slots, floor.discovered_recipes)
-			queue_redraw(); return
+			_bench_remove_at(_bench_slots.size() - 1); return
 		if kc == KEY_ENTER or kc == KEY_KP_ENTER:
-			if not _bench_slots.is_empty():
-				_animate(sim.bench_attempt(_bench_slots))
-				# Drain sponsor boxes after crafting.
-				for b in floor.sponsors.drain_boxes():
-					floor.boxes.append(b)
-					_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
-				_bench_slots.clear()
-				_bench_preview = {}
-				_craft_open = false
-			queue_redraw(); return
-		# Number keys 1–9: add the nth material to bench (up to 6 slots).
+			_bench_attempt_now(); return
 		var idx: int = kc - KEY_1
-		if idx >= 0 and idx <= 8 and _bench_slots.size() < 6:
-			var mat_keys := sim.materials.keys()
-			if idx < mat_keys.size():
-				var mat: String = mat_keys[idx]
-				_bench_slots.append(mat)
-				_bench_preview = Crafting.preview(_bench_slots, floor.discovered_recipes)
-			queue_redraw(); return
-
+		if idx >= 0 and idx <= 8:
+			_bench_add_material(idx); return
 	elif _craft_mode == "items":
 		if kc == KEY_ENTER or kc == KEY_KP_ENTER:
-			# Open first box if any.
 			if not floor.boxes.is_empty():
 				_open_box(0)
 			queue_redraw(); return
 		var idx: int = kc - KEY_1
 		if idx >= 0:
 			if idx < floor.items.size():
-				_animate(sim.player_use_item(idx))
-				_craft_open = false
+				_item_use(idx)
 			elif idx - floor.items.size() < floor.boxes.size():
-				_open_box(idx - floor.items.size())
-			queue_redraw()
+				_open_box(idx - floor.items.size()); queue_redraw()
+
+# Shared bench/item actions — used by BOTH keyboard and mouse so they never drift.
+func _bench_add_material(idx: int) -> void:
+	if _bench_slots.size() >= 6:
+		return
+	var mat_keys := sim.materials.keys()
+	if idx >= 0 and idx < mat_keys.size():
+		_bench_slots.append(mat_keys[idx])
+		_bench_preview = Crafting.preview(_bench_slots, floor.discovered_recipes)
+	queue_redraw()
+
+func _bench_remove_at(i: int) -> void:
+	if i >= 0 and i < _bench_slots.size():
+		_bench_slots.remove_at(i)
+		_bench_preview = Crafting.preview(_bench_slots, floor.discovered_recipes) if not _bench_slots.is_empty() else {}
+	queue_redraw()
+
+func _bench_attempt_now() -> void:
+	if _bench_slots.is_empty():
+		return
+	_animate(sim.bench_attempt(_bench_slots))
+	for b in floor.sponsors.drain_boxes():
+		floor.boxes.append(b)
+		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
+	_bench_slots.clear()
+	_bench_preview = {}
+	_craft_open = false
+	queue_redraw()
+
+func _item_use(idx: int) -> void:
+	if idx >= 0 and idx < floor.items.size():
+		_animate(sim.player_use_item(idx))
+		_craft_open = false
+	queue_redraw()
+
+func _set_aim(pkey: String) -> void:
+	_aim_zone = pkey
+	sim.aim_zone = pkey
+	var e := _focused_enemy()
+	if e != null and e.body != null and e.body.parts.has(pkey):
+		_log_push("Bierzesz na cel: %s." % e.body.part(pkey)["label_pl"])
+	queue_redraw()
 
 func _open_box(idx: int) -> void:
 	if idx < 0 or idx >= floor.boxes.size():
@@ -795,6 +906,7 @@ func _process(dt: float) -> void:
 # ── Drawing ───────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
+	_click_zones.clear()   # rebuilt below to match exactly what's drawn this frame
 	if _title:
 		_draw_title()
 		return
@@ -868,26 +980,35 @@ func _draw_title() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 72, COL_CYAN)
 	draw_string(_font, Vector2(184, 274), "galaktyczne reality show z lochów",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_DIM)
-	# Options
+	# Options (click them, or press the key)
 	var has_save := Save.has_save()
 	var y := 380.0
 	if has_save:
-		draw_string(_font, Vector2(184, y), "[Enter]  Kontynuuj zjazd",
+		draw_string(_font, Vector2(184, y), "▶  Kontynuuj zjazd   [Enter]",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
-		draw_string(_font, Vector2(184, y + 38), "[N]  Nowy bieg (porzuca zapis)",
+		_zone(Rect2(176, y - 24, 520, 34), "title_continue")
+		draw_string(_font, Vector2(184, y + 38), "▶  Nowy bieg (porzuca zapis)   [N]",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_AMBER)
+		_zone(Rect2(176, y + 14, 520, 34), "title_new")
 		y += 76
 	else:
-		draw_string(_font, Vector2(184, y), "[Enter]  Zacznij bieg",
+		draw_string(_font, Vector2(184, y), "▶  Zacznij bieg   [Enter]",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
+		_zone(Rect2(176, y - 24, 520, 34), "title_start")
 		y += 38
 	# Meta progress
 	draw_string(_font, Vector2(184, y + 24),
 		"Odblokowane opcje na przyszłe biegi: %d" % Meta.unlocked_count(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_GREEN)
-	# Controls primer
-	draw_string(_font, Vector2(184, 660),
-		"strzałki ruch/atak · Shift pchnij · T celuj · E rozbierz/rozmawiaj · I warsztat · F umiejętność",
+	# Controls primer (mouse-first)
+	draw_string(_font, Vector2(184, 632),
+		"MYSZ:  lewy = atak / rozmowa / ruch / wybór opcji      prawy = pchnięcie wroga",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
+	draw_string(_font, Vector2(184, 658),
+		"KLAWISZE:  WSAD/strzałki ruch · Shift pchnij · Spacja czekaj · E rozbierz/rozmawiaj",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+	draw_string(_font, Vector2(184, 678),
+		"           I warsztat · T celuj w strefę · F umiejętność · 1–9 wybór · Esc zamknij",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 
 func _draw_boss(pos: Vector2, fade: float, flashing: bool) -> void:
@@ -997,9 +1118,9 @@ func _draw_hud() -> void:
 		% [floor.depth if floor else 1, floor.current_name() if floor else "?", sim.round_num,
 		   "TY" if sim.side == "player" else "wrogowie"],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
-	# Controls hint
+	# Controls hint (mouse-first)
 	draw_string(_font, Vector2(40, 60),
-		"strzałki ruch (=atak)  ·  Shift pchnij  ·  T celuj  ·  E rozbierz/rozmawiaj  ·  I warsztat  ·  . czekaj",
+		"LPM atak/rozmowa/ruch · PPM pchnij  ·  WSAD ruch · Shift pchnij · Spacja czekaj · E rozbierz · I warsztat · F umiejętność",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Weapon / coating
 	var wln := "Broń: nóż"
@@ -1123,15 +1244,19 @@ func _draw_dialogue() -> void:
 			var mod: int = floor.player.stat_mod(sk[0])
 			label += "   [%s %+d vs TT %d]" % [Dialogue.STAT_PL.get(sk[0], sk[0]), mod, int(sk[1])]
 			col = COL_CYAN
-		draw_string(_font, Vector2(px + 28, cy), "[%d]  %s" % [i + 1, label],
-			HORIZONTAL_ALIGNMENT_LEFT, W - 56, 16, col)
+		var hot := _hover(Rect2(px + 20, cy - 18, W - 40, 28))
+		if hot:
+			draw_rect(Rect2(px + 20, cy - 18, W - 40, 28), Color(col, 0.12))
+		draw_string(_font, Vector2(px + 28, cy), "%d.  %s" % [i + 1, label],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 56, 16, COL_BRIGHT if hot else col)
+		_zone(Rect2(px + 20, cy - 18, W - 40, 28), "dlg", int(avail[i][0]))
 		cy += 32.0
 	# Last skill-check result
 	if _dlg_info != "":
 		draw_string(_font, Vector2(px + 22, py + H - 44), _dlg_info,
 			HORIZONTAL_ALIGNMENT_LEFT, W - 44, 14, COL_GREEN)
 	draw_string(_font, Vector2(px + 22, py + H - 18),
-		"[cyfra] wybierz   ·   [Esc] odejdź", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+		"kliknij lub [1–9] wybierz   ·   [Esc] odejdź", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## The route gamble at the stairs: pick which biome to descend into.
 func _draw_route_offer() -> void:
@@ -1147,13 +1272,16 @@ func _draw_route_offer() -> void:
 	var cy := py + 84.0
 	for i in _route_offer.size():
 		var key: String = _route_offer[i]
-		draw_rect(Rect2(px + 16, cy, W - 32, 76), Color(0.10, 0.13, 0.17, 0.9))
-		draw_rect(Rect2(px + 16, cy, W - 32, 76), COL_GRID, false, 1.0)
+		var box := Rect2(px + 16, cy, W - 32, 76)
+		var hot := _hover(box)
+		draw_rect(box, Color(0.14, 0.18, 0.13, 0.95) if hot else Color(0.10, 0.13, 0.17, 0.9))
+		draw_rect(box, COL_GREEN if hot else COL_GRID, false, 2.0 if hot else 1.0)
 		draw_string(_font, Vector2(px + 28, cy + 28),
-			"[%d]  %s" % [i + 1, Routes.label_of(key)],
+			"%d.  %s" % [i + 1, Routes.label_of(key)],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_BRIGHT)
 		draw_string(_font, Vector2(px + 28, cy + 52), Routes.blurb_of(key),
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 14, COL_AMBER)
+		_zone(box, "route", i)
 		cy += 84.0
 
 ## End-of-run results screen: victory/death header, run tallies, sponsors, and
@@ -1177,8 +1305,9 @@ func _draw_run_summary() -> void:
 		draw_string(_font, Vector2(140, y), ls, HORIZONTAL_ALIGNMENT_LEFT, 1000, 18, col)
 		y += 26.0
 	draw_string(_font, Vector2(140, 690),
-		"Odblokowano łącznie opcji: %d   ·   [Enter] od nowa" % Meta.unlocked_count(),
+		"Odblokowano łącznie opcji: %d   ·   kliknij lub [Enter] — od nowa" % Meta.unlocked_count(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+	_zone(Rect2(0, 0, 1280, 720), "summary_continue")   # click anywhere to restart
 
 ## The Syndicate's class pitch: 3 candidates, pick with number keys.
 func _draw_class_offer() -> void:
@@ -1196,10 +1325,12 @@ func _draw_class_offer() -> void:
 	var cy := py + 84.0
 	for i in _class_offer.size():
 		var key: String = _class_offer[i]
-		draw_rect(Rect2(px + 16, cy, W - 32, 96), Color(0.10, 0.12, 0.17, 0.9))
-		draw_rect(Rect2(px + 16, cy, W - 32, 96), COL_GRID, false, 1.0)
+		var box := Rect2(px + 16, cy, W - 32, 96)
+		var hot := _hover(box)
+		draw_rect(box, Color(0.16, 0.14, 0.10, 0.95) if hot else Color(0.10, 0.12, 0.17, 0.9))
+		draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
 		draw_string(_font, Vector2(px + 28, cy + 26),
-			"[%d]  %s" % [i + 1, Classes.name_of(key)],
+			"%d.  %s" % [i + 1, Classes.name_of(key)],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_BRIGHT)
 		draw_string(_font, Vector2(px + 28, cy + 48), Classes.desc_of(key),
 			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 14, COL_DIM)
@@ -1207,6 +1338,7 @@ func _draw_class_offer() -> void:
 		draw_string(_font, Vector2(px + 28, cy + 70),
 			"Pasywka: %s    Umiejętność: %s" % [pas, ClassFeatures.active_name(key)],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 13, COL_CYAN)
+		_zone(box, "class", i)
 		cy += 104.0
 
 func _passive_summary(key: String) -> String:
@@ -1242,9 +1374,14 @@ func _draw_body_readout(lx: float, lw: float) -> void:
 		var col := _severity_color(sev)
 		var aimed: bool = (pkey == _aim_zone)
 		var flashing: bool = _part_flash.has("%d:%s" % [e.id, pkey])
-		# Aim highlight box
+		# Aim highlight box (click a part to aim there, no need to cycle T)
+		var prect := Rect2(lx + 8, y - 13, lw - 16, 20)
 		if aimed:
-			draw_rect(Rect2(lx + 8, y - 13, lw - 16, 20), Color(COL_AMBER, 0.16))
+			draw_rect(prect, Color(COL_AMBER, 0.16))
+		elif _hover(prect) and not p["severed"]:
+			draw_rect(prect, Color(COL_CYAN, 0.10))
+		if not p["severed"]:
+			_zone(prect, "aim_part", 0, pkey)
 		# Part name + severity
 		var prefix := "» " if aimed else "  "
 		var sev_pl: String = BodyState.SEVERITY_PL.get(sev, sev)
@@ -1271,7 +1408,7 @@ func _draw_body_readout(lx: float, lw: float) -> void:
 		y += 22.0
 	# Aim hint
 	draw_string(_font, Vector2(lx + 12, top + 210),
-		"[T] celuj w strefę (teraz: %s)" % (_aim_zone_label(e)),
+		"kliknij część lub [T] — celuj (teraz: %s)" % (_aim_zone_label(e)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_AMBER)
 
 func _severity_color(sev: String) -> Color:
@@ -1311,13 +1448,16 @@ func _draw_craft_panel() -> void:
 	draw_string(_font, Vector2(px + 16, py + 24), "WARSZTAT", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_CYAN)
 	var tab1_col := COL_BRIGHT if mode_bench else COL_DIM
 	var tab2_col := COL_BRIGHT if not mode_bench else COL_DIM
-	draw_string(_font, Vector2(px + 200, py + 24), "[Stół]",
+	draw_string(_font, Vector2(px + 200, py + 24), "Stół",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, tab1_col)
-	draw_string(_font, Vector2(px + 310, py + 24), "[Kieszeń]",
+	_zone(Rect2(px + 196, py + 6, 90, 26), "tab_bench")
+	draw_string(_font, Vector2(px + 300, py + 24), "Kieszeń",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, tab2_col)
-	draw_string(_font, Vector2(px + W - 20, py + 24),
-		"Tab = zakładka   Esc = zamknij",
-		HORIZONTAL_ALIGNMENT_RIGHT, -1, 13, COL_DIM)
+	_zone(Rect2(px + 296, py + 6, 110, 26), "tab_items")
+	# Close button
+	draw_string(_font, Vector2(px + W - 24, py + 24), "✕  zamknij",
+		HORIZONTAL_ALIGNMENT_RIGHT, -1, 14, COL_DIM)
+	_zone(Rect2(px + W - 130, py + 6, 120, 26), "craft_close")
 	draw_line(Vector2(px + 12, py + 42), Vector2(px + W - 12, py + 42), COL_GRID, 1.0)
 
 	if mode_bench:
@@ -1330,15 +1470,19 @@ func _draw_bench_panel(px: float, py: float, W: float, H: float) -> void:
 	# Left: materials list
 	draw_string(_font, Vector2(px + 16, py + 54), "MATERIAŁY",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER)
-	draw_string(_font, Vector2(px + 16, py + 70), "(cyfra = dorzuć na stół)",
+	draw_string(_font, Vector2(px + 16, py + 70), "(kliknij lub cyfra = dorzuć na stół)",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COL_DIM)
 	for i in mat_keys.size():
 		var mat: String = mat_keys[i]
 		var yy := py + 90 + i * 46
 		var tags := Crafting.material_tags(mat)
+		var mrect := Rect2(px + 12, yy - 16, 300, 42)
+		if _hover(mrect):
+			draw_rect(mrect, Color(COL_CYAN, 0.10))
 		draw_string(_font, Vector2(px + 16, yy),
-			"[%d] %s x%d" % [i + 1, mat, int(sim.materials[mat])],
+			"%d. %s x%d" % [i + 1, mat, int(sim.materials[mat])],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 15, COL_BRIGHT)
+		_zone(mrect, "bench_mat", i)
 		var tag_x := px + 20
 		for t in tags:
 			var tw := float(_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x) + 16
@@ -1352,21 +1496,35 @@ func _draw_bench_panel(px: float, py: float, W: float, H: float) -> void:
 	var bx := px + 340.0
 	draw_string(_font, Vector2(bx, py + 54), "STÓŁ  (max 6 slotów)",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_CYAN)
-	draw_string(_font, Vector2(bx, py + 70), "Backspace = usuń ostatni   Enter = spróbuj",
+	draw_string(_font, Vector2(bx, py + 70), "kliknij slot = zdejmij   ·   Wytwórz / Enter = spróbuj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COL_DIM)
 	for i in 6:
 		var sx := bx + (i % 3) * 150.0
 		var sy := py + 90.0 + (i / 3) * 80.0
 		var filled := i < _bench_slots.size()
-		var bc := COL_CYAN if filled else COL_GRID
-		draw_rect(Rect2(sx, sy, 140, 68), Color(0.10, 0.14, 0.20, 0.9))
-		draw_rect(Rect2(sx, sy, 140, 68), bc, false, 2.0)
+		var srect := Rect2(sx, sy, 140, 68)
+		var hot := filled and _hover(srect)
+		var bc := (COL_RED if hot else COL_CYAN) if filled else COL_GRID
+		draw_rect(srect, Color(0.20, 0.12, 0.14, 0.9) if hot else Color(0.10, 0.14, 0.20, 0.9))
+		draw_rect(srect, bc, false, 2.0)
 		if filled:
-			draw_string(_font, Vector2(sx + 70, sy + 38), _bench_slots[i],
+			draw_string(_font, Vector2(sx + 70, sy + 34), _bench_slots[i],
 				HORIZONTAL_ALIGNMENT_CENTER, -1, 15, COL_BRIGHT)
+			draw_string(_font, Vector2(sx + 70, sy + 54), "(zdejmij)" if hot else "",
+				HORIZONTAL_ALIGNMENT_CENTER, -1, 11, COL_RED)
+			_zone(srect, "bench_remove", i)
 		else:
 			draw_string(_font, Vector2(sx + 70, sy + 38), "pusty",
 				HORIZONTAL_ALIGNMENT_CENTER, -1, 13, COL_DIM)
+	# Wytwórz button (bottom-left, clear of the preview column)
+	if not _bench_slots.is_empty():
+		var wb := Rect2(px + 16, py + H - 64, 300, 36)
+		var wh := _hover(wb)
+		draw_rect(wb, Color(0.12, 0.22, 0.14, 0.95) if wh else Color(0.10, 0.16, 0.11, 0.9))
+		draw_rect(wb, COL_GREEN, false, 2.0)
+		draw_string(_font, Vector2(px + 166, py + H - 40), "WYTWÓRZ",
+			HORIZONTAL_ALIGNMENT_CENTER, -1, 18, COL_GREEN)
+		_zone(wb, "bench_attempt")
 
 	# Preview block
 	var preview_y := py + 270.0
@@ -1439,11 +1597,15 @@ func _draw_items_panel(px: float, py: float, W: float, _H: float) -> void:
 		for i in floor.items.size():
 			var item := floor.items[i] as GameItem
 			var rcol := Rarity.color(item.rarity)
+			var irect := Rect2(px + 12, cy - 16, W - 24, 34)
+			if _hover(irect):
+				draw_rect(irect, Color(rcol, 0.12))
 			draw_string(_font, Vector2(px + 16, cy),
-				"[%d] %s" % [i + 1, item.display_name()],
+				"%d. %s   — użyj" % [i + 1, item.display_name()],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, rcol)
 			draw_string(_font, Vector2(px + 30, cy + 16), item.short_desc(),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+			_zone(irect, "item_use", i)
 			cy += 36
 	cy += 10
 	draw_line(Vector2(px + 12, cy), Vector2(px + W - 12, cy), COL_GRID, 1.0)
@@ -1458,10 +1620,14 @@ func _draw_items_panel(px: float, py: float, W: float, _H: float) -> void:
 		for i in floor.boxes.size():
 			var box := floor.boxes[i] as GameBox
 			var bcol := Rarity.color(box.rarity)
+			var brect := Rect2(px + 12, cy - 16, W - 24, 26)
+			if _hover(brect):
+				draw_rect(brect, Color(bcol, 0.12))
 			draw_string(_font, Vector2(px + 16, cy),
-				"[%d] %s" % [i + 1 + floor.items.size(), box.display_name()],
+				"%d. %s   — otwórz" % [i + 1 + floor.items.size(), box.display_name()],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, bcol)
+			_zone(brect, "box_open", i)
 			cy += 26
 	draw_string(_font, Vector2(px + 16, cy + 20),
-		"Enter = otwórz pierwszą skrzynkę  ·  [cyfra] = użyj przedmiot / otwórz skrzynkę",
+		"kliknij przedmiot = użyj · kliknij skrzynkę = otwórz · ([1–9] / Enter też działają)",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
