@@ -8,9 +8,9 @@ so heavy package __init__ files never run.
 import sys, os, types, importlib.util
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ENGINE = os.path.join(ROOT, "pygame", "dungeon_kraulem", "engine", "dialogue.py")
-NPC = os.path.join(ROOT, "pygame", "dungeon_kraulem", "content", "data", "npc_dialogues.py")
-OUT = os.path.join(ROOT, "godot", "sim", "dialogue_trees.gd")
+ENGINE = os.path.join(ROOT, "dungeon-kraulem-pygame", "dungeon_kraulem", "engine", "dialogue.py")
+NPC = os.path.join(ROOT, "dungeon-kraulem-pygame", "dungeon_kraulem", "content", "data", "npc_dialogues.py")
+OUT = os.path.join(ROOT, "dungeon-kraulem-godot", "sim", "dialogue_trees.gd")
 
 
 def _load(name, path):

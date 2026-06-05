@@ -7,7 +7,7 @@ set PROJ=%PROJ:~0,-1%
 echo Importing...
 %GODOT% --headless --import --path "%PROJ%" >nul 2>&1
 echo Exporting...
-%GODOT% --headless --path "%PROJ%" --export-release "Windows Desktop" "%PROJ%\builds\DungeonKraulem.exe"
+%GODOT% --headless --path "%PROJ%" --export-release "Windows Desktop" "%PROJ%\DungeonKraulem.exe"
 echo.
-echo Built: %PROJ%builds\DungeonKraulem.exe
+echo Built: %PROJ%\DungeonKraulem.exe
 endlocal

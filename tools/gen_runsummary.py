@@ -6,8 +6,8 @@ Re-run if the source flavor changes.
 import re, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "pygame", "dungeon_kraulem", "engine", "run_summary.py")
-OUT = os.path.join(ROOT, "godot", "sim", "run_summary.gd")
+SRC = os.path.join(ROOT, "dungeon-kraulem-pygame", "dungeon_kraulem", "engine", "run_summary.py")
+OUT = os.path.join(ROOT, "dungeon-kraulem-godot", "sim", "run_summary.gd")
 
 
 def extract_tuple(src, name):

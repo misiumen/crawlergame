@@ -4,8 +4,8 @@ Faithful: the exact Polish strings are copied, not retyped. Re-run if locale edi
 import json, re, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOCALE = os.path.join(ROOT, "pygame", "dungeon_kraulem", "ui", "locales", "pl.json")
-OUT = os.path.join(ROOT, "godot", "sim", "narrator.gd")
+LOCALE = os.path.join(ROOT, "dungeon-kraulem-pygame", "dungeon_kraulem", "ui", "locales", "pl.json")
+OUT = os.path.join(ROOT, "dungeon-kraulem-godot", "sim", "narrator.gd")
 
 # Categories the board demo actually triggers (combat, salvage, crafting,
 # audience, class offer). Memetics/dialogue/trap categories come in Phase 6.
