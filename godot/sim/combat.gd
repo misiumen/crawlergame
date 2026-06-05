@@ -118,6 +118,8 @@ func player_move(dir: Vector2i) -> Array:
 		var t: CombatEntity = entities[occ]
 		if t.faction == "object":
 			return [{"type": "blocked", "reason": "object", "id": t.id}]
+		if t.faction == "npc":
+			return [{"type": "talk", "npc_id": t.id}]   # bump an NPC = talk to it
 		evs += _player_attack(t)
 	elif board.is_free(dest):
 		board.move(p.cell, dest)
@@ -211,6 +213,11 @@ func player_wait() -> Array:
 func player_interact() -> Array:
 	if over or side != "player":
 		return []
+	# An adjacent NPC takes priority — talk to it.
+	for d in DIRS8:
+		var occ: int = board.occupant_at(player().cell + d)
+		if occ != -1 and occ != player_id and entities[occ].faction == "npc":
+			return [{"type": "talk", "npc_id": occ}]
 	for d in DIRS8:
 		var occ: int = board.occupant_at(player().cell + d)
 		if occ != -1 and occ != player_id:

@@ -111,6 +111,17 @@ func _initialize() -> void:
 		bv.handle_dir(Vector2i.RIGHT); bv._process(0.016)
 	_ck(true, "playing on the generated next floor does not crash")
 
+	# dialogue modal: open an NPC exchange, draw it, choose an option
+	var drng := RandomNumberGenerator.new(); drng.seed = 1
+	bv.floor.inv["złom"] = 5            # so any material-gated first option is affordable
+	bv._dialogue = Dialogue.random_npc(drng)
+	_ck(not bv._dialogue.is_empty(), "an NPC exchange opens a dialogue modal")
+	for i in 2:
+		bv._process(0.016)              # draws the dialogue
+	_ck(true, "dialogue modal draws without crash")
+	bv._choose_dialogue(0)
+	_ck(bv._dialogue.is_empty(), "choosing an option closes the dialogue")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)

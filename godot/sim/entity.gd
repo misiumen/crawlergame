@@ -24,6 +24,7 @@ var body: BodyState = null       # procedural breakable body (null = flat-HP act
 var monster_key: String = ""     # content key, for body-plan resolution
 var dmg_dice: String = ""        # enemy attack dice from content (e.g. "1d6+2"); "" = default
 var to_hit: int = 2              # enemy attack bonus from content
+var dialogue: Dictionary = {}    # NPCs (faction "npc"): a single-exchange dialogue
 # Emergent-class state (player only)
 var affinity: Dictionary = {}    # playstyle kind -> points
 var class_key: String = ""       # chosen emergent class, "" = none

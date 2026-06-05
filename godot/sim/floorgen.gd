@@ -129,6 +129,20 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 		entities[foe.id] = foe
 		next_id["v"] += 1
 
+	# Occasionally a non-combat NPC to talk to (not in the first room, ~30%).
+	if idx > 0 and rng.randf() < 0.3:
+		var cell := _free_interior(board, rng, entry, door)
+		if cell != Vector2i(-1, -1):
+			var npc := CombatEntity.new(next_id["v"], "", 1, 10, ["npc", "non_combat"])
+			npc.faction = "npc"
+			npc.affordances = ["talk"]
+			npc.dialogue = Dialogue.random_npc(rng)
+			npc.name_pl = npc.dialogue.get("speaker", "Ktoś")
+			npc.cell = cell
+			board.place(npc.id, cell)
+			entities[npc.id] = npc
+			next_id["v"] += 1
+
 	# Validate: entry must reach the door with objects in place. Free up the path
 	# by removing any object that blocks it (enemies are passable for the check).
 	_ensure_reachable(board, entry, door, entities)

@@ -52,6 +52,7 @@ var _narr_rng := RandomNumberGenerator.new()   # seeded narrator line picker
 var _summary: Dictionary = {}        # non-empty = end-of-run results screen
 var _summary_lines: Array = []       # rendered Polish lines for the screen
 var _route_offer: Array = []         # candidate biome keys at the stairs; non-empty = modal
+var _dialogue: Dictionary = {}       # active NPC exchange; non-empty = modal open
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -218,6 +219,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		if kc == KEY_ENTER or kc == KEY_KP_ENTER:
 			_summary = {}; _summary_lines = []; _done = false
 			_build()
+		return
+
+	# NPC dialogue grabs input until an option is chosen (Esc walks away).
+	if not _dialogue.is_empty():
+		if kc == KEY_ESCAPE:
+			_dialogue = {}; queue_redraw(); return
+		var dpick := kc - KEY_1
+		if dpick >= 0 and dpick < (_dialogue.get("options", []) as Array).size():
+			_choose_dialogue(dpick)
 		return
 
 	# Route-gamble modal at the stairs grabs input until a route is chosen.
@@ -456,6 +466,33 @@ func _use_class_active() -> void:
 	_advance_floor_turn()
 	_check_transition()
 
+func _open_dialogue(npc_id: int) -> void:
+	var npc = sim.entities.get(npc_id)
+	if npc == null or npc.dialogue.is_empty():
+		return
+	_dialogue = npc.dialogue
+	queue_redraw()
+
+func _choose_dialogue(idx: int) -> void:
+	if _dialogue.is_empty():
+		return
+	if not Dialogue.option_available(floor, _dialogue, idx):
+		_log_push("Nie stać cię na to.")
+		return
+	var res := Dialogue.choose(floor, _dialogue, idx)
+	var speaker: String = _dialogue.get("speaker", "Ktoś")
+	_dialogue = {}
+	for e in res.get("events", []):
+		match e.get("type"):
+			"dialogue_material":
+				var q: int = int(e["qty"])
+				_log_push("%s %s." % ["+%d" % q if q >= 0 else str(q), e["material"]])
+			"dialogue_audience":
+				_add_floater(sim.player_id, "widownia %+d" % int(e["delta"]), COL_AMBER)
+	if res.get("reply", "") != "":
+		_log_push("%s: %s" % [speaker, res["reply"]])
+	queue_redraw()
+
 # ── Event → animation ─────────────────────────────────────────────────────────
 
 func _animate(evs: Array) -> void:
@@ -544,6 +581,8 @@ func _animate(evs: Array) -> void:
 				_log_push(str(e.get("label", "")))
 			"class_active_blocked":
 				_log_push(str(e.get("reason", "Nie mozna uzyc umiejetnosci.")))
+			"talk":
+				_open_dialogue(int(e.get("npc_id", -1)))
 			"item_used":
 				_add_floater(sim.player_id, "użyto: " + e["name"], COL_BRIGHT)
 			"audience_change":
@@ -745,6 +784,7 @@ func _draw() -> void:
 		var flashing := _flash.has(id)
 		if e.faction == "player":      _draw_player(pos, fade)
 		elif e.faction == "object":    _draw_object(e, pos, fade)
+		elif e.faction == "npc":       _draw_npc(pos, fade)
 		else:                          _draw_rat(pos, fade, flashing)
 	for f in _floaters:
 		var a: float = 1.0 - float(f["age"]) / float(f["ttl"])
@@ -763,6 +803,14 @@ func _draw_player(pos: Vector2, fade: float) -> void:
 	draw_arc(pos, 16, 0, TAU, 24, col, 2.0)
 	draw_circle(pos + Vector2(0, -3), 9, Color(0.23, 0.70, 0.82, fade))
 	draw_line(pos + Vector2(-11, 6), pos + Vector2(-18, -10), Color(COL_BRIGHT, fade), 3.0)
+
+func _draw_npc(pos: Vector2, fade: float) -> void:
+	var col := COL_PURPLE; col.a = fade
+	draw_circle(pos, 15, Color(0.16, 0.10, 0.20, fade))
+	draw_arc(pos, 15, 0, TAU, 22, col, 2.0)
+	draw_circle(pos + Vector2(0, -3), 8, Color(0.55, 0.36, 0.66, fade))
+	# a little speech-bubble dot above the head
+	draw_string(_font, pos + Vector2(-4, -18), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, col)
 
 func _draw_rat(pos: Vector2, fade: float, flashing: bool) -> void:
 	var body := COL_RED if flashing else COL_RAT
@@ -856,7 +904,7 @@ func _draw_hud() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
 	# Controls hint
 	draw_string(_font, Vector2(40, 60),
-		"strzałki ruch (=atak)  ·  Shift pchnij  ·  T celuj w strefę  ·  E rozbierz  ·  I warsztat  ·  . czekaj",
+		"strzałki ruch (=atak)  ·  Shift pchnij  ·  T celuj  ·  E rozbierz/rozmawiaj  ·  I warsztat  ·  . czekaj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Weapon / coating
 	var wln := "Broń: nóż"
@@ -945,6 +993,30 @@ func _draw_hud() -> void:
 		_draw_class_offer()
 	if not _route_offer.is_empty():
 		_draw_route_offer()
+	if not _dialogue.is_empty():
+		_draw_dialogue()
+
+## An NPC exchange: speaker line + numbered options (material gates greyed out).
+func _draw_dialogue() -> void:
+	var W := 980.0; var H := 340.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.08, 0.08, 0.11, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 30), _dialogue.get("speaker", "Ktoś"),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_PURPLE)
+	draw_string(_font, Vector2(px + 20, py + 58), _dialogue.get("text", ""),
+		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 15, COL_BRIGHT)
+	var cy := py + 110.0
+	var opts: Array = _dialogue.get("options", [])
+	for i in opts.size():
+		var avail: bool = Dialogue.option_available(floor, _dialogue, i)
+		var col := COL_AMBER if avail else COL_DIM
+		draw_string(_font, Vector2(px + 28, cy),
+			"[%d]  %s" % [i + 1, (opts[i] as Dictionary).get("label", "")],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 16, col)
+		cy += 34.0
+	draw_string(_font, Vector2(px + 20, py + H - 18),
+		"[cyfra] wybierz   ·   [Esc] odejdź", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## The route gamble at the stairs: pick which biome to descend into.
 func _draw_route_offer() -> void:
