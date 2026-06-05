@@ -39,6 +39,11 @@ func _initialize() -> void:
 	bv.sim.player().int_xp = 50            # int_mod 10 guarantees success on DC 10
 	bv._animate(bv.sim.bench_attempt(["przewód", "szmata"]))
 	_ck(bv.floor.items.size() >= 1, "bench_attempt via the view crafts an item")
+	var narrated := false
+	for line in bv._log:
+		if (line as String).begins_with("Konferansjer:"):
+			narrated = true
+	_ck(narrated, "konferansjer narrates the successful craft")
 	bv._animate(bv.sim.player_use_item(0))
 	_ck(bv.sim.player().coating == "electric", "using the crafted coating arms the weapon")
 

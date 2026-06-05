@@ -48,6 +48,7 @@ var _part_flash: Dictionary = {}     # "enemyid:zone" -> seconds left, for hit p
 
 # Emergent-class offer
 var _class_offer: Array = []         # candidate class keys; non-empty = modal open
+var _narr_rng := RandomNumberGenerator.new()   # seeded narrator line picker
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -60,6 +61,7 @@ func _build() -> void:
 	sim = floor.sim
 	_hint = data.get("hint", "")
 	_log = ["Wchodzisz do kompleksu. Pierwsze pomieszczenie: magazyn."]
+	_narr_rng.seed = 9001
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
@@ -328,6 +330,7 @@ func _advance_floor_turn() -> void:
 		var offer := floor.check_class_offer()
 		if not offer.is_empty():
 			_class_offer = offer
+			_narrate("class_offer")
 			var tt := Classes.top_two(floor.player)
 			_log_push("Syndykat patrzy na twój styl (%s) i ma propozycję." %
 				Classes.affinity_label(tt[0]))
@@ -354,6 +357,7 @@ func _use_class_active() -> void:
 # ── Event → animation ─────────────────────────────────────────────────────────
 
 func _animate(evs: Array) -> void:
+	_narrate_batch(evs)
 	for e in evs:
 		match e.get("type"):
 			"move":
@@ -395,6 +399,12 @@ func _animate(evs: Array) -> void:
 					parts.append("+%s" % k)
 				_add_floater(e["target"], ", ".join(parts), COL_AMBER)
 				_shake = maxf(_shake, 2.0)
+				if e["gained"].has("drewno"):
+					_narrate("furniture_salvage")
+				elif e["gained"].has("przewód") or e["gained"].has("złom"):
+					_narrate("tech_salvage")
+				else:
+					_narrate("salvage_success")
 			"notice":
 				_add_floater(e["id"], "!", COL_RED)
 				_shake = maxf(_shake, 3.0)
@@ -409,6 +419,12 @@ func _animate(evs: Array) -> void:
 				_add_floater(sim.player_id, outcome.to_upper(), col)
 				if e.get("item_name", "") != "":
 					_add_floater(sim.player_id, "+" + e["item_name"], COL_GREEN)
+				match outcome:
+					"krytyk":    _narrate("clever_craft")
+					"sukces":    _narrate("craft_success")
+					"czesciowy": _narrate("craft_partial")
+					"porazka":   _narrate("craft_fail")
+					"backfire":  _narrate("craft_critical_fail")
 			"backfire_desc":
 				_add_floater(sim.player_id, e.get("desc", "backfire"), COL_RED)
 				_shake = maxf(_shake, 4.0)
@@ -439,6 +455,26 @@ func _animate(evs: Array) -> void:
 		if ln != "":
 			_log_push(ln)
 	queue_redraw()
+
+## Konferansjer reads the whole event batch for show-worthy moments: an
+## environment kill (shock + a dead enemy) and audience band crossings.
+func _narrate_batch(evs: Array) -> void:
+	var systemic_electric := false
+	var enemy_died := false
+	for e in evs:
+		match e.get("type"):
+			"systemic":
+				if e.get("element") == "electric":
+					systemic_electric = true
+			"death":
+				var t = sim.entities.get(e.get("target"))
+				if t != null and t.faction == "enemy":
+					enemy_died = true
+			"audience_change":
+				if e.get("crossed", false):
+					_narrate("audience_rise" if int(e.get("delta", 0)) > 0 else "audience_drop")
+	if systemic_electric and enemy_died:
+		_narrate("env_kill")
 
 func _name(id: int) -> String:
 	var e = sim.entities.get(id)
@@ -474,6 +510,12 @@ func _maim_line(e: Dictionary) -> String:
 		"disarmed": return "Miazdzysz %s — %s slabiej uderza." % [lbl, nm]
 		"blinded":  return "Niszczysz %s — %s oslepiony." % [lbl, nm]
 	return "%s u %s peka." % [lbl, nm]
+
+## Fire a konferansjer line for a category (if one exists) into the log.
+func _narrate(category: String) -> void:
+	var line := Narrator.say(category, _narr_rng)
+	if line != "":
+		_log_push("Konferansjer: " + line)
 
 func _log_push(line: String) -> void:
 	_log.append(line)
