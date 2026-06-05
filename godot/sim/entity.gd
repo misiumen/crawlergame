@@ -16,6 +16,9 @@ var faction: String = "enemy"    # "player" | "enemy" | "neutral" | "object"
 var alive: bool = true
 var aware: bool = true           # enemies: false = idle until they notice you
 var affordances: Array = []      # objects: ["salvage","break","inspect",...]
+var coating: String = ""         # player weapon coating: "" | "electric" | ...
+var coating_charges: int = 0     # hits remaining on the coating
+var bonus_damage: int = 0        # permanent melee damage bonus (crafted upgrades)
 
 func _init(_id: int = 0, _name: String = "", _hp: int = 1, _ac: int = 10, _tags: Array = []) -> void:
 	id = _id

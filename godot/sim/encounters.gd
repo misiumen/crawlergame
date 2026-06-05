@@ -35,7 +35,8 @@ static func intake() -> Dictionary:
 	table.affordances = ["inspect", "salvage", "break"]
 	table.cell = Vector2i(6, 2)
 
-	var cabinet := CombatEntity.new(4, "Metalowa szafka", 8, 6, ["furniture", "metal", "salvageable"])
+	var cabinet := CombatEntity.new(4, "Szafka z elektroniką", 8, 6,
+		["furniture", "metal", "electric", "salvageable"])
 	cabinet.faction = "object"
 	cabinet.affordances = ["inspect", "salvage", "break"]
 	cabinet.cell = Vector2i(6, 4)

@@ -34,6 +34,11 @@ func _initialize() -> void:
 		bv._process(0.016)               # manual frames (no main loop under -s)
 	_ck(true, "_process runs without error")
 
+	# crafting via the view: give materials, craft the first recipe
+	bv.sim.materials = {"przewód": 1}
+	bv._do_craft(0)
+	_ck(bv.sim.player().coating == "electric", "view _do_craft applies a recipe")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)

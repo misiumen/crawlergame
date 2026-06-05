@@ -90,8 +90,15 @@ func _player_attack(target: CombatEntity) -> Array:
 	target.aware = true                                # striking it certainly alerts it
 	var evs: Array = [{"type": "attack", "attacker": player_id, "target": target.id}]
 	if _roll_hit(3, target.ac):
-		var base: int = rng.randi_range(1, 6) + 2      # knife 1d6+2 (physical)
-		evs += _apply_damage(target, base, DMG_PHYSICAL)
+		var p: CombatEntity = player()
+		var base: int = rng.randi_range(1, 6) + 2 + p.bonus_damage   # knife 1d6+2 (+upgrades)
+		var dtype: String = DMG_PHYSICAL
+		if p.coating == "electric" and p.coating_charges > 0:
+			dtype = DMG_ELECTRIC                       # coated: bypasses thick hide, doubled vs shock-weak
+			p.coating_charges -= 1
+			if p.coating_charges <= 0:
+				p.coating = ""
+		evs += _apply_damage(target, base, dtype)
 	else:
 		evs.append({"type": "miss", "attacker": player_id, "target": target.id})
 	return evs
@@ -103,7 +110,7 @@ func player_shove(dir: Vector2i) -> Array:
 	var adj: Vector2i = p.cell + dir
 	var occ: int = board.occupant_at(adj)
 	if occ == -1 or occ == player_id:
-		return [{"type": "blocked"}]
+		return [{"type": "none", "action": "shove"}]   # nothing adjacent to push
 	var target: CombatEntity = entities[occ]
 	var land: Vector2i = adj + dir
 	var evs: Array = [{"type": "shove", "target": target.id, "dir": dir}]
@@ -134,7 +141,42 @@ func player_interact() -> Array:
 			var t: CombatEntity = entities[occ]
 			if t.faction == "object" and "salvage" in t.affordances:
 				return _salvage(t)
-	return [{"type": "none"}]                          # nothing to dismantle: not a turn
+	return [{"type": "none", "action": "salvage"}]     # nothing to dismantle: not a turn
+
+# ---- crafting: spend materials into power ----
+func craftables() -> Array:
+	var out: Array = []
+	for r in Recipes.all():
+		out.append({"recipe": r, "affordable": _can_afford(r["cost"])})
+	return out
+
+func _can_afford(cost: Dictionary) -> bool:
+	for k in cost:
+		if int(materials.get(k, 0)) < int(cost[k]):
+			return false
+	return true
+
+func craft(recipe_id: String) -> Array:
+	for r in Recipes.all():
+		if r["id"] != recipe_id:
+			continue
+		if not _can_afford(r["cost"]):
+			return [{"type": "craft_fail", "name": r["name"], "cost": r["cost"]}]
+		for k in r["cost"]:
+			materials[k] = int(materials[k]) - int(r["cost"][k])
+			if materials[k] <= 0:
+				materials.erase(k)
+		var p: CombatEntity = player()
+		match r.get("effect"):
+			"coating":
+				p.coating = r["coating"]
+				p.coating_charges = int(r["charges"])
+			"bonus_damage":
+				p.bonus_damage += int(r["amount"])
+		var evs: Array = [{"type": "craft", "id": r["id"], "name": r["name"]}]
+		evs += _after_player_action(1)
+		return evs
+	return [{"type": "none", "action": "craft"}]
 
 func _salvage(obj: CombatEntity) -> Array:
 	var gained: Dictionary = {}

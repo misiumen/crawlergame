@@ -107,5 +107,23 @@ func _initialize() -> void:
 	_ck(css.materials.size() > 0, "dismantling yields materials")
 	_ck(not obj.is_alive(), "dismantled object is removed")
 
+	# --- crafting: materials -> electric coating -> attacks bypass thick hide ---
+	var bc := Board.from_ascii(["####", "#..#", "####"])
+	var pc := CombatEntity.new(1, "Ty", 100, 14, []); pc.faction = "player"; pc.cell = Vector2i(1, 1)
+	var rc := CombatEntity.new(2, "Szczur", 60, 1, ["organic", "thick_hide", "shock_weak"])
+	rc.faction = "enemy"; rc.cell = Vector2i(2, 1); rc.aware = true     # ac 1 = always hit (test determinism)
+	var csc := CombatSim.new(bc, {1: pc, 2: rc}, 1, 11); bc.place(1, pc.cell); bc.place(2, rc.cell)
+	csc.materials = {"przewód": 1, "złom": 2}
+	_ck(csc.craftables().size() >= 2, "recipes are available")
+	var evc := csc.craft("coat_electric")
+	_ck(_has_event(evc, "craft"), "craft emits a craft event")
+	_ck(pc.coating == "electric" and pc.coating_charges == 3, "electric coating applied (3 charges)")
+	_ck(not csc.materials.has("przewód"), "crafting spent the materials")
+	var eva := csc.player_move(Vector2i.RIGHT)                          # coated bump-attack
+	_ck(_has_event(eva, "damage", "dmg_type", "electric"), "coated attack deals electric (bypasses hide)")
+	_ck(pc.coating_charges == 2, "coating charge consumed on hit")
+	var evf := csc.craft("coat_electric")
+	_ck(_has_event(evf, "craft_fail"), "crafting without materials fails gracefully")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

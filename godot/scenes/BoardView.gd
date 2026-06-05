@@ -33,6 +33,7 @@ var _shake := 0.0
 var _font: Font
 var _log: Array = []              # recent narration lines (Polish)
 var _hint := ""
+var _craft_open := false
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -59,9 +60,20 @@ func _cell_px(c: Vector2i) -> Vector2:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
+	var kc: int = (event as InputEventKey).keycode
+	if kc == KEY_Z:
+		_craft_open = not _craft_open
+		queue_redraw(); return
+	if _craft_open:
+		if kc == KEY_ESCAPE:
+			_craft_open = false; queue_redraw(); return
+		var idx: int = kc - KEY_1
+		if idx >= 0 and idx <= 8:
+			_do_craft(idx)
+		return
 	var shove := Input.is_key_pressed(KEY_SHIFT)
 	var dir := Vector2i.ZERO
-	match (event as InputEventKey).keycode:
+	match kc:
 		KEY_LEFT, KEY_A: dir = Vector2i.LEFT
 		KEY_RIGHT, KEY_D: dir = Vector2i.RIGHT
 		KEY_UP, KEY_W: dir = Vector2i.UP
@@ -71,6 +83,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		_: return
 	if shove: handle_shove(dir)
 	else: handle_dir(dir)
+
+func _do_craft(idx: int) -> void:
+	var list := sim.craftables()
+	if idx < list.size():
+		_animate(sim.craft(list[idx]["recipe"]["id"]))
+		_craft_open = false
+		queue_redraw()
 
 # ---------- public action drivers (also called by headless tests) ----------
 func handle_dir(dir: Vector2i) -> void:
@@ -112,6 +131,8 @@ func _animate(evs: Array) -> void:
 			"notice":
 				_add_floater(e["id"], "!", COL_RED)
 				_shake = maxf(_shake, 3.0)
+			"craft":
+				_add_floater(sim.player_id, "+" + str(e["name"]), COL_CYAN)
 			"combat_end":
 				_add_banner("ZWYCIĘSTWO" if e["outcome"] == "win" else "KONIEC")
 		var ln := _event_line(e)
@@ -161,6 +182,17 @@ func _event_line(e: Dictionary) -> String:
 		"blocked":
 			if e.get("reason") == "object":
 				return "(Sprzęt blokuje przejście — [E] rozbierz.)"
+		"craft":
+			return "Tworzysz: %s." % e["name"]
+		"craft_fail":
+			var need: Array = []
+			for k in e["cost"]:
+				need.append("%s x%d" % [k, e["cost"][k]])
+			return "Brakuje materiałów: " + ", ".join(need) + "."
+		"none":
+			match e.get("action"):
+				"shove": return "Nie ma kogo pchnąć — stań tuż obok wroga."
+				"salvage": return "Nie ma czego rozebrać w pobliżu."
 	return ""
 
 var _banner := ""
@@ -312,13 +344,20 @@ func _draw_hud() -> void:
 		% [sim.round_num, "TY" if sim.side == "player" else "wrogowie"],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
 	draw_string(_font, Vector2(40, 60),
-		"HP %d/%d   ·   strzałki/WSAD ruch (wejście = atak)   ·   Shift+ruch pchnij   ·   E rozbierz   ·   . czekaj"
+		"HP %d/%d   ·   strzałki/WSAD ruch (wejście=atak)   ·   Shift+ruch pchnij   ·   E rozbierz   ·   Z warsztat   ·   . czekaj"
 		% [p.hp, p.max_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+	# weapon / coating
+	var wln := "Broń: nóż"
+	if p.coating == "electric":
+		wln += "  [PRĄD x%d]" % p.coating_charges
+	if p.bonus_damage > 0:
+		wln += "  +%d obr." % p.bonus_damage
+	draw_string(_font, Vector2(40, 82), wln, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	# materials
 	var mats: Array = []
 	for k in sim.materials:
 		mats.append("%s x%d" % [k, sim.materials[k]])
-	draw_string(_font, Vector2(40, 82), "Materiały: " + ("—" if mats.is_empty() else ", ".join(mats)),
+	draw_string(_font, Vector2(40, 104), "Materiały: " + ("—" if mats.is_empty() else ", ".join(mats)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
 	# objective hint
 	if _hint != "":
@@ -343,3 +382,30 @@ func _draw_hud() -> void:
 	if _banner != "":
 		draw_string(_font, Vector2(_origin.x + 120, _origin.y + 160), _banner,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, COL_BRIGHT)
+	if _craft_open:
+		_draw_craft_panel()
+
+func _draw_craft_panel() -> void:
+	var w := 540.0
+	var h := 230.0
+	var x := (1280 - w) / 2.0
+	var y := (720 - h) / 2.0
+	draw_rect(Rect2(x, y, w, h), Color(0.10, 0.12, 0.16, 0.97))
+	draw_rect(Rect2(x, y, w, h), COL_CYAN, false, 2.0)
+	draw_string(_font, Vector2(x + 16, y + 26), "WARSZTAT   (cyfra = stwórz · Z/Esc zamknij)",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
+	var list := sim.craftables()
+	if list.is_empty():
+		draw_string(_font, Vector2(x + 16, y + 60), "Brak receptur.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+		return
+	for i in list.size():
+		var r: Dictionary = list[i]["recipe"]
+		var afford: bool = list[i]["affordable"]
+		var yy := y + 58 + i * 66
+		var costs: Array = []
+		for k in r["cost"]:
+			costs.append("%s x%d" % [k, r["cost"][k]])
+		var head := "[%d] %s  —  %s  %s" % [i + 1, r["name"], ", ".join(costs), "(OK)" if afford else "(brak)"]
+		draw_string(_font, Vector2(x + 16, yy), head, HORIZONTAL_ALIGNMENT_LEFT, -1, 16,
+			COL_BRIGHT if afford else COL_DIM)
+		draw_string(_font, Vector2(x + 40, yy + 22), r["desc"], HORIZONTAL_ALIGNMENT_LEFT, w - 60, 13, COL_DIM)
