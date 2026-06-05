@@ -1,33 +1,51 @@
-# Dungeon Kraulem — Godot port (Phase 0 scaffold)
+# Dungeon Kraulem — Godot 4 refactor
 
-Board-first tactical roguelike. Port of the pygame game in `../dungeon_kraulem`.
-Full plan: `../docs/GODOT_PORT_PLAN.md`. UI spec: the `../_mockup_*.png` / `../_sys_*.png` frames.
+Board-first tactical roguelike (DCC/litRPG soul). The **new game** — a rework +
+port of the old pygame game (now in `../pygame/`). Full plan + status:
+`../docs/GODOT_PORT_PLAN.md`. UI spec frames: `../docs/mockups/`.
+
+## Run it
+- **Play:** open `project.godot` in Godot 4.6+, or run the built exe
+  `builds/DungeonKraulem.exe` (rebuild with `build.bat`).
+- **Tests (headless):** `godot --headless --path . -s res://tests/test_<name>.gd`.
+  Suites: sim, combat, crafting, body, classes, narrator, meta, floorgen, routes,
+  save, dialogue, elements, boss, floor, view.
 
 ## Structure
 ```
-project.godot         autoloads + window config
-data/                 content JSON (generated — do not hand-edit)
-autoload/  Events.gd  signal bus (sim -> presentation)
-           Data.gd    loads data/*.json
-           Game.gd    run state + mode (explore/combat)
-           rng.gd     single seeded RNG
-sim/       tags.gd    tag->property inference (systemic foundation)
-                      (combat.gd, systemic.gd, crafting.gd, floorgen.gd ... land here in Phases 1-5)
-scenes/    Boot.tscn  Phase 0 smoke test (data load + tag inference)
+project.godot          autoloads + window config
+data/                  content JSON (generated from ../pygame — do not hand-edit)
+autoload/  Events.gd   signal bus (sim -> presentation)
+           Data.gd     loads data/*.json
+           Game.gd / rng.gd
+sim/                   THE SIM CORE — pure logic, no nodes, GUT-tested:
+           board, entity, tags, combat, crafting, rarity, item, box,
+           audience, sponsors, classes, class_features, narrator,
+           run_summary, meta, dice, floorgen, routes, save, body, floor,
+           dialogue (+ dialogue_trees, dialogue_trees_extra)
+scenes/    BoardView.gd the playable board (input, draw, animation)
+tests/                 headless GUT-style suites
 ```
 
-## Regenerate content data
-From the repo root (where `dungeon_kraulem/` lives):
+## Regenerate content from the pygame source
+Some `sim/*.gd` are GENERATED from the Python game (faithful ports of its content)
+by the bridge generators in `../tools/`:
 ```
-python -m dungeon_kraulem.tools.export_json
+python ../tools/gen_narrator.py      # -> sim/narrator.gd
+python ../tools/gen_runsummary.py    # -> sim/run_summary.gd
+python ../tools/gen_meta.py          # -> sim/meta.gd
+python ../tools/gen_dialogues.py     # -> sim/dialogue_trees.gd
 ```
-Writes `godot/data/*.json`. Two structures need a code port, not JSON:
-`floor_biomes.FLOOR_BIOMES` and `meta_progression.UNLOCK_CATALOG` (eval closures).
+The content JSON in `data/` comes from the pygame export pipeline:
+```
+cd ../pygame && python -m dungeon_kraulem.tools.export_json
+```
 
 ## Hard rule
-The **sim core never imports a node.** It takes data in, emits `Events` signals out.
-That keeps rules headlessly testable (GUT) and the renderer swappable.
+The **sim core never imports a node.** It takes data in, returns event dicts /
+emits `Events` signals out. That keeps the rules headlessly testable and the
+renderer swappable.
 
 ## Status
-Phase 0 foundations only. Next: Phase 0.5 (decouple embedded rules in the Python
-source) then Phase 1 vertical slice (one tile-combat encounter). See the plan.
+Phases 0–6 complete (vertical slice → exploration → crafting → bodies → DCC soul
+→ procedural floors/descent/save/routes/dialogue). See `../docs/GODOT_PORT_PLAN.md`.

@@ -7,7 +7,7 @@ small condition spec interpreted by evaluate(). Re-run if labels change.
 import re, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "dungeon_kraulem", "engine", "meta_progression.py")
+SRC = os.path.join(ROOT, "pygame", "dungeon_kraulem", "engine", "meta_progression.py")
 OUT = os.path.join(ROOT, "godot", "sim", "meta.gd")
 
 # key -> (kind, cond_type, arg).  cond_type interpreted by Meta.evaluate().

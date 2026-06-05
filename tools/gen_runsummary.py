@@ -6,7 +6,7 @@ Re-run if the source flavor changes.
 import re, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "dungeon_kraulem", "engine", "run_summary.py")
+SRC = os.path.join(ROOT, "pygame", "dungeon_kraulem", "engine", "run_summary.py")
 OUT = os.path.join(ROOT, "godot", "sim", "run_summary.gd")
 
 

@@ -5,9 +5,10 @@
 > embodied tactical roguelike. Rationale in English (internal doc); ALL
 > player-facing text stays Polish.
 >
-> Companion mockups (the UI spec): `_mockup_ideal.png` (combat),
-> `_combat_screen.png` (dedicated combat screen), `_combat_body.png` (embodied
-> combat), `_sys_1..9_*.png` (every reworked system).
+> Companion mockups (the UI spec) live in `mockups/`: `mockups/_mockup_ideal.png`
+> (combat), `mockups/_combat_screen.png` (dedicated combat screen),
+> `mockups/_combat_body.png` (embodied combat), `mockups/_sys_1..9_*.png` (every
+> reworked system).
 
 ---
 
