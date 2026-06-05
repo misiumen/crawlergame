@@ -17,7 +17,12 @@ var round_num: int = 1
 var side: String = "player"
 var over: bool = false
 var outcome: String = ""          # "" | "win" | "lose"
+var materials: Dictionary = {}    # run inventory: "drewno" -> count
 var rng := RandomNumberGenerator.new()
+
+const DIRS8 := [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN,
+	Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]
+const SIGHT := 4                  # an enemy notices you within this many tiles
 
 func _init(_board: Board, _entities: Dictionary, _player_id: int, seed_value: int = 0) -> void:
 	board = _board
@@ -67,7 +72,10 @@ func player_move(dir: Vector2i) -> Array:
 	var occ: int = board.occupant_at(dest)
 	var evs: Array = []
 	if occ != -1 and occ != player_id:
-		evs += _player_attack(entities[occ])          # bump = attack
+		var t: CombatEntity = entities[occ]
+		if t.faction == "object":
+			return [{"type": "blocked", "reason": "object", "id": t.id}]   # use [E] to dismantle
+		evs += _player_attack(t)                      # bump = attack
 	elif board.is_free(dest):
 		board.move(p.cell, dest)
 		p.cell = dest
@@ -79,6 +87,7 @@ func player_move(dir: Vector2i) -> Array:
 	return evs
 
 func _player_attack(target: CombatEntity) -> Array:
+	target.aware = true                                # striking it certainly alerts it
 	var evs: Array = [{"type": "attack", "attacker": player_id, "target": target.id}]
 	if _roll_hit(3, target.ac):
 		var base: int = rng.randi_range(1, 6) + 2      # knife 1d6+2 (physical)
@@ -115,6 +124,40 @@ func player_wait() -> Array:
 	evs += _after_player_action()
 	return evs
 
+## Dismantle the first adjacent object into materials (Dysmantle). Loud.
+func player_interact() -> Array:
+	if over or side != "player":
+		return []
+	for d in DIRS8:
+		var occ: int = board.occupant_at(player().cell + d)
+		if occ != -1 and occ != player_id:
+			var t: CombatEntity = entities[occ]
+			if t.faction == "object" and "salvage" in t.affordances:
+				return _salvage(t)
+	return [{"type": "none"}]                          # nothing to dismantle: not a turn
+
+func _salvage(obj: CombatEntity) -> Array:
+	var gained: Dictionary = {}
+	for tag in obj.tags:
+		match tag:
+			"wood": _gain(gained, "drewno", rng.randi_range(1, 3))
+			"metal": _gain(gained, "złom", rng.randi_range(1, 2))
+			"cloth", "fabric": _gain(gained, "szmata", 1)
+			"electric", "wire": _gain(gained, "przewód", 1)
+			"plastic": _gain(gained, "plastik", 1)
+	if gained.is_empty():
+		_gain(gained, "złom", 1)
+	for k in gained:
+		materials[k] = int(materials.get(k, 0)) + gained[k]
+	board.clear(obj.cell)
+	obj.alive = false
+	var evs: Array = [{"type": "salvage", "target": obj.id, "gained": gained}]
+	evs += _after_player_action(7)                     # dismantling is noisy
+	return evs
+
+func _gain(d: Dictionary, key: String, n: int) -> void:
+	d[key] = int(d.get(key, 0)) + n
+
 # ---- systemic: entering a cell can trigger environmental reactions ----
 func _on_enter_cell(e: CombatEntity) -> Array:
 	var evs: Array = []
@@ -142,10 +185,11 @@ func _adjacent_live_wire(c: Vector2i) -> bool:
 	return false
 
 # ---- turn flow ----
-func _after_player_action() -> Array:
+func _after_player_action(noise_radius: int = 0) -> Array:
 	var evs: Array = _check_end()
 	if over:
 		return evs
+	evs += _update_awareness(noise_radius)
 	side = "enemies"
 	evs += _enemy_turn()
 	if not over:
@@ -154,10 +198,26 @@ func _after_player_action() -> Array:
 	round_num += 1
 	return evs
 
+## Idle enemies wake when you come within sight, or when noise reaches them.
+func _update_awareness(noise_radius: int) -> Array:
+	var evs: Array = []
+	var p: CombatEntity = player()
+	var reach: int = maxi(SIGHT, noise_radius)
+	for e in enemies_alive():
+		if e.aware:
+			continue
+		var d: Vector2i = (e.cell - p.cell).abs()
+		if maxi(d.x, d.y) <= reach:
+			e.aware = true
+			evs.append({"type": "notice", "id": e.id})
+	return evs
+
 func _enemy_turn() -> Array:
 	var evs: Array = []
 	var p: CombatEntity = player()
 	for e in enemies_alive():
+		if not e.aware:
+			continue                                   # still idle / hasn't noticed you
 		if e.has_status("shocked"):
 			evs.append({"type": "skip", "id": e.id, "reason": "shocked"})
 			continue

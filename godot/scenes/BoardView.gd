@@ -31,6 +31,8 @@ var _dying: Dictionary = {}       # id -> fade 1..0
 var _floaters: Array = []         # {pos, text, color, age, ttl}
 var _shake := 0.0
 var _font: Font
+var _log: Array = []              # recent narration lines (Polish)
+var _hint := ""
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -40,8 +42,10 @@ func _ready() -> void:
 func _build() -> void:
 	var enc := Encounters.intake()
 	sim = CombatSim.new(enc["board"], enc["entities"], enc["player_id"], 1337)
+	_hint = enc.get("hint", "")
+	_log = ["Wchodzisz do hali. Coś tu śpi."]
 	var bw: int = sim.board.w * TILE
-	_origin = Vector2((1280 - bw) / 2.0, 96)
+	_origin = Vector2((1280 - bw) / 2.0 - 140, 110)   # leave room for the log on the right
 	for id in sim.entities:
 		var c: Vector2 = _cell_px(sim.entities[id].cell)
 		_vpos[id] = c
@@ -63,6 +67,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_UP, KEY_W: dir = Vector2i.UP
 		KEY_DOWN, KEY_S: dir = Vector2i.DOWN
 		KEY_PERIOD: handle_wait(); return
+		KEY_E: handle_interact(); return
 		_: return
 	if shove: handle_shove(dir)
 	else: handle_dir(dir)
@@ -76,6 +81,9 @@ func handle_shove(dir: Vector2i) -> void:
 
 func handle_wait() -> void:
 	_animate(sim.player_wait())
+
+func handle_interact() -> void:
+	_animate(sim.player_interact())
 
 # ---------- event -> animation ----------
 func _animate(evs: Array) -> void:
@@ -97,9 +105,63 @@ func _animate(evs: Array) -> void:
 				_dying[e["target"]] = 1.0
 			"miss":
 				_add_floater(e["target"], "pudło", COL_DIM)
+			"salvage":
+				_dying[e["target"]] = 1.0
+				_add_floater(e["target"], "+złom", COL_AMBER)
+				_shake = maxf(_shake, 2.0)
+			"notice":
+				_add_floater(e["id"], "!", COL_RED)
+				_shake = maxf(_shake, 3.0)
 			"combat_end":
 				_add_banner("ZWYCIĘSTWO" if e["outcome"] == "win" else "KONIEC")
+		var ln := _event_line(e)
+		if ln != "":
+			_log_push(ln)
 	queue_redraw()
+
+func _name(id: int) -> String:
+	var e = sim.entities.get(id)
+	return e.name_pl if e != null else "?"
+
+func _log_push(line: String) -> void:
+	_log.append(line)
+	if _log.size() > 9:
+		_log = _log.slice(_log.size() - 9)
+
+func _event_line(e: Dictionary) -> String:
+	match e.get("type"):
+		"damage":
+			var nm := _name(e["target"])
+			if e.get("dmg_type") == "electric":
+				return "Prąd razi %s: -%d!" % [nm, e["amount"]]
+			var tgt = sim.entities.get(e["target"])
+			if tgt != null and tgt.has_property("thick_hide"):
+				return "Tniesz %s: -%d (gruba skóra tłumi cios)." % [nm, e["amount"]]
+			return "Trafienie w %s: -%d." % [nm, e["amount"]]
+		"systemic":
+			if e.get("element") == "electric":
+				return "Iskra z kabla skacze przez wodę — PRĄD!"
+		"miss":
+			return "Pudło." if e["attacker"] == sim.player_id else "%s chybia." % _name(e["attacker"])
+		"death":
+			return "%s pada." % _name(e["target"])
+		"notice":
+			return "%s się budzi i cię widzi!" % _name(e["id"])
+		"salvage":
+			var parts: Array = []
+			for k in e["gained"]:
+				parts.append("%s x%d" % [k, e["gained"][k]])
+			return "Rozbierasz na: " + ", ".join(parts) + "."
+		"shove":
+			return "Pchasz %s." % _name(e["target"])
+		"skip":
+			return "%s drga — traci turę." % _name(e["id"])
+		"combat_end":
+			return "Wszyscy wrogowie pokonani." if e["outcome"] == "win" else "Giniesz."
+		"blocked":
+			if e.get("reason") == "object":
+				return "(Sprzęt blokuje przejście — [E] rozbierz.)"
+	return ""
 
 var _banner := ""
 func _add_banner(txt: String) -> void:
@@ -165,6 +227,8 @@ func _draw() -> void:
 		var flashing := _flash.has(id)
 		if e.faction == "player":
 			_draw_player(pos, fade)
+		elif e.faction == "object":
+			_draw_object(e, pos, fade)
 		else:
 			_draw_rat(pos, fade, flashing)
 	# floaters
@@ -193,6 +257,12 @@ func _draw_rat(pos: Vector2, fade: float, flashing: bool) -> void:
 	_draw_ellipse(pos, 15, 9, body)                                     # body
 	draw_circle(pos + Vector2(-13, 0), 7, body)                         # head
 
+func _draw_object(e: CombatEntity, pos: Vector2, fade: float) -> void:
+	var col := Color("8a6a3a") if "wood" in e.tags else Color("6a7280")
+	col.a = fade
+	draw_rect(Rect2(pos - Vector2(15, 12), Vector2(30, 24)), col)
+	draw_rect(Rect2(pos - Vector2(15, 12), Vector2(30, 24)), Color(0, 0, 0, 0.45 * fade), false, 1.0)
+
 func _draw_ellipse(center: Vector2, rx: float, ry: float, col: Color) -> void:
 	var pts := PackedVector2Array()
 	for i in 20:
@@ -208,8 +278,11 @@ func _draw_intent() -> void:
 		if e.faction != "enemy" or not e.is_alive():
 			continue
 		var ep: Vector2 = _vpos.get(id, _cell_px(e.cell))
+		if not e.aware:
+			draw_string(_font, ep + Vector2(-10, -20), "Zzz", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+			continue
 		if sim.board.is_adjacent(e.cell, p.cell):
-			draw_string(_font, ep + Vector2(-16, -20), "⚔ ugryzie", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_RED)
+			draw_string(_font, ep + Vector2(-16, -20), "ugryzie", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_RED)
 		else:
 			var step: Vector2i = e.cell + Vector2i(signi(p.cell.x - e.cell.x), signi(p.cell.y - e.cell.y))
 			var sp := _cell_px(step)
@@ -235,14 +308,38 @@ func _draw_preview() -> void:
 
 func _draw_hud() -> void:
 	var p := sim.player()
-	draw_string(_font, Vector2(40, 40), "STARCIE  ·  Runda %d  ·  %s" % [sim.round_num, sim.side],
+	draw_string(_font, Vector2(40, 36), "SORTOWNIA — Hala  ·  Runda %d  ·  tura: %s"
+		% [sim.round_num, "TY" if sim.side == "player" else "wrogowie"],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
-	draw_string(_font, Vector2(40, 64), "HP %d/%d   ·   ruch: strzałki/WSAD   ·   Shift+ruch: pchnij   ·   . czekaj"
-		% [p.hp, p.max_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, COL_DIM)
+	draw_string(_font, Vector2(40, 60),
+		"HP %d/%d   ·   strzałki/WSAD ruch (wejście = atak)   ·   Shift+ruch pchnij   ·   E rozbierz   ·   . czekaj"
+		% [p.hp, p.max_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+	# materials
+	var mats: Array = []
+	for k in sim.materials:
+		mats.append("%s x%d" % [k, sim.materials[k]])
+	draw_string(_font, Vector2(40, 82), "Materiały: " + ("—" if mats.is_empty() else ", ".join(mats)),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
+	# objective hint
+	if _hint != "":
+		draw_string(_font, Vector2(40, 700), "Cel: " + _hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+	# target readout
 	var rat: CombatEntity = sim.entities.get(2)
 	if rat != null and rat.is_alive():
-		draw_string(_font, Vector2(40, 720 - 30),
-			"CEL: %s  HP %d/%d  ·  gruba skóra (ciosy się ślizgają), słaby na prąd"
-			% [rat.name_pl, rat.hp, rat.max_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, COL_AMBER)
+		var st := "śpi" if not rat.aware else "ściga cię"
+		draw_string(_font, Vector2(40, 676),
+			"%s  HP %d/%d  [%s]  ·  gruba skóra (ciosy się ślizgają), słaby na PRĄD"
+			% [rat.name_pl, rat.hp, rat.max_hp, st], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
+	# log panel (DZIENNIK) on the right
+	var lx := _origin.x + sim.board.w * TILE + 24
+	var lw := 1280 - lx - 24
+	draw_rect(Rect2(lx, 110, lw, 360), Color(0.08, 0.10, 0.13, 0.9))
+	draw_rect(Rect2(lx, 110, lw, 360), COL_GRID, false, 1.0)
+	draw_string(_font, Vector2(lx + 12, 132), "DZIENNIK", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
+	for i in _log.size():
+		var alpha := 0.5 + 0.5 * float(i + 1) / _log.size()
+		draw_string(_font, Vector2(lx + 12, 158 + i * 22), _log[i],
+			HORIZONTAL_ALIGNMENT_LEFT, lw - 24, 14, Color(COL_BRIGHT, alpha))
 	if _banner != "":
-		draw_string(_font, Vector2(540, 360), _banner, HORIZONTAL_ALIGNMENT_LEFT, -1, 48, COL_BRIGHT)
+		draw_string(_font, Vector2(_origin.x + 120, _origin.y + 160), _banner,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, COL_BRIGHT)

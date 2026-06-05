@@ -12,8 +12,10 @@ var hp: int = 1
 var ac: int = 10
 var cell: Vector2i = Vector2i.ZERO
 var statuses: Dictionary = {}    # status name -> turns remaining
-var faction: String = "enemy"    # "player" | "enemy" | "neutral"
+var faction: String = "enemy"    # "player" | "enemy" | "neutral" | "object"
 var alive: bool = true
+var aware: bool = true           # enemies: false = idle until they notice you
+var affordances: Array = []      # objects: ["salvage","break","inspect",...]
 
 func _init(_id: int = 0, _name: String = "", _hp: int = 1, _ac: int = 10, _tags: Array = []) -> void:
 	id = _id

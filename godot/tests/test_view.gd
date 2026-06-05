@@ -17,7 +17,14 @@ func _initialize() -> void:
 	bv._font = ThemeDB.fallback_font
 	bv._build()                          # (_ready is deferred under -s; call directly)
 	_ck(bv.sim != null, "scene builds a CombatSim")
-	_ck(bv._vpos.size() == 2, "visual positions initialised for both tokens")
+	_ck(bv._vpos.size() >= 2, "visual positions initialised for tokens")
+
+	# narration: events map to readable Polish log lines
+	_ck(bv._event_line({"type": "damage", "target": 2, "amount": 5, "dmg_type": "electric"}) != "",
+		"narration: electric damage -> line")
+	_ck(bv._event_line({"type": "salvage", "target": 3, "gained": {"drewno": 2}}) != "",
+		"narration: salvage -> line")
+	_ck(bv._event_line({"type": "notice", "id": 2}) != "", "narration: notice -> line")
 
 	var r0: int = bv.sim.round_num
 	bv.handle_dir(Vector2i.RIGHT)        # a real move ends the player turn

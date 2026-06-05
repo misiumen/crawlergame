@@ -66,7 +66,10 @@ func _initialize() -> void:
 	var enc := Encounters.intake()
 	var eb: Board = enc["board"]
 	_ck(enc.has("board") and enc.has("entities") and enc.has("player_id"), "intake encounter builds")
-	_ck((enc["entities"] as Dictionary).size() == 2, "intake has player + rat")
+	var ee: Dictionary = enc["entities"]
+	_ck(ee.size() >= 2 and ee[1].faction == "player" and ee[2].faction == "enemy",
+		"intake has player + rat (+ objects)")
+	_ck(not (ee[2] as CombatEntity).aware, "intake rat starts asleep")
 	# a water tile in the intake is adjacent to the wire (the trap is real)
 	var trap_ok := false
 	for y in eb.h:
@@ -78,6 +81,31 @@ func _initialize() -> void:
 						if eb.hazard_at(c + Vector2i(dx, dy)) == "wire":
 							trap_ok = true
 	_ck(trap_ok, "intake has a water tile adjacent to the wire (live trap)")
+
+	# --- awareness: a sleeping enemy stays idle until it notices you ---
+	var ba := Board.from_ascii(["##########", "#........#", "##########"])
+	var pa := CombatEntity.new(1, "Ty", 100, 14, []); pa.faction = "player"; pa.cell = Vector2i(1, 1)
+	var ea := CombatEntity.new(2, "Wrog", 20, 10, []); ea.faction = "enemy"; ea.cell = Vector2i(8, 1); ea.aware = false
+	var csa := CombatSim.new(ba, {1: pa, 2: ea}, 1, 5); ba.place(1, pa.cell); ba.place(2, ea.cell)
+	csa.player_wait()
+	_ck(not ea.aware and ea.cell == Vector2i(8, 1), "distant sleeping enemy stays idle")
+	var g := 0
+	while not ea.aware and g < 10:
+		csa.player_move(Vector2i.RIGHT); g += 1
+	_ck(ea.aware, "enemy wakes when player comes within sight")
+
+	# --- dismantle the world into materials; objects block movement, not attacks ---
+	var bs := Board.from_ascii(["#####", "#...#", "#####"])
+	var ps := CombatEntity.new(1, "Ty", 100, 14, []); ps.faction = "player"; ps.cell = Vector2i(1, 1)
+	var obj := CombatEntity.new(3, "Stol", 6, 5, ["furniture", "wood", "salvageable"])
+	obj.faction = "object"; obj.affordances = ["salvage"]; obj.cell = Vector2i(2, 1)
+	var css := CombatSim.new(bs, {1: ps, 3: obj}, 1, 2); bs.place(1, ps.cell); bs.place(3, obj.cell)
+	var evb := css.player_move(Vector2i.RIGHT)
+	_ck(_has_event(evb, "blocked") and ps.cell == Vector2i(1, 1), "moving into an object is blocked, not an attack")
+	var evi := css.player_interact()
+	_ck(_has_event(evi, "salvage"), "dismantle emits a salvage event")
+	_ck(css.materials.size() > 0, "dismantling yields materials")
+	_ck(not obj.is_alive(), "dismantled object is removed")
 
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

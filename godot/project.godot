@@ -1,13 +1,22 @@
-; Dungeon Kraulem — Godot 4 project (port scaffold, Phase 0)
-; Verify on first open in the Godot editor; this file is hand-authored.
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="Dungeon Kraulem"
 run/main_scene="res://scenes/Slice.tscn"
-config/features=PackedStringArray("4.3")
+config/features=PackedStringArray("4.6")
 
 [autoload]
 
