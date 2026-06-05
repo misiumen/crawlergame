@@ -258,18 +258,40 @@ enemy intent telegraph). 36 GDScript checks green (`test_sim`/`test_combat`/
 **Verified:** 66 GDScript checks green (`test_sim`/`combat`/`view`/`floor`); main scene
 + exported exe boot clean.
 
-### Phase 3 — Crafting + power compounding (M)
+### Phase 3 — Crafting + power compounding (M) ✅ DONE
 *Maps to `_sys_3_craft.png`.*
-- `crafting.gd` (dual path) + recipe/experimental JSON.
-- Craft screen with tag-matching + outcome-tier preview.
-- Coatings applied in combat; deployable traps; crafted items as quick-use in the action bar.
+- ✅ `crafting.gd` — **tag-grammar crafting, no fixed recipes**: combine tagged
+  materials, infer a function, roll k20+INT vs DC, 5 outcome tiers (krytyk/
+  sukces/częściowy/porażka/backfire), per-dominant backfire pools, affix + name
+  generation, discovered-recipe book. Plus `rarity.gd` (5 tiers), `item.gd`,
+  `box.gd` (lootboxes).
+- ✅ Craft screen ([I] warsztat): 6 bench slots, combined-tag preview, DC readout,
+  fuzzy prediction, stability/risk bars, outcome-tier list, recipe book; items +
+  boxes tabs.
+- ✅ Coatings/upgrades applied in combat; crafted items used by index; all drop
+  pipelines produce unopened boxes the player opens.
+- ✅ **Bonus (pulled in):** full sponsor + audience + lootbox systems ported from
+  the Python engine (`sponsors.gd`, `audience.gd`) — 11 sponsors, attention
+  routing by gameplay tags, gift thresholds, COLD/WARMING/HOT/VIRAL bands with
+  combat mods. HUD strip + signals.
 
-### Phase 4 — Embodiment upgrade: reactive bodies (L)
+### Phase 4 — Embodiment upgrade: reactive bodies (L) ✅ DONE (sim + readout)
 *Maps to `_combat_body.png`. The combat-as-spine payoff.*
-- `BodyRig.gd`: procedural bodies from `body_plans` + tag-driven skin/palette.
-- Damage-overlay library (burn/bleed/corrode/shock/sever) applied per-part by tag + hit-zone.
-- Body-zone targeting UI; located + persistent wounds change behavior (broken leg → can't flee).
-- Bodies used at both scales: small grid tokens + the large combat readout.
+- ✅ `sim/body.gd` — `BodyState` from `body_plans.json`: per-part hp + wounds +
+  severity, layered on the canonical hp/death model. Located hits, part damage
+  multipliers, wound typing (burn/shock/corrode/freeze/bleed/sever), limb
+  severing, maims, butcher yields. Plus the **full `tags.gd` inference port**
+  (the systemic foundation, previously a stub).
+- ✅ Damage applied per-part by zone × element; `combat.gd` emits body_hit/maim/
+  sever events; wound floaters + glyphs + per-part hit flash.
+- ✅ Body-zone targeting ([T] cycles the aimed zone) + persistent wounds change
+  behavior (broken leg → can't chase, head → stunned, arm → weaker).
+- ✅ Large **body-readout panel** (parts colored by severity, HP pips, wound
+  glyphs, aim highlight). Grid-token wound tinting = TODO polish.
+- ⏸ **Deferred (visual rig):** the procedural part-shape rig with anchor points +
+  AI-seeded art (`BodyRig.gd` proper) is the remaining presentation polish; the
+  *systemic* embodiment (located breakable bodies driving combat) is complete and
+  test-locked (40 GUT checks).
 
 ### Phase 5 — The DCC soul (XL, can parallelize)
 *Maps to `_sys_5..9`.*
