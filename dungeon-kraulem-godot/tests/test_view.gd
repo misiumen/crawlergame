@@ -342,21 +342,27 @@ func _initialize() -> void:
 	if bv.floor.audience:
 		_ck(bv.floor.audience.rating >= aud_pre, "the chosen fork applies its effect")
 
-	# memetics: plant a belief seed, propagate it, see it act + show its modal
-	bv.floor.player.flags.erase("seeds")
-	bv.sim.player().stats["CHA"] = 6
-	bv._plant_meme("plotka")
-	_ck((bv.floor.player.flags.get("seeds", []) as Array).size() == 1, "planting a meme adds a seed")
-	var seeds: Array = bv.floor.player.flags["seeds"]
-	seeds[0]["age"] = 2                  # nudge it to the spreading stage
-	var meme_ap: int = bv.floor.audience.rating if bv.floor.audience else 0
-	bv._meme_tick()
-	_ck(bv.floor.audience == null or bv.floor.audience.rating >= meme_ap, "a spreading rumor grows the audience")
-	bv._meme_screen = true
-	for i in 2:
-		bv._process(0.016)
-	_ck(true, "the memetics planting screen draws without crash")
-	bv._meme_screen = false
+	# memetics: freeform persuasion — convert an adjacent enemy with a high-CHA roll
+	bv.sim.player().stats["CHA"] = 40        # force the persuasion check to land
+	var mind_id := -1
+	for id in bv.sim.entities:
+		var me: CombatEntity = bv.sim.entities[id]
+		if me.faction == "enemy" and me.is_alive() and not me.tags.has("boss"):
+			mind_id = id
+	if mind_id != -1:
+		bv.sim.player().cell = bv.sim.entities[mind_id].cell + Vector2i.LEFT
+		bv.sim.board.place(bv.sim.player_id, bv.sim.player().cell)
+		bv._speak = {"target_id": mind_id, "text": "klęknij przed jedyną wiarą", "mode": "type"}
+		for i in 2:
+			bv._process(0.016)             # draws the speak prompt
+		_ck(true, "the speak prompt draws without crash")
+		bv._speak_submit()                 # classify → convert → roll (auto-success at CHA 40)
+		_ck(bv.sim.entities[mind_id].faction == "ally", "a successful sermon converts the enemy to your side")
+	# blank submit → improvised fallback options
+	bv._speak = {"target_id": bv.sim.player_id, "text": "", "mode": "type"}
+	bv._speak_submit()
+	_ck(bv._speak.get("mode", "") == "fallback", "an empty line offers improvised lines")
+	bv._speak = {}
 
 	# flavor content: failure lines + celebrity cameos (previously-unused bundles)
 	_ck(Flavor.fail_line("failure", bv._narr_rng) != "", "a procedural craft-failure line is available")

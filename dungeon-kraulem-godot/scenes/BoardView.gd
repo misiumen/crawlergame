@@ -72,7 +72,7 @@ var _safehouse: Dictionary = {}      # open safehouse modal: {id, subtype} (non-
 var _crawler: Dictionary = {}        # open rival-crawler parley modal: {id} (non-empty = open)
 var _spellbook := false               # spell list overlay (cast with mana)
 var _event: Dictionary = {}           # active mid-floor decision beat (non-empty = modal)
-var _meme_screen := false             # belief-seed (memetics) plant overlay
+var _speak: Dictionary = {}           # freeform persuasion prompt: {target_id, text, mode, options}
 var _journal_screen := false          # knowledge journal overlay (clues + rumors)
 var _journal_scroll := 0.0
 const META_KIND_COL := {
@@ -305,6 +305,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		_mouse = (event as InputEventMouseMotion).position
 		queue_redraw()
 		return
+	# Freeform persuasion prompt: while typing, capture text directly (unicode), so
+	# this must intercept BEFORE the generic keycode handling below.
+	if not _speak.is_empty() and _speak.get("mode", "") == "type" \
+			and event is InputEventKey and event.pressed and not event.echo:
+		var sk: int = (event as InputEventKey).keycode
+		if sk == KEY_ESCAPE:
+			_speak = {}; queue_redraw()
+		elif sk == KEY_ENTER or sk == KEY_KP_ENTER:
+			_speak_submit()
+		elif sk == KEY_BACKSPACE:
+			var t: String = _speak.get("text", "")
+			_speak["text"] = t.substr(0, maxi(0, t.length() - 1)); queue_redraw()
+		else:
+			var ch: int = (event as InputEventKey).unicode
+			if ch >= 32 and str(_speak.get("text", "")).length() < 64:
+				_speak["text"] = str(_speak.get("text", "")) + String.chr(ch); queue_redraw()
+		return
 	# Lootbox reveal grabs all input: a click/key skips the spin or collects the loot.
 	if not _box_anim.is_empty():
 		if (event is InputEventMouseButton and event.pressed) \
@@ -416,13 +433,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif kc == KEY_UP:   _journal_scroll = maxf(0.0, _journal_scroll - 80.0); queue_redraw()
 		return
 
-	# Memetics planting menu: number keys plant, Esc/K closes.
-	if _meme_screen:
+	# Persuasion prompt in fallback mode: number keys pick an improvised line.
+	if not _speak.is_empty() and _speak.get("mode", "") == "fallback":
 		if kc == KEY_ESCAPE or kc == KEY_K:
-			_meme_screen = false; queue_redraw(); return
+			_speak = {}; queue_redraw(); return
 		var mi := kc - KEY_1
-		if mi >= 0 and mi < Memetics.METHODS.size():
-			_plant_meme(Memetics.METHODS[mi]["key"])
+		if mi >= 0 and mi < (_speak.get("options", []) as Array).size():
+			_speak_pick(mi)
 		return
 
 	# Spellbook grabs input: number keys cast, Esc closes.
@@ -483,9 +500,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if kc == KEY_J:
 		_journal_screen = not _journal_screen; _journal_scroll = 0.0; queue_redraw(); return
 
-	# [K] open/close the memetics (belief-seed) planting menu
+	# [K] speak to the nearest mind — freeform social engineering (hidden road)
 	if kc == KEY_K:
-		_meme_screen = not _meme_screen; queue_redraw(); return
+		_open_speak(); return
 
 	# [L] open the skill-point allocation modal (if you've banked any)
 	if kc == KEY_L:
@@ -531,7 +548,7 @@ func _can_take_board_input() -> bool:
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
 		and _levelup.is_empty() and not _ach_screen and not _meta_screen \
 		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook \
-		and not _journal_screen and _event.is_empty() and not _meme_screen
+		and not _journal_screen and _event.is_empty() and _speak.is_empty()
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -625,7 +642,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"crawler_action":    _crawler_action(z.get("s", ""))
 		"cast":              _cast_spell(z.get("s", ""))
 		"event_fork":        _event_choose(i)
-		"meme_plant":        _plant_meme(z.get("s", ""))
+		"speak_pick":        _speak_pick(i)
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
 
@@ -1449,9 +1466,6 @@ func _advance_floor_turn() -> void:
 			_event = beat
 			_log_push("Przerwa w akcji: %s" % _event.get("intro", ""))
 			queue_redraw()
-	# Belief seeds propagate every 4 floor-turns.
-	if floor.turn > 0 and floor.turn % 4 == 0:
-		_meme_tick()
 	# The Syndicate may now read your style and offer a class.
 	if _class_offer.is_empty():
 		var offer := floor.check_class_offer()
@@ -1491,79 +1505,125 @@ func _cast_spell(key: String) -> void:
 	_check_transition()
 	queue_redraw()
 
-## ── Memetics: plant a belief seed; it propagates over the run ────────────────
-func _plant_meme(method_key: String) -> void:
-	if floor == null:
-		return
-	_meme_screen = false
-	var seed := Memetics.plant(method_key, sim.player(), _narr_rng)
-	var seeds: Array = floor.player.flags.get("seeds", [])
-	seeds.append(seed)
-	floor.player.flags["seeds"] = seeds
-	_log_push("Zasiewasz meme: %s (siła %d). Teraz musi się rozejść." % [seed["label"], int(seed["potency"])])
-	_add_floater(sim.player_id, "MEME ZASIANE", COL_GAS)
-	# A lie buys instant buzz (but it'll sour fast).
-	if method_key == "klamstwo" and floor.audience != null:
-		floor.audience.change(int(seed["potency"]) * 3, "meme")
+## ── Freeform persuasion: say a line to a mind; the System judges + rolls CHA ─
+## The nearest enemy/crawler/npc within earshot, or null.
+func _nearest_mind() -> CombatEntity:
+	if sim == null: return null
+	var p := sim.player()
+	var best: CombatEntity = null
+	var bd := 1 << 30
+	for id in sim.entities:
+		var e: CombatEntity = sim.entities[id]
+		if not e.is_alive(): continue
+		if e.faction != "enemy" and e.faction != "crawler" and e.faction != "npc": continue
+		var d: int = maxi(absi(e.cell.x - p.cell.x), absi(e.cell.y - p.cell.y))
+		if d <= 6 and d < bd:
+			bd = d; best = e
+	return best
+
+func _open_speak() -> void:
+	if floor == null: return
+	var t := _nearest_mind()
+	if t == null:
+		_log_push("Nie ma kogo przekonywać — nikt nie jest w zasięgu głosu.")
+		queue_redraw(); return
+	_speak = {"target_id": t.id, "text": "", "mode": "type"}
+	queue_redraw()
+
+func _speak_submit() -> void:
+	var txt := str(_speak.get("text", "")).strip_edges()
+	if txt == "":
+		_speak["mode"] = "fallback"
+		_speak["options"] = Memetics.fallback_lines(_narr_rng)
+		queue_redraw(); return
+	var intent := Memetics.classify(txt)
+	if intent == "":
+		# Unreadable nonsense — a pure gamble (peak DCC). Random intent, harder DC.
+		var keys := Memetics.INTENTS.keys()
+		_resolve_speak(keys[_narr_rng.randi_range(0, keys.size() - 1)], txt, true)
+	else:
+		_resolve_speak(intent, txt, false)
+
+func _speak_pick(i: int) -> void:
+	var opts: Array = _speak.get("options", [])
+	if i < 0 or i >= opts.size(): return
+	_resolve_speak(opts[i]["intent"], opts[i]["text"], false)
+
+## DC = base + how implausible the claim is vs reality. Bosses / mindless = immune.
+func _persuasion_dc(intent: String, t: CombatEntity) -> int:
+	if t.tags.has("boss"): return 999
+	if Memetics.kind_of(intent) == "convert":
+		for mind in ["construct", "robot", "mechanical", "metal", "undead", "machine", "drone"]:
+			if t.tags.has(mind): return 999
+	var dc := Memetics.base_dc(intent)
+	if t.aware: dc += 3
+	if t.max_hp > 0: dc += int(4.0 * float(t.hp) / float(t.max_hp))
+	dc += int(t.max_hp / 14)
+	return dc
+
+func _resolve_speak(intent: String, line: String, wild: bool) -> void:
+	var t = sim.entities.get(int(_speak.get("target_id", -1)))
+	_speak = {}
+	if t == null:
+		queue_redraw(); return
+	var p := sim.player()
+	var kind := Memetics.kind_of(intent)
+	_log_push("Mówisz do %s: %s" % [t.name_pl, line])
+	var dc := _persuasion_dc(intent, t)
+	if dc >= 900:
+		_log_push("%s nie ma umysłu, który dałoby się przekonać." % t.name_pl)
+		_add_floater(t.id, "ODPORNY", COL_DIM)
+		_advance_floor_turn(); queue_redraw(); return
+	if wild: dc += 4
+	var roll := _narr_rng.randi_range(1, 20) + p.stat_mod("CHA")
+	var crit := roll >= dc + 8 or (dc >= 16 and roll >= dc)
+	var ok := roll >= dc
+	var partial := roll >= dc - 4
+	var fumble := roll <= dc - 8
+	if ok:
+		_persuade_apply(kind, t, crit, false)
+	elif partial:
+		_persuade_apply(kind, t, false, true)
+	else:
+		t.aware = true
+		if fumble:
+			_log_push("%s przejrzał cię na wylot — i jest wściekły." % t.name_pl)
+			_add_floater(t.id, "WPADKA", COL_RED)
+			for e in sim.enemies_alive():
+				if maxi(absi(e.cell.x - t.cell.x), absi(e.cell.y - t.cell.y)) <= 3:
+					e.aware = true
+		else:
+			_log_push("%s nie kupił tego." % t.name_pl)
+			_add_floater(t.id, "NIE KUPUJE", COL_DIM)
 	_advance_floor_turn()
 	queue_redraw()
 
-## Advance every active belief seed one propagation tick, applying stage effects.
-func _meme_tick() -> void:
-	var seeds: Array = floor.player.flags.get("seeds", [])
-	if seeds.is_empty():
-		return
-	var kept: Array = []
-	for s in seeds:
-		s["age"] = int(s["age"]) + 1
-		var stage := Memetics.stage_for(int(s["age"]))
-		var pot := int(s["potency"])
-		var m := str(s["method"])
-		var active := stage == "spreading" or stage == "institutionalized"
-		if active and m == "plotka" and floor.audience != null:
-			floor.audience.change(1 + pot / 2, "meme")
-		elif stage == "institutionalized" and m == "propaganda":
-			var foe := _nearest_aware_enemy()
-			if foe != null:
-				foe.add_status("stunned", 1)
-				_add_floater(foe.id, "WAHA SIĘ", COL_GAS)
-		elif stage == "institutionalized" and m == "kult" and not s.get("paid", false):
-			s["paid"] = true
-			var box := GameBox.new("kult", "Danina kultu", Rarity.UNCOMMON)
-			box.contents.append({"type": "material", "key": "złom", "qty": 3 + pot})
-			floor.boxes.append(box)
-			if floor.audience != null: floor.audience.change(pot, "meme")
-			_log_push("Twój kult przysyła daninę — skrzynka na planszy.")
-		elif stage == "institutionalized" and m == "tabu" and not s.get("paid", false):
-			s["paid"] = true
-			if floor.sponsors != null:
-				var prim := floor.sponsors.primary_sponsor()
-				for k in floor.sponsors.all_keys():
-					floor.sponsors.attention[k] = floor.sponsors.get_attention(k) + (3 if k == prim else -1)
-			_log_push("Tabu wchodzi do obiegu — sponsorzy przesuwają uwagę.")
-		# Souring.
-		if stage == "backlash" and not s.get("backlashed", false):
-			s["backlashed"] = true
-			var hit := pot * (3 if m == "klamstwo" else 1)
-			if floor.audience != null: floor.audience.change(-hit, "meme_backlash")
-			_log_push("Meme „%s" % s["label"] + "” obraca się przeciw tobie. (−%d widowni)" % hit)
-		if stage != "burned_out":
-			kept.append(s)
-		else:
-			_log_push("Meme „%s" % s["label"] + "” wypalił się i znika z obiegu.")
-	floor.player.flags["seeds"] = kept
-
-func _nearest_aware_enemy() -> CombatEntity:
-	var best: CombatEntity = null
-	var bd := 1 << 30
-	var pc: Vector2i = sim.player().cell
-	for e in sim.enemies_alive():
-		if not e.aware:
-			continue
-		var d: int = maxi(absi(e.cell.x - pc.x), absi(e.cell.y - pc.y))
-		if d < bd:
-			bd = d; best = e
-	return best
+## Apply the social outcome. `partial` = a weaker, shorter version.
+func _persuade_apply(kind: String, t: CombatEntity, crit: bool, partial: bool) -> void:
+	var dur := (1 if partial else (5 if crit else 3))
+	match kind:
+		"charm":
+			t.add_status("charmed", dur); t.flags.erase("incited")
+			_log_push("%s ci uwierzył — przestaje cię atakować." % t.name_pl)
+			_add_floater(t.id, "PRZEKONANY", COL_GAS)
+		"incite":
+			t.add_status("charmed", dur); t.flags["incited"] = true
+			_log_push("%s zwraca się przeciw swoim!" % t.name_pl)
+			_add_floater(t.id, "PODBURZONY", COL_AMBER)
+		"fear":
+			t.add_status("stunned", dur)
+			_log_push("%s łamie się ze strachu." % t.name_pl)
+			_add_floater(t.id, "ZŁAMANY", COL_GAS)
+		"convert":
+			if partial:
+				t.add_status("charmed", 2)
+				_log_push("%s waha się w wierze, ale jeszcze nie klęka." % t.name_pl)
+				_add_floater(t.id, "WAHA SIĘ", COL_GAS)
+			else:
+				sim.convert_enemy(t)
+				_log_push("%s przyjmuje Jedyną Wiarę i staje u twego boku!" % t.name_pl)
+				_add_floater(t.id, "NAWRÓCONY", COL_GREEN)
+				_shake = maxf(_shake, 4.0)
 
 ## Fire the companion's signature ability ([G]); free action, per-floor cooldown.
 func _use_companion_ability() -> void:
@@ -2226,7 +2286,7 @@ func _draw() -> void:
 		var pos: Vector2 = _vpos.get(id, _cell_px(e.cell))
 		var fade: float = _dying.get(id, 1.0)
 		var flashing := _flash.has(id)
-		if e.faction == "player":      _draw_player(pos, fade)
+		if e.faction == "player":      _draw_player(e, pos, fade)
 		elif e.faction == "safehouse": _draw_safehouse_token(pos, fade)
 		elif e.faction == "crawler":   _draw_crawler_token(pos, fade)
 		elif e.faction == "ally":      _draw_ally(e, pos, fade)
@@ -2245,12 +2305,18 @@ func _draw() -> void:
 func _draw_glyph(s: String, c: Vector2i, col: Color) -> void:
 	draw_string(_font, _cell_px(c) + Vector2(-6, 8), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, col)
 
-func _draw_player(pos: Vector2, fade: float) -> void:
+func _draw_player(e: CombatEntity, pos: Vector2, fade: float) -> void:
 	var col := COL_PLAYER; col.a = fade
 	draw_circle(pos, 16, Color(0.11, 0.20, 0.25, fade))
 	draw_arc(pos, 16, 0, TAU, 24, col, 2.0)
 	draw_circle(pos + Vector2(0, -3), 9, Color(0.23, 0.70, 0.82, fade))
 	draw_line(pos + Vector2(-11, 6), pos + Vector2(-18, -10), Color(COL_BRIGHT, fade), 3.0)
+	# HP bar under your own token (green→amber→red) so danger reads at a glance.
+	if e.max_hp > 0:
+		var frac: float = clampf(float(e.hp) / float(e.max_hp), 0.0, 1.0)
+		var hpc := COL_GREEN if frac > 0.5 else (COL_AMBER if frac > 0.25 else COL_RED)
+		draw_rect(Rect2(pos.x - 17, pos.y + 18, 34, 5), Color(0.1, 0.1, 0.1, fade))
+		draw_rect(Rect2(pos.x - 17, pos.y + 18, 34 * frac, 5), Color(hpc, fade))
 
 func _draw_title() -> void:
 	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
@@ -2465,8 +2531,8 @@ func _draw_hud() -> void:
 	draw_string(_font, Vector2(40, 60),
 		"Ruch: WSAD / LPM  ·  PPM pchnij  ·  E rozbierz  ·  I warsztat  ·  K/J/Z panele",
 		HORIZONTAL_ALIGNMENT_LEFT, 580, 13, COL_DIM)
-	# Weapon / coating / armor
-	var wln := "Broń: nóż"
+	# Weapon / coating / armor — led by your own HP so it's always on screen.
+	var wln := "HP %d/%d   ·   Broń: nóż" % [p.hp, p.max_hp]
 	if p.coating == "electric": wln += "  [PRĄD x%d]" % p.coating_charges
 	elif p.coating == "poison": wln += "  [TRUCIZNA x%d]" % p.coating_charges
 	if p.bonus_damage > 0:      wln += "  +%d obr." % p.bonus_damage
@@ -2502,10 +2568,17 @@ func _draw_hud() -> void:
 	draw_string(_font, Vector2(40, 116),
 		"Materiały: " + ("—" if mats.is_empty() else ", ".join(mats)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
-	# Inventory: items + boxes
+	# Inventory: list the actual item names (not just a count) so you can see what
+	# you're carrying without opening the workshop.
 	var inv_parts: Array = []
 	if not floor.items.is_empty():
-		inv_parts.append("Przedmioty: %d" % floor.items.size())
+		var names: Array = []
+		for it in floor.items:
+			names.append((it as GameItem).name_pl)
+		var shown: String = ", ".join(names.slice(0, 4))
+		if names.size() > 4:
+			shown += " +%d" % (names.size() - 4)
+		inv_parts.append("Przedmioty (%d): %s" % [floor.items.size(), shown])
 	if not floor.boxes.is_empty():
 		inv_parts.append("Skrzynki: %d" % floor.boxes.size())
 	# Companion + its ability readiness
@@ -2591,8 +2664,8 @@ func _draw_hud() -> void:
 		_draw_crawler_modal()
 	elif _spellbook:
 		_draw_spellbook()
-	elif _meme_screen:
-		_draw_meme_screen()
+	elif not _speak.is_empty():
+		_draw_speak()
 	elif _craft_open:
 		_draw_craft_panel()
 	_draw_toasts()
@@ -3022,39 +3095,44 @@ func _draw_journal() -> void:
 	draw_string(_font, Vector2(60, 702), "[J]/[Esc] zamknij   ·   kółko / [↑][↓] przewijaj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 
-## Memetics: pick a belief seed to plant. Shows your active seeds + their stage.
-func _draw_meme_screen() -> void:
-	var W := 700.0; var H := 460.0
+## Freeform persuasion prompt: type a line at a mind, or pick an improvised one.
+func _draw_speak() -> void:
+	var t = sim.entities.get(int(_speak.get("target_id", -1)))
+	var tname: String = t.name_pl if t != null else "?"
+	var W := 760.0; var H := 280.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
 	draw_rect(Rect2(px, py, W, H), Color(0.06, 0.09, 0.08, 0.98))
 	draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 32), "MEMETYKA — zasiej narrację",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_GAS)
-	var cy := py + 56.0
-	for i in Memetics.METHODS.size():
-		var m: Dictionary = Memetics.METHODS[i]
-		var box := Rect2(px + 16, cy, W - 32, 50)
-		var hot := _hover(box)
-		draw_rect(box, Color(0.10, 0.16, 0.13, 0.95) if hot else Color(0.09, 0.12, 0.10, 0.9))
-		draw_rect(box, COL_GAS if hot else COL_GRID, false, 1.0)
-		draw_string(_font, Vector2(px + 28, cy + 19), "%d. %s  (test %s)" % [i + 1, m["label"], m["stat"]],
-			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 15, COL_BRIGHT)
-		draw_string(_font, Vector2(px + 28, cy + 38), m["desc"], HORIZONTAL_ALIGNMENT_LEFT, W - 60, 11, COL_DIM)
-		_zone(box, "meme_plant", 0, m["key"])
-		cy += 56.0
-	# Active seeds + their stage.
-	var seeds: Array = floor.player.flags.get("seeds", [])
-	cy += 6.0
-	draw_string(_font, Vector2(px + 20, cy), "Aktywne memy: %d" % seeds.size(),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
-	cy += 22.0
-	for s in seeds:
-		draw_string(_font, Vector2(px + 28, cy), "• %s — %s (siła %d)" % [
-			s["label"], Memetics.stage_for(int(s["age"])), int(s["potency"])],
-			HORIZONTAL_ALIGNMENT_LEFT, W - 56, 12, COL_DIM)
-		cy += 18.0
-	draw_string(_font, Vector2(px + 20, py + H - 16), "Klik / 1–5 zasiewa   ·   [K]/[Esc] zamknij",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+	draw_string(_font, Vector2(px + 20, py + 32), "MÓWISZ DO: %s" % tname,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GAS)
+	if _speak.get("mode", "") == "fallback":
+		draw_string(_font, Vector2(px + 20, py + 58), "Nic nie przychodzi do głowy? Spróbuj tak:",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+		var opts: Array = _speak.get("options", [])
+		var cy := py + 84.0
+		for i in opts.size():
+			var box := Rect2(px + 16, cy, W - 32, 44)
+			var hot := _hover(box)
+			draw_rect(box, Color(0.10, 0.16, 0.13, 0.95) if hot else Color(0.09, 0.12, 0.10, 0.9))
+			draw_rect(box, COL_GAS if hot else COL_GRID, false, 1.0)
+			draw_string(_font, Vector2(px + 28, cy + 28), "%d.  %s" % [i + 1, opts[i]["text"]],
+				HORIZONTAL_ALIGNMENT_LEFT, W - 50, 15, COL_BRIGHT)
+			_zone(box, "speak_pick", i)
+			cy += 50.0
+	else:
+		draw_string(_font, Vector2(px + 20, py + 60),
+			"Powiedz coś. Cokolwiek. System sam oceni, w co celujesz.",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+		# the input line + a blinking caret
+		var typed: String = _speak.get("text", "")
+		var caret := "_" if (int(Time.get_ticks_msec() / 400) % 2 == 0) else " "
+		draw_rect(Rect2(px + 20, py + 92, W - 40, 40), Color(0.03, 0.05, 0.04, 0.95))
+		draw_rect(Rect2(px + 20, py + 92, W - 40, 40), COL_GRID, false, 1.0)
+		draw_string(_font, Vector2(px + 30, py + 118), "> " + typed + caret,
+			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 17, COL_BRIGHT)
+		draw_string(_font, Vector2(px + 20, py + H - 18),
+			"[Enter] mówisz   ·   puste [Enter] = podpowiedzi   ·   [Esc] cofnij",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## Spellbook: cast at the nearest enemy for mana. Rows greyed when you can't pay.
 func _draw_spellbook() -> void:

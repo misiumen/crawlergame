@@ -1,47 +1,73 @@
 class_name Memetics
 extends RefCounted
-## Belief seeds — ported (bounded) from systems/memetics.py. You PLANT a meme into
-## the show; it PROPAGATES through stages over the run (seeded → spreading →
-## institutionalized → backlash → burned-out), applying an ongoing effect while it
-## lives and a downside when it sours. Faithful to the core loop; method flavor
-## follows memetic_templates.json. Potency comes from a CHA/INT/WIS check at plant.
+## Freeform social engineering — a hidden third road through the Loch for the
+## silver-tongued. You don't pick from a menu of scripted actions; you SAY a line
+## to a mind on the floor (enemy / crawler / NPC), and the System reads your
+## intent, weighs how ridiculous the claim is against reality, and rolls CHA.
 ##
-## A seed is a plain dict: {method, label, age, potency, backlashed}.
+## It never touches the audience — this is about the minds in the room: convert
+## them to your faith (they fight for you and spread it), convince them you're a
+## friend, turn them against their own, or break their nerve. A wild lie to a
+## raging boss is a brutal check but a legendary payoff; nonsense is a pure gamble.
+##
+## This module is the pure brain: classify a typed line into an intent, score the
+## difficulty, and hand back canned "improvised" lines for the hybrid fallback.
+## BoardView owns the target, the CHA roll, and applying the emergent effect.
 
-const STAGES := ["seeded", "spreading", "institutionalized", "backlash", "burned_out"]
+# Intent -> {kw (keyword stems), base_dc, kind}. kind drives the mechanical effect.
+const INTENTS := {
+	"befriend": {
+		"kw": ["przyjac", "brat", "siostr", "swój", "swoj", "po naszej", "po twojej", "pokój", "pokoj",
+			"nie wróg", "nie wrog", "spokój", "spokoj", "zaufaj", "razem", "sojusz", "kumpel", "rodzin"],
+		"base_dc": 9, "kind": "charm"},
+	"convert": {
+		"kw": ["wiar", "bóg", "bog", "boż", "boz", "klęk", "klek", "nawróć", "nawroc", "prawd",
+			"jedyn", "prorok", "święt", "swiet", "módl", "modl", "kult", "zbawien", "owce", "owca", "objawien"],
+		"base_dc": 14, "kind": "convert"},
+	"incite": {
+		"kw": ["zdrad", "zabij", "atakuj", "wróg", "wrog", "kłam", "klam", "oszuk", "tamt",
+			"on cię", "on cie", "zabić", "zabic", "zniszcz", "bunt", "przeciw", "twój dowódca", "twoj dowodca"],
+		"base_dc": 12, "kind": "incite"},
+	"demoralize": {
+		"kw": ["uciek", "boisz", "zginiesz", "strach", "koniec", "poddaj", "przegr", "śmier", "smier",
+			"bój się", "boj sie", "uciekaj", "nie masz szans", "umrzesz"],
+		"base_dc": 10, "kind": "fear"},
+}
 
-## Plantable methods (a curated subset). effect drives the per-tick mechanic.
-const METHODS := [
-	{"key": "plotka",     "label": "Plotka", "stat": "CHA",
-		"desc": "Powoli rośnie — widownia podchwytuje narrację (+widownia/tik)."},
-	{"key": "propaganda", "label": "Propaganda", "stat": "INT",
-		"desc": "Demoralizuje wrogów — gdy się zakorzeni, wahają się w walce."},
-	{"key": "klamstwo",   "label": "Kłamstwo", "stat": "CHA",
-		"desc": "Natychmiastowy rozgłos, ale szybki backlash — przyłapią cię."},
-	{"key": "kult",       "label": "Rama religijna", "stat": "WIS",
-		"desc": "Wolno, ale przy zakorzenieniu kult przysyła daninę (skrzynka)."},
-	{"key": "tabu",       "label": "Tabu", "stat": "WIS",
-		"desc": "Przesuwa uwagę sponsorów, gdy wejdzie do obiegu."},
-]
+## Classify a typed line into an intent key (most keyword hits wins), or "" if the
+## line reads as nonsense the System can't parse.
+static func classify(line: String) -> String:
+	var low := line.to_lower()
+	var best := ""
+	var best_hits := 0
+	for intent in INTENTS:
+		var hits := 0
+		for kw in INTENTS[intent]["kw"]:
+			if low.contains(kw):
+				hits += 1
+		if hits > best_hits:
+			best_hits = hits
+			best = intent
+	return best
 
-static func method_def(key: String) -> Dictionary:
-	for m in METHODS:
-		if m["key"] == key:
-			return m
-	return {}
+static func base_dc(intent: String) -> int:
+	return int(INTENTS.get(intent, {}).get("base_dc", 12))
 
-## Stage from age (in propagation ticks).
-static func stage_for(age: int) -> String:
-	if age <= 1: return "seeded"
-	if age <= 4: return "spreading"
-	if age <= 7: return "institutionalized"
-	if age == 8: return "backlash"
-	return "burned_out"
+static func kind_of(intent: String) -> String:
+	return str(INTENTS.get(intent, {}).get("kind", ""))
 
-## Plant a seed: a CHA/INT/WIS check sets its potency (1–4). Returns the seed.
-static func plant(method_key: String, p, rng: RandomNumberGenerator) -> Dictionary:
-	var m := method_def(method_key)
-	var roll: int = rng.randi_range(1, 20) + int(p.stat_mod(m.get("stat", "CHA")))
-	var potency: int = clampi((roll - 6) / 4, 1, 4)
-	return {"method": method_key, "label": m.get("label", method_key),
-		"age": 0, "potency": potency, "backlashed": false}
+## Improvised lines for the hybrid fallback (when you leave the prompt blank or
+## type something unreadable). A handful of distinct, ready-to-say claims.
+static func fallback_lines(rng: RandomNumberGenerator) -> Array:
+	var pool := [
+		{"text": "Spokojnie — jestem po waszej stronie.", "intent": "befriend"},
+		{"text": "Klęknij. Poznaj Jedyną Wiarę.", "intent": "convert"},
+		{"text": "Twój dowódca cię zdradził. Zabij go.", "intent": "incite"},
+		{"text": "Uciekaj, póki możesz. To już koniec.", "intent": "demoralize"},
+		{"text": "Tamten obok was okradł. Dorwijcie go.", "intent": "incite"},
+		{"text": "Przyłącz się, a podzielę się łupem.", "intent": "befriend"},
+	]
+	for i in range(pool.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var t = pool[i]; pool[i] = pool[j]; pool[j] = t
+	return pool.slice(0, 3)

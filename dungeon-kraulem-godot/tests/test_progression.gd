@@ -258,15 +258,31 @@ func _initialize() -> void:
 	BiomeGimmicks.tick(bf, bf.sim, grng)
 	_ck(bf.sim.player().hp > 10, "the quiet biome gimmick heals you")
 
-	# ── Memetics (belief seeds) ───────────────────────────────────────────────
-	var mp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); mp.stats["CHA"] = 6
-	var mrng := RandomNumberGenerator.new(); mrng.seed = 2
-	var seed := Memetics.plant("plotka", mp, mrng)
-	_ck(seed["method"] == "plotka" and int(seed["potency"]) >= 1, "planting a meme yields a seed with potency")
-	_ck(Memetics.stage_for(0) == "seeded", "a fresh seed is just seeded")
-	_ck(Memetics.stage_for(3) == "spreading", "it ages into spreading")
-	_ck(Memetics.stage_for(8) == "backlash", "then a backlash beat")
-	_ck(Memetics.stage_for(20) == "burned_out", "and eventually burns out")
+	# ── Freeform persuasion (memetics) ────────────────────────────────────────
+	# classify reads intent from a typed line; nonsense returns "".
+	_ck(Memetics.classify("klęknij przed jedyną wiarą") == "convert", "faith words → convert")
+	_ck(Memetics.classify("spokojnie, jestem twoim bratem") == "befriend", "kinship words → befriend")
+	_ck(Memetics.classify("twój dowódca cię zdradził, zabij go") == "incite", "betrayal words → incite")
+	_ck(Memetics.classify("uciekaj bo zginiesz") == "demoralize", "fear words → demoralize")
+	_ck(Memetics.classify("kjsdhfk gghh") == "", "nonsense classifies as nothing (a wild gamble)")
+	_ck(Memetics.fallback_lines(RandomNumberGenerator.new()).size() == 3, "fallback offers 3 improvised lines")
+	# convert_enemy flips an enemy to your side with the faith tag.
+	var cvb := Board.new(5, 5)
+	var cvp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); cvp.faction = "player"; cvp.cell = Vector2i(1, 1)
+	var cvf := CombatEntity.new(2, "Szczur", 20, 11, ["organic"]); cvf.faction = "enemy"; cvf.cell = Vector2i(2, 1)
+	var cvs := CombatSim.new(cvb, {1: cvp, 2: cvf}, 1, 1); cvb.place(1, cvp.cell); cvb.place(2, cvf.cell)
+	cvs.convert_enemy(cvf)
+	_ck(cvf.faction == "ally" and cvf.tags.has("faith"), "convert_enemy turns a foe into a faith-ally")
+	_ck(cvs.enemies_alive().size() == 0 and cvs.allies_alive().size() == 1, "the convert now counts as an ally")
+	# a charmed enemy stands down (won't attack you); an incited one turns on its kind.
+	var chf := CombatEntity.new(3, "Karaluch", 20, 11, ["organic"]); chf.faction = "enemy"
+	chf.aware = true; chf.cell = Vector2i(2, 2); cvb.place(3, chf.cell)
+	cvs.entities[3] = chf
+	chf.add_status("charmed", 3)
+	var pre_hp := cvp.hp
+	cvp.cell = Vector2i(1, 2); cvb.move(Vector2i(1, 1), Vector2i(1, 2))   # stand next to the charmed foe
+	cvs._enemy_turn()
+	_ck(cvp.hp == pre_hp, "a charmed enemy does not attack you")
 
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

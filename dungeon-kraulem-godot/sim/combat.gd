@@ -862,6 +862,17 @@ func _ally_turn() -> Array:
 	var p: CombatEntity = player()
 	for a in allies_alive():
 		var foes := enemies_alive()
+		# A convert (zealot) may spread the faith to an adjacent enemy on its own —
+		# this is how a crusade chains through a room without you lifting a finger.
+		if a.tags.has("faith"):
+			var near: CombatEntity = null
+			for e in foes:
+				if board.is_adjacent(a.cell, e.cell):
+					near = e; break
+			if near != null and rng.randf() < 0.22:
+				convert_enemy(near)
+				evs.append({"type": "convert", "id": near.id, "name": near.name_pl, "chained": true})
+				continue
 		if foes.is_empty():
 			# follow the player (don't crowd — stop when already adjacent)
 			if not board.is_adjacent(a.cell, p.cell):
@@ -888,6 +899,18 @@ func _ally_turn() -> Array:
 				evs.append({"type": "move", "id": a.id, "to": step2})
 	return evs
 
+## Flip an enemy onto your side (a convert). It keeps its combat profile but now
+## fights with the ally AI and carries the faith (so it can chain-convert others).
+func convert_enemy(e: CombatEntity) -> void:
+	e.faction = "ally"
+	if not e.tags.has("faith"): e.tags.append("faith")
+	if not e.tags.has("convert"): e.tags.append("convert")
+	e.aware = true
+	e.statuses.erase("charmed")
+	e.flags.erase("incited")
+	if e.dmg_dice == "": e.dmg_dice = "1d4"
+	if e.to_hit == 0: e.to_hit = 2
+
 ## An ally swing: rolls to hit, deals its dmg_dice, and — flavor — its kills still
 ## thrill the crowd. Awareness wakes the victim (the pet is loud).
 func _ally_attack(a: CombatEntity, target: CombatEntity) -> Array:
@@ -912,6 +935,14 @@ func _enemy_turn() -> Array:
 		if e.has_status("shocked") or e.has_status("stunned"):
 			var why: String = "stunned" if e.has_status("stunned") else "shocked"
 			evs.append({"type": "skip", "id": e.id, "reason": why})
+			continue
+		# Talked-down minds: a charmed enemy won't attack YOU. If it was incited it
+		# turns on its own kind; otherwise it just stands down, confused.
+		if e.has_status("charmed"):
+			if e.flags.get("incited", false):
+				evs += _incited_turn(e)
+			else:
+				evs.append({"type": "skip", "id": e.id, "reason": "charmed"})
 			continue
 		# Target the player if adjacent; otherwise swat your pet if IT is adjacent
 		# (the "protect the mascot" tension — the companion can be downed).
@@ -961,6 +992,39 @@ func _enemy_turn() -> Array:
 	evs += _tick_dots()
 	for id in entities:
 		(entities[id] as CombatEntity).tick_statuses()
+	return evs
+
+## An incited enemy attacks its own kind: it goes for the nearest OTHER enemy
+## (or any crawler), closing in or striking — you turned the room on itself.
+func _incited_turn(e: CombatEntity) -> Array:
+	var evs: Array = []
+	var tgt: CombatEntity = null
+	var best := 1 << 30
+	for id in entities:
+		var o: CombatEntity = entities[id]
+		if o.id == e.id or not o.is_alive():
+			continue
+		if o.faction != "enemy" and o.faction != "crawler":
+			continue
+		var d: int = maxi(absi(o.cell.x - e.cell.x), absi(o.cell.y - e.cell.y))
+		if d < best:
+			best = d; tgt = o
+	if tgt == null:
+		evs.append({"type": "skip", "id": e.id, "reason": "charmed"})
+		return evs
+	if board.is_adjacent(e.cell, tgt.cell):
+		tgt.aware = true
+		evs.append({"type": "attack", "attacker": e.id, "target": tgt.id, "ally": true})
+		if _roll_hit(e.to_hit if e.dmg_dice != "" else 2, _eff_ac(tgt)):
+			var base: int = Dice.roll(e.dmg_dice, rng) if e.dmg_dice != "" else rng.randi_range(1, 4) + 1
+			evs += _apply_damage(tgt, base, DMG_PHYSICAL)
+		else:
+			evs.append({"type": "miss", "attacker": e.id, "target": tgt.id})
+	else:
+		var step := _step_toward(e.cell, tgt.cell)
+		if step != e.cell and board.is_free(step):
+			board.move(e.cell, step); e.cell = step
+			evs.append({"type": "move", "id": e.id, "to": step})
 	return evs
 
 ## Apply damage-over-time from lingering statuses (burning/poisoned/corroded) to
