@@ -258,5 +258,15 @@ func _initialize() -> void:
 	BiomeGimmicks.tick(bf, bf.sim, grng)
 	_ck(bf.sim.player().hp > 10, "the quiet biome gimmick heals you")
 
+	# ── Memetics (belief seeds) ───────────────────────────────────────────────
+	var mp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); mp.stats["CHA"] = 6
+	var mrng := RandomNumberGenerator.new(); mrng.seed = 2
+	var seed := Memetics.plant("plotka", mp, mrng)
+	_ck(seed["method"] == "plotka" and int(seed["potency"]) >= 1, "planting a meme yields a seed with potency")
+	_ck(Memetics.stage_for(0) == "seeded", "a fresh seed is just seeded")
+	_ck(Memetics.stage_for(3) == "spreading", "it ages into spreading")
+	_ck(Memetics.stage_for(8) == "backlash", "then a backlash beat")
+	_ck(Memetics.stage_for(20) == "burned_out", "and eventually burns out")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

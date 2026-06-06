@@ -72,6 +72,7 @@ var _safehouse: Dictionary = {}      # open safehouse modal: {id, subtype} (non-
 var _crawler: Dictionary = {}        # open rival-crawler parley modal: {id} (non-empty = open)
 var _spellbook := false               # spell list overlay (cast with mana)
 var _event: Dictionary = {}           # active mid-floor decision beat (non-empty = modal)
+var _meme_screen := false             # belief-seed (memetics) plant overlay
 var _journal_screen := false          # knowledge journal overlay (clues + rumors)
 var _journal_scroll := 0.0
 const META_KIND_COL := {
@@ -407,6 +408,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif kc == KEY_UP:   _journal_scroll = maxf(0.0, _journal_scroll - 80.0); queue_redraw()
 		return
 
+	# Memetics planting menu: number keys plant, Esc/K closes.
+	if _meme_screen:
+		if kc == KEY_ESCAPE or kc == KEY_K:
+			_meme_screen = false; queue_redraw(); return
+		var mi := kc - KEY_1
+		if mi >= 0 and mi < Memetics.METHODS.size():
+			_plant_meme(Memetics.METHODS[mi]["key"])
+		return
+
 	# Spellbook grabs input: number keys cast, Esc closes.
 	if _spellbook:
 		if kc == KEY_ESCAPE or kc == KEY_Z:
@@ -465,6 +475,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if kc == KEY_J:
 		_journal_screen = not _journal_screen; _journal_scroll = 0.0; queue_redraw(); return
 
+	# [K] open/close the memetics (belief-seed) planting menu
+	if kc == KEY_K:
+		_meme_screen = not _meme_screen; queue_redraw(); return
+
 	# [L] open the skill-point allocation modal (if you've banked any)
 	if kc == KEY_L:
 		if sim != null and sim.player().skill_points > 0:
@@ -509,7 +523,7 @@ func _can_take_board_input() -> bool:
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
 		and _levelup.is_empty() and not _ach_screen and not _meta_screen \
 		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook \
-		and not _journal_screen and _event.is_empty()
+		and not _journal_screen and _event.is_empty() and not _meme_screen
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -603,6 +617,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"crawler_action":    _crawler_action(z.get("s", ""))
 		"cast":              _cast_spell(z.get("s", ""))
 		"event_fork":        _event_choose(i)
+		"meme_plant":        _plant_meme(z.get("s", ""))
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
 
@@ -1418,6 +1433,9 @@ func _advance_floor_turn() -> void:
 		_event = MidFloorEvents.pick(_narr_rng)
 		_log_push("Przerwa w akcji: %s" % _event.get("intro", ""))
 		queue_redraw()
+	# Belief seeds propagate every 4 floor-turns.
+	if floor.turn > 0 and floor.turn % 4 == 0:
+		_meme_tick()
 	# The Syndicate may now read your style and offer a class.
 	if _class_offer.is_empty():
 		var offer := floor.check_class_offer()
@@ -1456,6 +1474,80 @@ func _cast_spell(key: String) -> void:
 	_animate(sim.cast_spell(key))
 	_check_transition()
 	queue_redraw()
+
+## ── Memetics: plant a belief seed; it propagates over the run ────────────────
+func _plant_meme(method_key: String) -> void:
+	if floor == null:
+		return
+	_meme_screen = false
+	var seed := Memetics.plant(method_key, sim.player(), _narr_rng)
+	var seeds: Array = floor.player.flags.get("seeds", [])
+	seeds.append(seed)
+	floor.player.flags["seeds"] = seeds
+	_log_push("Zasiewasz meme: %s (siła %d). Teraz musi się rozejść." % [seed["label"], int(seed["potency"])])
+	_add_floater(sim.player_id, "MEME ZASIANE", COL_GAS)
+	# A lie buys instant buzz (but it'll sour fast).
+	if method_key == "klamstwo" and floor.audience != null:
+		floor.audience.change(int(seed["potency"]) * 3, "meme")
+	_advance_floor_turn()
+	queue_redraw()
+
+## Advance every active belief seed one propagation tick, applying stage effects.
+func _meme_tick() -> void:
+	var seeds: Array = floor.player.flags.get("seeds", [])
+	if seeds.is_empty():
+		return
+	var kept: Array = []
+	for s in seeds:
+		s["age"] = int(s["age"]) + 1
+		var stage := Memetics.stage_for(int(s["age"]))
+		var pot := int(s["potency"])
+		var m := str(s["method"])
+		var active := stage == "spreading" or stage == "institutionalized"
+		if active and m == "plotka" and floor.audience != null:
+			floor.audience.change(1 + pot / 2, "meme")
+		elif stage == "institutionalized" and m == "propaganda":
+			var foe := _nearest_aware_enemy()
+			if foe != null:
+				foe.add_status("stunned", 1)
+				_add_floater(foe.id, "WAHA SIĘ", COL_GAS)
+		elif stage == "institutionalized" and m == "kult" and not s.get("paid", false):
+			s["paid"] = true
+			var box := GameBox.new("kult", "Danina kultu", Rarity.UNCOMMON)
+			box.contents.append({"type": "material", "key": "złom", "qty": 3 + pot})
+			floor.boxes.append(box)
+			if floor.audience != null: floor.audience.change(pot, "meme")
+			_log_push("Twój kult przysyła daninę — skrzynka na planszy.")
+		elif stage == "institutionalized" and m == "tabu" and not s.get("paid", false):
+			s["paid"] = true
+			if floor.sponsors != null:
+				var prim := floor.sponsors.primary_sponsor()
+				for k in floor.sponsors.all_keys():
+					floor.sponsors.attention[k] = floor.sponsors.get_attention(k) + (3 if k == prim else -1)
+			_log_push("Tabu wchodzi do obiegu — sponsorzy przesuwają uwagę.")
+		# Souring.
+		if stage == "backlash" and not s.get("backlashed", false):
+			s["backlashed"] = true
+			var hit := pot * (3 if m == "klamstwo" else 1)
+			if floor.audience != null: floor.audience.change(-hit, "meme_backlash")
+			_log_push("Meme „%s" % s["label"] + "” obraca się przeciw tobie. (−%d widowni)" % hit)
+		if stage != "burned_out":
+			kept.append(s)
+		else:
+			_log_push("Meme „%s" % s["label"] + "” wypalił się i znika z obiegu.")
+	floor.player.flags["seeds"] = kept
+
+func _nearest_aware_enemy() -> CombatEntity:
+	var best: CombatEntity = null
+	var bd := 1 << 30
+	var pc: Vector2i = sim.player().cell
+	for e in sim.enemies_alive():
+		if not e.aware:
+			continue
+		var d: int = maxi(absi(e.cell.x - pc.x), absi(e.cell.y - pc.y))
+		if d < bd:
+			bd = d; best = e
+	return best
 
 ## Fire the companion's signature ability ([G]); free action, per-floor cooldown.
 func _use_companion_ability() -> void:
@@ -2345,7 +2437,7 @@ func _draw_hud() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, 320, 12, META_KIND_COL["species"])
 	# Controls hint (mouse-first)
 	draw_string(_font, Vector2(40, 60),
-		"LPM akcja · PPM pchnij · WSAD ruch · Spacja czekaj · E rozbierz · I warsztat · F klasa · G towarzysz · Z zaklęcia · J dziennik",
+		"LPM akcja · PPM pchnij · WSAD ruch · Spacja czekaj · E rozbierz · I warsztat · F klasa · G towarzysz · Z zaklęcia · K memetyka · J dziennik",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Weapon / coating / armor
 	var wln := "Broń: nóż"
@@ -2473,6 +2565,8 @@ func _draw_hud() -> void:
 		_draw_event_modal()
 	if _spellbook:
 		_draw_spellbook()
+	if _meme_screen:
+		_draw_meme_screen()
 	_draw_toasts()
 
 ## VS-style achievement toasts: tier-framed panels that slide in from the right,
@@ -2899,6 +2993,40 @@ func _draw_journal() -> void:
 		draw_string(_font, Vector2(1160, 64), "▲▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 	draw_string(_font, Vector2(60, 702), "[J]/[Esc] zamknij   ·   kółko / [↑][↓] przewijaj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+
+## Memetics: pick a belief seed to plant. Shows your active seeds + their stage.
+func _draw_meme_screen() -> void:
+	var W := 700.0; var H := 460.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.06, 0.09, 0.08, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 32), "MEMETYKA — zasiej narrację",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_GAS)
+	var cy := py + 56.0
+	for i in Memetics.METHODS.size():
+		var m: Dictionary = Memetics.METHODS[i]
+		var box := Rect2(px + 16, cy, W - 32, 50)
+		var hot := _hover(box)
+		draw_rect(box, Color(0.10, 0.16, 0.13, 0.95) if hot else Color(0.09, 0.12, 0.10, 0.9))
+		draw_rect(box, COL_GAS if hot else COL_GRID, false, 1.0)
+		draw_string(_font, Vector2(px + 28, cy + 19), "%d. %s  (test %s)" % [i + 1, m["label"], m["stat"]],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 15, COL_BRIGHT)
+		draw_string(_font, Vector2(px + 28, cy + 38), m["desc"], HORIZONTAL_ALIGNMENT_LEFT, W - 60, 11, COL_DIM)
+		_zone(box, "meme_plant", 0, m["key"])
+		cy += 56.0
+	# Active seeds + their stage.
+	var seeds: Array = floor.player.flags.get("seeds", [])
+	cy += 6.0
+	draw_string(_font, Vector2(px + 20, cy), "Aktywne memy: %d" % seeds.size(),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
+	cy += 22.0
+	for s in seeds:
+		draw_string(_font, Vector2(px + 28, cy), "• %s — %s (siła %d)" % [
+			s["label"], Memetics.stage_for(int(s["age"])), int(s["potency"])],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 56, 12, COL_DIM)
+		cy += 18.0
+	draw_string(_font, Vector2(px + 20, py + H - 16), "Klik / 1–5 zasiewa   ·   [K]/[Esc] zamknij",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## Spellbook: cast at the nearest enemy for mana. Rows greyed when you can't pay.
 func _draw_spellbook() -> void:
