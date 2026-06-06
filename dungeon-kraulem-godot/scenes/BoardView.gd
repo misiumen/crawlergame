@@ -1397,6 +1397,9 @@ func _advance_floor_turn() -> void:
 	for b in new_boxes:
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
 		_add_floater(sim.player_id, "PACZKA!", COL_AMBER)
+	# Biome gimmick: a periodic flavor quirk with a tiny mechanical nudge.
+	if floor.turn > 0 and floor.turn % 6 == 0:
+		_animate(BiomeGimmicks.tick(floor, sim, _narr_rng))
 	# The Syndicate may now read your style and offer a class.
 	if _class_offer.is_empty():
 		var offer := floor.check_class_offer()
@@ -1807,6 +1810,8 @@ func _animate(evs: Array) -> void:
 				_add_floater(int(e.get("target", 0)), str(e.get("status", "")), COL_GAS)
 			"hazard_placed":
 				_log_push("Rozlewa się: %s." % e.get("kind", "?"))
+			"biome_gimmick":
+				_log_push(str(e.get("text", "")))
 			"trap_armed":
 				_log_push("Pułapka rozstawiona (%s)." % e.get("kind", "?"))
 			"item_used":

@@ -247,5 +247,16 @@ func _initialize() -> void:
 	var top := Highlights.top(reel, 2)
 	_ck(top.size() == 2 and top[0] == "BOSS PADŁ!", "the reel surfaces the highest-value moments first")
 
+	# ── Biome gimmicks ────────────────────────────────────────────────────────
+	var bf := Floor.new(FloorGen.generate(2, 5, _content()))
+	var grng := RandomNumberGenerator.new(); grng.seed = 3
+	bf.biome = "sortownia"
+	var gz := int(bf.sim.materials.get("złom", 0))
+	BiomeGimmicks.tick(bf, bf.sim, grng)
+	_ck(int(bf.sim.materials.get("złom", 0)) > gz, "the salvage biome gimmick yields scrap")
+	bf.biome = "zamknieta"; bf.sim.player().hp = 10
+	BiomeGimmicks.tick(bf, bf.sim, grng)
+	_ck(bf.sim.player().hp > 10, "the quiet biome gimmick heals you")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)
