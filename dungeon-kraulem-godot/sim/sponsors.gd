@@ -117,7 +117,29 @@ func note_tag(tag: String, weight: int = 1, floor_num: int = 1) -> Array:
 						"delta": new_val - old_val, "val": new_val,
 						"name": sdata.get("name_fallback", skey as String)})
 	evs.append_array(_check_gift_thresholds(floor_num))
+	evs.append_array(_check_hunters())
 	return evs
+
+## A sponsor you've annoyed past HUNTER_THRESHOLD sends a bounty hunter (once each).
+## Queues the hunter's name; the presentation drains the queue and spawns it.
+func _check_hunters() -> Array:
+	var evs: Array = []
+	var sponsors := _sponsors()
+	for skey in sponsors:
+		var sdata: Dictionary = sponsors[skey]
+		var flag: String = "hunter_" + (skey as String)
+		if get_attention(skey as String) <= HUNTER_THRESHOLD and not flags.get(flag, false):
+			flags[flag] = true
+			var nm: String = sdata.get("name_fallback", skey as String)
+			pending_hunters.append(nm)
+			evs.append({"type": "sponsor_hunter", "key": skey as String, "name": nm})
+	return evs
+
+## Consume and return all queued hunter names since last call.
+func drain_hunters() -> Array:
+	var out := pending_hunters.duplicate()
+	pending_hunters.clear()
+	return out
 
 func _check_gift_thresholds(floor_num: int) -> Array:
 	var evs: Array = []

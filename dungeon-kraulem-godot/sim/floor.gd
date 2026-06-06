@@ -22,6 +22,7 @@ var class_offered: bool = false   # once we've offered a class, don't nag again
 
 var depth: int = 1                 # how many floors deep this run is (1-based)
 var biome: String = ""             # the route-biome this floor was generated with
+var objective: Dictionary = {}     # this floor's tracked side-goal (see Objectives)
 
 # The cell the player was just placed on by a room transition. Exits on THIS cell
 # are disarmed until the player steps off — otherwise you'd bounce straight back
@@ -41,6 +42,7 @@ func _init(data: Dictionary) -> void:
 	audience = data.get("audience", null) if data.get("audience", null) is AudienceState else AudienceState.new()
 	sponsors = data.get("sponsors", null) if data.get("sponsors", null) is SponsorState else SponsorState.new()
 	class_offered = bool(data.get("class_offered", false))
+	objective = data.get("objective", {}) if data.get("objective", {}) is Dictionary else {}
 	companion = data.get("companion", null) if data.get("companion", null) is CombatEntity else null
 	enter(int(data.get("start", 0)), data["start_cell"])
 

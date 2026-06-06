@@ -118,6 +118,8 @@ func _build() -> void:
 			_log = ["Wczytano zapis. Kontynuujesz zjazd — piętro %d." % floor.depth]
 			floor.attach_companion(_make_companion())   # the pet rejoins on resume
 			_arm_floor_traits()
+			if floor.objective.is_empty():               # older save / first time → roll one
+				floor.objective = Objectives.pick(floor.depth, _narr_rng)
 			_attach_bodies(); _recenter(); _reset_visuals()
 			return
 	# Fresh run.
@@ -130,6 +132,7 @@ func _build() -> void:
 	_log = ["Piętro 1. Zaczynasz zjazd. Rozbieraj, kuj, walcz — i schodź głębiej."]
 	_apply_loadout()               # bake the meta-progression loadout into this fresh run
 	_arm_floor_traits()
+	floor.objective = Objectives.pick(floor.depth, _narr_rng)   # this floor's tracked goal
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
@@ -194,6 +197,7 @@ func _descend_into(biome_key: String) -> void:
 	_recenter()
 	_reset_visuals()
 	_arm_floor_traits()            # re-arm per-floor species traits (e.g. first strike)
+	floor.objective = Objectives.pick(next_depth, _narr_rng)   # a fresh segment goal
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
 	_ach_descend(next_depth)
 	if next_depth >= FINAL_FLOOR: _unlock_ach("reach_final")
@@ -649,6 +653,48 @@ func _apply_loadout() -> void:
 	if not applied.is_empty():
 		_log_push("Ekwipunek sezonu: " + ", ".join(applied) + ".")
 
+## Drop a sponsor's bounty hunter onto the board: a tough, already-aware enemy
+## that scales with depth. It persists in the room and reads as a real threat.
+func _spawn_hunter(hunter_name: String) -> void:
+	if sim == null or floor == null:
+		return
+	var id := 700
+	while sim.entities.has(id):
+		id += 1
+	var hp := 16 + floor.depth * 5
+	var h := CombatEntity.new(id, hunter_name, hp, 13, ["monster", "hunter", "humanoid", "bounty"])
+	h.faction = "enemy"
+	h.aware = true
+	h.monster_key = "hunter"
+	h.dmg_dice = "1d6+%d" % (1 + floor.depth / 2)
+	h.to_hit = 4
+	var spot := _free_cell_for_spawn(sim.player().cell)
+	if spot == Vector2i(-1, -1):
+		return
+	h.cell = spot
+	sim.board.place(id, spot)
+	sim.entities[id] = h
+	floor.rooms[floor.current]["entities"][id] = h   # persists within the floor
+	_attach_bodies()                                  # only the new (body-less) hunter
+	var px := _cell_px(spot)
+	_vpos[id] = px; _vtarget[id] = px
+	_log_push("%s wpada na planszę — sponsor wysłał łowcę nagród!" % hunter_name)
+	_add_banner("ŁOWCA SPONSORA")
+	_shake = maxf(_shake, 7.0)
+	queue_redraw()
+
+## A walkable, unoccupied cell within a few tiles of `origin` (for dynamic spawns).
+func _free_cell_for_spawn(origin: Vector2i) -> Vector2i:
+	for r in [2, 3, 4]:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var c := origin + Vector2i(dx, dy)
+				if sim.board.in_bounds(c) and not sim.board.is_wall(c) and sim.board.occupant_at(c) == -1:
+					return c
+	return Vector2i(-1, -1)
+
 ## Per-floor trait arming: "Pamiętający" lands its first blow of every floor.
 func _arm_floor_traits() -> void:
 	if floor != null and floor.player.species_trait == "first_strike":
@@ -1015,6 +1061,54 @@ func _ach_events(evs: Array) -> void:
 			if floor.sponsors.get_attention(k) >= 10: loyal += 1
 		if loyal >= 3: _unlock_ach("sponsor_loyal")
 
+## Advance this floor's tracked objective from a batch of events (+ scrap is
+## state-based: it checks your current złom count).
+func _objective_track(evs: Array) -> void:
+	if floor == null or floor.objective.is_empty() or bool(floor.objective.get("done", false)):
+		return
+	var k: String = floor.objective.get("key", "")
+	if k == "scrap":
+		var z := int(sim.materials.get("złom", 0))
+		if z > int(floor.objective["progress"]):
+			floor.objective["progress"] = z
+			if z >= int(floor.objective["target"]):
+				_complete_objective()
+		return
+	for e in evs:
+		match e.get("type"):
+			"salvage":
+				if k == "salvage": _objective_event(1)
+			"death":
+				var v = sim.entities.get(int(e.get("target", -1)))
+				if k == "kill" and v != null and v.faction == "enemy": _objective_event(1)
+			"craft_attempt":
+				var oc := str(e.get("outcome", ""))
+				if k == "craft" and (oc == "krytyk" or oc == "sukces" or oc == "czesciowy"):
+					_objective_event(1)
+
+## Advance the current objective by `amount`; complete it when the target is hit.
+func _objective_event(amount: int) -> void:
+	if floor.objective.is_empty() or bool(floor.objective.get("done", false)):
+		return
+	floor.objective["progress"] = int(floor.objective["progress"]) + amount
+	if int(floor.objective["progress"]) >= int(floor.objective["target"]):
+		_complete_objective()
+
+## Pay out the objective: audience + XP, a toast-ish floater, and a log line.
+func _complete_objective() -> void:
+	var obj := floor.objective
+	obj["done"] = true
+	obj["progress"] = int(obj["target"])
+	if floor.audience != null:
+		floor.audience.change(int(obj.get("reward_audience", 0)), "objective")
+	_award_xp(int(obj.get("reward_xp", 0)))
+	_add_floater(sim.player_id, "ZADANIE ✓", COL_GREEN)
+	_add_banner("ZADANIE WYKONANE")
+	_shake = maxf(_shake, 4.0)
+	_log_push("Zadanie piętra wykonane! +%d widowni, +%d XP." % [
+		int(obj.get("reward_audience", 0)), int(obj.get("reward_xp", 0))])
+	queue_redraw()
+
 func _ach_run_end(victory: bool) -> void:
 	if victory: _unlock_ach("finalista_sezonu")
 	if floor.player.run_kills == 0: _unlock_ach("brak_zwlok_brak_problemu")
@@ -1083,6 +1177,8 @@ func _commit_box_entries(box: GameBox, entries: Array) -> void:
 	box.opened = true
 	floor.boxes.erase(box)
 	_ach_bump("boxes", 1)
+	if not floor.objective.is_empty() and floor.objective.get("key", "") == "box":
+		_objective_event(1)
 	var contents_line := "  → " + (", ".join(spawned) if not spawned.is_empty() else "(pusto)")
 	for line in box.reveal_lines(contents_line):
 		_log_push(line)
@@ -1256,6 +1352,7 @@ func _animate(evs: Array) -> void:
 	_narrate_batch(evs)
 	_ach_scan(evs)
 	_ach_events(evs)
+	_objective_track(evs)
 	for e in evs:
 		match e.get("type"):
 			"move":
@@ -1382,6 +1479,11 @@ func _animate(evs: Array) -> void:
 		var ln := _event_line(e)
 		if ln != "":
 			_log_push(ln)
+	# A sponsor you've angered may have queued a bounty hunter this batch — drop it
+	# onto the board now (negative sponsor attention finally MEANS something).
+	if floor != null and floor.sponsors != null and not floor.sponsors.pending_hunters.is_empty():
+		for hn in floor.sponsors.drain_hunters():
+			_spawn_hunter(str(hn))
 	queue_redraw()
 
 ## Konferansjer reads the whole event batch for show-worthy moments: an
@@ -1908,9 +2010,13 @@ func _draw_hud() -> void:
 			"%s  HP %d/%d  [%s]  ·  gruba skóra, słaby na PRĄD"
 			% [rat.name_pl, rat.hp, rat.max_hp, st],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
-	# Objective hint
-	if _hint != "":
-		draw_string(_font, Vector2(40, 700), "Cel: " + _hint,
+	# Tracked floor objective (real, with progress + payout) — and a nav hint below.
+	if floor != null and not floor.objective.is_empty():
+		var done: bool = bool(floor.objective.get("done", false))
+		draw_string(_font, Vector2(40, 700), "Zadanie: " + Objectives.describe(floor.objective),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_GREEN if done else COL_AMBER)
+	elif _hint != "":
+		draw_string(_font, Vector2(40, 700), "Wskazówka: " + _hint,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# DZIENNIK log panel
 	var lx := _origin.x + sim.board.w * TILE + 24

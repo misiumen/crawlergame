@@ -28,6 +28,7 @@ static func write(floor, seed_value: int) -> void:
 		"biome": floor.biome,
 		"turn": floor.turn,
 		"class_offered": floor.class_offered,
+		"objective": floor.objective.duplicate(true),
 		"player": _player_dict(p),
 		"inv": floor.inv.duplicate(true),
 		"items": item_dicts,
@@ -129,6 +130,7 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 	fdata["items"] = items
 	fdata["discovered"] = (save_dict.get("discovered", []) as Array).duplicate(true)
 	fdata["class_offered"] = bool(save_dict.get("class_offered", false))
+	fdata["objective"] = (save_dict.get("objective", {}) as Dictionary).duplicate(true)
 
 	var aud := AudienceState.new()
 	var adict: Dictionary = save_dict.get("audience", {})

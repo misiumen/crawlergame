@@ -166,5 +166,15 @@ func _initialize() -> void:
 	aud.change(-100, "x")
 	_ck(aud.rating == 10, "audience floor blocks dropping below the minimum")
 
+	# ── Floor objectives ──────────────────────────────────────────────────────
+	var rngo := RandomNumberGenerator.new(); rngo.seed = 7
+	var fobj := Objectives.pick(3, rngo)
+	_ck(fobj.has("key") and int(fobj["target"]) >= 1, "an objective rolls with a target")
+	_ck(int(fobj["progress"]) == 0 and not bool(fobj["done"]), "a fresh objective starts unfinished")
+	_ck(Objectives.describe(fobj) != "", "the objective describes itself for the HUD")
+	_ck(Objectives.advance_for({"key": "kill", "done": false}, "kill") == 1, "a matching event advances it")
+	_ck(Objectives.advance_for({"key": "kill", "done": false}, "salvage") == 0, "an unrelated event does not")
+	_ck(Objectives.advance_for({"key": "kill", "done": true}, "kill") == 0, "a finished objective stops advancing")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

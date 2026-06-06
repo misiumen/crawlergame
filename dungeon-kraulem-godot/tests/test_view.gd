@@ -238,6 +238,23 @@ func _initialize() -> void:
 	_ck(true, "playing with a companion on the board does not crash")
 	MetaCatalog.reset()
 
+	# floor objective: a tracked goal that pays out on completion
+	bv.floor.objective = {"key": "kill", "label": "Pokonaj %d przeciwników", "target": 2,
+		"progress": 1, "done": false, "reward_audience": 10, "reward_xp": 20}
+	_ck(Objectives.describe(bv.floor.objective).contains("1/2"), "objective shows tracked progress")
+	var aud_before: int = bv.floor.audience.rating if bv.floor.audience else 0
+	bv._objective_event(1)               # hits the target → completes
+	_ck(bv.floor.objective["done"], "reaching the target completes the objective")
+	if bv.floor.audience:
+		_ck(bv.floor.audience.rating >= aud_before, "completing the objective rewards audience")
+
+	# sponsor hunter: an angered sponsor's bounty hunter actually spawns on the board
+	var foes_before: int = bv.sim.enemies_alive().size()
+	bv.floor.sponsors.pending_hunters.append("Łowca NovaChem")
+	bv._animate([])                      # drains pending hunters → spawns
+	_ck(bv.sim.enemies_alive().size() > foes_before, "a queued sponsor hunter spawns onto the board")
+	_ck(bv.floor.sponsors.pending_hunters.is_empty(), "the hunter queue drains after spawning")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)
