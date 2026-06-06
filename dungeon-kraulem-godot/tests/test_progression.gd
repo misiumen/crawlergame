@@ -190,6 +190,34 @@ func _initialize() -> void:
 	kcs.use_companion_ability(1)
 	_ck(kfoe.has_status("stunned"), "the cat's distract stuns the nearest enemy")
 
+	# ── Magic / spells ────────────────────────────────────────────────────────
+	var sbd := Board.new(7, 3)
+	var mage := CombatEntity.new(1, "Mag", 100, 14, ["humanoid"]); mage.faction = "player"; mage.cell = Vector2i(1, 1)
+	mage.stats["INT"] = 6                              # plenty of mana
+	var sfoe := CombatEntity.new(2, "Szczur", 40, 8, ["organic"]); sfoe.faction = "enemy"
+	sfoe.cell = Vector2i(4, 1); sfoe.aware = true
+	var scs2 := CombatSim.new(sbd, {1: mage, 2: sfoe}, 1, 2)
+	sbd.place(1, mage.cell); sbd.place(2, sfoe.cell)
+	scs2.refill_mana()
+	_ck(mage.mana >= 5, "mana refills and scales with INT")
+	var fhp2 := sfoe.hp
+	var m0 := mage.mana
+	scs2.cast_spell("ogien")                          # fire bolt at the rat
+	_ck(sfoe.hp < fhp2, "casting a fire bolt damages the enemy at range")
+	_ck(mage.mana < m0, "casting spends mana (net of slow regen)")
+	_ck(sfoe.has_status("burning"), "the fire spell applies burning")
+	# telekinesis emits a shove (the enemy may walk back on its own turn after)
+	var tk_evs := scs2.cast_spell("telekineza")
+	var pushed := false
+	for e in tk_evs:
+		if e.get("type") == "move" and int(e.get("id", -1)) == sfoe.id:
+			pushed = true
+	_ck(pushed or not sfoe.is_alive(), "telekinesis shoves the enemy")
+	# mana gating
+	mage.mana = 0
+	var blk := scs2.cast_spell("pustka")
+	_ck(blk.size() == 1 and blk[0]["type"] == "cast_blocked", "no mana → cast is blocked")
+
 	# ── Floor objectives ──────────────────────────────────────────────────────
 	var rngo := RandomNumberGenerator.new(); rngo.seed = 7
 	var fobj := Objectives.pick(3, rngo)

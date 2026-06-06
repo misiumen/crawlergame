@@ -514,6 +514,71 @@ func use_companion_ability(floor_num: int) -> Array:
 			evs += _change_audience(3, "pet")
 	return evs
 
+## Cast a spell at the nearest enemy (ranged systemic damage), reusing the
+## element engine. Costs mana (and sometimes HP); scales with INT. Takes a turn.
+func cast_spell(key: String) -> Array:
+	if over or side != "player":
+		return []
+	var sp := Spells.def_of(key)
+	if sp.is_empty():
+		return [{"type": "none", "action": "cast"}]
+	var p := player()
+	var cost: int = int(sp.get("mana", 0))
+	var hp_cost: int = int(sp.get("hp_cost", 0))
+	if p.mana < cost:
+		return [{"type": "cast_blocked", "reason": "Za mało many."}]
+	if hp_cost > 0 and p.hp <= hp_cost:
+		return [{"type": "cast_blocked", "reason": "Za mało HP na tę krew."}]
+	var kind: String = sp.get("kind", "element")
+	# Self-only spell (mend) needs no target; everything else wants an enemy.
+	var foe := _nearest_enemy_to(p.cell)
+	if kind != "mend" and foe == null:
+		return [{"type": "none", "action": "cast"}]
+	p.mana -= cost
+	if hp_cost > 0:
+		p.hp = maxi(1, p.hp - hp_cost)
+	var evs: Array = [{"type": "spell_cast", "key": key, "name": sp.get("name", key)}]
+	var pow: int = 4 + rng.randi_range(0, 3) + p.stat_mod("INT")   # INT drives spellpower
+	_add_affinity("tech", 1)
+	match kind:
+		"element":
+			evs += _apply_damage(foe, pow, sp.get("dmg_type", DMG_PHYSICAL))
+			if foe.is_alive() and sp.has("status"):
+				foe.add_status(sp["status"], 2)
+				evs.append({"type": "status", "target": foe.id, "status": sp["status"], "turns": 2})
+		"push":
+			var dir: Vector2i = Vector2i(signi(foe.cell.x - p.cell.x), signi(foe.cell.y - p.cell.y))
+			if dir == Vector2i.ZERO:
+				dir = Vector2i.RIGHT
+			var dest: Vector2i = foe.cell + dir
+			if board.is_free(dest):
+				board.move(foe.cell, dest); foe.cell = dest
+				evs.append({"type": "move", "id": foe.id, "to": dest})
+				evs += _on_enter_cell(foe)        # a shove into a hazard still triggers it
+		"drain":
+			evs += _apply_damage(foe, pow + 3, DMG_PHYSICAL)
+			evs += _heal_player(int(round(pow * 0.6)), "Krwawa danina")
+		"void":
+			evs += _apply_damage(foe, pow + 6, sp.get("dmg_type", DMG_COLD))
+			var recoil := rng.randi_range(1, 4)
+			p.hp = maxi(1, p.hp - recoil)
+			evs.append({"type": "damage", "target": player_id, "amount": recoil, "dmg_type": "void"})
+		"illusion":
+			foe.add_status("stunned", 1)
+			foe.aware = false
+			evs.append({"type": "status", "target": foe.id, "status": "stunned", "turns": 1})
+		"mend":
+			evs += _heal_player(int(round(p.max_hp * 0.45)), "Wskrzeszenie")
+	evs += _change_audience(2, "spell")
+	evs += _after_player_action(2)   # casting is loud
+	return evs
+
+## Refill mana to max (call on each new floor) and recompute the INT-scaled cap.
+func refill_mana() -> void:
+	var p := player()
+	p.max_mana = Spells.max_mana_for(p)
+	p.mana = p.max_mana
+
 ## Nearest living enemy to a cell (Chebyshev), or null if none.
 func _nearest_enemy_to(c: Vector2i) -> CombatEntity:
 	var best: CombatEntity = null
@@ -749,6 +814,8 @@ func _after_player_action(noise_radius: int = 0) -> Array:
 	if pl.species_trait == "regen" and pl.is_alive() and pl.hp < pl.max_hp:
 		pl.hp = mini(pl.max_hp, pl.hp + 1)
 		evs.append({"type": "heal", "target": player_id, "amount": 1})
+	if pl.mana < pl.max_mana:               # slow mana regen between casts
+		pl.mana += 1
 	side = "player"
 	round_num += 1
 	return evs

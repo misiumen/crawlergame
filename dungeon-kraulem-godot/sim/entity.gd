@@ -46,6 +46,8 @@ var equipment: Dictionary = {}   # "head" | "body" | "legs" | "trinket" -> GameI
 var level: int = 1
 var xp: int = 0
 var skill_points: int = 0        # banked, spent to raise a stat on level-up
+var mana: int = 0                # spell fuel (player); refills per floor, regens slowly
+var max_mana: int = 3
 # Emergent-class state (player only)
 var affinity: Dictionary = {}    # playstyle kind -> points
 var class_key: String = ""       # chosen emergent class, "" = none

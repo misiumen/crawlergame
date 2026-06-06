@@ -70,6 +70,7 @@ var _meta_screen := false            # loadout & meta-unlocks screen (from the t
 var _meta_scroll := 0.0
 var _safehouse: Dictionary = {}      # open safehouse modal: {id, subtype} (non-empty = open)
 var _crawler: Dictionary = {}        # open rival-crawler parley modal: {id} (non-empty = open)
+var _spellbook := false               # spell list overlay (cast with mana)
 const META_KIND_COL := {
 	"species":    Color(0.55, 0.92, 0.98),
 	"origin":     Color(1.00, 0.84, 0.27),
@@ -120,6 +121,7 @@ func _build() -> void:
 			_log = ["Wczytano zapis. Kontynuujesz zjazd — piętro %d." % floor.depth]
 			floor.attach_companion(_make_companion())   # the pet rejoins on resume
 			_arm_floor_traits()
+			sim.refill_mana()
 			if floor.objective.is_empty():               # older save / first time → roll one
 				floor.objective = Objectives.pick(floor.depth, _narr_rng)
 			_attach_bodies(); _recenter(); _reset_visuals()
@@ -136,6 +138,7 @@ func _build() -> void:
 	_log = ["Piętro 1. Zaczynasz zjazd. Rozbieraj, kuj, walcz — i schodź głębiej."]
 	_apply_loadout()               # bake the meta-progression loadout into this fresh run
 	_arm_floor_traits()
+	sim.refill_mana()
 	floor.objective = Objectives.pick(floor.depth, _narr_rng)   # this floor's tracked goal
 	_attach_bodies()
 	_recenter()
@@ -205,6 +208,7 @@ func _descend_into(biome_key: String) -> void:
 	_spawn_safehouse()
 	_maybe_spawn_crawler()
 	_arm_floor_traits()            # re-arm per-floor species traits (e.g. first strike)
+	sim.refill_mana()              # mana tops up each floor
 	floor.objective = Objectives.pick(next_depth, _narr_rng)   # a fresh segment goal
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
 	_ach_descend(next_depth)
@@ -380,6 +384,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			_crawler = {}; queue_redraw()
 		return
 
+	# Spellbook grabs input: number keys cast, Esc closes.
+	if _spellbook:
+		if kc == KEY_ESCAPE or kc == KEY_Z:
+			_spellbook = false; queue_redraw(); return
+		var si := kc - KEY_1
+		if si >= 0 and si < Spells.ORDER.size():
+			_cast_spell(Spells.ORDER[si])
+		return
+
 	# NPC dialogue grabs input until you choose or walk away (Esc).
 	if not _dlg.is_empty():
 		if kc == KEY_ESCAPE:
@@ -420,6 +433,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	# [G] fire the companion's ability
 	if kc == KEY_G:
 		_use_companion_ability(); return
+
+	# [Z] open/close the spellbook
+	if kc == KEY_Z:
+		_spellbook = not _spellbook; queue_redraw(); return
 
 	# [L] open the skill-point allocation modal (if you've banked any)
 	if kc == KEY_L:
@@ -464,7 +481,7 @@ func _can_take_board_input() -> bool:
 		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
 		and _levelup.is_empty() and not _ach_screen and not _meta_screen \
-		and _safehouse.is_empty() and _crawler.is_empty()
+		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -556,6 +573,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"safe_action":       _safehouse_action(z.get("s", ""), i)
 		"safe_close":        _safehouse = {}; queue_redraw()
 		"crawler_action":    _crawler_action(z.get("s", ""))
+		"cast":              _cast_spell(z.get("s", ""))
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
 
@@ -1379,6 +1397,15 @@ func _use_class_active() -> void:
 	_advance_floor_turn()
 	_check_transition()
 
+## Cast a spell from the book at the nearest enemy; closes the book + takes a turn.
+func _cast_spell(key: String) -> void:
+	if floor == null:
+		return
+	_spellbook = false
+	_animate(sim.cast_spell(key))
+	_check_transition()
+	queue_redraw()
+
 ## Fire the companion's signature ability ([G]); free action, per-floor cooldown.
 func _use_companion_ability() -> void:
 	if floor == null or floor.companion == null or not floor.companion.is_alive():
@@ -1688,6 +1715,12 @@ func _animate(evs: Array) -> void:
 				_shake = maxf(_shake, 3.0)
 			"companion_blocked":
 				_log_push(str(e.get("reason", "Towarzysz nie może teraz pomóc.")))
+			"spell_cast":
+				_add_floater(sim.player_id, "✦ " + str(e.get("name", "Zaklęcie")), COL_PURPLE)
+				_log_push("Rzucasz: %s." % e.get("name", "?"))
+				_shake = maxf(_shake, 3.0)
+			"cast_blocked":
+				_log_push(str(e.get("reason", "Nie możesz teraz rzucić.")))
 			"scrap_found":
 				_add_floater(sim.player_id, "+%d złom" % int(e.get("amount", 0)), COL_AMBER)
 			"marked":
@@ -2217,6 +2250,7 @@ func _draw_hud() -> void:
 			worn.append((p.equipment[slot] as GameItem).name_pl)
 	if not worn.is_empty():
 		wln += "   ·   Pancerz: " + ", ".join(worn)
+	wln += "   ·   Mana %d/%d [Z]" % [p.mana, p.max_mana]
 	draw_string(_font, Vector2(40, 80), wln, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	# INT stat
 	var int_str := "INT %d (+%d)" % [p.int_xp, p.int_mod()]
@@ -2326,6 +2360,8 @@ func _draw_hud() -> void:
 		_draw_safehouse()
 	if not _crawler.is_empty():
 		_draw_crawler_modal()
+	if _spellbook:
+		_draw_spellbook()
 	_draw_toasts()
 
 ## VS-style achievement toasts: tier-framed panels that slide in from the right,
@@ -2719,6 +2755,40 @@ func _draw_route_offer() -> void:
 
 ## Level-up: spend banked skill points on a stat. Click a row (or press its
 ## number); the modal closes when the bank runs dry, or [Esc]/the button banks it.
+## Spellbook: cast at the nearest enemy for mana. Rows greyed when you can't pay.
+func _draw_spellbook() -> void:
+	var p := sim.player()
+	var W := 640.0; var H := 470.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.05, 0.11, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 32), "KSIĘGA ZAKLĘĆ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_PURPLE)
+	draw_string(_font, Vector2(px + W - 180, py + 32), "Mana: %d / %d" % [p.mana, p.max_mana],
+		HORIZONTAL_ALIGNMENT_LEFT, 170, 18, COL_CYAN)
+	var cy := py + 60.0
+	var rh := 38.0
+	for i in Spells.ORDER.size():
+		var key: String = Spells.ORDER[i]
+		var sp: Dictionary = Spells.SPELLS[key]
+		var cost: int = int(sp.get("mana", 0))
+		var hp_cost: int = int(sp.get("hp_cost", 0))
+		var castable: bool = p.mana >= cost and (hp_cost == 0 or p.hp > hp_cost)
+		var box := Rect2(px + 16, cy, W - 32, rh - 4)
+		var hot := _hover(box) and castable
+		draw_rect(box, Color(0.16, 0.12, 0.22, 0.95) if hot else Color(0.10, 0.08, 0.14, 0.9))
+		draw_rect(box, COL_PURPLE if hot else (COL_GRID if castable else Color(COL_GRID, 0.5)), false, 1.0)
+		var lcol := COL_BRIGHT if castable else COL_DIM
+		var costtxt := "%d many" % cost if hp_cost == 0 else "%d HP" % hp_cost
+		draw_string(_font, Vector2(px + 28, cy + 16), "%d. %s  —  %s" % [i + 1, sp.get("name", key), costtxt],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 15, lcol)
+		draw_string(_font, Vector2(px + 28, cy + 31), sp.get("desc", ""),
+			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 11, COL_DIM)
+		if castable:
+			_zone(box, "cast", 0, key)
+		cy += rh
+	draw_string(_font, Vector2(px + 20, py + H - 16), "Klik / 1–9 rzuca w najbliższego wroga   ·   [Z]/[Esc] zamknij",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+
 ## Rival-crawler parley: talk / rob / fight. Robbing is a DEX gamble; a hostile
 ## crawler only offers a fight.
 func _draw_crawler_modal() -> void:
