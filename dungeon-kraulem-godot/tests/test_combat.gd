@@ -40,7 +40,7 @@ func _initialize() -> void:
 	_ck(r2.cell == Vector2i(1, 1), "rat shoved onto the water tile")
 	_ck(_has_event(evs, "systemic", "element", "electric"), "water+wire triggers electric shock")
 	_ck(r2.hp < rhp0, "shock damaged the rat")
-	_ck(p.hp == 100, "positioning kill: player took no counter-damage")
+	_ck(p.hp >= 100, "positioning kill: player took no counter-damage (level-up may heal past 100)")
 
 	# --- enemy turn: an adjacent enemy attacks; a distant one steps closer ---
 	var b2 := Board.from_ascii(["######", "#....#", "######"])

@@ -6,10 +6,26 @@ extends RefCounted
 const CAT_COATING  := "coating"
 const CAT_THROWN   := "thrown"
 const CAT_WEAPON   := "weapon"
+const CAT_ARMOR    := "armor"
 const CAT_TRAP     := "trap"
 const CAT_MEDICAL  := "medical"
 const CAT_TOOL     := "tool"
 const CAT_SCROLL   := "recipe_scroll"
+
+## Map a content template `type` (item_templates.json) onto a runtime category.
+## Without this, types like "wearable"/"oddity"/"consumable" fell through every
+## use-case and behaved like inert weapons. Slot is derived from a "slot:*" tag.
+static func category_from_type(type: String) -> String:
+	match type:
+		"weapon":     return CAT_WEAPON
+		"wearable":   return CAT_ARMOR
+		"medical":    return CAT_MEDICAL
+		"consumable": return CAT_MEDICAL
+		"coating":    return CAT_COATING
+		"thrown":     return CAT_THROWN
+		"trap":       return CAT_TRAP
+		"recipe":     return CAT_SCROLL
+		_:            return CAT_TOOL   # oddity / trinket / loot / material / tool
 
 static var _next_uid: int = 1
 
@@ -48,10 +64,18 @@ func short_desc() -> String:
 		CAT_COATING:  return "powłoka x%d" % charges
 		CAT_THROWN:   return "rzut x%d" % charges
 		CAT_WEAPON:   return "+%d obr." % effect.get("damage_bonus", 0)
+		CAT_ARMOR:    return "pancerz +%d AC (%s)" % [effect.get("ac_bonus", 1), effect.get("slot", "ciało")]
 		CAT_MEDICAL:  return "leczenie +%d" % effect.get("heal", 0)
 		CAT_TOOL:     return "narzędzie"
 		CAT_SCROLL:   return "receptura"
 		_:            return category
+
+## The equipment slot this armor occupies, read from a "slot:*" tag (default body).
+func armor_slot() -> String:
+	for t in tags:
+		if (t as String).begins_with("slot:"):
+			return (t as String).substr(5)
+	return "body"
 
 # ── Serialization (save/load) ─────────────────────────────────────────────────
 

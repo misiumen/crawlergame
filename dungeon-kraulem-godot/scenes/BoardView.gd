@@ -62,6 +62,10 @@ var _box_anim: Dictionary = {}       # active lootbox-opening reveal (non-empty 
 var _toasts: Array = []              # achievement-unlock toasts (VS-style)
 var _ach_screen := false             # achievements gallery overlay (from title)
 var _env_kills := 0                  # environment kills this run (for an achievement)
+var _levelup: Dictionary = {}        # pending level-up: spend skill points (non-empty = modal)
+const SKILL_STATS := [["STR", "siła — obrażenia w walce"], ["DEX", "zręczność — celność"],
+	["INT", "spryt — majsterkowanie i dialogi"], ["WIS", "spostrzegawczość — czujność i dialogi"],
+	["CHA", "charyzma — perswazja i widownia"]]
 const BOX_SPIN := 1.8                 # reel spin seconds
 const BOX_POP := 0.55                 # snap-flash seconds
 const BOX_REVEAL_STEP := 0.30         # seconds between each loot piece popping in
@@ -165,6 +169,7 @@ func _descend_into(biome_key: String) -> void:
 	_reset_visuals()
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
 	_ach_descend(next_depth)
+	_award_xp(12 + next_depth * 6)   # surviving a floor is worth real XP
 	Save.write(floor, _run_seed)   # checkpoint at each new floor
 
 ## Reach the Data autoload via /root (BoardView is a Node, so this is safe and
@@ -316,9 +321,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			_accept_class(pick)
 		return
 
+	# Level-up modal: spend banked skill points on a stat (1-5), Esc to bank them.
+	if not _levelup.is_empty():
+		if kc == KEY_ESCAPE:
+			_levelup = {}; queue_redraw(); return
+		var spick := kc - KEY_1
+		if spick >= 0 and spick < SKILL_STATS.size():
+			_spend_skill_point(SKILL_STATS[spick][0])
+		return
+
 	# [F] fire the emergent-class active ability
 	if kc == KEY_F:
 		_use_class_active(); return
+
+	# [L] open the skill-point allocation modal (if you've banked any)
+	if kc == KEY_L:
+		if sim != null and sim.player().skill_points > 0:
+			_levelup = {"open": true}; queue_redraw()
+		return
 
 	# [I] toggles the craft panel
 	if kc == KEY_I:
@@ -355,7 +375,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _can_take_board_input() -> bool:
 	return not _title and not _done and sim != null \
 		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
-		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open
+		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
+		and _levelup.is_empty()
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -439,6 +460,71 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"aim_part":          _set_aim(z.get("s", ""))
 		"ach_open":          _ach_screen = true; queue_redraw()
 		"ach_back":          _ach_screen = false; queue_redraw()
+		"levelup_stat":      _spend_skill_point(z.get("s", ""))
+		"levelup_close":     _levelup = {}; queue_redraw()
+
+## Award XP from a non-combat source (descending, etc.) and animate the result,
+## applying the same per-level rewards the combat path uses.
+func _award_xp(amount: int) -> void:
+	if amount <= 0 or sim == null:
+		return
+	var p := sim.player()
+	var lv := p.gain_xp(amount)
+	var evs: Array = [{"type": "xp", "amount": amount, "level": p.level,
+		"xp": p.xp, "to_next": p.xp_to_next()}]
+	for _i in lv:
+		p.max_hp += 5
+		p.hp = mini(p.max_hp, p.hp + 5)
+		p.skill_points += 1
+	if lv > 0:
+		evs.append({"type": "level_up", "level": p.level, "levels": lv,
+			"skill_points": p.skill_points, "max_hp": p.max_hp})
+	_animate(evs)
+
+## Level-up payoff: a banner + log, a guaranteed reward lootbox (DCC always pays
+## out on a level), and the skill-point allocation modal opens.
+func _on_level_up(e: Dictionary) -> void:
+	var lv: int = int(e.get("level", sim.player().level))
+	_add_floater(sim.player_id, "AWANS! POZIOM %d" % lv, COL_AMBER)
+	_add_banner("POZIOM %d" % lv)
+	_shake = maxf(_shake, 6.0)
+	_log_push("Awans na poziom %d! +5 HP, +%d pkt umiejętności." % [lv, int(e.get("levels", 1))])
+	_unlock_ach("pierwszy_awans")          # no-op if the key isn't in the catalog
+	if lv >= 5: _unlock_ach("weteran_areny")
+	_grant_level_box(lv)
+	_levelup = {"open": true}
+	queue_redraw()
+
+## Hand the player a reward box for leveling: a couple of bonus materials plus a
+## piece of gear, fatter on milestone levels (every 5th).
+func _grant_level_box(lv: int) -> void:
+	var milestone := lv % 5 == 0
+	var box := GameBox.new("level", "Awans", Rarity.RARE if milestone else Rarity.UNCOMMON)
+	for _i in (3 if milestone else 2):
+		var mat: String = BOX_BONUS_MATS[_narr_rng.randi_range(0, BOX_BONUS_MATS.size() - 1)]
+		box.contents.append({"type": "material", "key": mat, "qty": _narr_rng.randi_range(1, 3)})
+	var tpl: Variant = _data_group("item_templates", "ITEM_TEMPLATES")
+	if tpl is Dictionary and not (tpl as Dictionary).is_empty():
+		var keys: Array = (tpl as Dictionary).keys()
+		box.contents.append({"type": "item_key", "key": keys[_narr_rng.randi_range(0, keys.size() - 1)]})
+	floor.boxes.append(box)
+	_log_push("Awans nagradza skrzynką — odbierz ją na planszy.")
+
+## Spend one banked skill point raising `stat` by 1 (closes when the bank is dry).
+func _spend_skill_point(stat: String) -> void:
+	var p := sim.player()
+	if p.skill_points <= 0 or stat == "":
+		return
+	p.skill_points -= 1
+	p.stats[stat] = int(p.stats.get(stat, 0)) + 1
+	if stat == "INT":
+		p.int_xp += 5     # keep the tinkering track in step with raw INT
+	_add_floater(sim.player_id, "+1 %s" % stat, COL_GAS)
+	_log_push("Punkt umiejętności: %s teraz %d." % [stat, int(p.stats[stat])])
+	if p.skill_points <= 0:
+		_levelup = {}
+	Save.write(floor, _run_seed)         # persist the new stats immediately
+	queue_redraw()
 
 ## The enemy whose body we read out + aim at: the nearest aware living enemy,
 ## else the nearest living enemy.
@@ -654,10 +740,16 @@ func _resolve_box(box: GameBox) -> Array:
 				if templates is Dictionary and templates.has(entry["key"]):
 					var t: Dictionary = templates[entry["key"]]
 					var it := GameItem.new(t.get("fallback_name", entry["key"]),
-						t.get("type", "tool"), t.get("rarity", Rarity.COMMON))
+						GameItem.category_from_type(t.get("type", "tool")), t.get("rarity", Rarity.COMMON))
 					var tg: Variant = t.get("tags", [])
 					it.tags = (tg if tg is Array else []).duplicate()
 					it.origin = box.source
+					if it.category == GameItem.CAT_ARMOR:
+						it.effect = {"slot": it.armor_slot(), "ac_bonus": 1 + Rarity.order(it.rarity) / 2}
+						it.charges = 0
+					elif it.category == GameItem.CAT_WEAPON and it.effect.is_empty():
+						it.effect = {"damage_bonus": 1 + Rarity.order(it.rarity) / 2}
+						it.charges = 1   # applied once as a permanent +dmg upgrade
 					out.append({"type": "item", "item": it, "label": it.display_name(),
 						"color": it.rarity_color()})
 			"material":
@@ -920,6 +1012,18 @@ func _animate(evs: Array) -> void:
 				_add_floater(sim.player_id, "+%d HP" % e["amount"], COL_GREEN)
 			"weapon_upgrade":
 				_add_floater(sim.player_id, "+%d obr." % e["bonus"], COL_AMBER)
+			"xp":
+				_add_floater(sim.player_id, "+%d XP" % e["amount"], COL_GAS)
+			"level_up":
+				_on_level_up(e)
+			"armor_equipped":
+				_add_floater(sim.player_id, "+%d AC" % e.get("ac_bonus", 1), COL_CYAN)
+				_log_push("Zakładasz: %s. Pancerz +%d AC (%s)." % [
+					e.get("name", "?"), e.get("ac_bonus", 1), e.get("slot", "ciało")])
+			"recipe_learned":
+				if not e.get("known", false):
+					_add_floater(sim.player_id, "+przepis", COL_GREEN)
+					_log_push("Nowy przepis: %s." % e.get("name", "?"))
 			"class_active":
 				_add_floater(sim.player_id, str(e.get("name", "")).to_upper(), COL_AMBER)
 				_log_push("Umiejetnosc: %s." % e.get("name", "?"))
@@ -1353,15 +1457,33 @@ func _draw_hud() -> void:
 		% [floor.depth if floor else 1, floor.current_name() if floor else "?", sim.round_num,
 		   "TY" if sim.side == "player" else "wrogowie"],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
+	# Level + XP bar (top-right of the title row)
+	var xb := Rect2(640, 24, 260, 16)
+	draw_rect(xb, Color(0.08, 0.10, 0.13, 0.9))
+	var frac: float = clampf(float(p.xp) / maxf(1.0, float(p.xp_to_next())), 0.0, 1.0)
+	draw_rect(Rect2(xb.position, Vector2(xb.size.x * frac, xb.size.y)), COL_GAS)
+	draw_rect(xb, COL_GRID, false, 1.0)
+	var lvl_txt := "POZIOM %d   XP %d/%d" % [p.level, p.xp, p.xp_to_next()]
+	if p.skill_points > 0:
+		lvl_txt += "   ·   %d pkt [L]" % p.skill_points
+	draw_string(_font, Vector2(xb.position.x, 20), lvl_txt,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER if p.skill_points > 0 else COL_DIM)
 	# Controls hint (mouse-first)
 	draw_string(_font, Vector2(40, 60),
 		"LPM atak/rozmowa/ruch · PPM pchnij  ·  WSAD ruch · Shift pchnij · Spacja czekaj · E rozbierz · I warsztat · F umiejętność",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	# Weapon / coating
+	# Weapon / coating / armor
 	var wln := "Broń: nóż"
 	if p.coating == "electric": wln += "  [PRĄD x%d]" % p.coating_charges
 	elif p.coating == "poison": wln += "  [TRUCIZNA x%d]" % p.coating_charges
 	if p.bonus_damage > 0:      wln += "  +%d obr." % p.bonus_damage
+	wln += "   ·   AC %d" % (p.ac + p.armor_bonus())
+	var worn: Array = []
+	for slot in p.equipment:
+		if p.equipment[slot] != null:
+			worn.append((p.equipment[slot] as GameItem).name_pl)
+	if not worn.is_empty():
+		wln += "   ·   Pancerz: " + ", ".join(worn)
 	draw_string(_font, Vector2(40, 80), wln, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	# INT stat
 	var int_str := "INT %d (+%d)" % [p.int_xp, p.int_mod()]
@@ -1456,6 +1578,8 @@ func _draw_hud() -> void:
 		_draw_dialogue()
 	if not _box_anim.is_empty():
 		_draw_box_open()
+	if not _levelup.is_empty():
+		_draw_levelup()
 	_draw_toasts()
 
 ## VS-style achievement toasts: small panels that slide in from the right edge,
@@ -1676,6 +1800,43 @@ func _draw_route_offer() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 14, COL_AMBER)
 		_zone(box, "route", i)
 		cy += 84.0
+
+## Level-up: spend banked skill points on a stat. Click a row (or press its
+## number); the modal closes when the bank runs dry, or [Esc]/the button banks it.
+func _draw_levelup() -> void:
+	var p := sim.player()
+	var W := 720.0; var H := 420.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.08, 0.07, 0.04, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 32),
+		"AWANS — POZIOM %d" % p.level, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_AMBER)
+	draw_string(_font, Vector2(px + 20, py + 58),
+		"Punkty do rozdania: %d   ·   wybierz cechę, którą wzmocnisz." % p.skill_points,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
+	var cy := py + 84.0
+	for i in SKILL_STATS.size():
+		var stat: String = SKILL_STATS[i][0]
+		var desc: String = SKILL_STATS[i][1]
+		var box := Rect2(px + 16, cy, W - 32, 52)
+		var hot := _hover(box)
+		draw_rect(box, Color(0.18, 0.15, 0.07, 0.95) if hot else Color(0.12, 0.11, 0.08, 0.9))
+		draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
+		draw_string(_font, Vector2(px + 28, cy + 22),
+			"%d.  %s  —  %d" % [i + 1, desc, int(p.stats.get(stat, 0))],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 16, COL_BRIGHT)
+		draw_string(_font, Vector2(px + 28, cy + 42),
+			"obecny modyfikator: +%d" % p.stat_mod(stat),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+		_zone(box, "levelup_stat", i, stat)
+		cy += 58.0
+	var done := Rect2(px + W - 180, py + H - 44, 160, 30)
+	var dhot := _hover(done)
+	draw_rect(done, COL_GRID if dhot else Color(0.10, 0.13, 0.17, 0.9))
+	draw_rect(done, COL_AMBER if dhot else COL_GRID, false, 1.0)
+	draw_string(_font, Vector2(done.position.x + 14, done.position.y + 21),
+		"Zachowaj punkty [Esc]", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_BRIGHT)
+	_zone(done, "levelup_close")
 
 ## End-of-run results screen: victory/death header, run tallies, sponsors, and
 ## any meta options the season unlocked.

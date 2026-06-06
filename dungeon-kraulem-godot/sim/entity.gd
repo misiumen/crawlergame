@@ -36,6 +36,12 @@ func stat_mod(stat: String) -> int:
 	if stat == "INT":
 		m += int_mod()
 	return m
+# Equipment (player only): slot -> GameItem. Worn armor adds to AC.
+var equipment: Dictionary = {}   # "head" | "body" | "legs" | "trinket" -> GameItem
+# RPG progression (player only): the level track DCC runs on.
+var level: int = 1
+var xp: int = 0
+var skill_points: int = 0        # banked, spent to raise a stat on level-up
 # Emergent-class state (player only)
 var affinity: Dictionary = {}    # playstyle kind -> points
 var class_key: String = ""       # chosen emergent class, "" = none
@@ -49,6 +55,32 @@ var run_traps_armed: int = 0
 
 func int_mod() -> int:
 	return int_xp / 5
+
+## Total AC granted by worn equipment.
+func armor_bonus() -> int:
+	var b := 0
+	for slot in equipment:
+		var it = equipment[slot]
+		if it != null:
+			b += int((it.effect as Dictionary).get("ac_bonus", 0))
+	return b
+
+## XP needed to reach the next level (gently escalating curve).
+func xp_to_next() -> int:
+	return 20 + (level - 1) * 25
+
+## Bank XP; returns the number of levels gained (0 if none). Level-up rewards
+## (HP, skill points, loot) are applied by the caller so they can be narrated.
+func gain_xp(amount: int) -> int:
+	if amount <= 0:
+		return 0
+	xp += amount
+	var gained := 0
+	while xp >= xp_to_next():
+		xp -= xp_to_next()
+		level += 1
+		gained += 1
+	return gained
 
 func add_affinity(kind: String, amount: int = 1) -> void:
 	affinity[kind] = int(affinity.get(kind, 0)) + amount

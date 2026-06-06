@@ -22,6 +22,11 @@ var class_offered: bool = false   # once we've offered a class, don't nag again
 var depth: int = 1                 # how many floors deep this run is (1-based)
 var biome: String = ""             # the route-biome this floor was generated with
 
+# The cell the player was just placed on by a room transition. Exits on THIS cell
+# are disarmed until the player steps off — otherwise you'd bounce straight back
+# through the door you arrived from (the back-door sits on the entry cell).
+var _entered_on: Vector2i = Vector2i(-9999, -9999)
+
 func _init(data: Dictionary) -> void:
 	rooms = data["rooms"]
 	player = data["player"]
@@ -50,6 +55,7 @@ func enter(idx: int, entry: Vector2i) -> void:
 	var room: Dictionary = rooms[idx]
 	var board: Board = room["board"]
 	player.cell = entry
+	_entered_on = entry          # disarm exits on this cell until we step off it
 	board.place(player.id, entry)
 	var ents: Dictionary = {player.id: player}
 	for id in room["entities"]:
@@ -78,6 +84,11 @@ func check_class_offer() -> Array:
 
 ## Returns {to, name} or {descend: true} or {blocked: "boss"} or null.
 func try_transition() -> Variant:
+	# Don't fire the exit we were just placed on (prevents the door-bounce). Once
+	# the player has moved off that cell, re-arm every exit on the floor.
+	if player.cell == _entered_on:
+		return null
+	_entered_on = Vector2i(-9999, -9999)
 	var ex = exit_at(player.cell)
 	if ex == null:
 		return null

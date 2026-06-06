@@ -54,9 +54,18 @@ static func _player_dict(p) -> Dictionary:
 		"run_kills": p.run_kills, "run_corpses_salvaged": p.run_corpses_salvaged,
 		"run_traps_armed": p.run_traps_armed,
 		"stats": p.stats.duplicate(true),
+		"level": p.level, "xp": p.xp, "skill_points": p.skill_points,
+		"equipment": _equipment_dict(p.equipment),
 		"flags": p.flags.duplicate(true),
 		"relationships": p.relationships.duplicate(true),
 	}
+
+static func _equipment_dict(eq: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for slot in eq:
+		if eq[slot] != null:
+			out[slot] = (eq[slot] as GameItem).to_dict()
+	return out
 
 # ── Read ──────────────────────────────────────────────────────────────────────
 
@@ -99,6 +108,12 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 	p.run_corpses_salvaged = int(pd.get("run_corpses_salvaged", 0))
 	p.run_traps_armed = int(pd.get("run_traps_armed", 0))
 	if pd.has("stats"): p.stats = (pd["stats"] as Dictionary).duplicate(true)
+	p.level = int(pd.get("level", 1))
+	p.xp = int(pd.get("xp", 0))
+	p.skill_points = int(pd.get("skill_points", 0))
+	p.equipment = {}
+	for slot in (pd.get("equipment", {}) as Dictionary):
+		p.equipment[slot] = GameItem.from_dict(pd["equipment"][slot])
 	p.flags = (pd.get("flags", {}) as Dictionary).duplicate(true)
 	p.relationships = (pd.get("relationships", {}) as Dictionary).duplicate(true)
 

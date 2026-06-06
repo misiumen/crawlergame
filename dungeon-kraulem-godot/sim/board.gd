@@ -50,6 +50,31 @@ func move(frm: Vector2i, to: Vector2i) -> void:
 func clear(c: Vector2i) -> void:
 	occupants.erase(c)
 
+## Unobstructed line of sight between two cells? Walks a Bresenham line and fails
+## if any intermediate cell is a wall (endpoints themselves don't block). Used so
+## enemies behind walls / out of the room don't notice you through solid matter.
+func has_los(a: Vector2i, b: Vector2i) -> bool:
+	var dx: int = abs(b.x - a.x)
+	var dy: int = abs(b.y - a.y)
+	var sx: int = 1 if a.x < b.x else -1
+	var sy: int = 1 if a.y < b.y else -1
+	var err: int = dx - dy
+	var x: int = a.x
+	var y: int = a.y
+	while true:
+		if x == b.x and y == b.y:
+			return true
+		if not (x == a.x and y == a.y) and is_wall(Vector2i(x, y)):
+			return false
+		var e2: int = 2 * err
+		if e2 > -dy:
+			err -= dy
+			x += sx
+		if e2 < dx:
+			err += dx
+			y += sy
+	return true   # unreachable (loop returns at the endpoint), satisfies the analyzer
+
 func is_adjacent(a: Vector2i, b: Vector2i) -> bool:
 	if a == b: return false
 	var d: Vector2i = (a - b).abs()

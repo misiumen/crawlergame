@@ -28,6 +28,7 @@ var _sponsors: SponsorState         # may be null in headless unit tests
 var aim_zone: String = ""           # presentation sets this to aim the next player hit
 var _curse_to_hit: int = 0          # occultist Curse: +AC vs enemies while active
 var _curse_rounds: int = 0          # rounds the curse lasts
+var _xp_done: Dictionary = {}       # enemy ids we've already granted kill-XP for
 
 var rng := RandomNumberGenerator.new()
 
@@ -90,7 +91,7 @@ const STATUS_DOT := {"burning": [3, "fire"], "poisoned": [2, "physical"], "corro
 
 ## Effective AC, reduced while the target is corroded (armor eaten away).
 func _eff_ac(target: CombatEntity) -> int:
-	return target.ac - (2 if target.has_status("corroded") else 0)
+	return target.ac + target.armor_bonus() - (2 if target.has_status("corroded") else 0)
 
 ## Apply damage. If the target carries a procedural body, the blow is LOCATED:
 ## a zone is chosen (or the aimed one used), the part's damage multiplier scales
@@ -138,6 +139,7 @@ func player_move(dir: Vector2i) -> Array:
 	var dest: Vector2i = p.cell + dir
 	var occ: int = board.occupant_at(dest)
 	var evs: Array = []
+	var noise: int = 0
 	if occ != -1 and occ != player_id:
 		var t: CombatEntity = entities[occ]
 		if t.faction == "object":
@@ -145,6 +147,7 @@ func player_move(dir: Vector2i) -> Array:
 		if t.faction == "npc":
 			return [{"type": "talk", "npc_id": t.id}]   # bump an NPC = talk to it
 		evs += _player_attack(t)
+		noise = 3   # a melee swing is heard by nearby enemies (but not the whole floor)
 	elif board.is_free(dest):
 		board.move(p.cell, dest)
 		p.cell = dest
@@ -152,14 +155,14 @@ func player_move(dir: Vector2i) -> Array:
 		evs += _on_enter_cell(p)
 	else:
 		return [{"type": "blocked"}]
-	evs += _after_player_action()
+	evs += _after_player_action(noise)
 	return evs
 
 func _player_attack(target: CombatEntity) -> Array:
 	target.aware = true
 	# Aiming a small zone (head/limb) is harder to land but hits where you want.
 	var zone: String = aim_zone
-	var hit_bonus: int = 3
+	var hit_bonus: int = 3 + player().stat_mod("DEX")   # agility sharpens your aim
 	if zone != "" and target.body != null:
 		hit_bonus += target.body.to_hit_mod_for(zone)
 	var evs: Array = [{"type": "attack", "attacker": player_id, "target": target.id,
@@ -171,7 +174,7 @@ func _player_attack(target: CombatEntity) -> Array:
 	if autohit:
 		p.next_attack_autohit = false
 	if autohit or _roll_hit(hit_bonus, _eff_ac(target)):
-		var base: int = rng.randi_range(1, 6) + 2 + p.bonus_damage
+		var base: int = rng.randi_range(1, 6) + 2 + p.bonus_damage + p.stat_mod("STR")  # muscle hits harder
 		base += ClassFeatures.passive_bonus(p, "unarmed_dmg")   # bruiser/demoman fists
 		if p.next_attack_mult > 1:                               # bruiser charge (active)
 			base *= p.next_attack_mult
@@ -361,6 +364,29 @@ func player_use_item(item_idx: int) -> Array:
 			p.bonus_damage += int(item.effect.get("damage_bonus", 0))
 			evs.append({"type": "weapon_upgrade",
 						"bonus": item.effect.get("damage_bonus", 0)})
+		GameItem.CAT_ARMOR:
+			# Equip into its slot; the previously worn piece (if any) returns to the
+			# pocket. Worn armor adds to AC via CombatEntity.armor_bonus().
+			var slot: String = item.effect.get("slot", "body")
+			var prev = p.equipment.get(slot, null)
+			p.equipment[slot] = item
+			items.remove_at(item_idx)
+			if prev != null:
+				items.append(prev)
+			evs.append({"type": "armor_equipped", "slot": slot,
+						"ac_bonus": item.effect.get("ac_bonus", 1), "name": item.name_pl})
+			evs += _after_player_action(0)
+			return evs
+		GameItem.CAT_SCROLL:
+			# A recipe scroll teaches a recipe permanently (DCC loves found schematics).
+			var rec: Dictionary = item.effect if not item.effect.is_empty() else {"name": item.name_pl, "tags": item.tags}
+			var known := false
+			for r in discovered_recipes:
+				if (r as Dictionary).get("name", "") == rec.get("name", ""):
+					known = true
+			if not known:
+				discovered_recipes.append(rec)
+			evs.append({"type": "recipe_learned", "name": rec.get("name", item.name_pl), "known": known})
 		GameItem.CAT_TOOL:
 			if item.effect.has("recharge_coating") and p.coating != "":
 				p.coating_charges += int(item.effect["recharge_coating"])
@@ -536,7 +562,24 @@ func _salvage(obj: CombatEntity) -> Array:
 	_add_affinity("tech", 1)
 	if "wood" in obj.tags or "furniture" in obj.tags:
 		_add_affinity("environment", 1)
+	evs += _grant_xp(5)   # everything is a resource — including XP
 	evs += _after_player_action(7)
+	return evs
+
+## Bank XP from a non-kill source and emit the xp / level_up events (mirrors the
+## per-level rewards in _award_kill_xp).
+func _grant_xp(amount: int) -> Array:
+	var p := player()
+	var lv := p.gain_xp(amount)
+	var evs: Array = [{"type": "xp", "amount": amount, "level": p.level,
+		"xp": p.xp, "to_next": p.xp_to_next()}]
+	for _i in lv:
+		p.max_hp += 5
+		p.hp = mini(p.max_hp, p.hp + 5)
+		p.skill_points += 1
+	if lv > 0:
+		evs.append({"type": "level_up", "level": p.level, "levels": lv,
+			"skill_points": p.skill_points, "max_hp": p.max_hp})
 	return evs
 
 func _gain(d: Dictionary, key: String, n: int) -> void:
@@ -629,19 +672,40 @@ func _after_player_action(noise_radius: int = 0) -> Array:
 	evs += _enemy_turn()
 	if not over:
 		evs += _check_end()
+	evs += _award_kill_xp()
 	side = "player"
 	round_num += 1
 	return evs
 
+## Grant the player XP for any enemy that has died since we last looked (covers
+## both melee kills and damage-over-time deaths). Level-ups bump max HP + heal a
+## little and bank a skill point; the presentation narrates it and hands out loot.
+func _award_kill_xp() -> Array:
+	var evs: Array = []
+	for id in entities:
+		var e: CombatEntity = entities[id]
+		if e.faction != "enemy" or e.is_alive() or _xp_done.has(id):
+			continue
+		_xp_done[id] = true
+		var amt: int = 4 + e.max_hp + (12 if e.tags.has("boss") else 0)
+		evs += _grant_xp(amt)
+	return evs
+
+## An idle enemy wakes when it can SEE you (within SIGHT and unobstructed line of
+## sight — walls block) or HEAR a commotion (within noise_radius, which carries
+## around corners). This stops a whole room — or enemies behind walls — from
+## piling on the moment you poke one rat across the floor.
 func _update_awareness(noise_radius: int) -> Array:
 	var evs: Array = []
 	var p: CombatEntity = player()
-	var reach: int = maxi(SIGHT, noise_radius)
 	for e in enemies_alive():
 		if e.aware:
 			continue
 		var d: Vector2i = (e.cell - p.cell).abs()
-		if maxi(d.x, d.y) <= reach:
+		var cheby: int = maxi(d.x, d.y)
+		var sees: bool = cheby <= SIGHT and board.has_los(e.cell, p.cell)
+		var hears: bool = noise_radius > 0 and cheby <= noise_radius
+		if sees or hears:
 			e.aware = true
 			evs.append({"type": "notice", "id": e.id})
 	return evs
