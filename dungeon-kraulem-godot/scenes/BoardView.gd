@@ -622,6 +622,7 @@ func _on_level_up(e: Dictionary) -> void:
 	_add_banner("POZIOM %d" % lv)
 	_shake = maxf(_shake, 6.0)
 	_log_push("Awans na poziom %d! +5 HP, +%d pkt umiejętności." % [lv, int(e.get("levels", 1))])
+	_highlight("level", "Awans na poziom %d." % lv, 5 + lv)
 	if lv >= 2:  _unlock_ach("aw_poziom_2")
 	if lv >= 5:  _unlock_ach("aw_poziom_5")
 	if lv >= 10: _unlock_ach("aw_poziom_10")
@@ -1140,17 +1141,24 @@ func _ach_events(evs: Array) -> void:
 			"damage":
 				var v = sim.entities.get(int(e.get("target", -1)))
 				if v != null and v.faction == "enemy":
-					_ach_bump("damage", int(e.get("amount", 0)))
-					if int(e.get("amount", 0)) >= 30:
+					var amt := int(e.get("amount", 0))
+					_ach_bump("damage", amt)
+					if amt >= 30:
 						_unlock_ach("overkill")
+					if amt >= 14:
+						_highlight("big_hit", "Potężny cios — %d obrażeń." % amt, amt)
 			"death":
 				var d = sim.entities.get(int(e.get("target", -1)))
 				if d != null and d.faction == "enemy":
 					_ach_bump("kills", 1)
 					if d.tags.has("boss"):
 						_ach_bump("bosses", 1)
+						_highlight("boss", "BOSS PADŁ: %s!" % d.name_pl, 100)
+					else:
+						_highlight("kill", "Pokonano: %s." % d.name_pl, 10 + d.max_hp)
 					if sneak.has(int(e.get("target", -1))):
 						_unlock_ach("sneak_kill")
+						_highlight("sneak", "Cichy montaż: %s nie zdążył się obudzić." % d.name_pl, 25)
 			"maim":
 				if e.get("severed", false): _unlock_ach("sever")
 			"body_hit":
@@ -1531,6 +1539,14 @@ func _learn_knowledge(entry: Dictionary) -> bool:
 		(t.substr(0, 72) + "…") if t.length() > 72 else t])
 	_add_floater(sim.player_id, "✎ notatka", COL_CYAN)
 	return true
+
+## Record a standout moment for the end-of-run highlight reel (stored on the player).
+func _highlight(kind: String, line: String, value: int = 1) -> void:
+	if floor == null:
+		return
+	var reel: Array = floor.player.flags.get("highlight_reel", [])
+	Highlights.add(reel, kind, line, value)
+	floor.player.flags["highlight_reel"] = reel
 
 ## ── Rival crawlers: talk / rob (DEX gamble) / fight ──────────────────────────
 func _open_crawler(id: int) -> void:

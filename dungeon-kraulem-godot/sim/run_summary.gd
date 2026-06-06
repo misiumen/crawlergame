@@ -39,9 +39,10 @@ static func build(floor, victory: bool, rng: RandomNumberGenerator) -> Dictionar
 	var death := ""
 	if not DEATH_LOG_LINES.is_empty():
 		death = DEATH_LOG_LINES[rng.randi_range(0, DEATH_LOG_LINES.size() - 1)]
+	var zlom := int(floor.inv.get("złom", 0))
 	return {
 		"victory": victory,
-		"floor_reached": floor.current + 1,
+		"floor_reached": floor.depth,                 # the real depth (was room index)
 		"turns": floor.turn,
 		"kills": p.run_kills,
 		"salvaged": p.run_corpses_salvaged,
@@ -52,6 +53,8 @@ static func build(floor, victory: bool, rng: RandomNumberGenerator) -> Dictionar
 		"top_sponsors": sponsors_top,
 		"anti_host_line": anti,
 		"death_log_line": death,
+		"titles": Titles.earned(p, floor, victory, zlom),
+		"highlights": Highlights.top(p.flags.get("highlight_reel", []), 3),
 		"new_unlocks": [],
 	}
 
@@ -81,6 +84,18 @@ static func render_lines(s: Dictionary) -> Array:
 		for sp in s["top_sponsors"]:
 			var sign := "+" if int(sp["attention"]) >= 0 else ""
 			out.append("  %s  %s%d (%s)" % [sp["name"], sign, int(sp["attention"]), sp["mood"]])
+	var titles: Array = s.get("titles", [])
+	if not titles.is_empty():
+		out.append("")
+		out.append("Tytuły tego sezonu:")
+		for t in titles:
+			out.append("  ★ %s — %s" % [t["label"], t["desc"]])
+	var highlights: Array = s.get("highlights", [])
+	if not highlights.is_empty():
+		out.append("")
+		out.append("Highlight Reel:")
+		for h in highlights:
+			out.append("  ▸ %s" % h)
 	if not s["new_unlocks"].is_empty():
 		out.append("")
 		out.append("Sezon otwiera nowe opcje:")

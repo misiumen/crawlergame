@@ -228,5 +228,24 @@ func _initialize() -> void:
 	_ck(Objectives.advance_for({"key": "kill", "done": false}, "salvage") == 0, "an unrelated event does not")
 	_ck(Objectives.advance_for({"key": "kill", "done": true}, "kill") == 0, "a finished objective stops advancing")
 
+	# ── Titles + highlight reel (run-end) ─────────────────────────────────────
+	var tf := Floor.new(FloorGen.generate(2, 11, _content()))
+	tf.player.run_kills = 25
+	tf.player.run_traps_armed = 9
+	var titles := Titles.earned(tf.player, tf, false, 35)
+	var labels: Array = []
+	for t in titles:
+		labels.append(t["label"])
+	_ck("Rzeźnik" in labels, "20+ kills earns Rzeźnik")
+	_ck("Saper" in labels, "8+ traps earns Saper")
+	_ck("Handlarz Złomu" in labels, "30+ scrap earns Handlarz Złomu")
+	_ck(not ("Finalista Sezonu" in labels), "no victory → no Finalista")
+	var reel: Array = []
+	Highlights.add(reel, "kill", "Pokonano: Szczur.", 12)
+	Highlights.add(reel, "boss", "BOSS PADŁ!", 100)
+	Highlights.add(reel, "big_hit", "Potężny cios.", 20)
+	var top := Highlights.top(reel, 2)
+	_ck(top.size() == 2 and top[0] == "BOSS PADŁ!", "the reel surfaces the highest-value moments first")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)
