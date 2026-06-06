@@ -215,6 +215,12 @@ func _descend_into(biome_key: String) -> void:
 	sim.refill_mana()              # mana tops up each floor
 	floor.objective = Objectives.pick(next_depth, _narr_rng)   # a fresh segment goal
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
+	# A celebrity sometimes headlines the floor (celebrities.json) — pure spectacle.
+	if _narr_rng.randf() < 0.35:
+		var celeb := Flavor.celebrity_for(next_depth, _narr_rng)
+		if not celeb.is_empty():
+			_log_push("Konferansjer: " + celeb["intro"])
+			if floor.audience != null: floor.audience.change(2, "celebrity")
 	_ach_descend(next_depth)
 	if next_depth >= FINAL_FLOOR: _unlock_ach("reach_final")
 	_award_xp(12 + next_depth * 6)   # surviving a floor is worth real XP
@@ -1875,6 +1881,12 @@ func _animate(evs: Array) -> void:
 					"czesciowy": _narrate("craft_partial")
 					"porazka":   _narrate("craft_fail")
 					"backfire":  _narrate("craft_critical_fail")
+				# A procedural failure line (from failure_templates.json) on a botch.
+				var flvl: String = {"czesciowy": "partial", "porazka": "failure", "backfire": "critical_failure"}.get(outcome, "")
+				if flvl != "":
+					var fl := Flavor.fail_line(flvl, _narr_rng)
+					if fl != "":
+						_log_push(fl)
 			"backfire_desc":
 				_add_floater(sim.player_id, e.get("desc", "backfire"), COL_RED)
 				_shake = maxf(_shake, 4.0)

@@ -358,6 +358,11 @@ func _initialize() -> void:
 	_ck(true, "the memetics planting screen draws without crash")
 	bv._meme_screen = false
 
+	# flavor content: failure lines + celebrity cameos (previously-unused bundles)
+	_ck(Flavor.fail_line("failure", bv._narr_rng) != "", "a procedural craft-failure line is available")
+	var celeb: Dictionary = Flavor.celebrity_for(2, bv._narr_rng)
+	_ck(not celeb.is_empty() and celeb.has("intro"), "a depth-appropriate celebrity cameo is available")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)
