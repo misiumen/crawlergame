@@ -71,6 +71,8 @@ var _meta_scroll := 0.0
 var _safehouse: Dictionary = {}      # open safehouse modal: {id, subtype} (non-empty = open)
 var _crawler: Dictionary = {}        # open rival-crawler parley modal: {id} (non-empty = open)
 var _spellbook := false               # spell list overlay (cast with mana)
+var _journal_screen := false          # knowledge journal overlay (clues + rumors)
+var _journal_scroll := 0.0
 const META_KIND_COL := {
 	"species":    Color(0.55, 0.92, 0.98),
 	"origin":     Color(1.00, 0.84, 0.27),
@@ -313,6 +315,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				_meta_scroll += 56.0; queue_redraw(); return
 			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
 				_meta_scroll = maxf(0.0, _meta_scroll - 56.0); queue_redraw(); return
+		if _journal_screen:
+			if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				_journal_scroll += 56.0; queue_redraw(); return
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_journal_scroll = maxf(0.0, _journal_scroll - 56.0); queue_redraw(); return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			# On-screen buttons/options first. Reverse order so panels drawn LAST
 			# (modals on top) win over board-HUD zones underneath them.
@@ -384,6 +391,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			_crawler = {}; queue_redraw()
 		return
 
+	# Knowledge journal: scroll + close.
+	if _journal_screen:
+		if kc == KEY_ESCAPE or kc == KEY_J:
+			_journal_screen = false; queue_redraw()
+		elif kc == KEY_DOWN: _journal_scroll += 80.0; queue_redraw()
+		elif kc == KEY_UP:   _journal_scroll = maxf(0.0, _journal_scroll - 80.0); queue_redraw()
+		return
+
 	# Spellbook grabs input: number keys cast, Esc closes.
 	if _spellbook:
 		if kc == KEY_ESCAPE or kc == KEY_Z:
@@ -438,6 +453,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if kc == KEY_Z:
 		_spellbook = not _spellbook; queue_redraw(); return
 
+	# [J] open/close the knowledge journal
+	if kc == KEY_J:
+		_journal_screen = not _journal_screen; _journal_scroll = 0.0; queue_redraw(); return
+
 	# [L] open the skill-point allocation modal (if you've banked any)
 	if kc == KEY_L:
 		if sim != null and sim.player().skill_points > 0:
@@ -481,7 +500,7 @@ func _can_take_board_input() -> bool:
 		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
 		and _levelup.is_empty() and not _ach_screen and not _meta_screen \
-		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook
+		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook and not _journal_screen
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -1115,6 +1134,9 @@ func _ach_events(evs: Array) -> void:
 			sneak[int(e.get("target", -1))] = true
 	for e in evs:
 		match e.get("type"):
+			"salvage":
+				if _narr_rng.randf() < 0.18:          # dismantling sometimes turns up a clue
+					_learn_knowledge(Knowledge.random_clue(_narr_rng))
 			"damage":
 				var v = sim.entities.get(int(e.get("target", -1)))
 				if v != null and v.faction == "enemy":
@@ -1471,8 +1493,12 @@ func _safehouse_action(action: String, arg: int) -> void:
 		"read":
 			if floor.audience != null:
 				floor.audience.change(3, "tablica")
+			var learned := 0
+			for _i in 2:                          # pull a couple of rumors into the journal
+				if _learn_knowledge(Knowledge.random_rumor(_narr_rng)):
+					learned += 1
 			var obj_line := Objectives.describe(floor.objective) if not floor.objective.is_empty() else "brak"
-			_log_push("Tablica: plotki z areny. Cel piętra: %s. (+3 widowni)" % obj_line)
+			_log_push("Tablica: %d nowych plotek. Cel piętra: %s. (+3 widowni)" % [learned, obj_line])
 		"buy":
 			if arg >= 0 and arg < Safehouse.BUY_MATS.size():
 				var entry: Dictionary = Safehouse.BUY_MATS[arg]
@@ -1488,6 +1514,23 @@ func _safehouse_action(action: String, arg: int) -> void:
 				sim.materials["złom"] = _zlom() + price
 				_log_push("Sprzedajesz: %s. (+%d złomu)" % [it.name_pl, price])
 	queue_redraw()
+
+## ── Knowledge: clues + rumors collected into a browsable journal ─────────────
+## Add an intel entry to the run journal if it's new (idempotent by key).
+func _learn_knowledge(entry: Dictionary) -> bool:
+	if entry.is_empty() or entry.get("text", "") == "":
+		return false
+	var journal: Array = floor.player.flags.get("journal", [])
+	for j in journal:
+		if (j as Dictionary).get("key", "") == entry["key"]:
+			return false
+	journal.append(entry)
+	floor.player.flags["journal"] = journal
+	var t: String = entry["text"]
+	_log_push("Notujesz [%s]: %s" % [Knowledge.reliability_label(float(entry.get("truth", 0.5))),
+		(t.substr(0, 72) + "…") if t.length() > 72 else t])
+	_add_floater(sim.player_id, "✎ notatka", COL_CYAN)
+	return true
 
 ## ── Rival crawlers: talk / rob (DEX gamble) / fight ──────────────────────────
 func _open_crawler(id: int) -> void:
@@ -1511,6 +1554,7 @@ func _crawler_action(action: String) -> void:
 		"talk":
 			if floor.audience != null:
 				floor.audience.change(3, "crawler")
+			_learn_knowledge(Knowledge.random_rumor(_narr_rng))   # rivals trade gossip
 			_log_push("%s gada chwilę. Widownia lubi rywalizację. (+3 widowni)" % cr.name_pl)
 			_crawler = {}
 		"rob":
@@ -1951,6 +1995,10 @@ func _draw() -> void:
 		_draw_meta_screen()
 		_draw_toasts()
 		return
+	if _journal_screen and sim != null:
+		_draw_journal()
+		_draw_toasts()
+		return
 	if _ach_screen:
 		_draw_ach_screen()
 		_draw_toasts()
@@ -2236,7 +2284,7 @@ func _draw_hud() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, 320, 12, META_KIND_COL["species"])
 	# Controls hint (mouse-first)
 	draw_string(_font, Vector2(40, 60),
-		"LPM atak/rozmowa/ruch · PPM pchnij  ·  WSAD ruch · Shift pchnij · Spacja czekaj · E rozbierz · I warsztat · F umiejętność",
+		"LPM akcja · PPM pchnij · WSAD ruch · Spacja czekaj · E rozbierz · I warsztat · F klasa · G towarzysz · Z zaklęcia · J dziennik",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Weapon / coating / armor
 	var wln := "Broń: nóż"
@@ -2755,6 +2803,40 @@ func _draw_route_offer() -> void:
 
 ## Level-up: spend banked skill points on a stat. Click a row (or press its
 ## number); the modal closes when the bank runs dry, or [Esc]/the button banks it.
+## Knowledge journal: every clue + rumor you've collected, with a reliability read.
+func _draw_journal() -> void:
+	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+	var journal: Array = floor.player.flags.get("journal", [])
+	draw_string(_font, Vector2(60, 60), "DZIENNIK — wiedza i plotki  (%d)" % journal.size(),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 30, COL_CYAN)
+	if journal.is_empty():
+		draw_string(_font, Vector2(60, 120),
+			"Pusto. Czytaj tablice ogłoszeń, gadaj z rywalami, rozbieraj sprzęt — wiedza sama nie przyjdzie.",
+			HORIZONTAL_ALIGNMENT_LEFT, 1100, 16, COL_DIM)
+	var top := 100.0; var bottom := 680.0
+	var rh := 60.0
+	var content_h := journal.size() * rh
+	var max_scroll := maxf(0.0, content_h - (bottom - top))
+	_journal_scroll = clampf(_journal_scroll, 0.0, max_scroll)
+	for i in journal.size():
+		var e: Dictionary = journal[i]
+		var y := top + i * rh - _journal_scroll
+		if y + rh < top or y > bottom:
+			continue
+		var truth := float(e.get("truth", 0.5))
+		var tcol := COL_GREEN if truth >= 0.8 else (COL_AMBER if truth >= 0.5 else COL_DIM)
+		var kind := "ślad" if e.get("kind", "") == "clue" else "plotka"
+		draw_rect(Rect2(60, y, 1160, rh - 6), Color(0.08, 0.10, 0.13, 0.92))
+		draw_rect(Rect2(60, y, 1160, rh - 6), Color(tcol, 0.6), false, 1.0)
+		draw_string(_font, Vector2(74, y + 18), "[%s · %s]" % [kind, Knowledge.reliability_label(truth)],
+			HORIZONTAL_ALIGNMENT_LEFT, 300, 12, tcol)
+		draw_string(_font, Vector2(74, y + 42), e.get("text", ""),
+			HORIZONTAL_ALIGNMENT_LEFT, 1130, 14, COL_BRIGHT)
+	if max_scroll > 0.0:
+		draw_string(_font, Vector2(1160, 64), "▲▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+	draw_string(_font, Vector2(60, 702), "[J]/[Esc] zamknij   ·   kółko / [↑][↓] przewijaj",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+
 ## Spellbook: cast at the nearest enemy for mana. Rows greyed when you can't pay.
 func _draw_spellbook() -> void:
 	var p := sim.player()

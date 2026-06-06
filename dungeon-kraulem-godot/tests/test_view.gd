@@ -316,6 +316,19 @@ func _initialize() -> void:
 		_ck(bv.sim.entities[861].faction == "enemy" and bv.sim.entities[861].max_hp > 1,
 			"fighting provokes the rival into a real enemy")
 
+	# knowledge: clues/rumors collected into a browsable journal
+	bv.floor.player.flags.erase("journal")
+	var rum: Dictionary = Knowledge.random_rumor(bv._narr_rng)
+	_ck(not rum.is_empty() and rum.has("text"), "a rumor is drawn from the templates")
+	_ck(bv._learn_knowledge(rum), "learning a new clue/rumor adds it to the journal")
+	_ck(not bv._learn_knowledge(rum), "the same entry is not learned twice (idempotent by key)")
+	_ck((bv.floor.player.flags.get("journal", []) as Array).size() == 1, "the journal holds the entry")
+	bv._journal_screen = true
+	for i in 2:
+		bv._process(0.016)
+	_ck(true, "the knowledge journal draws without crash")
+	bv._journal_screen = false
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)
