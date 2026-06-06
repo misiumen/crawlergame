@@ -1,0 +1,48 @@
+species|species_mutant_chemiczny|Mutant chemiczny|+1 CON, odporność na truciznę, podatność na ogień.
+species|species_grzybica|Grzybica|+1 WIS, powolna regeneracja, grzybowa ręka widoczna.
+species|species_cyborg_recyklingu|Cyborg Recyklingu|+1 STR, mechaniczna kończyna (naprawialna złomem).
+species|species_pamietajacy|Pamiętający|+1 INT, czasem pamiętasz to, czego nie widziałeś.
+species|species_kolyski_anti_hosta|Kołyska Konferansjera|+1 do wszystkich statystyk; Konferansjer osobiście 
+origin|origin_drugi_cykl|Drugi cykl|Zaczynasz z widownią +5 i blizną po poprzednim sezonie.
+origin|origin_sponsorowany|Sponsorowany Uczestnik|Startujesz z kontraktem — większe bonusy uwagi, ale 
+origin|origin_zhanbiony_showman|Zhańbiony Showman|Startujesz z widownią=20, ale Kanał 7 ma na ciebie oko.
+companion|companion_papuga_anty_host|Papuga Konferansjera|Sarkastyczna papuga startuje z tobą — komentuje 
+item|item_mikrofon_anty_hosta|Mikrofon Konferansjera|Mikrofon kierunkowy: +5 widowni na użycie, gada 
+item|item_obrazek_finalu|Obrazek Finału|Drobiazg, który podnosi jedną losową statystykę +5 
+item|item_skarpetka_pulkownika|Skarpetka Pułkownika Recyklingu|Używana skarpetka rozgrzewająca. +1 do testów WIS 
+species|species_stary_uczestnik|Stary Uczestnik|Zaczynasz z blizną poprzedniego zwycięzcy i 
+species|species_bez_twarzy|Bez Twarzy|Widownia nigdy nie spada poniżej 10, ale CHA 
+species|species_ferromanta_meta|Ferromanta (start)|Startujesz jako Ferromanta — magnetyczna skóra, 
+origin|origin_wieczny_stazysta|Wieczny Stażysta|Startujesz z kredytami ×2. Konferansjer nigdy nie 
+origin|origin_sponsor_reject|Niechciane Dziecko Sponsorów|Każdy sponsor startuje z uwagą −5 (nielubiany), 
+origin|origin_byly_konferansjer|Były Konferansjer|Konferansjer mówi o tobie ze współczuciem. 
+origin|origin_dziedzic_k7|Dziedzic Kanału 7|Startujesz z wbudowanym mikrofonem kierunkowym + 
+companion|companion_suczka_recyklingu|Suczka Recyklingu|Trójnoga sunia, która zdziera 1 losowy 
+companion|companion_kot_ministerstwa|Kot Ministerstwa|Kot z legitymacją służbową. 1 raz na piętro 
+companion|companion_dron_sponsorski|Dron Sponsorski|Latająca kamera, widownia ×1.5. Jeśli zdradzisz 
+item|item_mosiezny_pierscien_producenta|Mosiężny Pierścień Producenta|Na początku piętra możesz przerolować layout 
+item|item_stara_czaszka_z_markerem|Stara Czaszka z Markerem|Gadająca czaszka w safehouse'ach. Mówi, którzy 
+item|item_czerwony_telefon_k7|Czerwony Telefon Kanału 7|Raz na run zadzwoń po drop-pod wybranego sponsora 
+item|item_klucz_do_kantyny|Klucz do Kantyny Sponsorów|Otwiera ukryty pokój na piętrze 18 — kredyty + 
+item|item_pamiatkowa_lyzka|Pamiątkowa Łyżka|Łyżka do podważania. +2 do otwierania zamków, 
+start_perk|perk_lapowka_dla_portiera|Łapówka dla portiera|Startujesz z 1 darmowym uzupełnieniem usług 
+start_perk|perk_insiderskie_info|Insiderskie info|Startujesz znając gatunek bossa pierwszego 
+start_perk|perk_stara_legitymacja|Stara legitymacja Syndykatu|Pierwszy nieudany rzut społeczny auto-sukces. 
+start_perk|perk_lyzka_cudu|Łyżka Cudu|Startujesz z jednorazowym „drugim oddechem” — 
+item|item_apteczka_kompletna|Apteczka Kompletna|Startujesz z apteczką polową — używaj raz na piętro, 
+start_perk|perk_rzemieslnik_terminala|Rzemieślnik terminala|Startujesz z 2 elektronikami + lockpick_set. 
+start_perk|perk_okopowy_weteran|Okopowy weteran|Maska filtrująca i kombinezon startowy. 
+start_perk|perk_handlarz_pakietow|Handlarz Pakietów|Każdy zabity miniboss dropuje +1 dodatkową paczkę 
+start_perk|perk_taneczne_nogi|Taneczne nogi|Pierwsza interakcja z hazardem w runie jest 
+start_perk|perk_dzikus_z_arena|Dzikus z areny|+10 max HP + +1 do testów STR gdy brak zbroi 
+start_perk|perk_skapy_jak_widz|Skąpy jak widz|Startujesz z +50 kredytami i 20% rabatem na 
+start_perk|perk_kolekcjoner|Kolekcjoner|Pierwszy legendarny przedmiot na sezon dropuje 
+biome|biome_oboz_goblinski|Obóz Gobliński|Biom dostępny na piętrach 3-8: palisady, ogniska, 
+biome|biome_siec_kanalizacyjna|Sieć Kanalizacyjna|Biom dostępny na piętrach 3-8: rury, smród, 
+biome|biome_tunel_karnawalowy|Tunel Karnawałowy|Biom dostępny na piętrach 3-8: luna park po nocy, 
+biome|biome_katakumby_faktur|Katakumby Spóźnionych Faktur|Biom dostępny na piętrach 9-12: świece, ołtarze 
+biome|biome_farma_klonow|Farma Klonów|Biom dostępny na piętrach 9-12: kapsuły z biopłynem, 
+biome|biome_elfia_kolonia|Elfia Kolonia|Biom dostępny na piętrach 9-12: drzewa rosną przez 
+biome|biome_redakcja_krawedzi|Redakcja Krawędzi|Biom dostępny na piętrach 13-17: biurka, kamery na 
+biome|biome_swiatynia_konferansjera|Świątynia Konferansjera|Biom dostępny na piętrach 13-17: ołtarze, popiersia, 
+biome|biome_lawowe_tunele|Lawowe Tunele|Biom dostępny na piętrach 13-17: magma, jaszczury, 
