@@ -159,6 +159,7 @@ func player_move(dir: Vector2i) -> Array:
 	return evs
 
 func _player_attack(target: CombatEntity) -> Array:
+	var was_unaware: bool = not target.aware   # for the stealth-kill achievement
 	target.aware = true
 	# Aiming a small zone (head/limb) is harder to land but hits where you want.
 	var zone: String = aim_zone
@@ -166,7 +167,7 @@ func _player_attack(target: CombatEntity) -> Array:
 	if zone != "" and target.body != null:
 		hit_bonus += target.body.to_hit_mod_for(zone)
 	var evs: Array = [{"type": "attack", "attacker": player_id, "target": target.id,
-		"aim": zone}]
+		"aim": zone, "target_unaware": was_unaware}]
 	var p: CombatEntity = player()
 	_add_affinity("melee", 1)
 	# Ranger's precise shot (active) forces the hit to land.

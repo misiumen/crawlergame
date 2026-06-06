@@ -15,14 +15,21 @@ func _initialize() -> void:
 	print("=== achievements tests ===")
 	Achievements.reset()
 
-	# --- catalog ---
-	_ck(AchievementsCatalog.CATALOG.size() == 48, "catalog has all 48 achievements")
-	_ck(Achievements.total() == 48, "total() reports 48")
-	_ck(AchievementsCatalog.ORDER.size() == 48, "stable display order covers them all")
+	# --- catalog: generated + hand-authored merge ---
+	_ck(AchievementsCatalog.CATALOG.size() == 48, "generated catalog has all 48 achievements")
+	_ck(Achievements.total() == AchievementsCatalog.CATALOG.size() + AchievementsExtra.EXTRA.size(),
+		"total() merges generated + hand-authored catalogs")
+	_ck(Achievements.order().size() == Achievements.total(), "merged display order covers every achievement")
 	var def: Dictionary = AchievementsCatalog.CATALOG["wszystko_jest_surowcem"]
 	_ck(def["name"] == "Wszystko jest surowcem", "Polish name ported verbatim")
 	_ck(def["category"] == "salvage", "category preserved")
 	_ck(AchievementsCatalog.CATALOG["sponsor_nie_pochwala"]["hidden"] == true, "hidden flag preserved")
+
+	# --- tiers + prestige points ---
+	_ck(Achievements.tier_of("aw_poziom_15") == "platinum", "hand-authored tier is read back")
+	_ck(Achievements.tier_of("wszystko_jest_surowcem") in ["bronze", "silver"], "generated entries get a default tier")
+	_ck(Achievements.TIER_POINTS["platinum"] == 12, "platinum is worth the most points")
+	_ck(Achievements.points() == 0, "no points before anything is unlocked")
 
 	# --- unlock / is_unlocked ---
 	_ck(not Achievements.is_unlocked("pierwsza_krew"), "nothing unlocked at the start")
@@ -33,6 +40,18 @@ func _initialize() -> void:
 	_ck(Achievements.unlock("pierwsza_krew").is_empty(), "re-unlocking returns empty (no double toast)")
 	_ck(Achievements.unlock("nie_ma_takiego").is_empty(), "an unknown key returns empty, no crash")
 	_ck(Achievements.count_unlocked() == 1, "count tracks unlocked achievements")
+
+	# --- lifetime progress goals ---
+	_ck(Achievements.progress("kill_10") == [0, 10], "a progress achievement starts at 0/goal")
+	_ck(Achievements.bump("kills", 9).is_empty(), "below the goal, bump unlocks nothing")
+	_ck(Achievements.stat("kills") == 9, "lifetime counter accumulates")
+	_ck(Achievements.progress("kill_10") == [9, 10], "progress reflects the counter")
+	var crossed := Achievements.bump("kills", 5)   # 9 + 5 = 14 >= 10
+	_ck(crossed.size() == 1 and crossed[0]["key"] == "kill_10", "hitting the goal auto-unlocks + returns the def")
+	_ck(Achievements.is_unlocked("kill_10"), "the goal achievement is now unlocked")
+	_ck(Achievements.progress("kill_10") == [10, 10], "progress caps at the goal once earned")
+	_ck(Achievements.points() >= Achievements.TIER_POINTS[Achievements.tier_of("kill_10")],
+		"unlocking adds its tier's points to the prestige score")
 
 	# --- persistence to disk ---
 	_ck(FileAccess.file_exists(Achievements.SAVE_PATH), "unlocking persists to user://achievements.json")

@@ -63,6 +63,15 @@ var _toasts: Array = []              # achievement-unlock toasts (VS-style)
 var _ach_screen := false             # achievements gallery overlay (from title)
 var _env_kills := 0                  # environment kills this run (for an achievement)
 var _levelup: Dictionary = {}        # pending level-up: spend skill points (non-empty = modal)
+var _ach_flash := 0.0                # golden screen-edge burst on a gold/platinum unlock
+var _ach_scroll := 0.0               # achievements gallery scroll offset (px)
+var _ach_recipes_seen := 0           # discovered-recipe count, to detect new ones for goals
+const ACH_TIER_COL := {              # Vampire-Survivors tier frames
+	"bronze":   Color(0.80, 0.52, 0.28),
+	"silver":   Color(0.78, 0.82, 0.86),
+	"gold":     Color(1.00, 0.84, 0.27),
+	"platinum": Color(0.55, 0.92, 0.98),
+}
 const SKILL_STATS := [["STR", "siła — obrażenia w walce"], ["DEX", "zręczność — celność"],
 	["INT", "spryt — majsterkowanie i dialogi"], ["WIS", "spostrzegawczość — czujność i dialogi"],
 	["CHA", "charyzma — perswazja i widownia"]]
@@ -169,6 +178,7 @@ func _descend_into(biome_key: String) -> void:
 	_reset_visuals()
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
 	_ach_descend(next_depth)
+	if next_depth >= FINAL_FLOOR: _unlock_ach("reach_final")
 	_award_xp(12 + next_depth * 6)   # surviving a floor is worth real XP
 	Save.write(floor, _run_seed)   # checkpoint at each new floor
 
@@ -210,6 +220,8 @@ func _recenter() -> void:
 	_origin = Vector2((1280 - bw) / 2.0 - 140, (720 - bh) / 2.0 + 10)
 
 func _reset_visuals() -> void:
+	if floor != null:
+		_ach_recipes_seen = floor.discovered_recipes.size()   # baseline for recipe-goal tracking
 	_vpos.clear(); _vtarget.clear(); _flash.clear(); _dying.clear(); _floaters.clear()
 	for id in sim.entities:
 		var c: Vector2 = _cell_px(sim.entities[id].cell)
@@ -256,6 +268,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	# ── Mouse: LMB acts (UI option, or board attack/talk/move), RMB shoves ──
 	if event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
+		# Wheel scrolls the achievements gallery.
+		if _ach_screen:
+			if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				_ach_scroll += 56.0; queue_redraw(); return
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_ach_scroll = maxf(0.0, _ach_scroll - 56.0); queue_redraw(); return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			# On-screen buttons/options first. Reverse order so panels drawn LAST
 			# (modals on top) win over board-HUD zones underneath them.
@@ -273,17 +291,21 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var kc: int = (event as InputEventKey).keycode
 
-	# Achievements gallery (opened from the title): Esc/back returns.
+	# Achievements gallery (opened from the title): scroll + Esc/back returns.
 	if _ach_screen:
 		if kc == KEY_ESCAPE or kc == KEY_A:
 			_ach_screen = false; queue_redraw()
+		elif kc == KEY_DOWN: _ach_scroll += 84.0; queue_redraw()
+		elif kc == KEY_UP:   _ach_scroll = maxf(0.0, _ach_scroll - 84.0); queue_redraw()
+		elif kc == KEY_PAGEDOWN: _ach_scroll += 480.0; queue_redraw()
+		elif kc == KEY_PAGEUP:   _ach_scroll = maxf(0.0, _ach_scroll - 480.0); queue_redraw()
 		return
 
 	# Title screen: Enter continues a save (or starts fresh), N forces a new run,
 	# A opens the achievements gallery.
 	if _title:
 		if kc == KEY_A:
-			_ach_screen = true; queue_redraw(); return
+			_open_ach_screen(); return
 		if kc == KEY_N:
 			Save.clear()
 		if kc == KEY_ENTER or kc == KEY_KP_ENTER or kc == KEY_N or kc == KEY_SPACE:
@@ -376,7 +398,7 @@ func _can_take_board_input() -> bool:
 	return not _title and not _done and sim != null \
 		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
-		and _levelup.is_empty()
+		and _levelup.is_empty() and not _ach_screen
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -458,7 +480,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"item_use":          _item_use(i)
 		"box_open":          _open_box(i); queue_redraw()
 		"aim_part":          _set_aim(z.get("s", ""))
-		"ach_open":          _ach_screen = true; queue_redraw()
+		"ach_open":          _open_ach_screen()
 		"ach_back":          _ach_screen = false; queue_redraw()
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
@@ -489,8 +511,11 @@ func _on_level_up(e: Dictionary) -> void:
 	_add_banner("POZIOM %d" % lv)
 	_shake = maxf(_shake, 6.0)
 	_log_push("Awans na poziom %d! +5 HP, +%d pkt umiejętności." % [lv, int(e.get("levels", 1))])
-	_unlock_ach("pierwszy_awans")          # no-op if the key isn't in the catalog
-	if lv >= 5: _unlock_ach("weteran_areny")
+	if lv >= 2:  _unlock_ach("aw_poziom_2")
+	if lv >= 5:  _unlock_ach("aw_poziom_5")
+	if lv >= 10: _unlock_ach("aw_poziom_10")
+	if lv >= 15: _unlock_ach("aw_poziom_15")
+	if lv >= 20: _unlock_ach("aw_poziom_20")
 	_grant_level_box(lv)
 	_levelup = {"open": true}
 	queue_redraw()
@@ -521,6 +546,10 @@ func _spend_skill_point(stat: String) -> void:
 		p.int_xp += 5     # keep the tinkering track in step with raw INT
 	_add_floater(sim.player_id, "+1 %s" % stat, COL_GAS)
 	_log_push("Punkt umiejętności: %s teraz %d." % [stat, int(p.stats[stat])])
+	_ach_bump("skill_spent", 1)
+	if int(p.stats.get("STR", 0)) >= 8: _unlock_ach("cecha_str")
+	if int(p.stats.get("DEX", 0)) >= 8: _unlock_ach("cecha_dex")
+	if int(p.stats.get("INT", 0)) >= 8: _unlock_ach("cecha_int")
 	if p.skill_points <= 0:
 		_levelup = {}
 	Save.write(floor, _run_seed)         # persist the new stats immediately
@@ -646,15 +675,62 @@ func _box_anim_advance() -> void:
 # ── Achievements ──────────────────────────────────────────────────────────────
 
 ## Try to unlock an achievement; on a NEW unlock, pop a toast + log + floater.
+## Push one earned achievement as a VS-style toast (tier-colored, points), with a
+## golden screen burst for the rare ones.
+func _push_ach_toast(d: Dictionary) -> void:
+	var tier := str(d.get("tier", "bronze"))
+	_toasts.append({"name": d.get("name", "?"), "desc": d.get("desc", ""),
+		"category": d.get("category", "general"), "tier": tier,
+		"points": int(Achievements.TIER_POINTS.get(tier, 1)), "t": 0.0, "ttl": 5.2})
+	_log_push("OSIĄGNIĘCIE: " + d.get("name", "?") + "!")
+	if sim != null:
+		_add_floater(sim.player_id, "★ " + d.get("name", "?"), _ach_tier_color(tier))
+	_shake = maxf(_shake, 4.0 if (tier == "gold" or tier == "platinum") else 2.0)
+	if tier == "gold" or tier == "platinum":
+		_ach_flash = maxf(_ach_flash, 0.7)
+
+func _ach_tier_color(tier: String) -> Color:
+	return ACH_TIER_COL.get(tier, COL_BRIGHT)
+
+## Open the achievements gallery. Looking at your own trophies is, itself, an
+## achievement (a hidden one).
+func _open_ach_screen() -> void:
+	_ach_screen = true
+	_ach_scroll = 0.0
+	_unlock_ach("narcyz")
+	queue_redraw()
+
 func _unlock_ach(key: String) -> void:
 	var d := Achievements.unlock(key)
 	if d.is_empty():
 		return
-	_toasts.append({"name": d.get("name", key), "desc": d.get("desc", ""),
-		"category": d.get("category", "general"), "t": 0.0, "ttl": 5.0})
-	_log_push("OSIĄGNIĘCIE: " + d.get("name", key) + "!")
-	_add_floater(sim.player_id, "★ " + d.get("name", key), COL_AMBER)
-	_shake = maxf(_shake, 2.0)
+	_push_ach_toast(d)
+	_ach_milestones()
+
+## Toast a batch of just-unlocked defs (e.g. from a lifetime-counter bump).
+func _ach_unlock_defs(defs: Array) -> void:
+	for d in defs:
+		_push_ach_toast(d)
+		_ach_milestones()
+
+## Add to a lifetime counter; toast anything it auto-unlocks.
+func _ach_bump(stat_key: String, n: int = 1) -> void:
+	_ach_unlock_defs(Achievements.bump(stat_key, n))
+
+## Collector milestones: a medal for the first, then 10/25/50, then 100%.
+func _ach_milestones() -> void:
+	var c := Achievements.count_unlocked()
+	_ach_meta_if(c >= 1, "first_ach")
+	_ach_meta_if(c >= 10, "collector_10")
+	_ach_meta_if(c >= 25, "collector_25")
+	_ach_meta_if(c >= 50, "collector_50")
+	_ach_meta_if(Achievements.count_unlocked() >= Achievements.total() - 1, "platinum_all")
+
+func _ach_meta_if(cond: bool, key: String) -> void:
+	if cond and not Achievements.is_unlocked(key):
+		var d := Achievements.unlock(key)
+		if not d.is_empty():
+			_push_ach_toast(d)   # not _unlock_ach: avoid re-entering the milestone scan
 
 func _ach_cat_color(cat: String) -> Color:
 	match cat:
@@ -723,10 +799,84 @@ func _ach_descend(depth: int) -> void:
 	if depth >= 5: _unlock_ach("piaty_set")
 	if depth >= 10: _unlock_ach("dziesiate_pietro")
 
+## Event-driven achievements + lifetime counters from a batch of sim events.
+## (Kept separate from _ach_scan so the wiring stays legible.)
+func _ach_events(evs: Array) -> void:
+	if sim == null:
+		return
+	var sneak: Dictionary = {}
+	for e in evs:
+		if e.get("type") == "attack" and e.get("target_unaware", false):
+			sneak[int(e.get("target", -1))] = true
+	for e in evs:
+		match e.get("type"):
+			"damage":
+				var v = sim.entities.get(int(e.get("target", -1)))
+				if v != null and v.faction == "enemy":
+					_ach_bump("damage", int(e.get("amount", 0)))
+					if int(e.get("amount", 0)) >= 30:
+						_unlock_ach("overkill")
+			"death":
+				var d = sim.entities.get(int(e.get("target", -1)))
+				if d != null and d.faction == "enemy":
+					_ach_bump("kills", 1)
+					if d.tags.has("boss"):
+						_ach_bump("bosses", 1)
+					if sneak.has(int(e.get("target", -1))):
+						_unlock_ach("sneak_kill")
+			"maim":
+				if e.get("severed", false): _unlock_ach("sever")
+			"body_hit":
+				if e.get("severed", false): _unlock_ach("sever")
+			"armor_equipped":
+				_unlock_ach("gear_first")
+				var eq: Dictionary = sim.player().equipment
+				if eq.has("head") and eq.has("body") and eq.has("legs"):
+					_unlock_ach("gear_full")
+				if sim.player().ac + sim.player().armor_bonus() >= 18:
+					_unlock_ach("gear_ac")
+			"weapon_upgrade":
+				if sim.player().bonus_damage >= 6: _unlock_ach("gear_dmg")
+			"craft_attempt":
+				var oc := str(e.get("outcome", ""))
+				if oc == "krytyk" or oc == "sukces" or oc == "czesciowy":
+					_ach_bump("crafts", 1)
+				if oc == "krytyk": _unlock_ach("craft_crit")
+				if oc == "backfire": _unlock_ach("backfire")
+			"audience_band_crossed":
+				if e.get("to_band", "") == "viral": _unlock_ach("viral")
+	# lifetime recipe discoveries
+	var rc := floor.discovered_recipes.size()
+	if rc > _ach_recipes_seen:
+		_ach_bump("recipes", rc - _ach_recipes_seen)
+		_ach_recipes_seen = rc
+	# three sponsors all maxed out on you
+	if floor.sponsors != null:
+		var loyal := 0
+		for k in floor.sponsors.all_keys():
+			if floor.sponsors.get_attention(k) >= 10: loyal += 1
+		if loyal >= 3: _unlock_ach("sponsor_loyal")
+
 func _ach_run_end(victory: bool) -> void:
 	if victory: _unlock_ach("finalista_sezonu")
 	if floor.player.run_kills == 0: _unlock_ach("brak_zwlok_brak_problemu")
 	if floor.audience != null and floor.audience.peak >= 80: _unlock_ach("kult_jednostki")
+	# Godot-only finale + infamy achievements
+	if victory:
+		_unlock_ach("win")
+		if floor.player.run_kills == 0: _unlock_ach("win_pacifist")
+		if floor.player.level < 8: _unlock_ach("win_lowlevel")
+	else:
+		_ach_bump("deaths", 1)
+		_unlock_ach("die_1")
+		if floor.depth <= 1: _unlock_ach("die_floor1")
+		if not floor.boxes.is_empty(): _unlock_ach("die_rich")
+		# pożarty przez statystę: a weak enemy was alive next to you when you fell
+		for id in sim.entities:
+			var en: CombatEntity = sim.entities[id]
+			if en.faction == "enemy" and en.is_alive() and en.max_hp <= 16 \
+					and sim.board.is_adjacent(en.cell, floor.player.cell):
+				_unlock_ach("die_rat"); break
 	queue_redraw()
 
 ## Resolve a box's contents into reveal entries WITHOUT adding them to the run
@@ -767,11 +917,14 @@ func _commit_box_entries(box: GameBox, entries: Array) -> void:
 		if e["type"] == "item":
 			floor.items.append(e["item"])
 			spawned.append(e["item"].name_pl)
+			if (e["item"] as GameItem).rarity == Rarity.LEGENDARY:
+				_unlock_ach("legend_loot")
 		else:
 			sim.materials[e["key"]] = int(sim.materials.get(e["key"], 0)) + int(e["qty"])
 			spawned.append(e["label"])
 	box.opened = true
 	floor.boxes.erase(box)
+	_ach_bump("boxes", 1)
 	var contents_line := "  → " + (", ".join(spawned) if not spawned.is_empty() else "(pusto)")
 	for line in box.reveal_lines(contents_line):
 		_log_push(line)
@@ -791,6 +944,7 @@ func _open_box(idx: int) -> void:
 	var tier := 1
 	if roll < 0.10 + ro * 0.05: tier = 5
 	elif roll < 0.34 + ro * 0.07: tier = 3
+	if tier >= 5: _unlock_ach("jackpot")
 	var bonus := tier - 1                           # 0 / 2 / 4 extra pieces
 	for _i in bonus:
 		var mat: String = BOX_BONUS_MATS[_narr_rng.randi_range(0, BOX_BONUS_MATS.size() - 1)]
@@ -878,6 +1032,7 @@ func _accept_class(idx: int) -> void:
 	_log_push("Zostajesz klasą: %s. %s" % [Classes.name_of(key),
 		ClassFeatures.active_name(key) + " — [F]."])
 	_add_floater(sim.player_id, Classes.name_of(key).to_upper(), COL_AMBER)
+	_ach_bump("classes", 1)
 	queue_redraw()
 
 func _use_class_active() -> void:
@@ -906,9 +1061,12 @@ func _dlg_advance(orig_idx: int) -> void:
 	_dlg_info = res.get("info", "")
 	if _dlg_info != "":
 		_log_push(_dlg_info)
+		if _dlg_info.begins_with("Krytyczny"):
+			_unlock_ach("skillcheck")           # a critical success in a skill check
 	_dlg_events(res.get("events", []))
 	if not res.get("continue", false):
 		_dlg = {}
+		_ach_bump("dialogues", 1)               # a conversation reached its end
 	queue_redraw()
 
 ## Surface dialogue consequence-events into the log / floaters.
@@ -927,6 +1085,9 @@ func _dlg_events(evs: Array) -> void:
 			"dialogue_relationship":
 				var d: int = int(e.get("delta", 0))
 				_log_push("Relacja %s." % ("poprawia się" if d >= 0 else "psuje się"))
+				for tk in floor.player.relationships:
+					if int(floor.player.relationships[tk]) >= 3:
+						_unlock_ach("relationship"); break
 			"dialogue_threat":
 				if int(e.get("amount", 0)) > 0:
 					_log_push("Hałas budzi wrogów w pobliżu.")
@@ -936,6 +1097,7 @@ func _dlg_events(evs: Array) -> void:
 func _animate(evs: Array) -> void:
 	_narrate_batch(evs)
 	_ach_scan(evs)
+	_ach_events(evs)
 	for e in evs:
 		match e.get("type"):
 			"move":
@@ -1207,6 +1369,8 @@ func _process(dt: float) -> void:
 	for to in _toasts:
 		to["t"] = float(to["t"]) + dt
 	_toasts = _toasts.filter(func(x): return float(x["t"]) < float(x["ttl"]))
+	if _ach_flash > 0.0:
+		_ach_flash = maxf(0.0, _ach_flash - dt)
 	queue_redraw()
 
 ## Advance the lootbox-opening reveal through its phases.
@@ -1582,10 +1746,19 @@ func _draw_hud() -> void:
 		_draw_levelup()
 	_draw_toasts()
 
-## VS-style achievement toasts: small panels that slide in from the right edge,
-## stack, and slide back out. Non-interactive; always drawn on top.
+## VS-style achievement toasts: tier-framed panels that slide in from the right,
+## stack, and slide back out, with a ray-burst on entry. Gold/platinum unlocks
+## also paint a brief golden vignette over the whole screen.
 func _draw_toasts() -> void:
-	var W := 380.0; var H := 60.0
+	# Rare-unlock screen-edge burst.
+	if _ach_flash > 0.0:
+		var fa := _ach_flash / 0.7
+		var gold := Color(1.0, 0.85, 0.3)
+		draw_rect(Rect2(0, 0, 1280, 14), Color(gold, 0.7 * fa))
+		draw_rect(Rect2(0, 706, 1280, 14), Color(gold, 0.7 * fa))
+		draw_rect(Rect2(0, 0, 14, 720), Color(gold, 0.7 * fa))
+		draw_rect(Rect2(1266, 0, 14, 720), Color(gold, 0.7 * fa))
+	var W := 400.0; var H := 64.0
 	for i in _toasts.size():
 		var to: Dictionary = _toasts[i]
 		var t: float = to["t"]; var ttl: float = to["ttl"]
@@ -1596,49 +1769,111 @@ func _draw_toasts() -> void:
 		var ease := 1.0 - pow(1.0 - s, 3.0)
 		var x := 1280.0 - (W + 16.0) * ease
 		var y := 92.0 + i * (H + 10.0)
-		var ccol := _ach_cat_color(to["category"])
+		var tier := str(to.get("tier", "bronze"))
+		var tcol := _ach_tier_color(tier)
+		# ray-burst behind the panel during the first ~0.45s
+		if t < 0.45:
+			var ra := (1.0 - t / 0.45)
+			var cxp := Vector2(x + 30, y + H * 0.5)
+			for k in 10:
+				var ang := TAU * k / 10.0 + t * 2.0
+				var p2 := cxp + Vector2(cos(ang), sin(ang)) * (24.0 + (1.0 - ra) * 40.0)
+				draw_line(cxp, p2, Color(tcol, 0.5 * ra), 2.0)
 		draw_rect(Rect2(x, y, W, H), Color(0.05, 0.05, 0.08, 0.96 * s))
-		draw_rect(Rect2(x, y, W, H), Color(ccol, s), false, 2.0)
-		draw_string(_font, Vector2(x + 14, y + 22), "🏆 OSIĄGNIĘCIE",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(ccol, s))
-		draw_string(_font, Vector2(x + 14, y + 44), to["name"],
-			HORIZONTAL_ALIGNMENT_LEFT, W - 24, 17, Color(COL_BRIGHT, s))
+		draw_rect(Rect2(x, y, W, H), Color(tcol, s), false, 2.5)
+		# tier chip
+		draw_rect(Rect2(x + 8, y + 8, 6, H - 16), Color(tcol, s))
+		var hdr := "🏆 OSIĄGNIĘCIE — %s  ·  +%d pkt" % [_tier_label(tier), int(to.get("points", 1))]
+		draw_string(_font, Vector2(x + 22, y + 22), hdr,
+			HORIZONTAL_ALIGNMENT_LEFT, W - 30, 12, Color(tcol, s))
+		draw_string(_font, Vector2(x + 22, y + 46), to["name"],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 36, 17, Color(COL_BRIGHT, s))
 
-## The achievements gallery (DCC-style list to chase), opened from the title.
+func _tier_label(tier: String) -> String:
+	match tier:
+		"bronze":   return "BRĄZ"
+		"silver":   return "SREBRO"
+		"gold":     return "ZŁOTO"
+		"platinum": return "PLATYNA"
+	return tier.to_upper()
+
+## The achievements gallery (DCC-style list to chase): tiered frames, lifetime
+## progress bars, a prestige-points header + completion bar, and scrolling.
 func _draw_ach_screen() -> void:
 	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
-	draw_string(_font, Vector2(60, 70), "OSIĄGNIĘCIA  —  %d / %d" %
-		[Achievements.count_unlocked(), Achievements.total()],
+	var got_n := Achievements.count_unlocked()
+	var tot_n := Achievements.total()
+	draw_string(_font, Vector2(60, 64), "OSIĄGNIĘCIA  —  %d / %d" % [got_n, tot_n],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 32, COL_AMBER)
+	draw_string(_font, Vector2(640, 50),
+		"Punkty prestiżu: %d / %d" % [Achievements.points(), Achievements.points_total()],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ACH_TIER_COL["gold"])
+	# completion bar
+	var pf: float = float(got_n) / maxf(1.0, float(tot_n))
+	draw_rect(Rect2(640, 60, 560, 14), Color(0.08, 0.10, 0.13, 0.9))
+	draw_rect(Rect2(640, 60, 560 * pf, 14), ACH_TIER_COL["gold"])
+	draw_rect(Rect2(640, 60, 560, 14), COL_GRID, false, 1.0)
+
+	# ── Scrollable grid, clipped to a viewport ──
 	var cols := 3
-	var cw := 380.0; var ch := 70.0
-	var x0 := 60.0; var y0 := 110.0
-	var i := 0
-	for key in AchievementsCatalog.ORDER:
-		var a: Dictionary = AchievementsCatalog.CATALOG[key]
+	var cw := 372.0; var ch := 74.0; var gap := 10.0
+	var x0 := 60.0; var top := 96.0; var bottom := 680.0
+	var order := Achievements.order()
+	var rows: int = int(ceil(order.size() / float(cols)))
+	var content_h := rows * (ch + gap)
+	var view_h := bottom - top
+	var max_scroll := maxf(0.0, content_h - view_h)
+	_ach_scroll = clampf(_ach_scroll, 0.0, max_scroll)
+	var cat := catalog_for_gallery()
+	for i in order.size():
+		var key: String = order[i]
+		var a: Dictionary = cat.get(key, {})
 		var got := Achievements.is_unlocked(key)
 		var col := i % cols; var row := i / cols
-		var x := x0 + col * (cw + 12)
-		var y := y0 + row * (ch + 8)
-		var ccol := _ach_cat_color(a.get("category", "general"))
-		draw_rect(Rect2(x, y, cw, ch), Color(0.09, 0.10, 0.13, 0.95) if got else Color(0.05, 0.05, 0.07, 0.9))
-		draw_rect(Rect2(x, y, cw, ch), ccol if got else COL_GRID, false, 2.0 if got else 1.0)
+		var x := x0 + col * (cw + gap)
+		var y := top + row * (ch + gap) - _ach_scroll
+		if y + ch < top or y > bottom:
+			continue                       # cull rows outside the viewport
+		var tier := Achievements.tier_of(key)
+		var tcol := _ach_tier_color(tier)
+		draw_rect(Rect2(x, y, cw, ch), Color(0.10, 0.11, 0.14, 0.96) if got else Color(0.05, 0.05, 0.07, 0.9))
+		draw_rect(Rect2(x, y, cw, ch), tcol if got else COL_GRID, false, 2.0 if got else 1.0)
+		draw_rect(Rect2(x, y, 5, ch), Color(tcol, 1.0 if got else 0.35))   # tier spine
+		var hidden: bool = a.get("hidden", false)
 		if got:
-			draw_string(_font, Vector2(x + 12, y + 24), "★ " + a.get("name", key),
-				HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 15, COL_BRIGHT)
-			draw_string(_font, Vector2(x + 12, y + 46), a.get("desc", ""),
+			draw_string(_font, Vector2(x + 14, y + 22), "★ " + a.get("name", key),
+				HORIZONTAL_ALIGNMENT_LEFT, cw - 70, 15, COL_BRIGHT)
+			draw_string(_font, Vector2(x + cw - 58, y + 22), _tier_label(tier),
+				HORIZONTAL_ALIGNMENT_LEFT, 54, 10, tcol)
+			draw_string(_font, Vector2(x + 14, y + 44), a.get("desc", ""),
 				HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 12, COL_DIM)
 		else:
-			var nm: String = "???" if a.get("hidden", false) else a.get("name", key)
-			draw_string(_font, Vector2(x + 12, y + 24), "☐ " + nm,
+			var nm: String = "???" if hidden else a.get("name", key)
+			draw_string(_font, Vector2(x + 14, y + 22), "☐ " + nm,
 				HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 15, COL_DIM)
-			if not a.get("hidden", false):
-				draw_string(_font, Vector2(x + 12, y + 46), a.get("desc", ""),
+			if not hidden:
+				draw_string(_font, Vector2(x + 14, y + 44), a.get("desc", ""),
 					HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 12, Color(COL_DIM, 0.5))
-		i += 1
-	draw_string(_font, Vector2(60, 700), "[Esc] / klik — powrót",
+			# progress bar for lifetime-goal achievements
+			var pr := Achievements.progress(key)
+			if not pr.is_empty() and not hidden:
+				var frac: float = float(pr[0]) / maxf(1.0, float(pr[1]))
+				draw_rect(Rect2(x + 14, y + ch - 14, cw - 90, 7), Color(0.08, 0.10, 0.13, 0.9))
+				draw_rect(Rect2(x + 14, y + ch - 14, (cw - 90) * frac, 7), Color(tcol, 0.8))
+				draw_string(_font, Vector2(x + cw - 70, y + ch - 8), "%d/%d" % [int(pr[0]), int(pr[1])],
+					HORIZONTAL_ALIGNMENT_LEFT, 60, 11, COL_DIM)
+	# scrollbar hint
+	if max_scroll > 0.0:
+		var bar_h := view_h * (view_h / content_h)
+		var bar_y := top + (view_h - bar_h) * (_ach_scroll / max_scroll)
+		draw_rect(Rect2(1240, bar_y, 5, bar_h), Color(COL_AMBER, 0.6))
+	draw_string(_font, Vector2(60, 702), "[Esc] / klik — powrót   ·   kółko myszy / [↑][↓] — przewijaj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
-	_zone(Rect2(40, 690, 300, 28), "ach_back")
+	_zone(Rect2(40, 692, 420, 26), "ach_back")
+
+## Merged catalog accessor for the gallery (kept tiny so the draw loop reads clean).
+func catalog_for_gallery() -> Dictionary:
+	return Achievements.catalog()
 
 ## Vampire-Survivors-style lootbox reveal: a slot reel of rarity tiles spins and
 ## decelerates, SNAPS onto the box's tier with a flash, then the loot pops in.

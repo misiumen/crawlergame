@@ -189,9 +189,10 @@ func _initialize() -> void:
 	Achievements.reset()
 	bv._toasts.clear()                  # drop any toasts queued by earlier play
 	bv._unlock_ach("pierwsza_krew")
-	_ck(bv._toasts.size() == 1, "unlocking an achievement queues a toast")
+	_ck(bv._toasts.size() >= 1, "unlocking an achievement queues a toast (+ a first-medal milestone)")
+	var n_after: int = bv._toasts.size()
 	bv._unlock_ach("pierwsza_krew")
-	_ck(bv._toasts.size() == 1, "a repeat unlock does not re-toast")
+	_ck(bv._toasts.size() == n_after, "a repeat unlock does not re-toast")
 	bv._ach_descend(5)
 	_ck(Achievements.is_unlocked("piaty_set"), "reaching floor 5 unlocks 'Piąty set'")
 	for i in 3:
