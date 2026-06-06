@@ -30,3 +30,6 @@ dungeon_kraulem_runs.json
 *~
 .DS_Store
 Thumbs.db
+
+# Godot export scratch file
+*.tmp

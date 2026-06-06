@@ -1,0 +1,104 @@
+wszystko_jest_surowcem:::Pierwsza rozbiórka zaliczona. System przekwalifikował twój świat na zasoby. Witaj w gospodarce.
+meble_tez_krwawia:::Rozłożyłeś krzesło na czynniki pierwsze. Gdzieś we wszechświecie widz obstawia, ile jeszcze wytrzymasz.
+recykling_agresywny:::Pięć obiektów rozebranych. Syndykat dziękuje za obniżenie kosztów utrzymania Lochu.
+rozbiorka_zwlok:::Potraktowałeś zwłoki jak skrzynkę z częściami. Połowa widowni wyłączyła. Druga zrobiła głośniej.
+technicznie_to_loot:::To był fragment ściany. Teraz jest w twoim plecaku. System klasyfikuje to jako inicjatywę.
+kradziez_armatury:::Ukradłeś armaturę z kryjówki. Portier zapamięta. Portierzy zawsze pamiętają.
+sponsor_nie_pochwala:::Naruszyłeś własność sponsora na wizji. Dział prawny Kanału 7 nadał ci właśnie numer sprawy.
+rzemieslnik_z_paniki:::Coś z czegoś zrobiłeś i nie wybuchło. Niski próg, ale widzowie lubią debiuty.
+przepis_jaki_przepis:::Skleiłeś to bez instrukcji, na czuja. System notuje cię jako kreatywnego lub zdesperowanego.
+inzynieria_odwagi:::Kraftowałeś, kiedy coś próbowało cię zjeść. Ręce drżały, ranking rósł.
+obrzydliwe_ale_dziala:::Użyłeś materiału z czyjegoś wnętrza. Działa. Sponsorzy gastronomiczni zerwali umowę.
+zlota_raczka_lochu:::Dziesięć rzeczy zmajstrowanych. Loch przechodzi przez twoje ręce jak taśma produkcyjna.
+pulapka_z_niczego:::Pierwsza pułapka rozstawiona. Loch ma teraz drugi cień, a ty masz alibi.
+samo_sie_rozstawilo:::Pułapka odpaliła w twoich rękach. Widzowie nazwali ten klip klasykiem gatunku.
+ekonomia_przetrwania:::Dwadzieścia rozbiórek. Jesteś już bardziej śmietnikiem niż człowiekiem. To komplement.
+smiec_wartosciowy:::Zrobiłeś coś poważnego z najtańszego złomu. Syndykat udaje, że tego nie widział.
+pierwsza_krew:::Pierwszy uczestnik skreślony z listy. Sponsorzy odetchnęli — pasywni zawodnicy nie sprzedają reklam.
+finiszer_kanalu:::Krytyk na żywej antenie. Kamera 4 złapała detal. Reżyser uronił łzę.
+rzeznia_kontrolowana:::Pięćdziesiąt ciał. Producent stawia ci drinka. Symboliczny, bo i tak stąd nie wyjdziesz.
+boss_padl_pierwszy:::Pierwszy boss piętra leży. Studio sprzedaje czas reklamowy na twojej krwi.
+anty_host_warknal:::Spadłeś do 1 HP i wstałeś. Widownia myślała, że to koniec. Ty też.
+reklama_przerywa_walke:::Pięć rund w defensywie. Tak nudno, że System puścił reklamy. Sponsorzy dziękują.
+brak_zwlok_brak_problemu:::Całe piętro bez jednego trupa. Pacyfizm na arenie śmierci. Widzowie są zdezorientowani.
+dno_jeszcze_dalej:::Drugie zejście po schodach. Loch zaczyna zapamiętywać twój numer startowy.
+piaty_set:::Piętro 5. Wskaźniki oglądalności drgnęły. Ktoś z innej galaktyki obstawił na ciebie.
+dziesiate_pietro:::Połowa Lochu za tobą. Konferansjer nagrał ci osobny jingiel. To nie znaczy, że cię lubi.
+finalista_sezonu:::Pokonałeś finał. Dyrektor generalny Kanału 7 chce znać twoje plany. To pytanie retoryczne.
+pakiet_z_sufitu:::Pierwsza paczka spadła z sufitu. Marka cię polubiła. Marki kochają zwycięzców i męczenników.
+markowy_uczestnik:::Sponsorski przepis odblokowany. Masz teraz logo na rękawie i cenę na głowie.
+widownia_gorzej_bije:::Oglądalność przekroczyła 50. Powstają pierwsze memy. Niektóre są nawet miłe.
+kult_jednostki:::Oglądalność 80+. W innym układzie gwiezdnym sprzedają koszulki z twoją twarzą. Działki nie dostaniesz.
+dzielo_mistrzowskie:::Krytyczny craft, dzieło mistrzowskie. Twoje ręce wiedzą więcej niż ty.
+apteka_w_plecaku:::Pierwsze wzmocnienie nałożone. Twój sprzęt dostał drugie życie. Ty wciąż masz jedno.
+globtroter:::Pięć biomów w jednym sezonie. Loch jest większy, niż obiecywała reklama. Jak zawsze.
+okopowiec:::Przeszedłeś Frontowe Okopy. Plakat propagandowy nadal nie pamięta twojego imienia.
+zoofobia_skonczona:::Wyszedłeś żywy z Zoo Korporacyjnego. Pawie nigdy ci nie wybaczą.
+archiwista:::Skończyłeś piętro w Muzeum Spektakli. Kurator ma teraz dwa palce mniej i jedną historię więcej.
+karaoke_killer:::Skończyłeś piętro w Barze U Skurczybyka. Mikrofon pamięta ciszę po twoim wyjściu.
+widzialem_legende:::Legendarny przedmiot w plecaku. Na ostatniej stronie pamiętnika masz już ofertę kupna. Od siebie.
+cala_paleta:::W jednym runie po jednym przedmiocie z każdej rzadkości. Kolekcjonerzy płaczą, plecak jęczy.
+niezwykly_zbieracz:::Trzy epiki w jednym runie. Sponsor pyta o nazwę twojej firmy. Nie masz firmy. Jeszcze.
+klepacz_minibossow:::Trzech minibossów na jednym piętrze. Mapa układa się sama, byle dalej od ciebie.
+czystka_srodowiska:::Zabiłeś środowiskiem. Sponsor klaszcze — nie jego budżet i nie jego sprzątanie.
+taneczny_krok:::Piętro bez wejścia w hazard. Ostrożnie. Nudno. Konferansjer woli inne reportaże.
+kompletny_hacker:::Pięć terminali zhakowanych. System cię nie lubi, ale zna już twój login.
+bez_zbroi_bez_smutku:::Piętro bez zbroi. Każda blizna ma teraz imię i numer odcinka.
+nadzwyczajne_oszczednosci:::Piętro bez jednego kredytu. Sponsor nie wie, czy płakać, czy cię pozwać.
+kazdy_ma_imie:::Wypatroszyłeś każde ciało, które po sobie zostawiłeś. Inspektor sponsorski jest pod wrażeniem. I w szoku.
+aw_poziom_2:::Poziom 2. Awansowałeś. System odnotował, produkcja udaje entuzjazm.
+aw_poziom_5:::Poziom 5. Widzowie zaczynają zapamiętywać twój numer startowy. Niektórzy nawet kibicują.
+aw_poziom_10:::Poziom 10. Masz własny hashtag i przynajmniej jednego stalkera w innej galaktyce.
+aw_poziom_15:::Poziom 15. Sponsorzy biją się o prawa do twojej skóry. Dosłownie.
+aw_poziom_20:::Poziom 20 w jednym sezonie. System sprawdza, czy to nie błąd. Nie jest.
+pkt_5:::Pięć punktów wydanych na siebie. Inwestycja w aktywo o krótkiej żywotności.
+pkt_15:::Piętnaście punktów rozdanych. Samodoskonalenie na arenie śmierci. Urocze.
+cecha_str:::Siła 8. Pchasz ściany dla zabawy. Widownia płaci za destrukcję.
+cecha_dex:::Zręczność 8. Trafiasz w to, na co nawet nie patrzysz. Kamerzyści cię nienawidzą.
+cecha_int:::Spryt 8. Z dwóch śmieci robisz trzeci, gorszy. Sponsorzy techniczni przysyłają próbki.
+kill_10:::Dziesięć trupów. System przestał liczyć cię jako statystę.
+kill_50:::Pięćdziesiąt zabitych łącznie. Rzeźnik ramówki. Producent dopisuje cię do plakatu.
+kill_100:::Setka ciał. Gdzieś powstaje o tobie ballada. W większości jest o krwi.
+kill_250:::250 zabitych. Nawet System zrobił pauzę. Widzowie nie.
+dmg_1000:::Tysiąc obrażeń łącznie. Maszyna do mięsa działa zgodnie ze specyfikacją.
+dmg_5000:::Pięć tysięcy obrażeń. Klęska żywiołowa z numerem startowym.
+boss_3:::Trzech bossów na koncie. Zarząd Lochu prosi o spotkanie. Nie idź.
+overkill:::30+ obrażeń jednym ciosem. Przesada to za mało powiedziane. Widzowie uwielbiają.
+sever:::Odciąłeś komuś kończynę. Kamera zrobiła zbliżenie. Pamiątka z odcinka gotowa.
+gear_first:::Założyłeś coś, co nie jest bronią. System gratuluje instynktu samozachowawczego.
+gear_full:::Głowa, tułów, nogi — komplet ze śmietnika. Wyglądasz jak zwycięzca taniej kategorii.
+gear_ac:::18 AC ze złomu. Czołg z recyklingu. Wszyscy pudłują, widzowie ziewają.
+gear_dmg:::+6 obrażeń z samych ulepszeń. Uzbrojony po zęby, których już połowy nie masz.
+sneak_kill:::Zabiłeś coś, zanim się obudziło. Cichy montaż. Widownia woli krzyk, ale liczy się wynik.
+flawless:::Wyczyściłeś pokój bez jednego zadrapania. Podejrzanie czysto. Reżyser sprawdza powtórki.
+box_5:::Pięć skrzynek otwartych. Hazard z gwarancją. Syndykat liczy na nawyk.
+box_25:::25 skrzynek. Uzależnienie potwierdzone klinicznie. Sponsorzy dosypują.
+box_100:::Setka skrzynek. To już nie loot, to terapia, której Loch ci nie zafunduje.
+jackpot:::SZCZĘŚCIE x5. Maszyna zapiszczała, widownia oszalała, a ty i tak stąd nie wyjdziesz bogaty.
+legend_loot:::Legenda ze skrzynki. Widziałeś ją naprawdę. Na ekranach pół wszechświata też.
+craft_crit:::Pierwszy krytyczny craft. Przypadkowy geniusz. System dopisał gwiazdkę przy słowie przypadkowy.
+craft_10:::Dziesięć rzeczy stworzonych. Majsterkowicz z licencją na desperację.
+craft_50:::Pięćdziesiąt przedmiotów. Fabryka jednego człowieka. Związki zawodowe milczą.
+recipe_5:::Pięć receptur odkrytych. Czytasz instrukcje, których nikt ci nie dał.
+backfire:::Przeżyłeś backfire. Eksperyment się udał. Prawie. Liczy się, że przeżyłeś.
+talk_5:::Pięć rozmów dobiegło końca. Gaduła areny. Widzowie przewijają, ale liczy się.
+skillcheck:::Krytyczny sukces w teście. Słowo jak miecz, i mniej krwi na kamerze.
+relationship:::Zdobyłeś czyjąś przyjaźń na arenie śmierci. Statystycznie to się nie opłaca. Brawo.
+viral:::Poziom VIRAL. Jesteś viralowym trupem w trakcie. Marzenie każdego producenta.
+sponsor_loyal:::Trzech sponsorów cię uwielbia. Trzy loga, trzy ceny na głowie, jeden ty.
+reach_final:::Dotarłeś do areny finałowej. System otworzył nową kategorię zakładów: czy przeżyje.
+win:::Wygrałeś cały sezon. Mistrz. Syndykat już szuka kogoś, kto cię pobije w następnym.
+win_pacifist:::Wygrałeś, nie zabijając nikogo. System nie ma na to przycisku. Widzowie też nie.
+win_lowlevel:::Wygrałeś poniżej 8 poziomu. Underdog. Bukmacherzy płaczą w trzech układach gwiezdnych.
+die_1:::Zginąłeś. Anulowano po pierwszym odcinku. Widownia i tak klaszcze — lubi finały.
+die_floor1:::Zginąłeś na pierwszym piętrze. Najkrótszy sezon w historii. Sponsorzy żądają zwrotu.
+die_rat:::Zabił cię najsłabszy potwór. Pożarty przez statystę. Klip leci w pętli na Kanale 7.
+die_5:::Pięć zgonów łącznie. Recydywa. System rezerwuje ci stały numer w kostnicy.
+die_rich:::Zginąłeś z nieotwartą skrzynką. Nie zdążyłeś. Syndykat zatrzymuje zawartość. Regulamin.
+narcyz:::Otworzyłeś listę własnych osiągnięć. Narcyz. Widzowie też lubią patrzeć na siebie.
+first_ach:::Pierwszy medal. System odnotował, że istniejesz. Na razie.
+collector_10:::Dziesięć osiągnięć. Kolekcjoner. Trofea ważą tyle, co twoje szanse.
+collector_25:::25 osiągnięć. Łowca trofeów. Producent zaczyna podejrzewać, że ci się podoba.
+collector_50:::50 osiągnięć. Maniak kompletu. Nie masz życia poza areną. Areny też długo nie będziesz miał.
+platinum_all:::Wszystkie osiągnięcia. Sto procent. System nie ma już czym cię zaskoczyć — zostaje tylko Loch.
+classes_3:::Trzy razy przyjąłeś klasę. Kryzys tożsamości na żywej antenie. Widzowie głosują na czwartą.

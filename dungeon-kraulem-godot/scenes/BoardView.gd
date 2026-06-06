@@ -223,7 +223,9 @@ func _descend_into(biome_key: String) -> void:
 			if floor.audience != null: floor.audience.change(2, "celebrity")
 	_ach_descend(next_depth)
 	if next_depth >= FINAL_FLOOR: _unlock_ach("reach_final")
-	_award_xp(12 + next_depth * 6)   # surviving a floor is worth real XP
+	# NB: descending does NOT grant XP — otherwise you could level up just by
+	# walking floor-to-floor without fighting. XP is earned from kills, salvage and
+	# completing the floor objective. The descent reward is the heal + the loot box.
 	Save.write(floor, _run_seed)   # checkpoint at each new floor
 
 ## Reach the Data autoload via /root (BoardView is a Node, so this is safe and

@@ -52,6 +52,15 @@ def main():
     open(OUT, "w", encoding="utf-8", newline="\n").write("\n".join(L))
     print("wrote %s with %d achievements" % (OUT, len(cat)))
 
+    # Re-apply the Dungeon-Crawler-Carl-voice description overrides so a regen
+    # never reverts the hand-polished flavor text (descriptions live in
+    # tools/dcc_descs.txt). Names/categories/flags still come from the pygame source.
+    try:
+        import dcc_descs
+        dcc_descs.patch(OUT, dcc_descs.load_descs())
+    except Exception as e:
+        print("WARN: could not apply DCC description overrides: %s" % e)
+
 
 if __name__ == "__main__":
     main()
