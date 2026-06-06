@@ -1428,17 +1428,25 @@ func _advance_floor_turn() -> void:
 	for b in new_boxes:
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
 		_add_floater(sim.player_id, "PACZKA!", COL_AMBER)
-	# Biome gimmick: a periodic flavor quirk with a tiny mechanical nudge.
-	if floor.turn > 0 and floor.turn % 6 == 0:
+	# Biome gimmick: an occasional flavor quirk with a tiny mechanical nudge (not
+	# right at the start of a floor — let the player settle in first).
+	if floor.turn >= 8 and floor.turn % 8 == 0:
 		_animate(BiomeGimmicks.tick(floor, sim, _narr_rng))
-	# Mid-floor decision beat: at most once per floor, after a few turns.
-	if _event.is_empty() and floor.turn >= 5 \
+	# Mid-floor decision beat: at most once per floor, and only well INTO a floor
+	# you've actually been playing (not on floor 1, not turn 5, and only after
+	# you've done something the show could react to). The beat must also fit the
+	# current audience — no sponsor interview for a nobody.
+	var engaged: bool = (floor.player.run_kills + floor.player.run_corpses_salvaged) >= 2
+	if _event.is_empty() and floor.depth >= 2 and floor.turn >= 14 and engaged \
 			and int(floor.player.flags.get("event_floor", -1)) != floor.depth \
-			and _narr_rng.randf() < 0.5:
-		floor.player.flags["event_floor"] = floor.depth
-		_event = MidFloorEvents.pick(_narr_rng)
-		_log_push("Przerwa w akcji: %s" % _event.get("intro", ""))
-		queue_redraw()
+			and _narr_rng.randf() < 0.35:
+		floor.player.flags["event_floor"] = floor.depth   # one attempt per floor regardless
+		var aud := floor.audience.rating if floor.audience != null else 0
+		var beat := MidFloorEvents.pick(_narr_rng, aud)
+		if not beat.is_empty():
+			_event = beat
+			_log_push("Przerwa w akcji: %s" % _event.get("intro", ""))
+			queue_redraw()
 	# Belief seeds propagate every 4 floor-turns.
 	if floor.turn > 0 and floor.turn % 4 == 0:
 		_meme_tick()
