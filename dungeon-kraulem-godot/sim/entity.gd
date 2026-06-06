@@ -39,6 +39,7 @@ func stat_mod(stat: String) -> int:
 # Meta-progression loadout this run was started with (player only) — for the HUD.
 var species_key: String = ""
 var origin_key: String = ""
+var species_trait: String = ""   # active species trait: regen / poison_immune / salvage_heal / first_strike
 # Equipment (player only): slot -> GameItem. Worn armor adds to AC.
 var equipment: Dictionary = {}   # "head" | "body" | "legs" | "trinket" -> GameItem
 # RPG progression (player only): the level track DCC runs on.
@@ -119,6 +120,9 @@ func has_property(p: String) -> bool:
 	return properties().has(p)
 
 func add_status(s: String, turns: int) -> void:
+	# "Mutant chemiczny" shrugs off poison entirely.
+	if s == "poisoned" and species_trait == "poison_immune":
+		return
 	statuses[s] = max(int(statuses.get(s, 0)), turns)
 
 func has_status(s: String) -> bool:

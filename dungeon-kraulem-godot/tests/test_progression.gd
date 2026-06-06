@@ -130,5 +130,41 @@ func _initialize() -> void:
 	var pd1: int = maxi(absi(pet.cell.x - ahero.cell.x), absi(pet.cell.y - ahero.cell.y))
 	_ck(pd1 < pd0, "with no enemies, the pet moves toward the player")
 
+	# ── Species active traits ─────────────────────────────────────────────────
+	# poison immunity: the status is refused entirely
+	var pi := CombatEntity.new(1, "Mutant", 100, 14, ["humanoid"]); pi.faction = "player"
+	pi.species_trait = "poison_immune"
+	pi.add_status("poisoned", 3)
+	_ck(not pi.has_status("poisoned"), "poison_immune refuses the poisoned status")
+	pi.add_status("burning", 2)
+	_ck(pi.has_status("burning"), "poison_immune does not block other statuses")
+
+	# regen: a wounded player heals 1/round after an action
+	var rb := Board.new(4, 4)
+	var rp := CombatEntity.new(1, "Grzyb", 100, 14, ["humanoid"]); rp.faction = "player"
+	rp.cell = Vector2i(1, 1); rp.species_trait = "regen"; rp.hp = 50
+	var rcs := CombatSim.new(rb, {1: rp}, 1, 1); rb.place(1, rp.cell)
+	rcs.player_move(Vector2i.RIGHT)              # one action → one round → +1 regen
+	_ck(rp.hp == 51, "the regen trait heals 1 HP per round")
+
+	# salvage_heal: recycling patches the cyborg
+	var sb := Board.new(4, 4)
+	var sp := CombatEntity.new(1, "Cyborg", 100, 14, ["humanoid"]); sp.faction = "player"
+	sp.cell = Vector2i(1, 1); sp.species_trait = "salvage_heal"; sp.hp = 40
+	var obj := CombatEntity.new(2, "Szafka", 6, 5, ["metal"]); obj.faction = "object"
+	obj.affordances = ["salvage"]; obj.cell = Vector2i(2, 1)
+	var scs := CombatSim.new(sb, {1: sp, 2: obj}, 1, 1)
+	sb.place(1, sp.cell); sb.place(2, obj.cell)
+	scs.player_interact()                         # dismantles the adjacent salvageable
+	_ck(sp.hp > 40, "salvage_heal restores HP when you dismantle something")
+
+	# audience floor (Bez Twarzy): rating never drops below the set minimum
+	var aud := AudienceState.new()
+	aud.min_rating = 10
+	aud.change(5, "x")                            # clamps UP to the floor
+	_ck(aud.rating >= 10, "audience floor lifts a low rating to the minimum")
+	aud.change(-100, "x")
+	_ck(aud.rating == 10, "audience floor blocks dropping below the minimum")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

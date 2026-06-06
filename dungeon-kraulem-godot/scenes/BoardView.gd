@@ -117,6 +117,7 @@ func _build() -> void:
 			_hint = floor.rooms[floor.current].get("name", "")
 			_log = ["Wczytano zapis. Kontynuujesz zjazd — piętro %d." % floor.depth]
 			floor.attach_companion(_make_companion())   # the pet rejoins on resume
+			_arm_floor_traits()
 			_attach_bodies(); _recenter(); _reset_visuals()
 			return
 	# Fresh run.
@@ -128,6 +129,7 @@ func _build() -> void:
 	_hint = data.get("hint", "")
 	_log = ["Piętro 1. Zaczynasz zjazd. Rozbieraj, kuj, walcz — i schodź głębiej."]
 	_apply_loadout()               # bake the meta-progression loadout into this fresh run
+	_arm_floor_traits()
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
@@ -191,6 +193,7 @@ func _descend_into(biome_key: String) -> void:
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
+	_arm_floor_traits()            # re-arm per-floor species traits (e.g. first strike)
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
 	_ach_descend(next_depth)
 	if next_depth >= FINAL_FLOOR: _unlock_ach("reach_final")
@@ -634,6 +637,10 @@ func _apply_loadout() -> void:
 		for ik in (eff.get("items", []) as Array):
 			var it := _item_from_template(str(ik))
 			if it != null: floor.items.append(it)
+		if eff.has("trait"):
+			p.species_trait = str(eff["trait"])
+		if eff.has("audience_min") and floor.audience != null:
+			floor.audience.min_rating = int(eff["audience_min"])
 		if eff.has("audience") and floor.audience != null:
 			floor.audience.change(int(eff["audience"]), "loadout")
 		if eff.has("sponsor_all") and floor.sponsors != null:
@@ -641,6 +648,11 @@ func _apply_loadout() -> void:
 				floor.sponsors.attention[sk] = floor.sponsors.get_attention(sk) + int(eff["sponsor_all"])
 	if not applied.is_empty():
 		_log_push("Ekwipunek sezonu: " + ", ".join(applied) + ".")
+
+## Per-floor trait arming: "Pamiętający" lands its first blow of every floor.
+func _arm_floor_traits() -> void:
+	if floor != null and floor.player.species_trait == "first_strike":
+		floor.player.next_attack_autohit = true
 
 ## Build a GameItem from an item_templates entry (shared by loadout + level boxes).
 func _item_from_template(key: String) -> GameItem:
@@ -1340,6 +1352,10 @@ func _animate(evs: Array) -> void:
 				_log_push(str(e.get("label", "")))
 			"class_active_blocked":
 				_log_push(str(e.get("reason", "Nie mozna uzyc umiejetnosci.")))
+			"ally_down":
+				_add_floater(int(e.get("id", 999)), "TOWARZYSZ PADŁ", COL_RED)
+				_log_push("%s pada! Wróci na następnym piętrze." % e.get("name", "Towarzysz"))
+				_shake = maxf(_shake, 5.0)
 			"talk":
 				_open_dialogue(int(e.get("npc_id", -1)))
 			"throw":

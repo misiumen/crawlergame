@@ -573,6 +573,12 @@ func _salvage(obj: CombatEntity) -> Array:
 	_add_affinity("tech", 1)
 	if "wood" in obj.tags or "furniture" in obj.tags:
 		_add_affinity("environment", 1)
+	# "Cyborg Recyklingu" feeds scrap into itself — salvage patches you up.
+	var pl := player()
+	if pl.species_trait == "salvage_heal" and pl.is_alive() and pl.hp < pl.max_hp:
+		var got := mini(3, pl.max_hp - pl.hp)
+		pl.hp += got
+		evs.append({"type": "heal", "target": player_id, "amount": got})
 	evs += _grant_xp(5)   # everything is a resource — including XP
 	evs += _after_player_action(7)
 	return evs
@@ -687,6 +693,11 @@ func _after_player_action(noise_radius: int = 0) -> Array:
 	if not over:
 		evs += _check_end()
 	evs += _award_kill_xp()
+	# "Grzybica" slow regeneration: heal a little each round if you took the trait.
+	var pl := player()
+	if pl.species_trait == "regen" and pl.is_alive() and pl.hp < pl.max_hp:
+		pl.hp = mini(pl.max_hp, pl.hp + 1)
+		evs.append({"type": "heal", "target": player_id, "amount": 1})
 	side = "player"
 	round_num += 1
 	return evs
@@ -784,23 +795,36 @@ func _enemy_turn() -> Array:
 			var why: String = "stunned" if e.has_status("stunned") else "shocked"
 			evs.append({"type": "skip", "id": e.id, "reason": why})
 			continue
+		# Target the player if adjacent; otherwise swat your pet if IT is adjacent
+		# (the "protect the mascot" tension — the companion can be downed).
+		var victim: CombatEntity = null
 		if board.is_adjacent(e.cell, p.cell):
-			evs.append({"type": "attack", "attacker": e.id, "target": player_id})
+			victim = p
+		else:
+			for a in allies_alive():
+				if board.is_adjacent(e.cell, a.cell):
+					victim = a; break
+		if victim != null:
+			evs.append({"type": "attack", "attacker": e.id, "target": victim.id})
 			# A disarmed (broken-arm) enemy swings weaker.
 			var atk_bonus: int = 0 if e.has_status("disarmed") else 2
-			# Survivor's passive + occultist's Curse make the player harder to hit.
-			var pac: int = p.ac + ClassFeatures.passive_bonus(p, "ac") + _curse_to_hit
+			# Survivor's passive + occultist's Curse make the PLAYER harder to hit.
+			var vac: int = _eff_ac(victim)
+			if victim == p:
+				vac += ClassFeatures.passive_bonus(p, "ac") + _curse_to_hit
 			# Content-driven enemies carry their own to-hit; fall back to the default.
 			var eatk: int = (e.to_hit if e.dmg_dice != "" else atk_bonus)
 			if e.has_status("disarmed"):
 				eatk -= 2
-			if _roll_hit(eatk, pac):
+			if _roll_hit(eatk, vac):
 				var base: int = Dice.roll(e.dmg_dice, rng) if e.dmg_dice != "" else rng.randi_range(1, 4) + 1
 				if e.has_status("disarmed"):
 					base = maxi(1, base - 2)
-				evs += _apply_damage(p, base, DMG_PHYSICAL)
+				evs += _apply_damage(victim, base, DMG_PHYSICAL)
+				if victim != p and not victim.is_alive():
+					evs.append({"type": "ally_down", "id": victim.id, "name": victim.name_pl})
 			else:
-				evs.append({"type": "miss", "attacker": e.id, "target": player_id})
+				evs.append({"type": "miss", "attacker": e.id, "target": victim.id})
 		elif not e.can_move():
 			# Locomotion destroyed — it can't close the gap, only thrash in place.
 			evs.append({"type": "skip", "id": e.id, "reason": "crippled"})

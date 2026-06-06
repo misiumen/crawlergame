@@ -41,13 +41,13 @@ const CATALOG: Dictionary = {
 	"origin_debiutant":   {"kind": "origin", "label": "Debiutant", "reward": "Pierwszy raz na arenie. Widzowie nie mają oczekiwań.", "cost": 0, "effect": {}},
 
 	# ── Species (races) ──────────────────────────────────────────────────────
-	"species_mutant_chemiczny":  {"kind": "species", "label": "Mutant chemiczny", "reward": "+1 KOND (więcej HP), odporność na truciznę, ale podatność na ogień.", "cost": 45, "effect": {"hp": 12, "tags": ["flammable"]}},
-	"species_grzybica":          {"kind": "species", "label": "Grzybica", "reward": "+1 WIS i powolna regeneracja. Grzybowa ręka widoczna dla wszystkich.", "cost": 45, "effect": {"stats": {"WIS": 1}, "hp": 8}},
-	"species_cyborg_recyklingu": {"kind": "species", "label": "Cyborg Recyklingu", "reward": "+1 SIŁ, mechaniczna kończyna ze złomu. Przewodzi prąd.", "cost": 45, "effect": {"stats": {"STR": 1}, "tags": ["metal"]}},
-	"species_pamietajacy":       {"kind": "species", "label": "Pamiętający", "reward": "+1 SPRYT. Czasem pamiętasz to, czego nie widziałeś.", "cost": 45, "effect": {"stats": {"INT": 1}}},
+	"species_mutant_chemiczny":  {"kind": "species", "label": "Mutant chemiczny", "reward": "+1 KOND (więcej HP), ODPORNOŚĆ NA TRUCIZNĘ, ale podatność na ogień.", "cost": 45, "effect": {"hp": 12, "tags": ["flammable"], "trait": "poison_immune"}},
+	"species_grzybica":          {"kind": "species", "label": "Grzybica", "reward": "+1 WIS i POWOLNA REGENERACJA (+1 HP co rundę). Grzybowa ręka widoczna.", "cost": 45, "effect": {"stats": {"WIS": 1}, "hp": 8, "trait": "regen"}},
+	"species_cyborg_recyklingu": {"kind": "species", "label": "Cyborg Recyklingu", "reward": "+1 SIŁ, metalowa kończyna. ROZBIÓRKA CIĘ NAPRAWIA (+3 HP za złom).", "cost": 45, "effect": {"stats": {"STR": 1}, "tags": ["metal"], "trait": "salvage_heal"}},
+	"species_pamietajacy":       {"kind": "species", "label": "Pamiętający", "reward": "+1 SPRYT. PIERWSZY CIOS na każdym piętrze trafia na pewno.", "cost": 45, "effect": {"stats": {"INT": 1}, "trait": "first_strike"}},
 	"species_kolyski_anti_hosta":{"kind": "species", "label": "Kołyska Konferansjera", "reward": "+1 do WSZYSTKICH statystyk. Konferansjer zna cię osobiście.", "cost": 110, "effect": {"stats": {"STR": 1, "DEX": 1, "INT": 1, "WIS": 1, "CHA": 1}}},
 	"species_stary_uczestnik":   {"kind": "species", "label": "Stary Uczestnik", "reward": "Blizna po poprzednim zwycięzcy: +8 HP i widownia zna twój numer (+5).", "cost": 50, "effect": {"hp": 8, "audience": 5}},
-	"species_bez_twarzy":        {"kind": "species", "label": "Bez Twarzy", "reward": "Widownia startuje wysoko (+12), ale brak twarzy boli charyzmę (−2 CHA).", "cost": 50, "effect": {"audience": 12, "stats": {"CHA": -2}}},
+	"species_bez_twarzy":        {"kind": "species", "label": "Bez Twarzy", "reward": "Widownia NIGDY nie spada poniżej 10 (i startuje +12), ale −2 CHA.", "cost": 50, "effect": {"audience": 12, "stats": {"CHA": -2}, "audience_min": 10}},
 	"species_ferromanta_meta":   {"kind": "species", "label": "Ferromanta", "reward": "Magnetyczna, opancerzona skóra (+1 SIŁ). Metal lgnie do ciebie.", "cost": 60, "effect": {"stats": {"STR": 1}, "tags": ["armored"]}},
 
 	# ── Origins ──────────────────────────────────────────────────────────────

@@ -38,6 +38,7 @@ var rating: int = 0
 var idle_turns: int = 0
 var history: Array = []   # recent values for sparkline (up to 32)
 var peak: int = 0
+var min_rating: int = 0   # a floor on the rating (species "Bez Twarzy" sets this)
 
 func band() -> String:
 	var r := clampi(rating, 0, 100)
@@ -58,7 +59,7 @@ func change(delta: int, _source: String = "") -> Dictionary:
 	if delta == 0:
 		return {"crossed": false}
 	var old_band := band()
-	rating = clampi(rating + delta, 0, 100)
+	rating = clampi(rating + delta, min_rating, 100)
 	if rating > peak:
 		peak = rating
 	idle_turns = 0
@@ -78,6 +79,6 @@ func tick(turns: int = 1) -> void:
 		return
 	var over := idle_turns - IDLE_GRACE_TURNS
 	var steps := over / IDLE_DECAY_TURNS
-	if steps > 0 and rating > 0:
-		rating = maxi(0, rating - steps)
+	if steps > 0 and rating > min_rating:
+		rating = maxi(min_rating, rating - steps)
 		idle_turns = IDLE_GRACE_TURNS + (over - steps * IDLE_DECAY_TURNS)
