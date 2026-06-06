@@ -166,6 +166,30 @@ func _initialize() -> void:
 	aud.change(-100, "x")
 	_ck(aud.rating == 10, "audience floor blocks dropping below the minimum")
 
+	# ── Companion abilities ───────────────────────────────────────────────────
+	# find_scrap (dog): grants scrap, once per floor
+	var cb := Board.new(6, 6)
+	var chero := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); chero.faction = "player"; chero.cell = Vector2i(1, 1)
+	var dog := CombatEntity.new(999, "Suczka", 24, 12, ["ally"]); dog.faction = "ally"
+	dog.monster_key = "companion_suczka_recyklingu"; dog.cell = Vector2i(2, 1)
+	var ccs := CombatSim.new(cb, {1: chero, 999: dog}, 1, 1)
+	cb.place(1, chero.cell); cb.place(999, dog.cell)
+	var z0c := int(ccs.materials.get("złom", 0))
+	ccs.use_companion_ability(2)
+	_ck(int(ccs.materials.get("złom", 0)) > z0c, "the dog's find-scrap ability grants scrap")
+	var blocked := ccs.use_companion_ability(2)   # same floor → on cooldown
+	_ck(blocked.size() == 1 and blocked[0]["type"] == "companion_blocked", "the ability is once-per-floor")
+	# distract (cat): an enemy loses its next turn
+	var kb := Board.new(6, 6)
+	var khero := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); khero.faction = "player"; khero.cell = Vector2i(1, 1)
+	var cat := CombatEntity.new(999, "Kot", 18, 12, ["ally"]); cat.faction = "ally"
+	cat.monster_key = "companion_kot_ministerstwa"; cat.cell = Vector2i(2, 1)
+	var kfoe := CombatEntity.new(2, "Szczur", 20, 10, ["organic"]); kfoe.faction = "enemy"; kfoe.cell = Vector2i(3, 1); kfoe.aware = true
+	var kcs := CombatSim.new(kb, {1: khero, 999: cat, 2: kfoe}, 1, 1)
+	for c2 in [khero, cat, kfoe]: kb.place(c2.id, c2.cell)
+	kcs.use_companion_ability(1)
+	_ck(kfoe.has_status("stunned"), "the cat's distract stuns the nearest enemy")
+
 	# ── Floor objectives ──────────────────────────────────────────────────────
 	var rngo := RandomNumberGenerator.new(); rngo.seed = 7
 	var fobj := Objectives.pick(3, rngo)

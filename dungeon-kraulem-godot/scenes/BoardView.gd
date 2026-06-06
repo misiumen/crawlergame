@@ -407,6 +407,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if kc == KEY_F:
 		_use_class_active(); return
 
+	# [G] fire the companion's ability
+	if kc == KEY_G:
+		_use_companion_ability(); return
+
 	# [L] open the skill-point allocation modal (if you've banked any)
 	if kc == KEY_L:
 		if sim != null and sim.player().skill_points > 0:
@@ -1334,6 +1338,13 @@ func _use_class_active() -> void:
 	_advance_floor_turn()
 	_check_transition()
 
+## Fire the companion's signature ability ([G]); free action, per-floor cooldown.
+func _use_companion_ability() -> void:
+	if floor == null or floor.companion == null or not floor.companion.is_alive():
+		_log_push("Nie masz towarzysza na planszy."); queue_redraw(); return
+	_animate(sim.use_companion_ability(floor.depth))
+	queue_redraw()
+
 ## ── Safehouse: spend scrap to heal / buy / sell / get a sponsor package ──────
 func _zlom() -> int:
 	return int(sim.materials.get("złom", 0))
@@ -1563,6 +1574,20 @@ func _animate(evs: Array) -> void:
 				_log_push(str(e.get("label", "")))
 			"class_active_blocked":
 				_log_push(str(e.get("reason", "Nie mozna uzyc umiejetnosci.")))
+			"companion_ability":
+				_add_floater(sim.player_id, str(e.get("name", "Towarzysz")).to_upper(), COL_GREEN)
+				_log_push("Towarzysz działa: %s." % e.get("name", "?"))
+				_shake = maxf(_shake, 3.0)
+			"companion_blocked":
+				_log_push(str(e.get("reason", "Towarzysz nie może teraz pomóc.")))
+			"scrap_found":
+				_add_floater(sim.player_id, "+%d złom" % int(e.get("amount", 0)), COL_AMBER)
+			"marked":
+				if int(e.get("id", -1)) != -1:
+					_add_floater(int(e["id"]), "CEL!", COL_CYAN)
+			"distract":
+				_add_floater(int(e.get("id", sim.player_id)), "ROZPROSZONY", COL_GAS)
+				_log_push("%s traci kolejną turę — rozproszony." % e.get("name", "Wróg"))
 			"ally_down":
 				_add_floater(int(e.get("id", 999)), "TOWARZYSZ PADŁ", COL_RED)
 				_log_push("%s pada! Wróci na następnym piętrze." % e.get("name", "Towarzysz"))
@@ -2103,6 +2128,11 @@ func _draw_hud() -> void:
 		inv_parts.append("Przedmioty: %d" % floor.items.size())
 	if not floor.boxes.is_empty():
 		inv_parts.append("Skrzynki: %d" % floor.boxes.size())
+	# Companion + its ability readiness
+	if floor.companion != null and floor.companion.is_alive():
+		var c: CombatEntity = floor.companion
+		var ready: bool = int(c.flags.get("ability_floor", -1)) != floor.depth
+		inv_parts.append("Towarzysz: %s  [G] %s" % [c.name_pl, "gotów" if ready else "użyty"])
 	if not inv_parts.is_empty():
 		draw_string(_font, Vector2(40, 134), " | ".join(inv_parts),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_GREEN)

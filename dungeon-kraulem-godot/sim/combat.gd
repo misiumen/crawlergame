@@ -475,6 +475,53 @@ func _deploy_trap(item: GameItem) -> Array:
 
 ## Fire the player's emergent-class active (once per floor). Returns events; the
 ## ability counts as the player's action, so the enemy turn follows.
+## Fire the pet's signature ability (per-floor cooldown, free action like a class
+## active). Each companion has ONE, ported from the pygame ability kit.
+func use_companion_ability(floor_num: int) -> Array:
+	if over or side != "player":
+		return []
+	var comp: CombatEntity = null
+	for id in entities:
+		if entities[id].faction == "ally" and entities[id].is_alive():
+			comp = entities[id]; break
+	if comp == null:
+		return [{"type": "companion_blocked", "reason": "Brak towarzysza."}]
+	if int(comp.flags.get("ability_floor", -1)) == floor_num:
+		return [{"type": "companion_blocked", "reason": "Umiejętność towarzysza już użyta na tym piętrze."}]
+	comp.flags["ability_floor"] = floor_num
+	var evs: Array = [{"type": "companion_ability", "key": comp.monster_key, "name": comp.name_pl}]
+	match comp.monster_key:
+		"companion_suczka_recyklingu":          # find_scrap: sniffs out a pile of scrap
+			var amt := 4 + floor_num * 2
+			materials["złom"] = int(materials.get("złom", 0)) + amt
+			evs.append({"type": "scrap_found", "amount": amt})
+		"companion_dron_sponsorski":            # scout: marks the nearest foe (next hit lands)
+			player().next_attack_autohit = true
+			var f := _nearest_enemy_to(player().cell)
+			evs += _change_audience(2, "pet_scout")
+			evs.append({"type": "marked", "id": (f.id if f != null else -1)})
+		"companion_kot_ministerstwa":           # distract: an enemy loses its next turn
+			var foe := _nearest_enemy_to(comp.cell)
+			if foe != null:
+				foe.add_status("stunned", 1)
+				evs.append({"type": "distract", "id": foe.id, "name": foe.name_pl})
+		"companion_papuga_anty_host":           # morale_boost: works the crowd hard
+			evs += _change_audience(8, "pet_morale")
+			evs.append({"type": "buff", "label": "+8 widowni (papuga rozgrzewa tłum)"})
+		_:
+			evs += _change_audience(3, "pet")
+	return evs
+
+## Nearest living enemy to a cell (Chebyshev), or null if none.
+func _nearest_enemy_to(c: Vector2i) -> CombatEntity:
+	var best: CombatEntity = null
+	var bd := 1 << 30
+	for e in enemies_alive():
+		var d: int = maxi(absi(e.cell.x - c.x), absi(e.cell.y - c.y))
+		if d < bd:
+			bd = d; best = e
+	return best
+
 func use_class_active(floor_num: int) -> Array:
 	if over or side != "player":
 		return []
