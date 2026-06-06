@@ -223,6 +223,19 @@ func _initialize() -> void:
 	_ck(true, "meta/loadout screen draws without crash")
 	bv._dispatch_zone({"kind": "meta_back"})
 	_ck(not bv._meta_screen, "closing the meta screen works")
+
+	# companion: an owned companion joins the board as a fighting ally
+	MetaCatalog.reset()
+	for k in ["kill_250", "aw_poziom_20", "win_pacifist", "win_lowlevel"]:
+		Achievements.unlock(k)            # 48 prestige (idempotent if already earned)
+	_ck(MetaCatalog.try_purchase("companion_suczka_recyklingu"), "buy a companion with prestige")
+	var comp = bv._make_companion()
+	_ck(comp != null and comp.faction == "ally", "an owned companion builds an ally entity")
+	bv.floor.attach_companion(comp)
+	_ck(bv.sim.allies_alive().size() >= 1, "the companion joins the board as an ally")
+	for i in 3:
+		bv.handle_dir(Vector2i.LEFT); bv._process(0.016)   # ally acts each turn, no crash
+	_ck(true, "playing with a companion on the board does not crash")
 	MetaCatalog.reset()
 
 	# hammer many actions + frames; must never crash

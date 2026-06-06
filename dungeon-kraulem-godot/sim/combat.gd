@@ -62,6 +62,14 @@ func enemies_alive() -> Array:
 			out.append(e)
 	return out
 
+func allies_alive() -> Array:
+	var out: Array = []
+	for id in entities:
+		var e: CombatEntity = entities[id]
+		if e.faction == "ally" and e.is_alive():
+			out.append(e)
+	return out
+
 # ── Damage model ──────────────────────────────────────────────────────────────
 
 func effective_damage(target: CombatEntity, base: int, dmg_type: String) -> int:
@@ -146,6 +154,8 @@ func player_move(dir: Vector2i) -> Array:
 			return [{"type": "blocked", "reason": "object", "id": t.id}]
 		if t.faction == "npc":
 			return [{"type": "talk", "npc_id": t.id}]   # bump an NPC = talk to it
+		if t.faction == "ally":
+			return [{"type": "blocked", "reason": "ally"}]   # don't swing at your own pet
 		evs += _player_attack(t)
 		noise = 3   # a melee swing is heard by nearby enemies (but not the whole floor)
 	elif board.is_free(dest):
@@ -668,6 +678,9 @@ func _after_player_action(noise_radius: int = 0) -> Array:
 	var evs: Array = _check_end()
 	if over:
 		return evs
+	evs += _ally_turn()          # your pet acts on your side, first
+	if not over:
+		evs += _check_end()
 	evs += _update_awareness(noise_radius)
 	side = "enemies"
 	evs += _enemy_turn()
@@ -709,6 +722,55 @@ func _update_awareness(noise_radius: int) -> Array:
 		if sees or hears:
 			e.aware = true
 			evs.append({"type": "notice", "id": e.id})
+	return evs
+
+## Your pet ally's turn: attack an adjacent enemy, else close on the nearest one;
+## with no enemies in the room it trots back toward you. A loyal mascot, not a
+## second protagonist — modest dice, and enemies leave it alone (it never dies on
+## the board; it just respawns each floor from your loadout).
+func _ally_turn() -> Array:
+	var evs: Array = []
+	var p: CombatEntity = player()
+	for a in allies_alive():
+		var foes := enemies_alive()
+		if foes.is_empty():
+			# follow the player (don't crowd — stop when already adjacent)
+			if not board.is_adjacent(a.cell, p.cell):
+				var step := _step_toward(a.cell, p.cell)
+				if step != a.cell and board.is_free(step):
+					board.move(a.cell, step); a.cell = step
+					evs.append({"type": "move", "id": a.id, "to": step})
+			continue
+		# target the nearest enemy
+		var tgt: CombatEntity = null
+		var best := 1 << 30
+		for e in foes:
+			var d: int = maxi(absi(e.cell.x - a.cell.x), absi(e.cell.y - a.cell.y))
+			if d < best:
+				best = d; tgt = e
+		if tgt == null:
+			continue
+		if board.is_adjacent(a.cell, tgt.cell):
+			evs += _ally_attack(a, tgt)
+		else:
+			var step2 := _step_toward(a.cell, tgt.cell)
+			if step2 != a.cell and board.is_free(step2):
+				board.move(a.cell, step2); a.cell = step2
+				evs.append({"type": "move", "id": a.id, "to": step2})
+	return evs
+
+## An ally swing: rolls to hit, deals its dmg_dice, and — flavor — its kills still
+## thrill the crowd. Awareness wakes the victim (the pet is loud).
+func _ally_attack(a: CombatEntity, target: CombatEntity) -> Array:
+	target.aware = true
+	var evs: Array = [{"type": "attack", "attacker": a.id, "target": target.id, "ally": true}]
+	if _roll_hit(a.to_hit, _eff_ac(target)):
+		var base: int = Dice.roll(a.dmg_dice, rng) if a.dmg_dice != "" else rng.randi_range(1, 4) + 1
+		evs += _apply_damage(target, base, DMG_PHYSICAL)
+		if not target.is_alive():
+			evs += _change_audience(1, "ally_kill")
+	else:
+		evs.append({"type": "miss", "attacker": a.id, "target": target.id})
 	return evs
 
 func _enemy_turn() -> Array:

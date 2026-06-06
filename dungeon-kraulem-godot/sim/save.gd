@@ -55,6 +55,7 @@ static func _player_dict(p) -> Dictionary:
 		"run_traps_armed": p.run_traps_armed,
 		"stats": p.stats.duplicate(true),
 		"level": p.level, "xp": p.xp, "skill_points": p.skill_points,
+		"species_key": p.species_key, "origin_key": p.origin_key,
 		"equipment": _equipment_dict(p.equipment),
 		"flags": p.flags.duplicate(true),
 		"relationships": p.relationships.duplicate(true),
@@ -111,6 +112,8 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 	p.level = int(pd.get("level", 1))
 	p.xp = int(pd.get("xp", 0))
 	p.skill_points = int(pd.get("skill_points", 0))
+	p.species_key = str(pd.get("species_key", ""))
+	p.origin_key = str(pd.get("origin_key", ""))
 	p.equipment = {}
 	for slot in (pd.get("equipment", {}) as Dictionary):
 		p.equipment[slot] = GameItem.from_dict(pd["equipment"][slot])

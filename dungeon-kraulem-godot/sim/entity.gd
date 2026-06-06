@@ -36,6 +36,9 @@ func stat_mod(stat: String) -> int:
 	if stat == "INT":
 		m += int_mod()
 	return m
+# Meta-progression loadout this run was started with (player only) — for the HUD.
+var species_key: String = ""
+var origin_key: String = ""
 # Equipment (player only): slot -> GameItem. Worn armor adds to AC.
 var equipment: Dictionary = {}   # "head" | "body" | "legs" | "trinket" -> GameItem
 # RPG progression (player only): the level track DCC runs on.

@@ -106,5 +106,29 @@ func _initialize() -> void:
 	_ck(bounced == null, "standing on the entry cell does not re-trigger the door")
 	_ck(fl.current == entered, "you stay in the room you just entered")
 
+	# ── Companion ally: fights enemies, follows you otherwise ─────────────────
+	var ab := Board.new(6, 6)
+	var ahero := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); ahero.faction = "player"; ahero.cell = Vector2i(1, 1)
+	var pet := CombatEntity.new(999, "Suczka", 24, 12, ["ally"]); pet.faction = "ally"
+	pet.dmg_dice = "1d6"; pet.to_hit = 8; pet.cell = Vector2i(2, 1)
+	var afoe := CombatEntity.new(2, "Szczur", 30, 8, ["organic"]); afoe.faction = "enemy"
+	afoe.cell = Vector2i(3, 1); afoe.aware = true
+	var acs := CombatSim.new(ab, {1: ahero, 999: pet, 2: afoe}, 1, 5)
+	for c in [ahero, pet, afoe]:
+		ab.place(c.id, c.cell)
+	_ck(acs.allies_alive().size() == 1, "the pet counts as an ally, not an enemy")
+	_ck(acs.enemies_alive().size() == 1, "allies are excluded from enemies_alive()")
+	var fhp := afoe.hp
+	acs._ally_turn()                       # pet is adjacent to the foe → attacks
+	_ck(afoe.hp < fhp, "the pet attacks an adjacent enemy on its turn")
+	_ck(ahero.faction == "player" and ahero.hp == 100, "the pet never harms you")
+	# with no enemies left, the pet trots back toward the player
+	afoe.alive = false
+	ab.clear(Vector2i(2, 1)); pet.cell = Vector2i(5, 5); ab.place(999, pet.cell)
+	var pd0: int = maxi(absi(pet.cell.x - ahero.cell.x), absi(pet.cell.y - ahero.cell.y))
+	acs._ally_turn()
+	var pd1: int = maxi(absi(pet.cell.x - ahero.cell.x), absi(pet.cell.y - ahero.cell.y))
+	_ck(pd1 < pd0, "with no enemies, the pet moves toward the player")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

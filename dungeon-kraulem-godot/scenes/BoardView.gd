@@ -116,11 +116,13 @@ func _build() -> void:
 			sim = floor.sim
 			_hint = floor.rooms[floor.current].get("name", "")
 			_log = ["Wczytano zapis. Kontynuujesz zjazd — piętro %d." % floor.depth]
+			floor.attach_companion(_make_companion())   # the pet rejoins on resume
 			_attach_bodies(); _recenter(); _reset_visuals()
 			return
 	# Fresh run.
 	_run_seed = _new_seed()
 	var data := FloorGen.generate(1, _run_seed, content)
+	data["companion"] = _make_companion()    # pet ally from the loadout, if any
 	floor = Floor.new(data)
 	sim = floor.sim
 	_hint = data.get("hint", "")
@@ -181,6 +183,7 @@ func _descend_into(biome_key: String) -> void:
 	data["audience"] = floor.audience
 	data["sponsors"] = floor.sponsors
 	data["class_offered"] = floor.class_offered
+	data["companion"] = _make_companion()   # a fresh mascot is sent down each floor
 	floor = Floor.new(data)
 	sim = floor.sim
 	_hint = data.get("hint", "")
@@ -580,10 +583,36 @@ func _register_loadout_biomes() -> void:
 		if eff.has("biome"):
 			Routes.register(ent["key"], eff["biome"])
 
+## Build the on-board pet ally for the run from the first owned companion in the
+## loadout (or null if none owned). Each companion fights with its own dice.
+func _make_companion() -> CombatEntity:
+	var key := ""
+	for k in MetaCatalog.keys_of_kind("companion"):
+		if MetaCatalog.is_owned(k):
+			key = k; break
+	if key == "":
+		return null
+	var defs := {
+		"companion_papuga_anty_host":  {"name": "Papuga Konferansjera", "dice": "1d3", "hp": 14},
+		"companion_suczka_recyklingu": {"name": "Suczka Recyklingu", "dice": "1d6", "hp": 24},
+		"companion_kot_ministerstwa":  {"name": "Kot Ministerstwa", "dice": "1d4", "hp": 18},
+		"companion_dron_sponsorski":   {"name": "Dron Sponsorski", "dice": "1d4", "hp": 16},
+	}
+	var d: Dictionary = defs.get(key, {"name": "Towarzysz", "dice": "1d4", "hp": 18})
+	var c := CombatEntity.new(999, d["name"], int(d["hp"]), 12, ["ally", "companion"])
+	c.faction = "ally"
+	c.dmg_dice = d["dice"]
+	c.to_hit = 3
+	c.monster_key = key
+	return c
+
 ## Bake the meta-progression loadout (chosen species + origin + all owned passives)
 ## into the fresh-run player + run state. The faithful "menu of choices" payoff.
 func _apply_loadout() -> void:
 	var p := floor.player
+	var lo := MetaCatalog.loadout()
+	p.species_key = lo["species"]
+	p.origin_key = lo["origin"]
 	var applied: Array = []
 	for ent in MetaCatalog.active_effects():
 		var eff: Dictionary = ent["effect"]
@@ -1570,6 +1599,7 @@ func _draw() -> void:
 		var fade: float = _dying.get(id, 1.0)
 		var flashing := _flash.has(id)
 		if e.faction == "player":      _draw_player(pos, fade)
+		elif e.faction == "ally":      _draw_ally(e, pos, fade)
 		elif e.faction == "object":    _draw_object(e, pos, fade)
 		elif e.faction == "npc":       _draw_npc(pos, fade)
 		elif "boss" in e.tags:         _draw_boss(pos, fade, flashing)
@@ -1659,6 +1689,20 @@ func _draw_npc(pos: Vector2, fade: float) -> void:
 	draw_circle(pos + Vector2(0, -3), 8, Color(0.55, 0.36, 0.66, fade))
 	# a little speech-bubble dot above the head
 	draw_string(_font, pos + Vector2(-4, -18), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, col)
+
+## Your pet ally: a friendly green token with a HP pip and a heart, clearly NOT
+## an enemy. Distinct silhouette so the board reads at a glance.
+func _draw_ally(e: CombatEntity, pos: Vector2, fade: float) -> void:
+	var col := Color(0.45, 0.90, 0.55, fade)
+	draw_circle(pos, 14, Color(0.08, 0.18, 0.10, fade))
+	draw_arc(pos, 14, 0, TAU, 22, col, 2.0)
+	draw_circle(pos + Vector2(0, -2), 7, Color(0.30, 0.70, 0.40, fade))
+	draw_string(_font, pos + Vector2(-5, -16), "♥", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, col)
+	# tiny HP bar so you can see when the mascot is hurting
+	if e.max_hp > 0:
+		var frac: float = clampf(float(e.hp) / float(e.max_hp), 0.0, 1.0)
+		draw_rect(Rect2(pos.x - 14, pos.y + 16, 28, 4), Color(0.1, 0.1, 0.1, fade))
+		draw_rect(Rect2(pos.x - 14, pos.y + 16, 28 * frac, 4), Color(col, fade))
 
 func _draw_rat(pos: Vector2, fade: float, flashing: bool) -> void:
 	var body := COL_RED if flashing else COL_RAT
@@ -1761,6 +1805,12 @@ func _draw_hud() -> void:
 		lvl_txt += "   ·   %d pkt [L]" % p.skill_points
 	draw_string(_font, Vector2(xb.position.x, 20), lvl_txt,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER if p.skill_points > 0 else COL_DIM)
+	# Who you are this run (the meta loadout)
+	if p.species_key != "" and p.species_key != "species_bezimienny":
+		var spn: String = MetaCatalog.def_of(p.species_key).get("label", "?")
+		var ogn: String = MetaCatalog.def_of(p.origin_key).get("label", "?")
+		draw_string(_font, Vector2(xb.position.x, 56), "Jesteś: %s  ·  %s" % [spn, ogn],
+			HORIZONTAL_ALIGNMENT_LEFT, 320, 12, META_KIND_COL["species"])
 	# Controls hint (mouse-first)
 	draw_string(_font, Vector2(40, 60),
 		"LPM atak/rozmowa/ruch · PPM pchnij  ·  WSAD ruch · Shift pchnij · Spacja czekaj · E rozbierz · I warsztat · F umiejętność",

@@ -7,6 +7,7 @@ extends RefCounted
 
 var rooms: Array = []             # [{name, board, entities(no player), exits, ...}]
 var player: CombatEntity
+var companion: CombatEntity = null  # meta-progression pet ally, carried like the player
 var inv: Dictionary = {}          # run materials, shared across rooms
 var items: Array = []             # GameItem list — crafted or found
 var boxes: Array = []             # GameBox list — unopened lootboxes
@@ -40,6 +41,7 @@ func _init(data: Dictionary) -> void:
 	audience = data.get("audience", null) if data.get("audience", null) is AudienceState else AudienceState.new()
 	sponsors = data.get("sponsors", null) if data.get("sponsors", null) is SponsorState else SponsorState.new()
 	class_offered = bool(data.get("class_offered", false))
+	companion = data.get("companion", null) if data.get("companion", null) is CombatEntity else null
 	enter(int(data.get("start", 0)), data["start_cell"])
 
 func current_name() -> String:
@@ -51,6 +53,8 @@ func exit_at(cell: Vector2i) -> Variant:
 func enter(idx: int, entry: Vector2i) -> void:
 	if current >= 0:
 		(rooms[current]["board"] as Board).clear(player.cell)
+		if companion != null:
+			(rooms[current]["board"] as Board).clear(companion.cell)
 	current = idx
 	var room: Dictionary = rooms[idx]
 	var board: Board = room["board"]
@@ -60,8 +64,41 @@ func enter(idx: int, entry: Vector2i) -> void:
 	var ents: Dictionary = {player.id: player}
 	for id in room["entities"]:
 		ents[id] = room["entities"][id]
+	# The pet ally follows the player from room to room: drop it on a free cell next
+	# to where the player just arrived.
+	if companion != null and companion.is_alive():
+		var spot := _free_cell_near(board, entry, ents)
+		if spot != Vector2i(-1, -1):
+			companion.cell = spot
+			board.place(companion.id, spot)
+			ents[companion.id] = companion
 	sim = CombatSim.new(board, ents, player.id, 1337 + idx,
 			inv, items, discovered_recipes, audience, sponsors)
+
+## Attach a companion to an already-built floor (used on resume, where the floor
+## was rebuilt before the companion existed). Injects it into the current sim.
+func attach_companion(c: CombatEntity) -> void:
+	companion = c
+	if c == null or sim == null or current < 0:
+		return
+	var board: Board = rooms[current]["board"]
+	var spot := _free_cell_near(board, player.cell, sim.entities)
+	if spot != Vector2i(-1, -1):
+		c.cell = spot
+		board.place(c.id, spot)
+		sim.entities[c.id] = c
+
+## A walkable, unoccupied cell adjacent (then near) `origin`, or (-1,-1) if none.
+func _free_cell_near(board: Board, origin: Vector2i, ents: Dictionary) -> Vector2i:
+	for r in [1, 2]:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if dx == 0 and dy == 0:
+					continue
+				var c := origin + Vector2i(dx, dy)
+				if board.in_bounds(c) and not board.is_wall(c) and board.occupant_at(c) == -1:
+					return c
+	return Vector2i(-1, -1)
 
 ## Advance one turn: tick audience idle decay, drain any sponsor boxes.
 func advance_turn() -> Array:
