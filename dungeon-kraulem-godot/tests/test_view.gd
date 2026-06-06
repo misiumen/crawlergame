@@ -283,6 +283,39 @@ func _initialize() -> void:
 		_ck(int(bv.sim.materials.get("złom", 0)) > z0, "selling pays scrap")
 	bv._safehouse = {}
 
+	# rival crawler: parley → rob (forced success) yields scrap; fight provokes
+	var spot1: Vector2i = bv._free_cell_for_spawn(bv.sim.player().cell)
+	if spot1 != Vector2i(-1, -1):
+		var crw := CombatEntity.new(860, "Voss Vex", 1, 12, ["crawler", "humanoid"])
+		crw.faction = "crawler"
+		crw.flags["crawler"] = {"name": "Voss Vex", "personality": "arrogant", "disposition": "neutral", "carried": {"złom": 5}}
+		crw.cell = spot1
+		bv.sim.board.place(860, spot1); bv.sim.entities[860] = crw
+		bv.floor.rooms[bv.floor.current]["entities"][860] = crw
+		bv._open_crawler(860)
+		_ck(not bv._crawler.is_empty(), "bumping a rival crawler opens the parley")
+		for i in 2:
+			bv._process(0.016)
+		_ck(true, "crawler parley draws without crash")
+		var z_pre: int = int(bv.sim.materials.get("złom", 0))
+		bv.sim.player().stats["DEX"] = 40        # force the DEX check to succeed
+		bv._crawler_action("rob")
+		_ck(int(bv.sim.materials.get("złom", 0)) == z_pre + 5, "a successful robbery lifts their scrap")
+		_ck(not bv.sim.entities.has(860), "the robbed rival flees the board")
+	# a second crawler: fighting it converts it into a real enemy
+	var spot2: Vector2i = bv._free_cell_for_spawn(bv.sim.player().cell)
+	if spot2 != Vector2i(-1, -1):
+		var crw2 := CombatEntity.new(861, "Mira Crane", 1, 12, ["crawler", "humanoid"])
+		crw2.faction = "crawler"
+		crw2.flags["crawler"] = {"name": "Mira Crane", "personality": "hostile", "disposition": "hostile", "carried": {}}
+		crw2.cell = spot2
+		bv.sim.board.place(861, spot2); bv.sim.entities[861] = crw2
+		bv.floor.rooms[bv.floor.current]["entities"][861] = crw2
+		bv._open_crawler(861)
+		bv._crawler_action("fight")
+		_ck(bv.sim.entities[861].faction == "enemy" and bv.sim.entities[861].max_hp > 1,
+			"fighting provokes the rival into a real enemy")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)

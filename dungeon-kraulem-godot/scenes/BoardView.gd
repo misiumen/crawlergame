@@ -69,6 +69,7 @@ var _ach_recipes_seen := 0           # discovered-recipe count, to detect new on
 var _meta_screen := false            # loadout & meta-unlocks screen (from the title)
 var _meta_scroll := 0.0
 var _safehouse: Dictionary = {}      # open safehouse modal: {id, subtype} (non-empty = open)
+var _crawler: Dictionary = {}        # open rival-crawler parley modal: {id} (non-empty = open)
 const META_KIND_COL := {
 	"species":    Color(0.55, 0.92, 0.98),
 	"origin":     Color(1.00, 0.84, 0.27),
@@ -123,6 +124,7 @@ func _build() -> void:
 				floor.objective = Objectives.pick(floor.depth, _narr_rng)
 			_attach_bodies(); _recenter(); _reset_visuals()
 			_spawn_safehouse()
+			_maybe_spawn_crawler()
 			return
 	# Fresh run.
 	_run_seed = _new_seed()
@@ -139,6 +141,7 @@ func _build() -> void:
 	_recenter()
 	_reset_visuals()
 	_spawn_safehouse()
+	_maybe_spawn_crawler()
 	Save.write(floor, _run_seed)   # checkpoint at the start (loadout now baked into the save)
 
 func _new_seed() -> int:
@@ -200,6 +203,7 @@ func _descend_into(biome_key: String) -> void:
 	_recenter()
 	_reset_visuals()
 	_spawn_safehouse()
+	_maybe_spawn_crawler()
 	_arm_floor_traits()            # re-arm per-floor species traits (e.g. first strike)
 	floor.objective = Objectives.pick(next_depth, _narr_rng)   # a fresh segment goal
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
@@ -370,6 +374,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_safehouse = {}; queue_redraw()
 		return
 
+	# Rival-crawler parley grabs input until you choose (Esc = leave).
+	if not _crawler.is_empty():
+		if kc == KEY_ESCAPE:
+			_crawler = {}; queue_redraw()
+		return
+
 	# NPC dialogue grabs input until you choose or walk away (Esc).
 	if not _dlg.is_empty():
 		if kc == KEY_ESCAPE:
@@ -453,7 +463,8 @@ func _can_take_board_input() -> bool:
 	return not _title and not _done and sim != null \
 		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
-		and _levelup.is_empty() and not _ach_screen and not _meta_screen and _safehouse.is_empty()
+		and _levelup.is_empty() and not _ach_screen and not _meta_screen \
+		and _safehouse.is_empty() and _crawler.is_empty()
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -544,6 +555,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"meta_start":        _start_run_from_meta()
 		"safe_action":       _safehouse_action(z.get("s", ""), i)
 		"safe_close":        _safehouse = {}; queue_redraw()
+		"crawler_action":    _crawler_action(z.get("s", ""))
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
 
@@ -722,6 +734,35 @@ func _spawn_safehouse() -> void:
 	sim.board.place(id, spot)
 	sim.entities[id] = sh
 	floor.rooms[floor.current]["entities"][id] = sh   # persists within the floor
+	var px := _cell_px(spot)
+	_vpos[id] = px; _vtarget[id] = px
+
+## Maybe drop a rival crawler on the floor (deterministic per depth, ~55% chance).
+func _maybe_spawn_crawler() -> void:
+	if sim == null or floor == null:
+		return
+	for id in sim.entities:
+		if sim.entities[id].faction == "crawler":
+			return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _run_seed + floor.depth * 977
+	if rng.randi_range(0, 99) >= 55:
+		return
+	var desc := Crawlers.make(floor.depth, rng)
+	var id := 850
+	while sim.entities.has(id):
+		id += 1
+	var cr := CombatEntity.new(id, desc["name"], 1, 12, ["crawler", "humanoid", "non_combat"])
+	cr.faction = "crawler"
+	cr.monster_key = desc.get("archetype", "")
+	cr.flags["crawler"] = desc
+	var spot := _free_cell_for_spawn(sim.player().cell)
+	if spot == Vector2i(-1, -1):
+		return
+	cr.cell = spot
+	sim.board.place(id, spot)
+	sim.entities[id] = cr
+	floor.rooms[floor.current]["entities"][id] = cr
 	var px := _cell_px(spot)
 	_vpos[id] = px; _vtarget[id] = px
 
@@ -1421,6 +1462,73 @@ func _safehouse_action(action: String, arg: int) -> void:
 				_log_push("Sprzedajesz: %s. (+%d złomu)" % [it.name_pl, price])
 	queue_redraw()
 
+## ── Rival crawlers: talk / rob (DEX gamble) / fight ──────────────────────────
+func _open_crawler(id: int) -> void:
+	var cr = sim.entities.get(id)
+	if cr == null or cr.faction != "crawler":
+		return
+	_crawler = {"id": id}
+	var desc: Dictionary = cr.flags.get("crawler", {})
+	_log_push("Inny zawodnik: %s (%s)." % [cr.name_pl, desc.get("personality", "?")])
+	queue_redraw()
+
+func _crawler_action(action: String) -> void:
+	if _crawler.is_empty():
+		return
+	var id: int = _crawler["id"]
+	var cr = sim.entities.get(id)
+	if cr == null:
+		_crawler = {}; queue_redraw(); return
+	var desc: Dictionary = cr.flags.get("crawler", {})
+	match action:
+		"talk":
+			if floor.audience != null:
+				floor.audience.change(3, "crawler")
+			_log_push("%s gada chwilę. Widownia lubi rywalizację. (+3 widowni)" % cr.name_pl)
+			_crawler = {}
+		"rob":
+			# A DEX gamble: win and you lift their scrap + they flee; lose and they turn hostile.
+			var roll := _narr_rng.randi_range(1, 20) + sim.player().stat_mod("DEX")
+			if roll >= 12:
+				var carried: Dictionary = desc.get("carried", {})
+				var parts: Array = []
+				for mk in carried:
+					sim.materials[mk] = int(sim.materials.get(mk, 0)) + int(carried[mk])
+					parts.append("%s x%d" % [mk, int(carried[mk])])
+				_log_push("Okradasz %s i znika w mroku. Łup: %s." % [cr.name_pl, ", ".join(parts) if not parts.is_empty() else "nic"])
+				_add_floater(sim.player_id, "OKRADZIONY", COL_AMBER)
+				sim.board.clear(cr.cell)
+				cr.alive = false
+				sim.entities.erase(id)
+				floor.rooms[floor.current]["entities"].erase(id)
+			else:
+				_log_push("%s łapie cię za rękę — robi się gorąco!" % cr.name_pl)
+				_provoke_crawler(id)
+			_crawler = {}
+		"fight":
+			_provoke_crawler(id)
+			_crawler = {}
+		_:
+			_crawler = {}
+	queue_redraw()
+
+## Turn a crawler into a real, aware enemy on the board.
+func _provoke_crawler(id: int) -> void:
+	var cr = sim.entities.get(id)
+	if cr == null:
+		return
+	var st := Crawlers.combat_stats(floor.depth)
+	cr.faction = "enemy"
+	cr.aware = true
+	cr.max_hp = int(st["hp"]); cr.hp = cr.max_hp
+	cr.ac = int(st["ac"]); cr.to_hit = int(st["to_hit"]); cr.dmg_dice = st["dice"]
+	if "monster" not in cr.tags: cr.tags.append("monster")
+	cr.flags.erase("crawler")
+	_attach_bodies()
+	_log_push("%s rzuca się do walki!" % cr.name_pl)
+	_add_banner("RYWAL ATAKUJE")
+	_shake = maxf(_shake, 5.0)
+
 func _open_dialogue(npc_id: int) -> void:
 	var npc = sim.entities.get(npc_id)
 	if npc == null or npc.dialogue_tree_key == "":
@@ -1596,6 +1704,8 @@ func _animate(evs: Array) -> void:
 				_open_dialogue(int(e.get("npc_id", -1)))
 			"safehouse":
 				_open_safehouse(int(e.get("id", -1)))
+			"crawler":
+				_open_crawler(int(e.get("id", -1)))
 			"throw":
 				_add_floater(sim.player_id, "RZUT", COL_AMBER)
 				_log_push("Rzucasz: %s!" % e.get("name", "?"))
@@ -1859,6 +1969,7 @@ func _draw() -> void:
 		var flashing := _flash.has(id)
 		if e.faction == "player":      _draw_player(pos, fade)
 		elif e.faction == "safehouse": _draw_safehouse_token(pos, fade)
+		elif e.faction == "crawler":   _draw_crawler_token(pos, fade)
 		elif e.faction == "ally":      _draw_ally(e, pos, fade)
 		elif e.faction == "object":    _draw_object(e, pos, fade)
 		elif e.faction == "npc":       _draw_npc(pos, fade)
@@ -1974,6 +2085,14 @@ func _draw_safehouse_token(pos: Vector2, fade: float) -> void:
 	draw_line(pos + Vector2(-17, -12), pos + Vector2(0, -22), col, 2.0)
 	draw_line(pos + Vector2(17, -12), pos + Vector2(0, -22), col, 2.0)
 	draw_string(_font, pos + Vector2(-5, 8), "✚", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, col)
+
+## A rival crawler: an amber humanoid with a star (a fellow contestant, not an NPC).
+func _draw_crawler_token(pos: Vector2, fade: float) -> void:
+	var col := COL_AMBER; col.a = fade
+	draw_circle(pos, 15, Color(0.20, 0.15, 0.06, fade))
+	draw_arc(pos, 15, 0, TAU, 22, col, 2.0)
+	draw_circle(pos + Vector2(0, -3), 8, Color(0.66, 0.50, 0.20, fade))
+	draw_string(_font, pos + Vector2(-5, -16), "☆", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, col)
 
 func _draw_rat(pos: Vector2, fade: float, flashing: bool) -> void:
 	var body := COL_RED if flashing else COL_RAT
@@ -2205,6 +2324,8 @@ func _draw_hud() -> void:
 		_draw_levelup()
 	if not _safehouse.is_empty():
 		_draw_safehouse()
+	if not _crawler.is_empty():
+		_draw_crawler_modal()
 	_draw_toasts()
 
 ## VS-style achievement toasts: tier-framed panels that slide in from the right,
@@ -2598,6 +2719,41 @@ func _draw_route_offer() -> void:
 
 ## Level-up: spend banked skill points on a stat. Click a row (or press its
 ## number); the modal closes when the bank runs dry, or [Esc]/the button banks it.
+## Rival-crawler parley: talk / rob / fight. Robbing is a DEX gamble; a hostile
+## crawler only offers a fight.
+func _draw_crawler_modal() -> void:
+	var cr = sim.entities.get(int(_crawler.get("id", -1)))
+	if cr == null:
+		_crawler = {}; return
+	var desc: Dictionary = cr.flags.get("crawler", {})
+	var hostile: bool = desc.get("disposition", "neutral") == "hostile"
+	var W := 620.0; var H := 300.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.10, 0.08, 0.05, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 32), "RYWAL: " + cr.name_pl,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_AMBER)
+	draw_string(_font, Vector2(px + 20, py + 58),
+		"Charakter: %s%s" % [desc.get("personality", "?"), "   ·   WROGI" if hostile else ""],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_RED if hostile else COL_DIM)
+	var rows: Array = []
+	if hostile:
+		rows.append({"label": "Walcz (rzuca się na ciebie)", "action": "fight"})
+	else:
+		rows.append({"label": "Pogadaj  (+widownia)", "action": "talk"})
+		rows.append({"label": "Okradnij  (ZRĘ vs 12 — albo łup, albo bójka)", "action": "rob"})
+	rows.append({"label": "Zostaw go", "action": "leave"})
+	var cy := py + 92.0
+	for r in rows:
+		var box := Rect2(px + 16, cy, W - 32, 44)
+		var hot := _hover(box)
+		draw_rect(box, Color(0.18, 0.14, 0.07, 0.95) if hot else Color(0.12, 0.10, 0.07, 0.9))
+		draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
+		draw_string(_font, Vector2(px + 28, cy + 28), r["label"],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 50, 16, COL_BRIGHT)
+		_zone(box, "crawler_action", 0, r["action"])
+		cy += 52.0
+
 ## Safehouse menu: spend scrap on heal / buy materials / sell loot / sponsor
 ## package / intel. Rows are clickable; cost shown + greyed if unaffordable.
 func _draw_safehouse() -> void:
