@@ -2105,8 +2105,10 @@ func _event_line(e: Dictionary) -> String:
 	return ""
 
 var _banner := ""
+var _banner_t := 0.0          # seconds the current banner stays before fading out
 func _add_banner(txt: String) -> void:
 	_banner = txt
+	_banner_t = 2.2
 
 func _add_floater(id: int, text: String, color: Color) -> void:
 	var pos: Vector2 = _vpos.get(id, _cell_px(Vector2i.ZERO))
@@ -2136,6 +2138,10 @@ func _process(dt: float) -> void:
 	_toasts = _toasts.filter(func(x): return float(x["t"]) < float(x["ttl"]))
 	if _ach_flash > 0.0:
 		_ach_flash = maxf(0.0, _ach_flash - dt)
+	if _banner_t > 0.0:
+		_banner_t = maxf(0.0, _banner_t - dt)
+		if _banner_t == 0.0:
+			_banner = ""
 	queue_redraw()
 
 ## Advance the lootbox-opening reveal through its phases.
@@ -2164,17 +2170,15 @@ func _tick_box_anim(dt: float) -> void:
 
 func _draw() -> void:
 	_click_zones.clear()   # rebuilt below to match exactly what's drawn this frame
+	# Full-screen content menus own the whole screen — no toasts layered over them.
 	if _meta_screen:
 		_draw_meta_screen()
-		_draw_toasts()
 		return
 	if _journal_screen and sim != null:
 		_draw_journal()
-		_draw_toasts()
 		return
 	if _ach_screen:
 		_draw_ach_screen()
-		_draw_toasts()
 		return
 	if _title:
 		_draw_title()
@@ -2183,7 +2187,6 @@ func _draw() -> void:
 	if sim == null: return
 	if not _summary.is_empty():
 		_draw_run_summary()
-		_draw_toasts()
 		return
 	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 	var sh := Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
@@ -2455,10 +2458,11 @@ func _draw_hud() -> void:
 		var ogn: String = MetaCatalog.def_of(p.origin_key).get("label", "?")
 		draw_string(_font, Vector2(xb.position.x, 56), "Jesteś: %s  ·  %s" % [spn, ogn],
 			HORIZONTAL_ALIGNMENT_LEFT, 320, 12, META_KIND_COL["species"])
-	# Controls hint (mouse-first)
+	# Controls hint (mouse-first) — clipped to 580px so it can't run under the
+	# top-right level/species readout.
 	draw_string(_font, Vector2(40, 60),
-		"LPM akcja · PPM pchnij · WSAD ruch · Spacja czekaj · E rozbierz · I warsztat · F klasa · G towarzysz · Z zaklęcia · K memetyka · J dziennik",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+		"Ruch: WSAD / LPM  ·  PPM pchnij  ·  E rozbierz  ·  I warsztat  ·  K/J/Z panele",
+		HORIZONTAL_ALIGNMENT_LEFT, 580, 13, COL_DIM)
 	# Weapon / coating / armor
 	var wln := "Broń: nóż"
 	if p.coating == "electric": wln += "  [PRĄD x%d]" % p.coating_charges
@@ -2561,32 +2565,34 @@ func _draw_hud() -> void:
 		var alpha := 0.5 + 0.5 * float(i + 1) / _log.size()
 		draw_string(_font, Vector2(lx + 12, 158 + i * 22), _log[i],
 			HORIZONTAL_ALIGNMENT_LEFT, lw - 24, 14, Color(COL_BRIGHT, alpha))
-	if _banner != "":
+	if _banner != "" and _banner_t > 0.0:
+		var ba: float = clampf(_banner_t / 0.6, 0.0, 1.0)   # fade out over the last 0.6s
 		draw_string(_font, Vector2(_origin.x + 120, _origin.y + 160), _banner,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, COL_BRIGHT)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(COL_BRIGHT, ba))
 	_draw_body_readout(lx, lw)
-	if _craft_open:
-		_draw_craft_panel()
-	if not _class_offer.is_empty():
-		_draw_class_offer()
-	if not _route_offer.is_empty():
-		_draw_route_offer()
-	if not _dlg.is_empty():
-		_draw_dialogue()
+	# Exactly ONE in-game modal at a time (priority order), so nothing ever stacks.
 	if not _box_anim.is_empty():
 		_draw_box_open()
-	if not _levelup.is_empty():
+	elif not _levelup.is_empty():
 		_draw_levelup()
-	if not _safehouse.is_empty():
-		_draw_safehouse()
-	if not _crawler.is_empty():
-		_draw_crawler_modal()
-	if not _event.is_empty():
+	elif not _event.is_empty():
 		_draw_event_modal()
-	if _spellbook:
+	elif not _route_offer.is_empty():
+		_draw_route_offer()
+	elif not _class_offer.is_empty():
+		_draw_class_offer()
+	elif not _dlg.is_empty():
+		_draw_dialogue()
+	elif not _safehouse.is_empty():
+		_draw_safehouse()
+	elif not _crawler.is_empty():
+		_draw_crawler_modal()
+	elif _spellbook:
 		_draw_spellbook()
-	if _meme_screen:
+	elif _meme_screen:
 		_draw_meme_screen()
+	elif _craft_open:
+		_draw_craft_panel()
 	_draw_toasts()
 
 ## VS-style achievement toasts: tier-framed panels that slide in from the right,

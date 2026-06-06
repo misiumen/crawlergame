@@ -363,6 +363,13 @@ func _initialize() -> void:
 	var celeb: Dictionary = Flavor.celebrity_for(2, bv._narr_rng)
 	_ck(not celeb.is_empty() and celeb.has("intro"), "a depth-appropriate celebrity cameo is available")
 
+	# banner auto-clears (was sticking forever — "zadanie wykonane" never vanished)
+	bv._add_banner("TEST BANNER")
+	_ck(bv._banner == "TEST BANNER", "a banner shows when triggered")
+	for i in 30:
+		bv._process(0.1)                 # 3s of frames > the 2.2s banner timer
+	_ck(bv._banner == "", "the banner auto-clears after its timer")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)
