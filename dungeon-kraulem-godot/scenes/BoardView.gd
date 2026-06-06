@@ -66,6 +66,16 @@ var _levelup: Dictionary = {}        # pending level-up: spend skill points (non
 var _ach_flash := 0.0                # golden screen-edge burst on a gold/platinum unlock
 var _ach_scroll := 0.0               # achievements gallery scroll offset (px)
 var _ach_recipes_seen := 0           # discovered-recipe count, to detect new ones for goals
+var _meta_screen := false            # loadout & meta-unlocks screen (from the title)
+var _meta_scroll := 0.0
+const META_KIND_COL := {
+	"species":    Color(0.55, 0.92, 0.98),
+	"origin":     Color(1.00, 0.84, 0.27),
+	"start_perk": Color(0.62, 0.86, 0.55),
+	"item":       Color(0.80, 0.66, 0.95),
+	"companion":  Color(0.95, 0.72, 0.45),
+	"biome":      Color(0.55, 0.80, 0.70),
+}
 const ACH_TIER_COL := {              # Vampire-Survivors tier frames
 	"bronze":   Color(0.80, 0.52, 0.28),
 	"silver":   Color(0.78, 0.82, 0.86),
@@ -95,6 +105,7 @@ func _build() -> void:
 	_env_kills = 0
 	var content := _content_bundle()
 	_narr_rng.seed = 9001
+	_register_loadout_biomes()           # owned biomes join the route pool (fresh OR resumed)
 	# Resume from a checkpoint if one exists.
 	if Save.has_save():
 		var sd := Save.read()
@@ -114,10 +125,11 @@ func _build() -> void:
 	sim = floor.sim
 	_hint = data.get("hint", "")
 	_log = ["Piętro 1. Zaczynasz zjazd. Rozbieraj, kuj, walcz — i schodź głębiej."]
+	_apply_loadout()               # bake the meta-progression loadout into this fresh run
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
-	Save.write(floor, _run_seed)   # checkpoint at the start
+	Save.write(floor, _run_seed)   # checkpoint at the start (loadout now baked into the save)
 
 func _new_seed() -> int:
 	# Varies per launch (Math.random/argless Date are unavailable in this harness).
@@ -268,12 +280,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	# ── Mouse: LMB acts (UI option, or board attack/talk/move), RMB shoves ──
 	if event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
-		# Wheel scrolls the achievements gallery.
+		# Wheel scrolls the achievements gallery / meta screen.
 		if _ach_screen:
 			if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 				_ach_scroll += 56.0; queue_redraw(); return
 			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
 				_ach_scroll = maxf(0.0, _ach_scroll - 56.0); queue_redraw(); return
+		if _meta_screen:
+			if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				_meta_scroll += 56.0; queue_redraw(); return
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_meta_scroll = maxf(0.0, _meta_scroll - 56.0); queue_redraw(); return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			# On-screen buttons/options first. Reverse order so panels drawn LAST
 			# (modals on top) win over board-HUD zones underneath them.
@@ -291,6 +308,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var kc: int = (event as InputEventKey).keycode
 
+	# Loadout & meta-unlocks screen (from the title): scroll + Esc returns.
+	if _meta_screen:
+		if kc == KEY_ESCAPE or kc == KEY_M:
+			_meta_screen = false; queue_redraw()
+		elif kc == KEY_DOWN: _meta_scroll += 84.0; queue_redraw()
+		elif kc == KEY_UP:   _meta_scroll = maxf(0.0, _meta_scroll - 84.0); queue_redraw()
+		elif kc == KEY_PAGEDOWN: _meta_scroll += 480.0; queue_redraw()
+		elif kc == KEY_PAGEUP:   _meta_scroll = maxf(0.0, _meta_scroll - 480.0); queue_redraw()
+		elif kc == KEY_ENTER or kc == KEY_KP_ENTER:
+			_start_run_from_meta()
+		return
+
 	# Achievements gallery (opened from the title): scroll + Esc/back returns.
 	if _ach_screen:
 		if kc == KEY_ESCAPE or kc == KEY_A:
@@ -306,6 +335,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _title:
 		if kc == KEY_A:
 			_open_ach_screen(); return
+		if kc == KEY_M:
+			_meta_screen = true; _meta_scroll = 0.0; queue_redraw(); return
 		if kc == KEY_N:
 			Save.clear()
 		if kc == KEY_ENTER or kc == KEY_KP_ENTER or kc == KEY_N or kc == KEY_SPACE:
@@ -398,7 +429,7 @@ func _can_take_board_input() -> bool:
 	return not _title and not _done and sim != null \
 		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
-		and _levelup.is_empty() and not _ach_screen
+		and _levelup.is_empty() and not _ach_screen and not _meta_screen
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -482,6 +513,11 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"aim_part":          _set_aim(z.get("s", ""))
 		"ach_open":          _open_ach_screen()
 		"ach_back":          _ach_screen = false; queue_redraw()
+		"meta_open":         _meta_screen = true; _meta_scroll = 0.0; queue_redraw()
+		"meta_back":         _meta_screen = false; queue_redraw()
+		"meta_buy":          _meta_buy(z.get("s", ""))
+		"meta_pick":         _meta_pick(z.get("s", ""))
+		"meta_start":        _start_run_from_meta()
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
 
@@ -534,6 +570,64 @@ func _grant_level_box(lv: int) -> void:
 		box.contents.append({"type": "item_key", "key": keys[_narr_rng.randi_range(0, keys.size() - 1)]})
 	floor.boxes.append(box)
 	_log_push("Awans nagradza skrzynką — odbierz ją na planszy.")
+
+## Register every owned meta biome into the route pool (so it can appear at the
+## stairs). Safe to call on both fresh and resumed runs.
+func _register_loadout_biomes() -> void:
+	Routes.clear_extra()
+	for ent in MetaCatalog.active_effects():
+		var eff: Dictionary = ent["effect"]
+		if eff.has("biome"):
+			Routes.register(ent["key"], eff["biome"])
+
+## Bake the meta-progression loadout (chosen species + origin + all owned passives)
+## into the fresh-run player + run state. The faithful "menu of choices" payoff.
+func _apply_loadout() -> void:
+	var p := floor.player
+	var applied: Array = []
+	for ent in MetaCatalog.active_effects():
+		var eff: Dictionary = ent["effect"]
+		if eff.is_empty():
+			continue
+		applied.append(ent["label"])
+		for st in (eff.get("stats", {}) as Dictionary):
+			p.stats[st] = int(p.stats.get(st, 0)) + int(eff["stats"][st])
+		if eff.has("hp"):
+			p.max_hp += int(eff["hp"]); p.hp = p.max_hp
+		if eff.has("bonus_damage"):
+			p.bonus_damage += int(eff["bonus_damage"])
+		for t in (eff.get("tags", []) as Array):
+			if t not in p.tags: p.tags.append(t)
+		if eff.has("coating"):
+			p.coating = str(eff["coating"].get("type", "")); p.coating_charges = int(eff["coating"].get("charges", 0))
+		for mk in (eff.get("materials", {}) as Dictionary):
+			floor.inv[mk] = int(floor.inv.get(mk, 0)) + int(eff["materials"][mk])
+		for ik in (eff.get("items", []) as Array):
+			var it := _item_from_template(str(ik))
+			if it != null: floor.items.append(it)
+		if eff.has("audience") and floor.audience != null:
+			floor.audience.change(int(eff["audience"]), "loadout")
+		if eff.has("sponsor_all") and floor.sponsors != null:
+			for sk in floor.sponsors.all_keys():
+				floor.sponsors.attention[sk] = floor.sponsors.get_attention(sk) + int(eff["sponsor_all"])
+	if not applied.is_empty():
+		_log_push("Ekwipunek sezonu: " + ", ".join(applied) + ".")
+
+## Build a GameItem from an item_templates entry (shared by loadout + level boxes).
+func _item_from_template(key: String) -> GameItem:
+	var tpl: Variant = _data_group("item_templates", "ITEM_TEMPLATES")
+	if not (tpl is Dictionary) or not (tpl as Dictionary).has(key):
+		return null
+	var t: Dictionary = tpl[key]
+	var cat := GameItem.category_from_type(t.get("type", "tool"))
+	var it := GameItem.new(t.get("fallback_name", key), cat, t.get("rarity", Rarity.COMMON))
+	var tg: Variant = t.get("tags", [])
+	it.tags = (tg if tg is Array else []).duplicate()
+	it.origin = "meta"
+	if cat == GameItem.CAT_ARMOR:
+		it.effect = {"slot": it.armor_slot(), "ac_bonus": 1 + Rarity.order(it.rarity) / 2}
+		it.charges = 0
+	return it
 
 ## Spend one banked skill point raising `stat` by 1 (closes when the bank is dry).
 func _spend_skill_point(stat: String) -> void:
@@ -691,6 +785,29 @@ func _push_ach_toast(d: Dictionary) -> void:
 
 func _ach_tier_color(tier: String) -> Color:
 	return ACH_TIER_COL.get(tier, COL_BRIGHT)
+
+## Buy a meta unlock with prestige points; a confirming log line + a small flash.
+func _meta_buy(key: String) -> void:
+	if key == "":
+		return
+	if MetaCatalog.try_purchase(key):
+		_log_push("Odblokowano: %s." % MetaCatalog.def_of(key).get("label", key))
+		_ach_flash = maxf(_ach_flash, 0.5)
+	queue_redraw()
+
+## Select an owned species/origin for the next run.
+func _meta_pick(key: String) -> void:
+	if MetaCatalog.kind_of(key) == "species":
+		MetaCatalog.set_species(key)
+	elif MetaCatalog.kind_of(key) == "origin":
+		MetaCatalog.set_origin(key)
+	queue_redraw()
+
+## Start a fresh run from the loadout screen (abandons any in-progress save).
+func _start_run_from_meta() -> void:
+	_meta_screen = false
+	Save.clear()
+	_build()
 
 ## Open the achievements gallery. Looking at your own trophies is, itself, an
 ## achievement (a hidden one).
@@ -1399,6 +1516,10 @@ func _tick_box_anim(dt: float) -> void:
 
 func _draw() -> void:
 	_click_zones.clear()   # rebuilt below to match exactly what's drawn this frame
+	if _meta_screen:
+		_draw_meta_screen()
+		_draw_toasts()
+		return
 	if _ach_screen:
 		_draw_ach_screen()
 		_draw_toasts()
@@ -1499,10 +1620,18 @@ func _draw_title() -> void:
 		"🏆  Osiągnięcia  (%d / %d)   [A]" % [Achievements.count_unlocked(), Achievements.total()],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_AMBER)
 	_zone(Rect2(176, y - 2, 520, 32), "ach_open")
-	# Meta progress
+	# Loadout & meta-progression entry
+	var lo := MetaCatalog.loadout()
 	draw_string(_font, Vector2(184, y + 54),
-		"Odblokowane opcje na przyszłe biegi: %d" % Meta.unlocked_count(),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_GREEN)
+		"🧬  Ekwipunek sezonu  (%s · %s)   [M]" % [
+			MetaCatalog.def_of(lo["species"]).get("label", "?"),
+			MetaCatalog.def_of(lo["origin"]).get("label", "?")],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_GREEN)
+	_zone(Rect2(176, y + 32, 520, 30), "meta_open")
+	draw_string(_font, Vector2(184, y + 82),
+		"Prestiż: %d / %d pkt    ·    odblokowane opcje: %d" % [
+			MetaCatalog.available_prestige(), Achievements.points_total(), Meta.unlocked_count()],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ACH_TIER_COL["gold"])
 	# Controls primer (mouse-first)
 	draw_string(_font, Vector2(184, 632),
 		"MYSZ:  lewy = atak / rozmowa / ruch / wybór opcji      prawy = pchnięcie wroga",
@@ -1874,6 +2003,105 @@ func _draw_ach_screen() -> void:
 ## Merged catalog accessor for the gallery (kept tiny so the draw loop reads clean).
 func catalog_for_gallery() -> Dictionary:
 	return Achievements.catalog()
+
+## Loadout & meta-progression screen: pick an owned species + origin, spend
+## achievement prestige to unlock more, and launch a fresh run with it all baked in.
+func _draw_meta_screen() -> void:
+	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+	var lo := MetaCatalog.loadout()
+	draw_string(_font, Vector2(60, 58), "EKWIPUNEK SEZONU", HORIZONTAL_ALIGNMENT_LEFT, -1, 32, COL_AMBER)
+	draw_string(_font, Vector2(60, 86),
+		"Wybrane:  %s  ·  %s" % [MetaCatalog.def_of(lo["species"]).get("label", "?"),
+			MetaCatalog.def_of(lo["origin"]).get("label", "?")],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_BRIGHT)
+	draw_string(_font, Vector2(700, 58),
+		"Prestiż do wydania: %d / %d" % [MetaCatalog.available_prestige(), Achievements.points_total()],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ACH_TIER_COL["gold"])
+	draw_string(_font, Vector2(700, 84),
+		"Zdobywaj punkty osiągnięciami, wydawaj na gatunki, atuty i biomy.",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+
+	# Start button
+	var start := Rect2(700, 110, 300, 36)
+	var shot := _hover(start)
+	draw_rect(start, Color(0.10, 0.20, 0.12, 0.96) if shot else Color(0.08, 0.13, 0.10, 0.9))
+	draw_rect(start, COL_GREEN, false, 2.0 if shot else 1.5)
+	draw_string(_font, Vector2(start.position.x + 16, start.position.y + 26),
+		"▶  ROZPOCZNIJ BIEG  [Enter]", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_GREEN)
+	_zone(start, "meta_start")
+
+	# ── Scrollable two-column list of every catalog entry ──
+	var cols := 2
+	var cw := 568.0; var rh := 66.0; var gap := 8.0
+	var x0 := 60.0; var top := 150.0; var bottom := 686.0
+	var order: Array = MetaCatalog.ORDER
+	var rows: int = int(ceil(order.size() / float(cols)))
+	var content_h := rows * (rh + gap)
+	var max_scroll := maxf(0.0, content_h - (bottom - top))
+	_meta_scroll = clampf(_meta_scroll, 0.0, max_scroll)
+	for i in order.size():
+		var key: String = order[i]
+		var d: Dictionary = MetaCatalog.CATALOG[key]
+		var kind: String = d["kind"]
+		var col := i % cols; var row := i / cols
+		var x := x0 + col * (cw + 16)
+		var y := top + row * (rh + gap) - _meta_scroll
+		if y + rh < top or y > bottom:
+			continue
+		var owned := MetaCatalog.is_owned(key)
+		var selected: bool = (key == lo["species"] or key == lo["origin"])
+		var kc: Color = META_KIND_COL.get(kind, COL_BRIGHT)
+		draw_rect(Rect2(x, y, cw, rh), Color(0.10, 0.11, 0.14, 0.96) if owned else Color(0.05, 0.05, 0.07, 0.92))
+		var frame := COL_GREEN if selected else (kc if owned else COL_GRID)
+		draw_rect(Rect2(x, y, cw, rh), frame, false, 2.0 if (owned or selected) else 1.0)
+		draw_rect(Rect2(x, y, 5, rh), kc)
+		draw_string(_font, Vector2(x + 14, y + 13), MetaCatalog.KIND_LABELS.get(kind, kind),
+			HORIZONTAL_ALIGNMENT_LEFT, 200, 10, kc)
+		draw_string(_font, Vector2(x + 14, y + 32), d.get("label", key),
+			HORIZONTAL_ALIGNMENT_LEFT, cw - 150, 16, COL_BRIGHT if owned else COL_DIM)
+		draw_string(_font, Vector2(x + 14, y + 52), d.get("reward", ""),
+			HORIZONTAL_ALIGNMENT_LEFT, cw - 150, 11, COL_DIM)
+		# right-side action / status
+		var ax := x + cw - 132
+		var btn := Rect2(ax, y + 16, 120, 34)
+		if owned:
+			if kind == "species" or kind == "origin":
+				if selected:
+					draw_string(_font, Vector2(ax, y + 30), "✓ WYBRANY", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_GREEN)
+				else:
+					var ph := _hover(btn)
+					draw_rect(btn, Color(kc, 0.25 if ph else 0.12))
+					draw_rect(btn, kc, false, 1.0)
+					draw_string(_font, Vector2(ax + 14, y + 38), "WYBIERZ", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_BRIGHT)
+					_zone(btn, "meta_pick", 0, key)
+			else:
+				draw_string(_font, Vector2(ax, y + 30), "✓ aktywne", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, kc)
+		else:
+			var cost := MetaCatalog.cost_of(key)
+			var afford := cost <= MetaCatalog.available_prestige()
+			if afford:
+				var bh := _hover(btn)
+				draw_rect(btn, Color(ACH_TIER_COL["gold"], 0.25 if bh else 0.12))
+				draw_rect(btn, ACH_TIER_COL["gold"], false, 1.0)
+				draw_string(_font, Vector2(ax + 8, y + 38), "KUP: %d" % cost, HORIZONTAL_ALIGNMENT_LEFT, 120, 13, ACH_TIER_COL["gold"])
+				_zone(btn, "meta_buy", 0, key)
+			else:
+				draw_string(_font, Vector2(ax, y + 30), "🔒 %d pkt" % cost, HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_DIM)
+	if max_scroll > 0.0:
+		var bar_h := (bottom - top) * ((bottom - top) / content_h)
+		var bar_y := top + ((bottom - top) - bar_h) * (_meta_scroll / max_scroll)
+		draw_rect(Rect2(1244, bar_y, 5, bar_h), Color(COL_AMBER, 0.6))
+	# Back button (top-right, clear of the list)
+	var back := Rect2(1040, 110, 120, 36)
+	var bkh := _hover(back)
+	draw_rect(back, Color(0.14, 0.10, 0.10, 0.95) if bkh else Color(0.09, 0.07, 0.07, 0.9))
+	draw_rect(back, COL_RED if bkh else COL_GRID, false, 1.5)
+	draw_string(_font, Vector2(back.position.x + 12, back.position.y + 26), "← powrót",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, COL_BRIGHT)
+	_zone(back, "meta_back")
+	draw_string(_font, Vector2(60, 706),
+		"[Esc]/[M] powrót   ·   kółko / [↑][↓] przewijaj   ·   kliknij KUP by odblokować, WYBIERZ by założyć",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 
 ## Vampire-Survivors-style lootbox reveal: a slot reel of rarity tiles spins and
 ## decelerates, SNAPS onto the box's tier with a flash, then the loot pops in.

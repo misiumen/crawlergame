@@ -47,9 +47,28 @@ const BIOMES: Dictionary = {
 	},
 }
 
+## Meta-progression biomes (unlocked via the catalog) register here so they join
+## the route pool for the run. Cleared + repopulated when a loadout is applied.
+static var _extra: Dictionary = {}
+
+static func register(key: String, def: Dictionary) -> void:
+	_extra[key] = def
+
+static func clear_extra() -> void:
+	_extra.clear()
+
+## All currently-offerable biomes (built-in + meta-unlocked).
+static func all_biomes() -> Dictionary:
+	if _extra.is_empty():
+		return BIOMES
+	var m := BIOMES.duplicate(true)
+	for k in _extra:
+		m[k] = _extra[k]
+	return m
+
 ## Offer n distinct routes (keys), chosen without replacement.
 static func offer(rng: RandomNumberGenerator, n: int = 3) -> Array:
-	var keys: Array = BIOMES.keys()
+	var keys: Array = all_biomes().keys()
 	# Fisher–Yates shuffle (seeded), then take n.
 	for i in range(keys.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)
@@ -59,7 +78,7 @@ static func offer(rng: RandomNumberGenerator, n: int = 3) -> Array:
 ## The generation modifiers for a biome key (with the key + label folded in so
 ## FloorGen can stamp the floor name). Unknown key -> neutral mods.
 static func mods_for(key: String) -> Dictionary:
-	var b: Dictionary = BIOMES.get(key, {})
+	var b: Dictionary = all_biomes().get(key, {})
 	return {
 		"biome_key": key,
 		"label": b.get("label", ""),
@@ -70,7 +89,7 @@ static func mods_for(key: String) -> Dictionary:
 	}
 
 static func label_of(key: String) -> String:
-	return BIOMES.get(key, {}).get("label", key)
+	return all_biomes().get(key, {}).get("label", key)
 
 static func blurb_of(key: String) -> String:
-	return BIOMES.get(key, {}).get("blurb", "")
+	return all_biomes().get(key, {}).get("blurb", "")

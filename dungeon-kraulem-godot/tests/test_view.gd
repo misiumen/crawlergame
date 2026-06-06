@@ -15,6 +15,7 @@ func _initialize() -> void:
 	print("=== view tests ===")
 	Save.clear()                         # start from a clean slate, not a leftover save
 	Achievements.reset()
+	MetaCatalog.reset()                  # default loadout (no effects) for a deterministic build
 	var bv = preload("res://scenes/BoardView.gd").new()
 	bv._font = ThemeDB.fallback_font
 	bv._build()                          # (_ready is deferred under -s; call directly)
@@ -204,6 +205,25 @@ func _initialize() -> void:
 	_ck(true, "achievements gallery draws without crash")
 	bv._dispatch_zone({"kind": "ach_back"})
 	_ck(not bv._ach_screen, "closing the gallery works")
+
+	# meta loadout: an owned perk's effect bakes into the run on _apply_loadout
+	MetaCatalog.reset()
+	for k in ["kill_250", "aw_poziom_20", "win_pacifist"]:   # 36 prestige
+		Achievements.unlock(k)
+	_ck(MetaCatalog.try_purchase("perk_dzikus_z_arena"), "buy a start perk with earned prestige")
+	var hp_before: int = bv.sim.player().max_hp
+	var str_before: int = int(bv.sim.player().stats.get("STR", 0))
+	bv._apply_loadout()
+	_ck(bv.sim.player().max_hp >= hp_before + 10, "owned perk adds max HP at loadout")
+	_ck(int(bv.sim.player().stats.get("STR", 0)) >= str_before + 1, "owned perk adds STR at loadout")
+	# the loadout & meta screen opens + draws without crashing
+	bv._meta_screen = true
+	for i in 2:
+		bv._process(0.016)
+	_ck(true, "meta/loadout screen draws without crash")
+	bv._dispatch_zone({"kind": "meta_back"})
+	_ck(not bv._meta_screen, "closing the meta screen works")
+	MetaCatalog.reset()
 
 	# hammer many actions + frames; must never crash
 	for i in 30:
