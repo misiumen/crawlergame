@@ -68,6 +68,7 @@ var _ach_scroll := 0.0               # achievements gallery scroll offset (px)
 var _ach_recipes_seen := 0           # discovered-recipe count, to detect new ones for goals
 var _meta_screen := false            # loadout & meta-unlocks screen (from the title)
 var _meta_scroll := 0.0
+var _safehouse: Dictionary = {}      # open safehouse modal: {id, subtype} (non-empty = open)
 const META_KIND_COL := {
 	"species":    Color(0.55, 0.92, 0.98),
 	"origin":     Color(1.00, 0.84, 0.27),
@@ -121,6 +122,7 @@ func _build() -> void:
 			if floor.objective.is_empty():               # older save / first time → roll one
 				floor.objective = Objectives.pick(floor.depth, _narr_rng)
 			_attach_bodies(); _recenter(); _reset_visuals()
+			_spawn_safehouse()
 			return
 	# Fresh run.
 	_run_seed = _new_seed()
@@ -136,6 +138,7 @@ func _build() -> void:
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
+	_spawn_safehouse()
 	Save.write(floor, _run_seed)   # checkpoint at the start (loadout now baked into the save)
 
 func _new_seed() -> int:
@@ -196,6 +199,7 @@ func _descend_into(biome_key: String) -> void:
 	_attach_bodies()
 	_recenter()
 	_reset_visuals()
+	_spawn_safehouse()
 	_arm_floor_traits()            # re-arm per-floor species traits (e.g. first strike)
 	floor.objective = Objectives.pick(next_depth, _narr_rng)   # a fresh segment goal
 	_log_push("Piętro %d — %s." % [next_depth, Routes.label_of(biome_key)])
@@ -360,6 +364,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_build()
 		return
 
+	# Safehouse menu grabs input until you leave (Esc).
+	if not _safehouse.is_empty():
+		if kc == KEY_ESCAPE:
+			_safehouse = {}; queue_redraw()
+		return
+
 	# NPC dialogue grabs input until you choose or walk away (Esc).
 	if not _dlg.is_empty():
 		if kc == KEY_ESCAPE:
@@ -439,7 +449,7 @@ func _can_take_board_input() -> bool:
 	return not _title and not _done and sim != null \
 		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
-		and _levelup.is_empty() and not _ach_screen and not _meta_screen
+		and _levelup.is_empty() and not _ach_screen and not _meta_screen and _safehouse.is_empty()
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -528,6 +538,8 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"meta_buy":          _meta_buy(z.get("s", ""))
 		"meta_pick":         _meta_pick(z.get("s", ""))
 		"meta_start":        _start_run_from_meta()
+		"safe_action":       _safehouse_action(z.get("s", ""), i)
+		"safe_close":        _safehouse = {}; queue_redraw()
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
 
@@ -682,6 +694,32 @@ func _spawn_hunter(hunter_name: String) -> void:
 	_add_banner("ŁOWCA SPONSORA")
 	_shake = maxf(_shake, 7.0)
 	queue_redraw()
+
+## Place this floor's safehouse in the starting room (always reachable). The
+## subtype is deterministic per depth, so a reloaded floor shows the same one.
+func _spawn_safehouse() -> void:
+	if sim == null or floor == null:
+		return
+	# Don't double-spawn if one is already on this room's board.
+	for id in sim.entities:
+		if sim.entities[id].faction == "safehouse":
+			return
+	var sub := Safehouse.subtype_for(floor.depth)
+	var id := 800
+	while sim.entities.has(id):
+		id += 1
+	var sh := CombatEntity.new(id, Safehouse.name_of(sub), 1, 10, ["safehouse"])
+	sh.faction = "safehouse"
+	sh.monster_key = sub                       # stash the subtype on the entity
+	var spot := _free_cell_for_spawn(sim.player().cell)
+	if spot == Vector2i(-1, -1):
+		return
+	sh.cell = spot
+	sim.board.place(id, spot)
+	sim.entities[id] = sh
+	floor.rooms[floor.current]["entities"][id] = sh   # persists within the floor
+	var px := _cell_px(spot)
+	_vpos[id] = px; _vtarget[id] = px
 
 ## A walkable, unoccupied cell within a few tiles of `origin` (for dynamic spawns).
 func _free_cell_for_spawn(origin: Vector2i) -> Vector2i:
@@ -1296,6 +1334,82 @@ func _use_class_active() -> void:
 	_advance_floor_turn()
 	_check_transition()
 
+## ── Safehouse: spend scrap to heal / buy / sell / get a sponsor package ──────
+func _zlom() -> int:
+	return int(sim.materials.get("złom", 0))
+
+func _spend_zlom(n: int) -> bool:
+	if _zlom() < n:
+		_log_push("Za mało złomu (masz %d, trzeba %d)." % [_zlom(), n])
+		return false
+	sim.materials["złom"] = _zlom() - n   # sim.materials is the live run-inventory ref
+	return true
+
+func _open_safehouse(id: int) -> void:
+	var sh = sim.entities.get(id)
+	if sh == null or sh.faction != "safehouse":
+		return
+	_safehouse = {"id": id, "subtype": sh.monster_key}
+	_log_push("%s: %s" % [Safehouse.name_of(sh.monster_key), Safehouse.blurb_of(sh.monster_key)])
+	queue_redraw()
+
+## Resolve a clicked safehouse row. `arg` carries the item index for buy/sell.
+func _safehouse_action(action: String, arg: int) -> void:
+	if _safehouse.is_empty():
+		return
+	var p := sim.player()
+	match action:
+		"heal_small":
+			if p.hp >= p.max_hp:
+				_log_push("Jesteś już w pełni zdrowia."); queue_redraw(); return
+			if _spend_zlom(6):
+				var got := mini(12, p.max_hp - p.hp)
+				p.hp += got
+				_add_floater(sim.player_id, "+%d HP" % got, COL_GREEN)
+				_log_push("Klinika cię zszywa: +%d HP (−6 złomu)." % got)
+		"heal_full":
+			if p.hp >= p.max_hp:
+				_log_push("Jesteś już w pełni zdrowia."); queue_redraw(); return
+			if _spend_zlom(20):
+				var got := p.max_hp - p.hp
+				p.hp = p.max_hp
+				_add_floater(sim.player_id, "+%d HP" % got, COL_GREEN)
+				_log_push("Pełne leczenie. Rachunek boli bardziej niż rany. (−20 złomu)")
+		"ad":
+			if _spend_zlom(4) and floor.audience != null:
+				floor.audience.change(6, "kiosk")
+				_log_push("Reklama sponsora. Głośna, idiotyczna — widownia klaszcze. (−4 złomu)")
+		"box":
+			if _spend_zlom(18):
+				var box := GameBox.new("kiosk", "Kiosk sponsora", Rarity.UNCOMMON)
+				box.contents.append({"type": "material", "key": "złom", "qty": _narr_rng.randi_range(3, 6)})
+				var tpl: Variant = _data_group("item_templates", "ITEM_TEMPLATES")
+				if tpl is Dictionary and not (tpl as Dictionary).is_empty():
+					var keys: Array = (tpl as Dictionary).keys()
+					box.contents.append({"type": "item_key", "key": keys[_narr_rng.randi_range(0, keys.size() - 1)]})
+				floor.boxes.append(box)
+				_log_push("Kupujesz paczkę sponsora — odbierz skrzynkę na planszy. (−18 złomu)")
+		"read":
+			if floor.audience != null:
+				floor.audience.change(3, "tablica")
+			var obj_line := Objectives.describe(floor.objective) if not floor.objective.is_empty() else "brak"
+			_log_push("Tablica: plotki z areny. Cel piętra: %s. (+3 widowni)" % obj_line)
+		"buy":
+			if arg >= 0 and arg < Safehouse.BUY_MATS.size():
+				var entry: Dictionary = Safehouse.BUY_MATS[arg]
+				if _spend_zlom(int(entry["price"])):
+					var mk: String = entry["mat"]
+					sim.materials[mk] = int(sim.materials.get(mk, 0)) + 1
+					_log_push("Kupujesz: %s. (−%d złomu)" % [mk, int(entry["price"])])
+		"sell":
+			if arg >= 0 and arg < floor.items.size():
+				var it := floor.items[arg] as GameItem
+				var price := Safehouse.sell_price(it.rarity)
+				floor.items.remove_at(arg)
+				sim.materials["złom"] = _zlom() + price
+				_log_push("Sprzedajesz: %s. (+%d złomu)" % [it.name_pl, price])
+	queue_redraw()
+
 func _open_dialogue(npc_id: int) -> void:
 	var npc = sim.entities.get(npc_id)
 	if npc == null or npc.dialogue_tree_key == "":
@@ -1455,6 +1569,8 @@ func _animate(evs: Array) -> void:
 				_shake = maxf(_shake, 5.0)
 			"talk":
 				_open_dialogue(int(e.get("npc_id", -1)))
+			"safehouse":
+				_open_safehouse(int(e.get("id", -1)))
 			"throw":
 				_add_floater(sim.player_id, "RZUT", COL_AMBER)
 				_log_push("Rzucasz: %s!" % e.get("name", "?"))
@@ -1717,6 +1833,7 @@ func _draw() -> void:
 		var fade: float = _dying.get(id, 1.0)
 		var flashing := _flash.has(id)
 		if e.faction == "player":      _draw_player(pos, fade)
+		elif e.faction == "safehouse": _draw_safehouse_token(pos, fade)
 		elif e.faction == "ally":      _draw_ally(e, pos, fade)
 		elif e.faction == "object":    _draw_object(e, pos, fade)
 		elif e.faction == "npc":       _draw_npc(pos, fade)
@@ -1821,6 +1938,17 @@ func _draw_ally(e: CombatEntity, pos: Vector2, fade: float) -> void:
 		var frac: float = clampf(float(e.hp) / float(e.max_hp), 0.0, 1.0)
 		draw_rect(Rect2(pos.x - 14, pos.y + 16, 28, 4), Color(0.1, 0.1, 0.1, fade))
 		draw_rect(Rect2(pos.x - 14, pos.y + 16, 28 * frac, 4), Color(col, fade))
+
+## A safehouse on the board: a calm cyan tent/booth with a '+' so it reads as a
+## safe spot to step into (bump it to open the menu).
+func _draw_safehouse_token(pos: Vector2, fade: float) -> void:
+	var col := COL_CYAN; col.a = fade
+	draw_rect(Rect2(pos.x - 15, pos.y - 12, 30, 26), Color(0.10, 0.20, 0.24, fade))
+	draw_rect(Rect2(pos.x - 15, pos.y - 12, 30, 26), col, false, 2.0)
+	# little roof
+	draw_line(pos + Vector2(-17, -12), pos + Vector2(0, -22), col, 2.0)
+	draw_line(pos + Vector2(17, -12), pos + Vector2(0, -22), col, 2.0)
+	draw_string(_font, pos + Vector2(-5, 8), "✚", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, col)
 
 func _draw_rat(pos: Vector2, fade: float, flashing: bool) -> void:
 	var body := COL_RED if flashing else COL_RAT
@@ -2045,6 +2173,8 @@ func _draw_hud() -> void:
 		_draw_box_open()
 	if not _levelup.is_empty():
 		_draw_levelup()
+	if not _safehouse.is_empty():
+		_draw_safehouse()
 	_draw_toasts()
 
 ## VS-style achievement toasts: tier-framed panels that slide in from the right,
@@ -2438,6 +2568,62 @@ func _draw_route_offer() -> void:
 
 ## Level-up: spend banked skill points on a stat. Click a row (or press its
 ## number); the modal closes when the bank runs dry, or [Esc]/the button banks it.
+## Safehouse menu: spend scrap on heal / buy materials / sell loot / sponsor
+## package / intel. Rows are clickable; cost shown + greyed if unaffordable.
+func _draw_safehouse() -> void:
+	var sub: String = _safehouse.get("subtype", "")
+	var W := 760.0; var H := 460.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.06, 0.08, 0.10, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_CYAN, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 32), Safehouse.name_of(sub).to_upper(),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_CYAN)
+	draw_string(_font, Vector2(px + 20, py + 56), Safehouse.blurb_of(sub),
+		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 13, COL_DIM)
+	draw_string(_font, Vector2(px + W - 200, py + 32), "Złom: %d" % _zlom(),
+		HORIZONTAL_ALIGNMENT_LEFT, 190, 18, COL_AMBER)
+
+	# Build the row list: fixed services + (for the black market) buy + sell rows.
+	var rows: Array = []
+	for s in Safehouse.services(sub):
+		rows.append({"label": s["label"], "cost": int(s["cost"]), "action": s["action"], "arg": 0})
+	if sub == "czarny_rynek":
+		for i in Safehouse.BUY_MATS.size():
+			var e: Dictionary = Safehouse.BUY_MATS[i]
+			rows.append({"label": "Kup: %s" % e["mat"], "cost": int(e["price"]), "action": "buy", "arg": i})
+		for i in floor.items.size():
+			var it := floor.items[i] as GameItem
+			rows.append({"label": "Sprzedaj: %s" % it.display_name(), "cost": -Safehouse.sell_price(it.rarity),
+				"action": "sell", "arg": i})
+
+	var cy := py + 84.0
+	var rh := 34.0
+	for r in rows:
+		if cy > py + H - 80:
+			break                                  # don't overflow the panel
+		var box := Rect2(px + 16, cy, W - 32, rh - 4)
+		var cost: int = int(r["cost"])
+		var affordable: bool = cost <= 0 or _zlom() >= cost
+		var hot := _hover(box) and affordable
+		draw_rect(box, Color(0.12, 0.16, 0.18, 0.95) if hot else Color(0.09, 0.11, 0.13, 0.9))
+		draw_rect(box, COL_CYAN if hot else (COL_GRID if affordable else Color(COL_GRID, 0.5)), false, 1.0)
+		var lcol := COL_BRIGHT if affordable else COL_DIM
+		draw_string(_font, Vector2(px + 28, cy + 21), r["label"], HORIZONTAL_ALIGNMENT_LEFT, W - 200, 15, lcol)
+		var ctxt := "za darmo" if cost == 0 else ("+%d złomu" % (-cost) if cost < 0 else "−%d złomu" % cost)
+		var ccol := COL_GREEN if cost < 0 else (COL_AMBER if affordable else COL_DIM)
+		draw_string(_font, Vector2(px + W - 150, cy + 21), ctxt, HORIZONTAL_ALIGNMENT_LEFT, 130, 14, ccol)
+		if affordable:
+			_zone(box, "safe_action", int(r["arg"]), r["action"])
+		cy += rh
+
+	var close := Rect2(px + W - 150, py + H - 42, 130, 30)
+	var chot := _hover(close)
+	draw_rect(close, COL_GRID if chot else Color(0.10, 0.13, 0.17, 0.9))
+	draw_rect(close, COL_CYAN if chot else COL_GRID, false, 1.0)
+	draw_string(_font, Vector2(close.position.x + 14, close.position.y + 21), "Wyjdź [Esc]",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_BRIGHT)
+	_zone(close, "safe_close")
+
 func _draw_levelup() -> void:
 	var p := sim.player()
 	var W := 720.0; var H := 420.0

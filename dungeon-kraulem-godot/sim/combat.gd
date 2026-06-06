@@ -154,6 +154,8 @@ func player_move(dir: Vector2i) -> Array:
 			return [{"type": "blocked", "reason": "object", "id": t.id}]
 		if t.faction == "npc":
 			return [{"type": "talk", "npc_id": t.id}]   # bump an NPC = talk to it
+		if t.faction == "safehouse":
+			return [{"type": "safehouse", "id": t.id}]  # bump a safehouse = use it
 		if t.faction == "ally":
 			return [{"type": "blocked", "reason": "ally"}]   # don't swing at your own pet
 		evs += _player_attack(t)

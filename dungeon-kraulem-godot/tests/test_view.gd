@@ -255,6 +255,34 @@ func _initialize() -> void:
 	_ck(bv.sim.enemies_alive().size() > foes_before, "a queued sponsor hunter spawns onto the board")
 	_ck(bv.floor.sponsors.pending_hunters.is_empty(), "the hunter queue drains after spawning")
 
+	# safehouse: a clinic heals for scrap; the black market sells loot for scrap
+	bv._spawn_safehouse()
+	var sh_id := -1
+	for id in bv.sim.entities:
+		if bv.sim.entities[id].faction == "safehouse": sh_id = id
+	_ck(sh_id != -1, "a safehouse spawns onto the floor")
+	bv._open_safehouse(sh_id)
+	_ck(not bv._safehouse.is_empty(), "bumping/using a safehouse opens its menu")
+	for i in 2:
+		bv._process(0.016)
+	_ck(true, "safehouse menu draws without crash")
+	# clinic heal: wound the player, give scrap, buy an opatrunek
+	bv.sim.player().hp = 50
+	bv.sim.materials["złom"] = 30
+	bv._safehouse = {"id": sh_id, "subtype": "klinika"}
+	bv._safehouse_action("heal_small", 0)
+	_ck(bv.sim.player().hp > 50, "clinic heal restores HP")
+	_ck(int(bv.sim.materials.get("złom", 0)) == 24, "clinic heal costs 6 scrap")
+	# black market sell: a carried item converts to scrap
+	if not bv.floor.items.is_empty():
+		var z0: int = int(bv.sim.materials.get("złom", 0))
+		var items0: int = bv.floor.items.size()
+		bv._safehouse = {"id": sh_id, "subtype": "czarny_rynek"}
+		bv._safehouse_action("sell", 0)
+		_ck(bv.floor.items.size() == items0 - 1, "selling removes the item")
+		_ck(int(bv.sim.materials.get("złom", 0)) > z0, "selling pays scrap")
+	bv._safehouse = {}
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)
