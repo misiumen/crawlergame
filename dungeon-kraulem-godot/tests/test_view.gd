@@ -329,6 +329,19 @@ func _initialize() -> void:
 	_ck(true, "the knowledge journal draws without crash")
 	bv._journal_screen = false
 
+	# mid-floor decision beat: choosing a fork applies its effect
+	bv._event = {"key": "camera_swarm", "intro": "Kamery!", "forks": [
+		{"label": "Pozuj", "effect": {"audience": 5}},
+		{"label": "Zasłoń twarz", "effect": {"audience": -1}}]}
+	var aud_pre: int = bv.floor.audience.rating if bv.floor.audience else 0
+	for i in 2:
+		bv._process(0.016)
+	_ck(true, "mid-floor event modal draws without crash")
+	bv._event_choose(0)                  # pose for the cameras → +5 audience
+	_ck(bv._event.is_empty(), "choosing a fork closes the beat")
+	if bv.floor.audience:
+		_ck(bv.floor.audience.rating >= aud_pre, "the chosen fork applies its effect")
+
 	# hammer many actions + frames; must never crash
 	for i in 30:
 		bv.handle_dir(Vector2i.LEFT)

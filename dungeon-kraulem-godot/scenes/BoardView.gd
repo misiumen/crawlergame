@@ -71,6 +71,7 @@ var _meta_scroll := 0.0
 var _safehouse: Dictionary = {}      # open safehouse modal: {id, subtype} (non-empty = open)
 var _crawler: Dictionary = {}        # open rival-crawler parley modal: {id} (non-empty = open)
 var _spellbook := false               # spell list overlay (cast with mana)
+var _event: Dictionary = {}           # active mid-floor decision beat (non-empty = modal)
 var _journal_screen := false          # knowledge journal overlay (clues + rumors)
 var _journal_scroll := 0.0
 const META_KIND_COL := {
@@ -391,6 +392,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			_crawler = {}; queue_redraw()
 		return
 
+	# Mid-floor decision beat grabs input until a fork is chosen (1/2).
+	if not _event.is_empty():
+		var ei := kc - KEY_1
+		if ei >= 0 and ei < (_event.get("forks", []) as Array).size():
+			_event_choose(ei)
+		return
+
 	# Knowledge journal: scroll + close.
 	if _journal_screen:
 		if kc == KEY_ESCAPE or kc == KEY_J:
@@ -500,7 +508,8 @@ func _can_take_board_input() -> bool:
 		and _summary.is_empty() and _dlg.is_empty() and _box_anim.is_empty() \
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
 		and _levelup.is_empty() and not _ach_screen and not _meta_screen \
-		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook and not _journal_screen
+		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook \
+		and not _journal_screen and _event.is_empty()
 
 ## Viewport pixel -> board cell.
 func _cell_from_mouse(pos: Vector2) -> Vector2i:
@@ -593,6 +602,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"safe_close":        _safehouse = {}; queue_redraw()
 		"crawler_action":    _crawler_action(z.get("s", ""))
 		"cast":              _cast_spell(z.get("s", ""))
+		"event_fork":        _event_choose(i)
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
 
@@ -1400,6 +1410,14 @@ func _advance_floor_turn() -> void:
 	# Biome gimmick: a periodic flavor quirk with a tiny mechanical nudge.
 	if floor.turn > 0 and floor.turn % 6 == 0:
 		_animate(BiomeGimmicks.tick(floor, sim, _narr_rng))
+	# Mid-floor decision beat: at most once per floor, after a few turns.
+	if _event.is_empty() and floor.turn >= 5 \
+			and int(floor.player.flags.get("event_floor", -1)) != floor.depth \
+			and _narr_rng.randf() < 0.5:
+		floor.player.flags["event_floor"] = floor.depth
+		_event = MidFloorEvents.pick(_narr_rng)
+		_log_push("Przerwa w akcji: %s" % _event.get("intro", ""))
+		queue_redraw()
 	# The Syndicate may now read your style and offer a class.
 	if _class_offer.is_empty():
 		var offer := floor.check_class_offer()
@@ -1600,6 +1618,28 @@ func _crawler_action(action: String) -> void:
 			_crawler = {}
 		_:
 			_crawler = {}
+	queue_redraw()
+
+## Resolve a mid-floor decision beat: apply the chosen fork's effect, then close.
+func _event_choose(idx: int) -> void:
+	if _event.is_empty():
+		return
+	var forks: Array = _event.get("forks", [])
+	if idx < 0 or idx >= forks.size():
+		_event = {}; queue_redraw(); return
+	var fx: Dictionary = (forks[idx] as Dictionary).get("effect", {})
+	if fx.has("audience") and floor.audience != null:
+		floor.audience.change(int(fx["audience"]), "event")
+	if fx.has("zlom"):
+		sim.materials["złom"] = maxi(0, _zlom() + int(fx["zlom"]))
+	if fx.has("hp"):
+		var p := sim.player()
+		if int(fx["hp"]) >= 0:
+			p.hp = mini(p.max_hp, p.hp + int(fx["hp"]))
+		else:
+			p.hp = maxi(1, p.hp + int(fx["hp"]))
+	_log_push("→ " + str((forks[idx] as Dictionary).get("label", "")))
+	_event = {}
 	queue_redraw()
 
 ## Turn a crawler into a real, aware enemy on the board.
@@ -2429,6 +2469,8 @@ func _draw_hud() -> void:
 		_draw_safehouse()
 	if not _crawler.is_empty():
 		_draw_crawler_modal()
+	if not _event.is_empty():
+		_draw_event_modal()
 	if _spellbook:
 		_draw_spellbook()
 	_draw_toasts()
@@ -2891,6 +2933,27 @@ func _draw_spellbook() -> void:
 		cy += rh
 	draw_string(_font, Vector2(px + 20, py + H - 16), "Klik / 1–9 rzuca w najbliższego wroga   ·   [Z]/[Esc] zamknij",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+
+## Mid-floor decision beat: an intro line + two clickable forks.
+func _draw_event_modal() -> void:
+	var W := 720.0; var H := 280.0
+	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
+	draw_rect(Rect2(px, py, W, H), Color(0.05, 0.07, 0.11, 0.98))
+	draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
+	draw_string(_font, Vector2(px + 20, py + 32), "PRZERWA W AKCJI", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GAS)
+	draw_string(_font, Vector2(px + 20, py + 60), _event.get("intro", ""),
+		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 15, COL_BRIGHT)
+	var forks: Array = _event.get("forks", [])
+	var cy := py + 96.0
+	for i in forks.size():
+		var box := Rect2(px + 16, cy, W - 32, 54)
+		var hot := _hover(box)
+		draw_rect(box, Color(0.10, 0.16, 0.20, 0.95) if hot else Color(0.09, 0.12, 0.15, 0.9))
+		draw_rect(box, COL_GAS if hot else COL_GRID, false, 2.0 if hot else 1.0)
+		draw_string(_font, Vector2(px + 28, cy + 32), "%d.  %s" % [i + 1, (forks[i] as Dictionary).get("label", "")],
+			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 15, COL_BRIGHT)
+		_zone(box, "event_fork", i)
+		cy += 62.0
 
 ## Rival-crawler parley: talk / rob / fight. Robbing is a DEX gamble; a hostile
 ## crawler only offers a fight.
