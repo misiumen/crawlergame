@@ -11,6 +11,7 @@ const CAT_TRAP     := "trap"
 const CAT_MEDICAL  := "medical"
 const CAT_TOOL     := "tool"
 const CAT_SCROLL   := "recipe_scroll"
+const CAT_SPELL    := "spell_scroll"
 
 ## Map a content template `type` (item_templates.json) onto a runtime category.
 ## Without this, types like "wearable"/"oddity"/"consumable" fell through every

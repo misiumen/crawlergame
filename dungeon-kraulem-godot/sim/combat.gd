@@ -402,6 +402,18 @@ func player_use_item(item_idx: int) -> Array:
 			if not known:
 				discovered_recipes.append(rec)
 			evs.append({"type": "recipe_learned", "name": rec.get("name", item.name_pl), "known": known})
+		GameItem.CAT_SPELL:
+			# A spell scroll teaches a spell — if your race can grasp magic at all.
+			if not Spells.can_learn(p):
+				evs.append({"type": "spell_learned", "name": "", "fizzle": true})
+			else:
+				var skey: String = item.effect.get("spell", "")
+				if skey == "" or Spells.is_known(p, skey):
+					skey = Spells.random_unknown(p, rng)
+				if skey != "" and Spells.learn(p, skey):
+					evs.append({"type": "spell_learned", "name": Spells.def_of(skey).get("name", skey)})
+				else:
+					evs.append({"type": "spell_learned", "name": "", "fizzle": true})
 		GameItem.CAT_TOOL:
 			if item.effect.has("recharge_coating") and p.coating != "":
 				p.coating_charges += int(item.effect["recharge_coating"])
@@ -523,6 +535,8 @@ func cast_spell(key: String) -> Array:
 	if sp.is_empty():
 		return [{"type": "none", "action": "cast"}]
 	var p := player()
+	if not Spells.is_known(p, key):
+		return [{"type": "cast_blocked", "reason": "Nie znasz tego zaklęcia."}]
 	var cost: int = int(sp.get("mana", 0))
 	var hp_cost: int = int(sp.get("hp_cost", 0))
 	if p.mana < cost:

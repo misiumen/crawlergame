@@ -37,6 +37,7 @@ const SERVICES := {
 	"kiosk_sponsora": [
 		{"action": "ad", "label": "Reklama sponsora (+6 widowni)", "cost": 4},
 		{"action": "box", "label": "Paczka sponsora (skrzynka)", "cost": 18},
+		{"action": "scroll", "label": "Zwój zaklęć (naucz się zaklęcia)", "cost": 14},
 	],
 	"tablica": [
 		{"action": "read", "label": "Przeczytaj ogłoszenia (za darmo)", "cost": 0},

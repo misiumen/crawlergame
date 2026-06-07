@@ -190,16 +190,27 @@ func _initialize() -> void:
 	kcs.use_companion_ability(1)
 	_ck(kfoe.has_status("stunned"), "the cat's distract stuns the nearest enemy")
 
-	# ── Magic / spells ────────────────────────────────────────────────────────
+	# ── Magic / spells (must be LEARNED; affinity gates) ──────────────────────
+	# affinity scales mana; mundane races can't learn at all.
+	var adept := CombatEntity.new(9, "Adept", 100, 14, ["humanoid"]); adept.magic_affinity = "adept"
+	var mundane := CombatEntity.new(9, "Robot", 100, 14, ["humanoid"]); mundane.magic_affinity = "mundane"
+	_ck(Spells.max_mana_for(adept) > Spells.max_mana_for(mundane), "adept races run more mana than mundane")
+	_ck(not Spells.learn(mundane, "ogien"), "a mundane race cannot learn magic")
+	var rngl := RandomNumberGenerator.new(); rngl.seed = 1
+	_ck(Spells.learn(adept, "ogien") and Spells.is_known(adept, "ogien"), "an adept learns a spell")
+	_ck(not Spells.learn(adept, "ogien"), "you don't re-learn a spell you already know")
+
 	var sbd := Board.new(7, 3)
 	var mage := CombatEntity.new(1, "Mag", 100, 14, ["humanoid"]); mage.faction = "player"; mage.cell = Vector2i(1, 1)
 	mage.stats["INT"] = 6                              # plenty of mana
+	mage.flags["known_spells"] = ["ogien", "telekineza", "pustka"]   # taught for the test
 	var sfoe := CombatEntity.new(2, "Szczur", 40, 8, ["organic"]); sfoe.faction = "enemy"
 	sfoe.cell = Vector2i(4, 1); sfoe.aware = true
 	var scs2 := CombatSim.new(sbd, {1: mage, 2: sfoe}, 1, 2)
 	sbd.place(1, mage.cell); sbd.place(2, sfoe.cell)
 	scs2.refill_mana()
 	_ck(mage.mana >= 5, "mana refills and scales with INT")
+	_ck(scs2.cast_spell("mroz")[0]["type"] == "cast_blocked", "an unknown spell can't be cast")
 	var fhp2 := sfoe.hp
 	var m0 := mage.mana
 	scs2.cast_spell("ogien")                          # fire bolt at the rat
@@ -217,6 +228,14 @@ func _initialize() -> void:
 	mage.mana = 0
 	var blk := scs2.cast_spell("pustka")
 	_ck(blk.size() == 1 and blk[0]["type"] == "cast_blocked", "no mana → cast is blocked")
+	# a spell scroll teaches a spell on use (and is consumed)
+	var scroll := GameItem.new("Zwój: Szron", GameItem.CAT_SPELL, Rarity.UNCOMMON)
+	scroll.effect = {"spell": "mroz"}; scroll.charges = 1
+	mage.flags["known_spells"] = []
+	scs2.items = [scroll]
+	scs2.player_use_item(0)
+	_ck(Spells.is_known(mage, "mroz"), "using a spell scroll learns the spell")
+	_ck(scs2.items.is_empty(), "the scroll is consumed on use")
 
 	# ── Floor objectives ──────────────────────────────────────────────────────
 	var rngo := RandomNumberGenerator.new(); rngo.seed = 7

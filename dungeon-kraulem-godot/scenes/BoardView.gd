@@ -442,13 +442,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			_speak_pick(mi)
 		return
 
-	# Spellbook grabs input: number keys cast, Esc closes.
+	# Spellbook grabs input: number keys cast a KNOWN spell, Esc closes.
 	if _spellbook:
 		if kc == KEY_ESCAPE or kc == KEY_Z:
 			_spellbook = false; queue_redraw(); return
+		var ks: Array = Spells.known(sim.player())
 		var si := kc - KEY_1
-		if si >= 0 and si < Spells.ORDER.size():
-			_cast_spell(Spells.ORDER[si])
+		if si >= 0 and si < ks.size():
+			_cast_spell(ks[si])
 		return
 
 	# NPC dialogue grabs input until you choose or walk away (Esc).
@@ -694,6 +695,9 @@ func _grant_level_box(lv: int) -> void:
 	if tpl is Dictionary and not (tpl as Dictionary).is_empty():
 		var keys: Array = (tpl as Dictionary).keys()
 		box.contents.append({"type": "item_key", "key": keys[_narr_rng.randi_range(0, keys.size() - 1)]})
+	# A chance at a spell scroll — how a non-adept can stumble into the arcane.
+	if Spells.can_learn(floor.player) and _narr_rng.randf() < (0.5 if milestone else 0.25):
+		box.contents.append({"type": "spell_scroll", "key": ""})
 	floor.boxes.append(box)
 	_log_push("Awans nagradza skrzynką — odbierz ją na planszy.")
 
@@ -736,6 +740,11 @@ func _apply_loadout() -> void:
 	var lo := MetaCatalog.loadout()
 	p.species_key = lo["species"]
 	p.origin_key = lo["origin"]
+	# Magic aptitude of the chosen race: adepts start knowing spells + run more mana,
+	# mundane races can't learn magic at all. Everyone else starts with none to learn.
+	var sp_eff: Dictionary = MetaCatalog.def_of(lo["species"]).get("effect", {})
+	p.magic_affinity = str(sp_eff.get("magic", ""))
+	p.flags["known_spells"] = (sp_eff.get("start_spells", []) as Array).duplicate()
 	var applied: Array = []
 	for ent in MetaCatalog.active_effects():
 		var eff: Dictionary = ent["effect"]
@@ -1341,7 +1350,21 @@ func _resolve_box(box: GameBox) -> Array:
 				if mat != "":
 					out.append({"type": "material", "key": mat, "qty": qty,
 						"label": "%s x%d" % [mat, qty], "color": COL_AMBER})
+			"spell_scroll":
+				var sc := _spell_scroll_item(entry.get("key", ""))
+				out.append({"type": "item", "item": sc, "label": sc.display_name(), "color": COL_PURPLE})
 	return out
+
+## Build a spell-scroll item (teaches a spell on use). Blank key = a random spell.
+func _spell_scroll_item(spell_key: String = "") -> GameItem:
+	var nm := "Zwój zaklęć"
+	if spell_key != "":
+		nm = "Zwój: %s" % Spells.def_of(spell_key).get("name", spell_key)
+	var it := GameItem.new(nm, GameItem.CAT_SPELL, Rarity.UNCOMMON)
+	it.effect = {"spell": spell_key}
+	it.charges = 1
+	it.origin = "scroll"
+	return it
 
 ## Add resolved entries to the run, drop the box, and log the reveal flavor.
 func _commit_box_entries(box: GameBox, entries: Array) -> void:
@@ -1687,6 +1710,12 @@ func _safehouse_action(action: String, arg: int) -> void:
 					box.contents.append({"type": "item_key", "key": keys[_narr_rng.randi_range(0, keys.size() - 1)]})
 				floor.boxes.append(box)
 				_log_push("Kupujesz paczkę sponsora — odbierz skrzynkę na planszy. (−18 złomu)")
+		"scroll":
+			if not Spells.can_learn(sim.player()):
+				_log_push("Twój gatunek nie pojmuje magii — zwój na nic ci się nie zda.")
+			elif _spend_zlom(14):
+				floor.items.append(_spell_scroll_item(""))
+				_log_push("Kupujesz zwój zaklęć — użyj go z kieszeni [I], by się nauczyć.")
 		"read":
 			if floor.audience != null:
 				floor.audience.change(3, "tablica")
@@ -1978,6 +2007,14 @@ func _animate(evs: Array) -> void:
 				if not e.get("known", false):
 					_add_floater(sim.player_id, "+przepis", COL_GREEN)
 					_log_push("Nowy przepis: %s." % e.get("name", "?"))
+			"spell_learned":
+				if e.get("fizzle", false):
+					_add_floater(sim.player_id, "ZWÓJ ROZSYPUJE SIĘ", COL_DIM)
+					_log_push("Litery rozpływają ci się przed oczami. Magia nie dla ciebie.")
+				else:
+					_add_floater(sim.player_id, "✦ +zaklęcie", COL_PURPLE)
+					_log_push("Uczysz się zaklęcia: %s. (otwórz księgę [Z])" % e.get("name", "?"))
+					_shake = maxf(_shake, 3.0)
 			"class_active":
 				_add_floater(sim.player_id, str(e.get("name", "")).to_upper(), COL_AMBER)
 				_log_push("Umiejetnosc: %s." % e.get("name", "?"))
@@ -3144,10 +3181,15 @@ func _draw_spellbook() -> void:
 	draw_string(_font, Vector2(px + 20, py + 32), "KSIĘGA ZAKLĘĆ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_PURPLE)
 	draw_string(_font, Vector2(px + W - 180, py + 32), "Mana: %d / %d" % [p.mana, p.max_mana],
 		HORIZONTAL_ALIGNMENT_LEFT, 170, 18, COL_CYAN)
+	var ks: Array = Spells.known(p)
+	if ks.is_empty():
+		var msg := "Maszyna nie pojmuje magii." if p.magic_affinity == "mundane" \
+			else "Nie znasz jeszcze żadnych zaklęć. Znajdź zwój i naucz się go."
+		draw_string(_font, Vector2(px + 24, py + 80), msg, HORIZONTAL_ALIGNMENT_LEFT, W - 48, 15, COL_DIM)
 	var cy := py + 60.0
 	var rh := 38.0
-	for i in Spells.ORDER.size():
-		var key: String = Spells.ORDER[i]
+	for i in ks.size():
+		var key: String = ks[i]
 		var sp: Dictionary = Spells.SPELLS[key]
 		var cost: int = int(sp.get("mana", 0))
 		var hp_cost: int = int(sp.get("hp_cost", 0))

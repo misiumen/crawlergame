@@ -40,6 +40,7 @@ func stat_mod(stat: String) -> int:
 var species_key: String = ""
 var origin_key: String = ""
 var species_trait: String = ""   # active species trait: regen / poison_immune / salvage_heal / first_strike
+var magic_affinity: String = ""  # species magic aptitude: "adept" / "" (neutral) / "mundane"
 # Equipment (player only): slot -> GameItem. Worn armor adds to AC.
 var equipment: Dictionary = {}   # "head" | "body" | "legs" | "trinket" -> GameItem
 # RPG progression (player only): the level track DCC runs on.
