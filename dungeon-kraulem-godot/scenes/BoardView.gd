@@ -97,11 +97,32 @@ const BOX_POP := 0.55                 # snap-flash seconds
 const BOX_REVEAL_STEP := 0.30         # seconds between each loot piece popping in
 const BOX_BONUS_MATS := ["złom", "drewno", "szmata", "przewód", "plastik", "bateria", "rurka"]
 
+var _cam: Camera2D = null            # world camera (smooth follow + shake)
+var _ui: Control = null              # screen-fixed UI painter on a CanvasLayer
+var _smoke := false                  # --smoke: scripted draw-path autotest, then quit
+var _smoke_frames := 0
+
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
+	RenderingServer.set_default_clear_color(COL_BG)
+	# World camera: the board lives in world space; the camera frames it (and will
+	# follow the player on bigger boards in Phase B).
+	_cam = Camera2D.new()
+	_cam.position_smoothing_enabled = true
+	_cam.position_smoothing_speed = 8.0
+	add_child(_cam)
+	_cam.make_current()
+	# Screen-fixed UI on a CanvasLayer above the world.
+	var layer := CanvasLayer.new()
+	layer.layer = 10
+	add_child(layer)
+	_ui = preload("res://scenes/UIView.gd").new()
+	_ui.controller = self
+	layer.add_child(_ui)
+	if "--smoke" in OS.get_cmdline_user_args():
+		_smoke = true
 	set_process(true)
 	queue_redraw()                   # show the title; a run starts on a keypress
-	set_process(true)
 
 const FINAL_FLOOR := 6   # descending from here wins the run
 var _run_seed: int = 20260605
@@ -262,9 +283,14 @@ func _attach_bodies() -> void:
 			e.attach_body(full)
 
 func _recenter() -> void:
-	var bw: int = sim.board.w * TILE
-	var bh: int = sim.board.h * TILE
-	_origin = Vector2((1280 - bw) / 2.0 - 140, (720 - bh) / 2.0 + 10)
+	# The board sits at world origin; the camera frames it centred in the playfield
+	# (the area left of the fixed log panel at x=830 → playfield centre ≈ 415).
+	_origin = Vector2.ZERO
+	if _cam != null:
+		var bw: int = sim.board.w * TILE
+		var bh: int = sim.board.h * TILE
+		_cam.position = Vector2(bw / 2.0 + (640.0 - 415.0), bh / 2.0 - 10.0)
+		_cam.reset_smoothing()
 
 func _reset_visuals() -> void:
 	if floor != null:
@@ -305,6 +331,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		_mouse = (event as InputEventMouseMotion).position
 		queue_redraw()
+		return
+	# [F11] fullscreen toggle — available everywhere.
+	if event is InputEventKey and event.pressed and not event.echo \
+			and (event as InputEventKey).keycode == KEY_F11:
+		var wm := DisplayServer.window_get_mode()
+		DisplayServer.window_set_mode(
+			DisplayServer.WINDOW_MODE_WINDOWED if wm == DisplayServer.WINDOW_MODE_FULLSCREEN
+			else DisplayServer.WINDOW_MODE_FULLSCREEN)
 		return
 	# Freeform persuasion prompt: while typing, capture text directly (unicode), so
 	# this must intercept BEFORE the generic keycode handling below.
@@ -556,9 +590,9 @@ func _can_take_board_input() -> bool:
 		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook \
 		and not _journal_screen and _event.is_empty() and _speak.is_empty()
 
-## Viewport pixel -> board cell.
-func _cell_from_mouse(pos: Vector2) -> Vector2i:
-	var local := pos - _origin
+## Mouse -> board cell, through the camera (the board lives in world space now).
+func _cell_from_mouse(_pos: Vector2) -> Vector2i:
+	var local := get_global_mouse_position() - _origin
 	return Vector2i(int(floor(local.x / TILE)), int(floor(local.y / TILE)))
 
 ## LMB on the board is fully contextual: an adjacent enemy → attack (honoring the
@@ -2338,7 +2372,32 @@ func _process(dt: float) -> void:
 		_banner_t = maxf(0.0, _banner_t - dt)
 		if _banner_t == 0.0:
 			_banner = ""
+	# Screen-shake rides the camera now (the world no longer redraws transformed).
+	if _cam != null:
+		_cam.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) \
+			if _shake > 0.0 else Vector2.ZERO
+	if _smoke:
+		_smoke_tick()
 	queue_redraw()
+	if _ui != null:
+		_ui.queue_redraw()
+
+## --smoke: a scripted pass through the real draw paths (title → run → panels)
+## with rendering ON, then quit. Catches draw-time errors headless tests can't.
+func _smoke_tick() -> void:
+	_smoke_frames += 1
+	match _smoke_frames:
+		20: _build()
+		50: handle_dir(Vector2i.RIGHT)
+		70: _spellbook = true
+		90: _spellbook = false; _journal_screen = true
+		110: _journal_screen = false; _craft_open = true; _craft_mode = "bench"
+		130: _craft_open = false; _open_ach_screen()
+		150: _ach_screen = false; _meta_screen = true
+		170: _meta_screen = false
+		190:
+			print("SMOKE OK")
+			get_tree().quit(0)
 
 ## Advance the lootbox-opening reveal through its phases.
 func _tick_box_anim(dt: float) -> void:
@@ -2364,29 +2423,14 @@ func _tick_box_anim(dt: float) -> void:
 
 # ── Drawing ───────────────────────────────────────────────────────────────────
 
+## WORLD pass: the board + entities, drawn in world space under the Camera2D.
+## All screen-fixed UI (HUD, modals, menus) is painted by UIView on a CanvasLayer
+## via _draw_ui — this split is what lets Phase B swap these rects for tilemaps
+## and sprites without touching any interface code.
 func _draw() -> void:
-	_click_zones.clear()   # rebuilt below to match exactly what's drawn this frame
-	# Full-screen content menus own the whole screen — no toasts layered over them.
-	if _meta_screen:
-		_draw_meta_screen()
-		return
-	if _journal_screen and sim != null:
-		_draw_journal()
-		return
-	if _ach_screen:
-		_draw_ach_screen()
-		return
-	if _title:
-		_draw_title()
-		_draw_toasts()
-		return
-	if sim == null: return
-	if not _summary.is_empty():
-		_draw_run_summary()
-		return
-	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
-	var sh := Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
-	draw_set_transform(sh, 0.0, Vector2.ONE)
+	if _title or _meta_screen or _ach_screen or _journal_screen or sim == null \
+			or not _summary.is_empty():
+		return   # a full-screen menu owns the frame; the UI layer paints it
 	var b: Board = sim.board
 	for y in b.h:
 		for x in b.w:
@@ -2433,8 +2477,30 @@ func _draw() -> void:
 		var col: Color = f["color"]; col.a = a
 		var fp: Vector2 = f["pos"] + Vector2(-10, -20 - f["age"] * 36.0)
 		draw_string(_font, fp, f["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, col)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	_draw_hud()
+
+## UI pass: everything screen-fixed, painted into the UIView CanvasItem. Click
+## zones are rebuilt here so they always match exactly what is on screen.
+func _draw_ui(c: CanvasItem) -> void:
+	_click_zones.clear()
+	# Full-screen content menus own the whole screen — no toasts layered over them.
+	if _meta_screen:
+		_draw_meta_screen(c)
+		return
+	if _journal_screen and sim != null:
+		_draw_journal(c)
+		return
+	if _ach_screen:
+		_draw_ach_screen(c)
+		return
+	if _title:
+		_draw_title(c)
+		_draw_toasts(c)
+		return
+	if sim == null: return
+	if not _summary.is_empty():
+		_draw_run_summary(c)
+		return
+	_draw_hud(c)
 
 func _draw_glyph(s: String, c: Vector2i, col: Color) -> void:
 	draw_string(_font, _cell_px(c) + Vector2(-6, 8), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, col)
@@ -2452,54 +2518,54 @@ func _draw_player(e: CombatEntity, pos: Vector2, fade: float) -> void:
 		draw_rect(Rect2(pos.x - 17, pos.y + 18, 34, 5), Color(0.1, 0.1, 0.1, fade))
 		draw_rect(Rect2(pos.x - 17, pos.y + 18, 34 * frac, 5), Color(hpc, fade))
 
-func _draw_title() -> void:
-	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+func _draw_title(c: CanvasItem) -> void:
+	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 	# Title
-	draw_string(_font, Vector2(180, 230), "DUNGEON KRAULEM",
+	c.draw_string(_font, Vector2(180, 230), "DUNGEON KRAULEM",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 72, COL_CYAN)
-	draw_string(_font, Vector2(184, 274), "galaktyczne reality show z lochów",
+	c.draw_string(_font, Vector2(184, 274), "galaktyczne reality show z lochów",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_DIM)
 	# Options (click them, or press the key)
 	var has_save := Save.has_save()
 	var y := 380.0
 	if has_save:
-		draw_string(_font, Vector2(184, y), "▶  Kontynuuj zjazd   [Enter]",
+		c.draw_string(_font, Vector2(184, y), "▶  Kontynuuj zjazd   [Enter]",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
 		_zone(Rect2(176, y - 24, 520, 34), "title_continue")
-		draw_string(_font, Vector2(184, y + 38), "▶  Nowy bieg (porzuca zapis)   [N]",
+		c.draw_string(_font, Vector2(184, y + 38), "▶  Nowy bieg (porzuca zapis)   [N]",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_AMBER)
 		_zone(Rect2(176, y + 14, 520, 34), "title_new")
 		y += 76
 	else:
-		draw_string(_font, Vector2(184, y), "▶  Zacznij bieg   [Enter]",
+		c.draw_string(_font, Vector2(184, y), "▶  Zacznij bieg   [Enter]",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
 		_zone(Rect2(176, y - 24, 520, 34), "title_start")
 		y += 38
 	# Achievements gallery entry
-	draw_string(_font, Vector2(184, y + 22),
+	c.draw_string(_font, Vector2(184, y + 22),
 		"🏆  Osiągnięcia  (%d / %d)   [A]" % [Achievements.count_unlocked(), Achievements.total()],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_AMBER)
 	_zone(Rect2(176, y - 2, 520, 32), "ach_open")
 	# Loadout & meta-progression entry
 	var lo := MetaCatalog.loadout()
-	draw_string(_font, Vector2(184, y + 54),
+	c.draw_string(_font, Vector2(184, y + 54),
 		"🧬  Ekwipunek sezonu  (%s · %s)   [M]" % [
 			MetaCatalog.def_of(lo["species"]).get("label", "?"),
 			MetaCatalog.def_of(lo["origin"]).get("label", "?")],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_GREEN)
 	_zone(Rect2(176, y + 32, 520, 30), "meta_open")
-	draw_string(_font, Vector2(184, y + 82),
+	c.draw_string(_font, Vector2(184, y + 82),
 		"Prestiż: %d / %d pkt    ·    odblokowane opcje: %d" % [
 			MetaCatalog.available_prestige(), Achievements.points_total(), Meta.unlocked_count()],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ACH_TIER_COL["gold"])
 	# Controls primer (mouse-first)
-	draw_string(_font, Vector2(184, 632),
+	c.draw_string(_font, Vector2(184, 632),
 		"MYSZ:  lewy = atak / rozmowa / ruch / wybór opcji      prawy = pchnięcie wroga",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
-	draw_string(_font, Vector2(184, 658),
+	c.draw_string(_font, Vector2(184, 658),
 		"KLAWISZE:  WSAD/strzałki ruch · Shift pchnij · Spacja czekaj · E rozbierz/rozmawiaj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	draw_string(_font, Vector2(184, 678),
+	c.draw_string(_font, Vector2(184, 678),
 		"           I warsztat · T celuj w strefę · F umiejętność · 1–9 wybór · Esc zamknij",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 
@@ -2571,19 +2637,19 @@ func _draw_exits() -> void:
 		else:
 			_draw_glyph("+", cell, COL_AMBER)
 
-func _draw_minimap() -> void:
+func _draw_minimap(c: CanvasItem) -> void:
 	if floor == null: return
 	var n: int = floor.rooms.size()
-	var bx: float = 1280 - 28 - n * 64
+	var bx: float = 1280 - 28 - n * 46
 	for i in n:
-		var rx: float = bx + i * 64
+		var rx: float = bx + i * 46
 		var col: Color = COL_CYAN if i == floor.current else COL_DIM
-		draw_rect(Rect2(rx, 24, 52, 30), Color(0.10, 0.12, 0.16, 0.92))
-		draw_rect(Rect2(rx, 24, 52, 30), col, false, 2.0)
-		draw_string(_font, Vector2(rx + 8, 44), floor.rooms[i]["name"].substr(0, 5),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
+		c.draw_rect(Rect2(rx, 24, 34, 30), Color(0.10, 0.12, 0.16, 0.92))
+		c.draw_rect(Rect2(rx, 24, 34, 30), col, false, 2.0)
+		c.draw_string(_font, Vector2(rx + 12, 45), str(i + 1),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, col)
 		if i < n - 1:
-			draw_line(Vector2(rx + 52, 39), Vector2(rx + 64, 39), COL_DIM, 1.0)
+			c.draw_line(Vector2(rx + 34, 39), Vector2(rx + 46, 39), COL_DIM, 1.0)
 
 func _draw_object(e: CombatEntity, pos: Vector2, fade: float) -> void:
 	var col := Color("8a6a3a") if "wood" in e.tags else Color("6a7280")
@@ -2634,35 +2700,35 @@ func _draw_preview() -> void:
 				"Shift+ruch: w kałużę → prąd", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 			return
 
-func _draw_hud() -> void:
+func _draw_hud(c: CanvasItem) -> void:
 	var p := sim.player()
-	_draw_minimap()
+	_draw_minimap(c)
 	# Title bar
-	draw_string(_font, Vector2(40, 36),
+	c.draw_string(_font, Vector2(40, 36),
 		"PIĘTRO %d — %s  ·  Runda %d  ·  tura: %s"
 		% [floor.depth if floor else 1, floor.current_name() if floor else "?", sim.round_num,
 		   "TY" if sim.side == "player" else "wrogowie"],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
 	# Level + XP bar (top-right of the title row)
 	var xb := Rect2(640, 24, 260, 16)
-	draw_rect(xb, Color(0.08, 0.10, 0.13, 0.9))
+	c.draw_rect(xb, Color(0.08, 0.10, 0.13, 0.9))
 	var frac: float = clampf(float(p.xp) / maxf(1.0, float(p.xp_to_next())), 0.0, 1.0)
-	draw_rect(Rect2(xb.position, Vector2(xb.size.x * frac, xb.size.y)), COL_GAS)
-	draw_rect(xb, COL_GRID, false, 1.0)
+	c.draw_rect(Rect2(xb.position, Vector2(xb.size.x * frac, xb.size.y)), COL_GAS)
+	c.draw_rect(xb, COL_GRID, false, 1.0)
 	var lvl_txt := "POZIOM %d   XP %d/%d" % [p.level, p.xp, p.xp_to_next()]
 	if p.skill_points > 0:
 		lvl_txt += "   ·   %d pkt [L]" % p.skill_points
-	draw_string(_font, Vector2(xb.position.x, 20), lvl_txt,
+	c.draw_string(_font, Vector2(xb.position.x, 20), lvl_txt,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER if p.skill_points > 0 else COL_DIM)
 	# Who you are this run (the meta loadout)
 	if p.species_key != "" and p.species_key != "species_bezimienny":
 		var spn: String = MetaCatalog.def_of(p.species_key).get("label", "?")
 		var ogn: String = MetaCatalog.def_of(p.origin_key).get("label", "?")
-		draw_string(_font, Vector2(xb.position.x, 56), "Jesteś: %s  ·  %s" % [spn, ogn],
+		c.draw_string(_font, Vector2(xb.position.x, 56), "Jesteś: %s  ·  %s" % [spn, ogn],
 			HORIZONTAL_ALIGNMENT_LEFT, 320, 12, META_KIND_COL["species"])
 	# Controls hint (mouse-first) — clipped to 580px so it can't run under the
 	# top-right level/species readout.
-	draw_string(_font, Vector2(40, 60),
+	c.draw_string(_font, Vector2(40, 60),
 		"Ruch: WSAD / LPM  ·  PPM pchnij  ·  E rozbierz  ·  I warsztat  ·  K/J/Z/O panele",
 		HORIZONTAL_ALIGNMENT_LEFT, 580, 13, COL_DIM)
 	# Weapon / coating / armor — led by your own HP so it's always on screen.
@@ -2678,10 +2744,10 @@ func _draw_hud() -> void:
 	if not worn.is_empty():
 		wln += "   ·   Pancerz: " + ", ".join(worn)
 	wln += "   ·   Mana %d/%d [Z]" % [p.mana, p.max_mana]
-	draw_string(_font, Vector2(40, 80), wln, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
+	c.draw_string(_font, Vector2(40, 80), wln, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	# INT stat
 	var int_str := "INT %d (+%d)" % [p.int_xp, p.int_mod()]
-	draw_string(_font, Vector2(40, 98), int_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+	c.draw_string(_font, Vector2(40, 98), int_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Class + active readiness — or, before you have one, your building playstyle
 	# (so the eventual class offer is visibly EARNED, not a random pop-up).
 	if p.class_key != "":
@@ -2690,16 +2756,16 @@ func _draw_hud() -> void:
 		var cstr := "Klasa: %s   ·   [F] %s (%s)" % [Classes.name_of(p.class_key),
 			ClassFeatures.active_name(p.class_key), ready]
 		var ccol := COL_AMBER if bool(gate[0]) else COL_DIM
-		draw_string(_font, Vector2(220, 98), cstr, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ccol)
+		c.draw_string(_font, Vector2(220, 98), cstr, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ccol)
 	else:
-		draw_string(_font, Vector2(220, 98),
+		c.draw_string(_font, Vector2(220, 98),
 			"Styl: %s   (→ klasa)" % Classes.style_summary(p, 3),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# Materials
 	var mats: Array = []
 	for k in sim.materials:
 		mats.append("%s x%d" % [k, sim.materials[k]])
-	draw_string(_font, Vector2(40, 116),
+	c.draw_string(_font, Vector2(40, 116),
 		"Materiały: " + ("—" if mats.is_empty() else ", ".join(mats)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
 	# Inventory: list the actual item names (not just a count) so you can see what
@@ -2717,11 +2783,11 @@ func _draw_hud() -> void:
 		inv_parts.append("Skrzynki: %d" % floor.boxes.size())
 	# Companion + its ability readiness
 	if floor.companion != null and floor.companion.is_alive():
-		var c: CombatEntity = floor.companion
-		var ready: bool = int(c.flags.get("ability_floor", -1)) != floor.depth
-		inv_parts.append("Towarzysz: %s  [G] %s" % [c.name_pl, "gotów" if ready else "użyty"])
+		var comp: CombatEntity = floor.companion
+		var ready: bool = int(comp.flags.get("ability_floor", -1)) != floor.depth
+		inv_parts.append("Towarzysz: %s  [G] %s" % [comp.name_pl, "gotów" if ready else "użyty"])
 	if not inv_parts.is_empty():
-		draw_string(_font, Vector2(40, 134), " | ".join(inv_parts),
+		c.draw_string(_font, Vector2(40, 134), " | ".join(inv_parts),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_GREEN)
 	# Audience + top sponsors
 	if floor.audience:
@@ -2731,7 +2797,7 @@ func _draw_hud() -> void:
 			"warming": band_col = COL_AMBER
 			"hot":     band_col = COL_RED
 			"viral":   band_col = COL_CYAN
-		draw_string(_font, Vector2(40, 152),
+		c.draw_string(_font, Vector2(40, 152),
 			"Widownia: %d  [%s]" % [aud.rating, aud.band_label()],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, band_col)
 	if floor.sponsors:
@@ -2745,77 +2811,78 @@ func _draw_hud() -> void:
 				# Show attention + progress to next gift, so you SEE the box coming.
 				var prog := "  %d→%d📦" % [int(gp[0]), int(gp[1])] if int(gp[1]) > 0 else "  (max)"
 				parts2.append("%s %s%s" % [nm, floor.sponsors.mood(skey), prog])
-			draw_string(_font, Vector2(40, 168), "Sponsorzy: " + " | ".join(parts2),
+			c.draw_string(_font, Vector2(40, 168), "Sponsorzy: " + " | ".join(parts2),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 	# Target readout
 	var rat: CombatEntity = sim.entities.get(2)
 	if rat != null and rat.is_alive():
 		var st := "śpi" if not rat.aware else "ściga cię"
-		draw_string(_font, Vector2(40, 676),
+		c.draw_string(_font, Vector2(40, 676),
 			"%s  HP %d/%d  [%s]  ·  gruba skóra, słaby na PRĄD"
 			% [rat.name_pl, rat.hp, rat.max_hp, st],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
 	# Tracked floor objective (real, with progress + payout) — and a nav hint below.
 	if floor != null and not floor.objective.is_empty():
 		var done: bool = bool(floor.objective.get("done", false))
-		draw_string(_font, Vector2(40, 700), "Zadanie: " + Objectives.describe(floor.objective),
+		c.draw_string(_font, Vector2(40, 700), "Zadanie: " + Objectives.describe(floor.objective),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_GREEN if done else COL_AMBER)
 	elif _hint != "":
-		draw_string(_font, Vector2(40, 700), "Wskazówka: " + _hint,
+		c.draw_string(_font, Vector2(40, 700), "Wskazówka: " + _hint,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	# DZIENNIK log panel
-	var lx := _origin.x + sim.board.w * TILE + 24
+	# DZIENNIK log panel — screen-fixed on the right (the board no longer defines
+	# screen positions; the camera frames it left of this panel).
+	var lx := 830.0
 	var lw := 1280 - lx - 24
-	draw_rect(Rect2(lx, 110, lw, 360), Color(0.08, 0.10, 0.13, 0.9))
-	draw_rect(Rect2(lx, 110, lw, 360), COL_GRID, false, 1.0)
-	draw_string(_font, Vector2(lx + 12, 132), "DZIENNIK",
+	c.draw_rect(Rect2(lx, 110, lw, 360), Color(0.08, 0.10, 0.13, 0.9))
+	c.draw_rect(Rect2(lx, 110, lw, 360), COL_GRID, false, 1.0)
+	c.draw_string(_font, Vector2(lx + 12, 132), "DZIENNIK",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	for i in _log.size():
 		var alpha := 0.5 + 0.5 * float(i + 1) / _log.size()
-		draw_string(_font, Vector2(lx + 12, 158 + i * 22), _log[i],
+		c.draw_string(_font, Vector2(lx + 12, 158 + i * 22), _log[i],
 			HORIZONTAL_ALIGNMENT_LEFT, lw - 24, 14, Color(COL_BRIGHT, alpha))
 	if _banner != "" and _banner_t > 0.0:
 		var ba: float = clampf(_banner_t / 0.6, 0.0, 1.0)   # fade out over the last 0.6s
-		draw_string(_font, Vector2(_origin.x + 120, _origin.y + 160), _banner,
+		c.draw_string(_font, Vector2(260, 330), _banner,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(COL_BRIGHT, ba))
-	_draw_body_readout(lx, lw)
+	_draw_body_readout(c, lx, lw)
 	# Exactly ONE in-game modal at a time (priority order), so nothing ever stacks.
 	if not _box_anim.is_empty():
-		_draw_box_open()
+		_draw_box_open(c)
 	elif not _levelup.is_empty():
-		_draw_levelup()
+		_draw_levelup(c)
 	elif not _event.is_empty():
-		_draw_event_modal()
+		_draw_event_modal(c)
 	elif not _route_offer.is_empty():
-		_draw_route_offer()
+		_draw_route_offer(c)
 	elif not _class_offer.is_empty():
-		_draw_class_offer()
+		_draw_class_offer(c)
 	elif not _dlg.is_empty():
-		_draw_dialogue()
+		_draw_dialogue(c)
 	elif not _safehouse.is_empty():
-		_draw_safehouse()
+		_draw_safehouse(c)
 	elif not _crawler.is_empty():
-		_draw_crawler_modal()
+		_draw_crawler_modal(c)
 	elif _spellbook:
-		_draw_spellbook()
+		_draw_spellbook(c)
 	elif not _speak.is_empty():
-		_draw_speak()
+		_draw_speak(c)
 	elif _craft_open:
-		_draw_craft_panel()
-	_draw_toasts()
+		_draw_craft_panel(c)
+	_draw_toasts(c)
 
 ## VS-style achievement toasts: tier-framed panels that slide in from the right,
 ## stack, and slide back out, with a ray-burst on entry. Gold/platinum unlocks
 ## also paint a brief golden vignette over the whole screen.
-func _draw_toasts() -> void:
+func _draw_toasts(c: CanvasItem) -> void:
 	# Rare-unlock screen-edge burst.
 	if _ach_flash > 0.0:
 		var fa := _ach_flash / 0.7
 		var gold := Color(1.0, 0.85, 0.3)
-		draw_rect(Rect2(0, 0, 1280, 14), Color(gold, 0.7 * fa))
-		draw_rect(Rect2(0, 706, 1280, 14), Color(gold, 0.7 * fa))
-		draw_rect(Rect2(0, 0, 14, 720), Color(gold, 0.7 * fa))
-		draw_rect(Rect2(1266, 0, 14, 720), Color(gold, 0.7 * fa))
+		c.draw_rect(Rect2(0, 0, 1280, 14), Color(gold, 0.7 * fa))
+		c.draw_rect(Rect2(0, 706, 1280, 14), Color(gold, 0.7 * fa))
+		c.draw_rect(Rect2(0, 0, 14, 720), Color(gold, 0.7 * fa))
+		c.draw_rect(Rect2(1266, 0, 14, 720), Color(gold, 0.7 * fa))
 	var W := 400.0; var H := 64.0
 	for i in _toasts.size():
 		var to: Dictionary = _toasts[i]
@@ -2836,15 +2903,15 @@ func _draw_toasts() -> void:
 			for k in 10:
 				var ang := TAU * k / 10.0 + t * 2.0
 				var p2 := cxp + Vector2(cos(ang), sin(ang)) * (24.0 + (1.0 - ra) * 40.0)
-				draw_line(cxp, p2, Color(tcol, 0.5 * ra), 2.0)
-		draw_rect(Rect2(x, y, W, H), Color(0.05, 0.05, 0.08, 0.96 * s))
-		draw_rect(Rect2(x, y, W, H), Color(tcol, s), false, 2.5)
+				c.draw_line(cxp, p2, Color(tcol, 0.5 * ra), 2.0)
+		c.draw_rect(Rect2(x, y, W, H), Color(0.05, 0.05, 0.08, 0.96 * s))
+		c.draw_rect(Rect2(x, y, W, H), Color(tcol, s), false, 2.5)
 		# tier chip
-		draw_rect(Rect2(x + 8, y + 8, 6, H - 16), Color(tcol, s))
+		c.draw_rect(Rect2(x + 8, y + 8, 6, H - 16), Color(tcol, s))
 		var hdr := "🏆 OSIĄGNIĘCIE — %s  ·  +%d pkt" % [_tier_label(tier), int(to.get("points", 1))]
-		draw_string(_font, Vector2(x + 22, y + 22), hdr,
+		c.draw_string(_font, Vector2(x + 22, y + 22), hdr,
 			HORIZONTAL_ALIGNMENT_LEFT, W - 30, 12, Color(tcol, s))
-		draw_string(_font, Vector2(x + 22, y + 46), to["name"],
+		c.draw_string(_font, Vector2(x + 22, y + 46), to["name"],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 36, 17, Color(COL_BRIGHT, s))
 
 func _tier_label(tier: String) -> String:
@@ -2857,20 +2924,20 @@ func _tier_label(tier: String) -> String:
 
 ## The achievements gallery (DCC-style list to chase): tiered frames, lifetime
 ## progress bars, a prestige-points header + completion bar, and scrolling.
-func _draw_ach_screen() -> void:
-	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+func _draw_ach_screen(c: CanvasItem) -> void:
+	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 	var got_n := Achievements.count_unlocked()
 	var tot_n := Achievements.total()
-	draw_string(_font, Vector2(60, 64), "OSIĄGNIĘCIA  —  %d / %d" % [got_n, tot_n],
+	c.draw_string(_font, Vector2(60, 64), "OSIĄGNIĘCIA  —  %d / %d" % [got_n, tot_n],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 32, COL_AMBER)
-	draw_string(_font, Vector2(640, 50),
+	c.draw_string(_font, Vector2(640, 50),
 		"Punkty prestiżu: %d / %d" % [Achievements.points(), Achievements.points_total()],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ACH_TIER_COL["gold"])
 	# completion bar
 	var pf: float = float(got_n) / maxf(1.0, float(tot_n))
-	draw_rect(Rect2(640, 60, 560, 14), Color(0.08, 0.10, 0.13, 0.9))
-	draw_rect(Rect2(640, 60, 560 * pf, 14), ACH_TIER_COL["gold"])
-	draw_rect(Rect2(640, 60, 560, 14), COL_GRID, false, 1.0)
+	c.draw_rect(Rect2(640, 60, 560, 14), Color(0.08, 0.10, 0.13, 0.9))
+	c.draw_rect(Rect2(640, 60, 560 * pf, 14), ACH_TIER_COL["gold"])
+	c.draw_rect(Rect2(640, 60, 560, 14), COL_GRID, false, 1.0)
 
 	# ── Scrollable grid, clipped to a viewport ──
 	var cols := 3
@@ -2894,38 +2961,38 @@ func _draw_ach_screen() -> void:
 			continue                       # cull rows outside the viewport
 		var tier := Achievements.tier_of(key)
 		var tcol := _ach_tier_color(tier)
-		draw_rect(Rect2(x, y, cw, ch), Color(0.10, 0.11, 0.14, 0.96) if got else Color(0.05, 0.05, 0.07, 0.9))
-		draw_rect(Rect2(x, y, cw, ch), tcol if got else COL_GRID, false, 2.0 if got else 1.0)
-		draw_rect(Rect2(x, y, 5, ch), Color(tcol, 1.0 if got else 0.35))   # tier spine
+		c.draw_rect(Rect2(x, y, cw, ch), Color(0.10, 0.11, 0.14, 0.96) if got else Color(0.05, 0.05, 0.07, 0.9))
+		c.draw_rect(Rect2(x, y, cw, ch), tcol if got else COL_GRID, false, 2.0 if got else 1.0)
+		c.draw_rect(Rect2(x, y, 5, ch), Color(tcol, 1.0 if got else 0.35))   # tier spine
 		var hidden: bool = a.get("hidden", false)
 		if got:
-			draw_string(_font, Vector2(x + 14, y + 22), "★ " + a.get("name", key),
+			c.draw_string(_font, Vector2(x + 14, y + 22), "★ " + a.get("name", key),
 				HORIZONTAL_ALIGNMENT_LEFT, cw - 70, 15, COL_BRIGHT)
-			draw_string(_font, Vector2(x + cw - 58, y + 22), _tier_label(tier),
+			c.draw_string(_font, Vector2(x + cw - 58, y + 22), _tier_label(tier),
 				HORIZONTAL_ALIGNMENT_LEFT, 54, 10, tcol)
-			draw_string(_font, Vector2(x + 14, y + 44), a.get("desc", ""),
+			c.draw_string(_font, Vector2(x + 14, y + 44), a.get("desc", ""),
 				HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 12, COL_DIM)
 		else:
 			var nm: String = "???" if hidden else a.get("name", key)
-			draw_string(_font, Vector2(x + 14, y + 22), "☐ " + nm,
+			c.draw_string(_font, Vector2(x + 14, y + 22), "☐ " + nm,
 				HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 15, COL_DIM)
 			if not hidden:
-				draw_string(_font, Vector2(x + 14, y + 44), a.get("desc", ""),
+				c.draw_string(_font, Vector2(x + 14, y + 44), a.get("desc", ""),
 					HORIZONTAL_ALIGNMENT_LEFT, cw - 24, 12, Color(COL_DIM, 0.5))
 			# progress bar for lifetime-goal achievements
 			var pr := Achievements.progress(key)
 			if not pr.is_empty() and not hidden:
 				var frac: float = float(pr[0]) / maxf(1.0, float(pr[1]))
-				draw_rect(Rect2(x + 14, y + ch - 14, cw - 90, 7), Color(0.08, 0.10, 0.13, 0.9))
-				draw_rect(Rect2(x + 14, y + ch - 14, (cw - 90) * frac, 7), Color(tcol, 0.8))
-				draw_string(_font, Vector2(x + cw - 70, y + ch - 8), "%d/%d" % [int(pr[0]), int(pr[1])],
+				c.draw_rect(Rect2(x + 14, y + ch - 14, cw - 90, 7), Color(0.08, 0.10, 0.13, 0.9))
+				c.draw_rect(Rect2(x + 14, y + ch - 14, (cw - 90) * frac, 7), Color(tcol, 0.8))
+				c.draw_string(_font, Vector2(x + cw - 70, y + ch - 8), "%d/%d" % [int(pr[0]), int(pr[1])],
 					HORIZONTAL_ALIGNMENT_LEFT, 60, 11, COL_DIM)
 	# scrollbar hint
 	if max_scroll > 0.0:
 		var bar_h := view_h * (view_h / content_h)
 		var bar_y := top + (view_h - bar_h) * (_ach_scroll / max_scroll)
-		draw_rect(Rect2(1240, bar_y, 5, bar_h), Color(COL_AMBER, 0.6))
-	draw_string(_font, Vector2(60, 702), "[Esc] / klik — powrót   ·   kółko myszy / [↑][↓] — przewijaj",
+		c.draw_rect(Rect2(1240, bar_y, 5, bar_h), Color(COL_AMBER, 0.6))
+	c.draw_string(_font, Vector2(60, 702), "[Esc] / klik — powrót   ·   kółko myszy / [↑][↓] — przewijaj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 	_zone(Rect2(40, 692, 420, 26), "ach_back")
 
@@ -2935,27 +3002,27 @@ func catalog_for_gallery() -> Dictionary:
 
 ## Loadout & meta-progression screen: pick an owned species + origin, spend
 ## achievement prestige to unlock more, and launch a fresh run with it all baked in.
-func _draw_meta_screen() -> void:
-	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+func _draw_meta_screen(c: CanvasItem) -> void:
+	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 	var lo := MetaCatalog.loadout()
-	draw_string(_font, Vector2(60, 58), "EKWIPUNEK SEZONU", HORIZONTAL_ALIGNMENT_LEFT, -1, 32, COL_AMBER)
-	draw_string(_font, Vector2(60, 86),
+	c.draw_string(_font, Vector2(60, 58), "EKWIPUNEK SEZONU", HORIZONTAL_ALIGNMENT_LEFT, -1, 32, COL_AMBER)
+	c.draw_string(_font, Vector2(60, 86),
 		"Wybrane:  %s  ·  %s" % [MetaCatalog.def_of(lo["species"]).get("label", "?"),
 			MetaCatalog.def_of(lo["origin"]).get("label", "?")],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_BRIGHT)
-	draw_string(_font, Vector2(700, 58),
+	c.draw_string(_font, Vector2(700, 58),
 		"Prestiż do wydania: %d / %d" % [MetaCatalog.available_prestige(), Achievements.points_total()],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ACH_TIER_COL["gold"])
-	draw_string(_font, Vector2(700, 84),
+	c.draw_string(_font, Vector2(700, 84),
 		"Zdobywaj punkty osiągnięciami, wydawaj na gatunki, atuty i biomy.",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 
 	# Start button
 	var start := Rect2(700, 110, 300, 36)
 	var shot := _hover(start)
-	draw_rect(start, Color(0.10, 0.20, 0.12, 0.96) if shot else Color(0.08, 0.13, 0.10, 0.9))
-	draw_rect(start, COL_GREEN, false, 2.0 if shot else 1.5)
-	draw_string(_font, Vector2(start.position.x + 16, start.position.y + 26),
+	c.draw_rect(start, Color(0.10, 0.20, 0.12, 0.96) if shot else Color(0.08, 0.13, 0.10, 0.9))
+	c.draw_rect(start, COL_GREEN, false, 2.0 if shot else 1.5)
+	c.draw_string(_font, Vector2(start.position.x + 16, start.position.y + 26),
 		"▶  ROZPOCZNIJ BIEG  [Enter]", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_GREEN)
 	_zone(start, "meta_start")
 
@@ -2980,15 +3047,15 @@ func _draw_meta_screen() -> void:
 		var owned := MetaCatalog.is_owned(key)
 		var selected: bool = (key == lo["species"] or key == lo["origin"])
 		var kc: Color = META_KIND_COL.get(kind, COL_BRIGHT)
-		draw_rect(Rect2(x, y, cw, rh), Color(0.10, 0.11, 0.14, 0.96) if owned else Color(0.05, 0.05, 0.07, 0.92))
+		c.draw_rect(Rect2(x, y, cw, rh), Color(0.10, 0.11, 0.14, 0.96) if owned else Color(0.05, 0.05, 0.07, 0.92))
 		var frame := COL_GREEN if selected else (kc if owned else COL_GRID)
-		draw_rect(Rect2(x, y, cw, rh), frame, false, 2.0 if (owned or selected) else 1.0)
-		draw_rect(Rect2(x, y, 5, rh), kc)
-		draw_string(_font, Vector2(x + 14, y + 13), MetaCatalog.KIND_LABELS.get(kind, kind),
+		c.draw_rect(Rect2(x, y, cw, rh), frame, false, 2.0 if (owned or selected) else 1.0)
+		c.draw_rect(Rect2(x, y, 5, rh), kc)
+		c.draw_string(_font, Vector2(x + 14, y + 13), MetaCatalog.KIND_LABELS.get(kind, kind),
 			HORIZONTAL_ALIGNMENT_LEFT, 200, 10, kc)
-		draw_string(_font, Vector2(x + 14, y + 32), d.get("label", key),
+		c.draw_string(_font, Vector2(x + 14, y + 32), d.get("label", key),
 			HORIZONTAL_ALIGNMENT_LEFT, cw - 150, 16, COL_BRIGHT if owned else COL_DIM)
-		draw_string(_font, Vector2(x + 14, y + 52), d.get("reward", ""),
+		c.draw_string(_font, Vector2(x + 14, y + 52), d.get("reward", ""),
 			HORIZONTAL_ALIGNMENT_LEFT, cw - 150, 11, COL_DIM)
 		# right-side action / status
 		var ax := x + cw - 132
@@ -2996,47 +3063,47 @@ func _draw_meta_screen() -> void:
 		if owned:
 			if kind == "species" or kind == "origin":
 				if selected:
-					draw_string(_font, Vector2(ax, y + 30), "✓ WYBRANY", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_GREEN)
+					c.draw_string(_font, Vector2(ax, y + 30), "✓ WYBRANY", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_GREEN)
 				else:
 					var ph := _hover(btn)
-					draw_rect(btn, Color(kc, 0.25 if ph else 0.12))
-					draw_rect(btn, kc, false, 1.0)
-					draw_string(_font, Vector2(ax + 14, y + 38), "WYBIERZ", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_BRIGHT)
+					c.draw_rect(btn, Color(kc, 0.25 if ph else 0.12))
+					c.draw_rect(btn, kc, false, 1.0)
+					c.draw_string(_font, Vector2(ax + 14, y + 38), "WYBIERZ", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_BRIGHT)
 					_zone(btn, "meta_pick", 0, key)
 			else:
-				draw_string(_font, Vector2(ax, y + 30), "✓ aktywne", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, kc)
+				c.draw_string(_font, Vector2(ax, y + 30), "✓ aktywne", HORIZONTAL_ALIGNMENT_LEFT, 120, 13, kc)
 		else:
 			var cost := MetaCatalog.cost_of(key)
 			var afford := cost <= MetaCatalog.available_prestige()
 			if afford:
 				var bh := _hover(btn)
-				draw_rect(btn, Color(ACH_TIER_COL["gold"], 0.25 if bh else 0.12))
-				draw_rect(btn, ACH_TIER_COL["gold"], false, 1.0)
-				draw_string(_font, Vector2(ax + 8, y + 38), "KUP: %d" % cost, HORIZONTAL_ALIGNMENT_LEFT, 120, 13, ACH_TIER_COL["gold"])
+				c.draw_rect(btn, Color(ACH_TIER_COL["gold"], 0.25 if bh else 0.12))
+				c.draw_rect(btn, ACH_TIER_COL["gold"], false, 1.0)
+				c.draw_string(_font, Vector2(ax + 8, y + 38), "KUP: %d" % cost, HORIZONTAL_ALIGNMENT_LEFT, 120, 13, ACH_TIER_COL["gold"])
 				_zone(btn, "meta_buy", 0, key)
 			else:
-				draw_string(_font, Vector2(ax, y + 30), "🔒 %d pkt" % cost, HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_DIM)
+				c.draw_string(_font, Vector2(ax, y + 30), "🔒 %d pkt" % cost, HORIZONTAL_ALIGNMENT_LEFT, 120, 13, COL_DIM)
 	if max_scroll > 0.0:
 		var bar_h := (bottom - top) * ((bottom - top) / content_h)
 		var bar_y := top + ((bottom - top) - bar_h) * (_meta_scroll / max_scroll)
-		draw_rect(Rect2(1244, bar_y, 5, bar_h), Color(COL_AMBER, 0.6))
+		c.draw_rect(Rect2(1244, bar_y, 5, bar_h), Color(COL_AMBER, 0.6))
 	# Back button (top-right, clear of the list)
 	var back := Rect2(1040, 110, 120, 36)
 	var bkh := _hover(back)
-	draw_rect(back, Color(0.14, 0.10, 0.10, 0.95) if bkh else Color(0.09, 0.07, 0.07, 0.9))
-	draw_rect(back, COL_RED if bkh else COL_GRID, false, 1.5)
-	draw_string(_font, Vector2(back.position.x + 12, back.position.y + 26), "← powrót",
+	c.draw_rect(back, Color(0.14, 0.10, 0.10, 0.95) if bkh else Color(0.09, 0.07, 0.07, 0.9))
+	c.draw_rect(back, COL_RED if bkh else COL_GRID, false, 1.5)
+	c.draw_string(_font, Vector2(back.position.x + 12, back.position.y + 26), "← powrót",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, COL_BRIGHT)
 	_zone(back, "meta_back")
-	draw_string(_font, Vector2(60, 706),
+	c.draw_string(_font, Vector2(60, 706),
 		"[Esc]/[M] powrót   ·   kółko / [↑][↓] przewijaj   ·   kliknij KUP by odblokować, WYBIERZ by założyć",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 
 ## Vampire-Survivors-style lootbox reveal: a slot reel of rarity tiles spins and
 ## decelerates, SNAPS onto the box's tier with a flash, then the loot pops in.
-func _draw_box_open() -> void:
+func _draw_box_open(c: CanvasItem) -> void:
 	# Dim everything behind the reveal.
-	draw_rect(Rect2(0, 0, 1280, 720), Color(0.02, 0.02, 0.04, 0.82))
+	c.draw_rect(Rect2(0, 0, 1280, 720), Color(0.02, 0.02, 0.04, 0.82))
 	var box: GameBox = _box_anim["box"]
 	var phase: String = _box_anim["phase"]
 	var t: float = _box_anim["t"]
@@ -3049,9 +3116,9 @@ func _draw_box_open() -> void:
 	var tile_h := 92.0
 
 	# Header
-	draw_string(_font, Vector2(cx - 200, 150), box.tier_label(),
+	c.draw_string(_font, Vector2(cx - 200, 150), box.tier_label(),
 		HORIZONTAL_ALIGNMENT_CENTER, 400, 30, rcol)
-	draw_string(_font, Vector2(cx - 200, 182), "od: " + box.source_name,
+	c.draw_string(_font, Vector2(cx - 200, 182), "od: " + box.source_name,
 		HORIZONTAL_ALIGNMENT_CENTER, 400, 14, COL_DIM)
 
 	# ── The reel ──
@@ -3070,23 +3137,23 @@ func _draw_box_open() -> void:
 		var centered: bool = absf(x - cx) < tile_w * 0.5
 		var th := tile_h * (1.12 if centered else 0.9)
 		var r := Rect2(x - tile_w * 0.5 + 6, reel_y - th * 0.5, tile_w - 12, th)
-		draw_rect(r, Color(col, 0.9 if centered else 0.5))
-		draw_rect(r, COL_BRIGHT if centered else Color(col, 0.7), false, 3.0 if centered else 1.0)
-		draw_string(_font, Vector2(r.position.x, reel_y + 4),
+		c.draw_rect(r, Color(col, 0.9 if centered else 0.5))
+		c.draw_rect(r, COL_BRIGHT if centered else Color(col, 0.7), false, 3.0 if centered else 1.0)
+		c.draw_string(_font, Vector2(r.position.x, reel_y + 4),
 			Rarity.label(strip[i]).substr(0, 3), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 14,
 			COL_BG if centered else Color(0, 0, 0, 0.5))
 	# centre marker
-	draw_rect(Rect2(cx - 52, reel_y - 60, 104, 120), Color(rcol, 0.0), false, 2.0)
-	draw_string(_font, Vector2(cx - 10, reel_y - 66), "▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
+	c.draw_rect(Rect2(cx - 52, reel_y - 60, 104, 120), Color(rcol, 0.0), false, 2.0)
+	c.draw_string(_font, Vector2(cx - 10, reel_y - 66), "▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
 
 	# ── The snap flash (bigger for a lucky 3/5) ──
 	var tier: int = int(_box_anim.get("tier", 1))
 	if phase == "pop":
 		var a := clampf(1.0 - t / BOX_POP, 0.0, 1.0)
 		var flash_mul := 0.55 + (0.2 if tier >= 3 else 0.0) + (0.2 if tier >= 5 else 0.0)
-		draw_rect(Rect2(0, 0, 1280, 720), Color(rcol, a * flash_mul))
+		c.draw_rect(Rect2(0, 0, 1280, 720), Color(rcol, a * flash_mul))
 		var sc := 30 + int((1.0 - a) * 26)
-		draw_string(_font, Vector2(cx - 300, reel_y + 8), Rarity.label(box.rarity).to_upper(),
+		c.draw_string(_font, Vector2(cx - 300, reel_y + 8), Rarity.label(box.rarity).to_upper(),
 			HORIZONTAL_ALIGNMENT_CENTER, 600, sc, rcol)
 
 	# ── The loot ──
@@ -3096,9 +3163,9 @@ func _draw_box_open() -> void:
 		var header := "ZDOBYWASZ:"
 		if tier >= 3:
 			var tcol := COL_AMBER if tier == 3 else COL_GAS
-			draw_string(_font, Vector2(cx - 300, 322),
+			c.draw_string(_font, Vector2(cx - 300, 322),
 				"SZCZĘŚCIE! ×%d" % tier, HORIZONTAL_ALIGNMENT_CENTER, 600, 30, tcol)
-		draw_string(_font, Vector2(cx - 300, 360), header,
+		c.draw_string(_font, Vector2(cx - 300, 360), header,
 			HORIZONTAL_ALIGNMENT_CENTER, 600, 20, COL_BRIGHT)
 		var y := 400.0
 		for i in mini(shown, entries.size()):
@@ -3108,27 +3175,27 @@ func _draw_box_open() -> void:
 			var pop := clampf(age / 0.2, 0.0, 1.0)
 			var ecol: Color = e["color"]; ecol.a = pop
 			var rowy := y + i * 34
-			draw_rect(Rect2(cx - 250, rowy - 16, 500 * pop, 28), Color(e["color"], 0.14 * pop))
-			draw_string(_font, Vector2(cx - 240, rowy + 4), "✦  " + str(e["label"]),
+			c.draw_rect(Rect2(cx - 250, rowy - 16, 500 * pop, 28), Color(e["color"], 0.14 * pop))
+			c.draw_string(_font, Vector2(cx - 240, rowy + 4), "✦  " + str(e["label"]),
 				HORIZONTAL_ALIGNMENT_LEFT, 480, 18, ecol)
 		if entries.is_empty():
-			draw_string(_font, Vector2(cx - 200, 410), "(pusto — pech)",
+			c.draw_string(_font, Vector2(cx - 200, 410), "(pusto — pech)",
 				HORIZONTAL_ALIGNMENT_CENTER, 400, 16, COL_DIM)
 	if phase == "done":
-		draw_string(_font, Vector2(cx - 200, 660), "kliknij — odbierz",
+		c.draw_string(_font, Vector2(cx - 200, 660), "kliknij — odbierz",
 			HORIZONTAL_ALIGNMENT_CENTER, 400, 16, COL_AMBER)
 	else:
-		draw_string(_font, Vector2(cx - 200, 660), "(kliknij — pomiń)",
+		c.draw_string(_font, Vector2(cx - 200, 660), "(kliknij — pomiń)",
 			HORIZONTAL_ALIGNMENT_CENTER, 400, 13, COL_DIM)
 
 ## A dialogue-tree conversation: speaker + the node's line + the AVAILABLE options
 ## (numbered 1..N; skill options show your modifier vs the TT), plus the last
 ## skill-check result line.
-func _draw_dialogue() -> void:
+func _draw_dialogue(c: CanvasItem) -> void:
 	var W := 1040.0; var H := 440.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.07, 0.11, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
+	c.draw_rect(Rect2(px, py, W, H), Color(0.07, 0.07, 0.11, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
 	var n := Dialogue.node(_dlg)
 	# Speaker + relationship standing
 	var tk: String = _dlg.get("tree_key", "")
@@ -3136,10 +3203,10 @@ func _draw_dialogue() -> void:
 	var head: String = n.get("speaker", "Ktoś")
 	if rel != 0:
 		head += "   (%s)" % ("przyjazny" if rel > 0 else "wrogi")
-	draw_string(_font, Vector2(px + 22, py + 32), head,
+	c.draw_string(_font, Vector2(px + 22, py + 32), head,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_PURPLE)
 	# NPC line
-	draw_string(_font, Vector2(px + 22, py + 64), n.get("text", ""),
+	c.draw_string(_font, Vector2(px + 22, py + 64), n.get("text", ""),
 		HORIZONTAL_ALIGNMENT_LEFT, W - 44, 16, COL_BRIGHT)
 	# Available options (numbered by availability), skill ones annotated
 	var avail := Dialogue.available_options(floor, _dlg)
@@ -3155,27 +3222,27 @@ func _draw_dialogue() -> void:
 			col = COL_CYAN
 		var hot := _hover(Rect2(px + 20, cy - 18, W - 40, 28))
 		if hot:
-			draw_rect(Rect2(px + 20, cy - 18, W - 40, 28), Color(col, 0.12))
-		draw_string(_font, Vector2(px + 28, cy), "%d.  %s" % [i + 1, label],
+			c.draw_rect(Rect2(px + 20, cy - 18, W - 40, 28), Color(col, 0.12))
+		c.draw_string(_font, Vector2(px + 28, cy), "%d.  %s" % [i + 1, label],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 56, 16, COL_BRIGHT if hot else col)
 		_zone(Rect2(px + 20, cy - 18, W - 40, 28), "dlg", int(avail[i][0]))
 		cy += 32.0
 	# Last skill-check result
 	if _dlg_info != "":
-		draw_string(_font, Vector2(px + 22, py + H - 44), _dlg_info,
+		c.draw_string(_font, Vector2(px + 22, py + H - 44), _dlg_info,
 			HORIZONTAL_ALIGNMENT_LEFT, W - 44, 14, COL_GREEN)
-	draw_string(_font, Vector2(px + 22, py + H - 18),
+	c.draw_string(_font, Vector2(px + 22, py + H - 18),
 		"kliknij lub [1–9] wybierz   ·   [Esc] odejdź", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## The route gamble at the stairs: pick which biome to descend into.
-func _draw_route_offer() -> void:
+func _draw_route_offer(c: CanvasItem) -> void:
 	var W := 1000.0; var H := 360.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.09, 0.12, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_GREEN, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 30), "SCHODY W DÓŁ — WYBIERZ TRASĘ",
+	c.draw_rect(Rect2(px, py, W, H), Color(0.07, 0.09, 0.12, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_GREEN, false, 2.0)
+	c.draw_string(_font, Vector2(px + 20, py + 30), "SCHODY W DÓŁ — WYBIERZ TRASĘ",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GREEN)
-	draw_string(_font, Vector2(px + 20, py + 54),
+	c.draw_string(_font, Vector2(px + 20, py + 54),
 		"Każda trasa to inne piętro. Wybierasz raz — i schodzisz.",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	var cy := py + 84.0
@@ -3183,12 +3250,12 @@ func _draw_route_offer() -> void:
 		var key: String = _route_offer[i]
 		var box := Rect2(px + 16, cy, W - 32, 76)
 		var hot := _hover(box)
-		draw_rect(box, Color(0.14, 0.18, 0.13, 0.95) if hot else Color(0.10, 0.13, 0.17, 0.9))
-		draw_rect(box, COL_GREEN if hot else COL_GRID, false, 2.0 if hot else 1.0)
-		draw_string(_font, Vector2(px + 28, cy + 28),
+		c.draw_rect(box, Color(0.14, 0.18, 0.13, 0.95) if hot else Color(0.10, 0.13, 0.17, 0.9))
+		c.draw_rect(box, COL_GREEN if hot else COL_GRID, false, 2.0 if hot else 1.0)
+		c.draw_string(_font, Vector2(px + 28, cy + 28),
 			"%d.  %s" % [i + 1, Routes.label_of(key)],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_BRIGHT)
-		draw_string(_font, Vector2(px + 28, cy + 52), Routes.blurb_of(key),
+		c.draw_string(_font, Vector2(px + 28, cy + 52), Routes.blurb_of(key),
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 14, COL_AMBER)
 		_zone(box, "route", i)
 		cy += 84.0
@@ -3196,13 +3263,13 @@ func _draw_route_offer() -> void:
 ## Level-up: spend banked skill points on a stat. Click a row (or press its
 ## number); the modal closes when the bank runs dry, or [Esc]/the button banks it.
 ## Knowledge journal: every clue + rumor you've collected, with a reliability read.
-func _draw_journal() -> void:
-	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+func _draw_journal(c: CanvasItem) -> void:
+	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 	var journal: Array = floor.player.flags.get("journal", [])
-	draw_string(_font, Vector2(60, 60), "DZIENNIK — wiedza i plotki  (%d)" % journal.size(),
+	c.draw_string(_font, Vector2(60, 60), "DZIENNIK — wiedza i plotki  (%d)" % journal.size(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 30, COL_CYAN)
 	if journal.is_empty():
-		draw_string(_font, Vector2(60, 120),
+		c.draw_string(_font, Vector2(60, 120),
 			"Pusto. Czytaj tablice ogłoszeń, gadaj z rywalami, rozbieraj sprzęt — wiedza sama nie przyjdzie.",
 			HORIZONTAL_ALIGNMENT_LEFT, 1100, 16, COL_DIM)
 	var top := 100.0; var bottom := 680.0
@@ -3218,71 +3285,71 @@ func _draw_journal() -> void:
 		var truth := float(e.get("truth", 0.5))
 		var tcol := COL_GREEN if truth >= 0.8 else (COL_AMBER if truth >= 0.5 else COL_DIM)
 		var kind := "ślad" if e.get("kind", "") == "clue" else "plotka"
-		draw_rect(Rect2(60, y, 1160, rh - 6), Color(0.08, 0.10, 0.13, 0.92))
-		draw_rect(Rect2(60, y, 1160, rh - 6), Color(tcol, 0.6), false, 1.0)
-		draw_string(_font, Vector2(74, y + 18), "[%s · %s]" % [kind, Knowledge.reliability_label(truth)],
+		c.draw_rect(Rect2(60, y, 1160, rh - 6), Color(0.08, 0.10, 0.13, 0.92))
+		c.draw_rect(Rect2(60, y, 1160, rh - 6), Color(tcol, 0.6), false, 1.0)
+		c.draw_string(_font, Vector2(74, y + 18), "[%s · %s]" % [kind, Knowledge.reliability_label(truth)],
 			HORIZONTAL_ALIGNMENT_LEFT, 300, 12, tcol)
-		draw_string(_font, Vector2(74, y + 42), e.get("text", ""),
+		c.draw_string(_font, Vector2(74, y + 42), e.get("text", ""),
 			HORIZONTAL_ALIGNMENT_LEFT, 1130, 14, COL_BRIGHT)
 	if max_scroll > 0.0:
-		draw_string(_font, Vector2(1160, 64), "▲▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
-	draw_string(_font, Vector2(60, 702), "[J]/[Esc] zamknij   ·   kółko / [↑][↓] przewijaj",
+		c.draw_string(_font, Vector2(1160, 64), "▲▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+	c.draw_string(_font, Vector2(60, 702), "[J]/[Esc] zamknij   ·   kółko / [↑][↓] przewijaj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 
 ## Freeform persuasion prompt: type a line at a mind, or pick an improvised one.
-func _draw_speak() -> void:
+func _draw_speak(c: CanvasItem) -> void:
 	var t = sim.entities.get(int(_speak.get("target_id", -1)))
 	var tname: String = t.name_pl if t != null else "?"
 	var W := 760.0; var H := 280.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.06, 0.09, 0.08, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 32), "MÓWISZ DO: %s" % tname,
+	c.draw_rect(Rect2(px, py, W, H), Color(0.06, 0.09, 0.08, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
+	c.draw_string(_font, Vector2(px + 20, py + 32), "MÓWISZ DO: %s" % tname,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GAS)
 	if _speak.get("mode", "") == "fallback":
-		draw_string(_font, Vector2(px + 20, py + 58), "Nic nie przychodzi do głowy? Spróbuj tak:",
+		c.draw_string(_font, Vector2(px + 20, py + 58), "Nic nie przychodzi do głowy? Spróbuj tak:",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 		var opts: Array = _speak.get("options", [])
 		var cy := py + 84.0
 		for i in opts.size():
 			var box := Rect2(px + 16, cy, W - 32, 44)
 			var hot := _hover(box)
-			draw_rect(box, Color(0.10, 0.16, 0.13, 0.95) if hot else Color(0.09, 0.12, 0.10, 0.9))
-			draw_rect(box, COL_GAS if hot else COL_GRID, false, 1.0)
-			draw_string(_font, Vector2(px + 28, cy + 28), "%d.  %s" % [i + 1, opts[i]["text"]],
+			c.draw_rect(box, Color(0.10, 0.16, 0.13, 0.95) if hot else Color(0.09, 0.12, 0.10, 0.9))
+			c.draw_rect(box, COL_GAS if hot else COL_GRID, false, 1.0)
+			c.draw_string(_font, Vector2(px + 28, cy + 28), "%d.  %s" % [i + 1, opts[i]["text"]],
 				HORIZONTAL_ALIGNMENT_LEFT, W - 50, 15, COL_BRIGHT)
 			_zone(box, "speak_pick", i)
 			cy += 50.0
 	else:
-		draw_string(_font, Vector2(px + 20, py + 60),
+		c.draw_string(_font, Vector2(px + 20, py + 60),
 			"Powiedz coś. Cokolwiek. System sam oceni, w co celujesz.",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 		# the input line + a blinking caret
 		var typed: String = _speak.get("text", "")
 		var caret := "_" if (int(Time.get_ticks_msec() / 400) % 2 == 0) else " "
-		draw_rect(Rect2(px + 20, py + 92, W - 40, 40), Color(0.03, 0.05, 0.04, 0.95))
-		draw_rect(Rect2(px + 20, py + 92, W - 40, 40), COL_GRID, false, 1.0)
-		draw_string(_font, Vector2(px + 30, py + 118), "> " + typed + caret,
+		c.draw_rect(Rect2(px + 20, py + 92, W - 40, 40), Color(0.03, 0.05, 0.04, 0.95))
+		c.draw_rect(Rect2(px + 20, py + 92, W - 40, 40), COL_GRID, false, 1.0)
+		c.draw_string(_font, Vector2(px + 30, py + 118), "> " + typed + caret,
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 17, COL_BRIGHT)
-		draw_string(_font, Vector2(px + 20, py + H - 18),
+		c.draw_string(_font, Vector2(px + 20, py + H - 18),
 			"[Enter] mówisz   ·   puste [Enter] = podpowiedzi   ·   [Esc] cofnij",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## Spellbook: cast at the nearest enemy for mana. Rows greyed when you can't pay.
-func _draw_spellbook() -> void:
+func _draw_spellbook(c: CanvasItem) -> void:
 	var p := sim.player()
 	var W := 640.0; var H := 470.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.05, 0.11, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 32), "KSIĘGA ZAKLĘĆ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_PURPLE)
-	draw_string(_font, Vector2(px + W - 180, py + 32), "Mana: %d / %d" % [p.mana, p.max_mana],
+	c.draw_rect(Rect2(px, py, W, H), Color(0.07, 0.05, 0.11, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
+	c.draw_string(_font, Vector2(px + 20, py + 32), "KSIĘGA ZAKLĘĆ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_PURPLE)
+	c.draw_string(_font, Vector2(px + W - 180, py + 32), "Mana: %d / %d" % [p.mana, p.max_mana],
 		HORIZONTAL_ALIGNMENT_LEFT, 170, 18, COL_CYAN)
 	var ks: Array = Spells.known(p)
 	if ks.is_empty():
 		var msg := "Maszyna nie pojmuje magii." if p.magic_affinity == "mundane" \
 			else "Nie znasz jeszcze żadnych zaklęć. Znajdź zwój i naucz się go."
-		draw_string(_font, Vector2(px + 24, py + 80), msg, HORIZONTAL_ALIGNMENT_LEFT, W - 48, 15, COL_DIM)
+		c.draw_string(_font, Vector2(px + 24, py + 80), msg, HORIZONTAL_ALIGNMENT_LEFT, W - 48, 15, COL_DIM)
 	var cy := py + 60.0
 	var rh := 38.0
 	for i in ks.size():
@@ -3293,44 +3360,44 @@ func _draw_spellbook() -> void:
 		var castable: bool = p.mana >= cost and (hp_cost == 0 or p.hp > hp_cost)
 		var box := Rect2(px + 16, cy, W - 32, rh - 4)
 		var hot := _hover(box) and castable
-		draw_rect(box, Color(0.16, 0.12, 0.22, 0.95) if hot else Color(0.10, 0.08, 0.14, 0.9))
-		draw_rect(box, COL_PURPLE if hot else (COL_GRID if castable else Color(COL_GRID, 0.5)), false, 1.0)
+		c.draw_rect(box, Color(0.16, 0.12, 0.22, 0.95) if hot else Color(0.10, 0.08, 0.14, 0.9))
+		c.draw_rect(box, COL_PURPLE if hot else (COL_GRID if castable else Color(COL_GRID, 0.5)), false, 1.0)
 		var lcol := COL_BRIGHT if castable else COL_DIM
 		var costtxt := "%d many" % cost if hp_cost == 0 else "%d HP" % hp_cost
-		draw_string(_font, Vector2(px + 28, cy + 16), "%d. %s  —  %s" % [i + 1, sp.get("name", key), costtxt],
+		c.draw_string(_font, Vector2(px + 28, cy + 16), "%d. %s  —  %s" % [i + 1, sp.get("name", key), costtxt],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 15, lcol)
-		draw_string(_font, Vector2(px + 28, cy + 31), sp.get("desc", ""),
+		c.draw_string(_font, Vector2(px + 28, cy + 31), sp.get("desc", ""),
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 11, COL_DIM)
 		if castable:
 			_zone(box, "cast", 0, key)
 		cy += rh
-	draw_string(_font, Vector2(px + 20, py + H - 16), "Klik / 1–9 rzuca w najbliższego wroga   ·   [Z]/[Esc] zamknij",
+	c.draw_string(_font, Vector2(px + 20, py + H - 16), "Klik / 1–9 rzuca w najbliższego wroga   ·   [Z]/[Esc] zamknij",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## Mid-floor decision beat: an intro line + two clickable forks.
-func _draw_event_modal() -> void:
+func _draw_event_modal(c: CanvasItem) -> void:
 	var W := 720.0; var H := 280.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.05, 0.07, 0.11, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 32), "PRZERWA W AKCJI", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GAS)
-	draw_string(_font, Vector2(px + 20, py + 60), _event.get("intro", ""),
+	c.draw_rect(Rect2(px, py, W, H), Color(0.05, 0.07, 0.11, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
+	c.draw_string(_font, Vector2(px + 20, py + 32), "PRZERWA W AKCJI", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GAS)
+	c.draw_string(_font, Vector2(px + 20, py + 60), _event.get("intro", ""),
 		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 15, COL_BRIGHT)
 	var forks: Array = _event.get("forks", [])
 	var cy := py + 96.0
 	for i in forks.size():
 		var box := Rect2(px + 16, cy, W - 32, 54)
 		var hot := _hover(box)
-		draw_rect(box, Color(0.10, 0.16, 0.20, 0.95) if hot else Color(0.09, 0.12, 0.15, 0.9))
-		draw_rect(box, COL_GAS if hot else COL_GRID, false, 2.0 if hot else 1.0)
-		draw_string(_font, Vector2(px + 28, cy + 32), "%d.  %s" % [i + 1, (forks[i] as Dictionary).get("label", "")],
+		c.draw_rect(box, Color(0.10, 0.16, 0.20, 0.95) if hot else Color(0.09, 0.12, 0.15, 0.9))
+		c.draw_rect(box, COL_GAS if hot else COL_GRID, false, 2.0 if hot else 1.0)
+		c.draw_string(_font, Vector2(px + 28, cy + 32), "%d.  %s" % [i + 1, (forks[i] as Dictionary).get("label", "")],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 15, COL_BRIGHT)
 		_zone(box, "event_fork", i)
 		cy += 62.0
 
 ## Rival-crawler parley: talk / rob / fight. Robbing is a DEX gamble; a hostile
 ## crawler only offers a fight.
-func _draw_crawler_modal() -> void:
+func _draw_crawler_modal(c: CanvasItem) -> void:
 	var cr = sim.entities.get(int(_crawler.get("id", -1)))
 	if cr == null:
 		_crawler = {}; return
@@ -3338,11 +3405,11 @@ func _draw_crawler_modal() -> void:
 	var hostile: bool = desc.get("disposition", "neutral") == "hostile"
 	var W := 620.0; var H := 300.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.10, 0.08, 0.05, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 32), "RYWAL: " + cr.name_pl,
+	c.draw_rect(Rect2(px, py, W, H), Color(0.10, 0.08, 0.05, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	c.draw_string(_font, Vector2(px + 20, py + 32), "RYWAL: " + cr.name_pl,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_AMBER)
-	draw_string(_font, Vector2(px + 20, py + 58),
+	c.draw_string(_font, Vector2(px + 20, py + 58),
 		"Charakter: %s%s" % [desc.get("personality", "?"), "   ·   WROGI" if hostile else ""],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_RED if hostile else COL_DIM)
 	var rows: Array = []
@@ -3356,26 +3423,26 @@ func _draw_crawler_modal() -> void:
 	for r in rows:
 		var box := Rect2(px + 16, cy, W - 32, 44)
 		var hot := _hover(box)
-		draw_rect(box, Color(0.18, 0.14, 0.07, 0.95) if hot else Color(0.12, 0.10, 0.07, 0.9))
-		draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
-		draw_string(_font, Vector2(px + 28, cy + 28), r["label"],
+		c.draw_rect(box, Color(0.18, 0.14, 0.07, 0.95) if hot else Color(0.12, 0.10, 0.07, 0.9))
+		c.draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
+		c.draw_string(_font, Vector2(px + 28, cy + 28), r["label"],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 50, 16, COL_BRIGHT)
 		_zone(box, "crawler_action", 0, r["action"])
 		cy += 52.0
 
 ## Safehouse menu: spend scrap on heal / buy materials / sell loot / sponsor
 ## package / intel. Rows are clickable; cost shown + greyed if unaffordable.
-func _draw_safehouse() -> void:
+func _draw_safehouse(c: CanvasItem) -> void:
 	var sub: String = _safehouse.get("subtype", "")
 	var W := 760.0; var H := 460.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.06, 0.08, 0.10, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_CYAN, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 32), Safehouse.name_of(sub).to_upper(),
+	c.draw_rect(Rect2(px, py, W, H), Color(0.06, 0.08, 0.10, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_CYAN, false, 2.0)
+	c.draw_string(_font, Vector2(px + 20, py + 32), Safehouse.name_of(sub).to_upper(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_CYAN)
-	draw_string(_font, Vector2(px + 20, py + 56), Safehouse.blurb_of(sub),
+	c.draw_string(_font, Vector2(px + 20, py + 56), Safehouse.blurb_of(sub),
 		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 13, COL_DIM)
-	draw_string(_font, Vector2(px + W - 200, py + 32), "Złom: %d" % _zlom(),
+	c.draw_string(_font, Vector2(px + W - 200, py + 32), "Złom: %d" % _zlom(),
 		HORIZONTAL_ALIGNMENT_LEFT, 190, 18, COL_AMBER)
 
 	# Build the row list: fixed services + (for the black market) buy + sell rows.
@@ -3400,34 +3467,34 @@ func _draw_safehouse() -> void:
 		var cost: int = int(r["cost"])
 		var affordable: bool = cost <= 0 or _zlom() >= cost
 		var hot := _hover(box) and affordable
-		draw_rect(box, Color(0.12, 0.16, 0.18, 0.95) if hot else Color(0.09, 0.11, 0.13, 0.9))
-		draw_rect(box, COL_CYAN if hot else (COL_GRID if affordable else Color(COL_GRID, 0.5)), false, 1.0)
+		c.draw_rect(box, Color(0.12, 0.16, 0.18, 0.95) if hot else Color(0.09, 0.11, 0.13, 0.9))
+		c.draw_rect(box, COL_CYAN if hot else (COL_GRID if affordable else Color(COL_GRID, 0.5)), false, 1.0)
 		var lcol := COL_BRIGHT if affordable else COL_DIM
-		draw_string(_font, Vector2(px + 28, cy + 21), r["label"], HORIZONTAL_ALIGNMENT_LEFT, W - 200, 15, lcol)
+		c.draw_string(_font, Vector2(px + 28, cy + 21), r["label"], HORIZONTAL_ALIGNMENT_LEFT, W - 200, 15, lcol)
 		var ctxt := "za darmo" if cost == 0 else ("+%d złomu" % (-cost) if cost < 0 else "−%d złomu" % cost)
 		var ccol := COL_GREEN if cost < 0 else (COL_AMBER if affordable else COL_DIM)
-		draw_string(_font, Vector2(px + W - 150, cy + 21), ctxt, HORIZONTAL_ALIGNMENT_LEFT, 130, 14, ccol)
+		c.draw_string(_font, Vector2(px + W - 150, cy + 21), ctxt, HORIZONTAL_ALIGNMENT_LEFT, 130, 14, ccol)
 		if affordable:
 			_zone(box, "safe_action", int(r["arg"]), r["action"])
 		cy += rh
 
 	var close := Rect2(px + W - 150, py + H - 42, 130, 30)
 	var chot := _hover(close)
-	draw_rect(close, COL_GRID if chot else Color(0.10, 0.13, 0.17, 0.9))
-	draw_rect(close, COL_CYAN if chot else COL_GRID, false, 1.0)
-	draw_string(_font, Vector2(close.position.x + 14, close.position.y + 21), "Wyjdź [Esc]",
+	c.draw_rect(close, COL_GRID if chot else Color(0.10, 0.13, 0.17, 0.9))
+	c.draw_rect(close, COL_CYAN if chot else COL_GRID, false, 1.0)
+	c.draw_string(_font, Vector2(close.position.x + 14, close.position.y + 21), "Wyjdź [Esc]",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_BRIGHT)
 	_zone(close, "safe_close")
 
-func _draw_levelup() -> void:
+func _draw_levelup(c: CanvasItem) -> void:
 	var p := sim.player()
 	var W := 720.0; var H := 420.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.08, 0.07, 0.04, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 32),
+	c.draw_rect(Rect2(px, py, W, H), Color(0.08, 0.07, 0.04, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	c.draw_string(_font, Vector2(px + 20, py + 32),
 		"AWANS — POZIOM %d" % p.level, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_AMBER)
-	draw_string(_font, Vector2(px + 20, py + 58),
+	c.draw_string(_font, Vector2(px + 20, py + 58),
 		"Punkty do rozdania: %d   ·   wybierz cechę, którą wzmocnisz." % p.skill_points,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
 	var cy := py + 84.0
@@ -3436,32 +3503,32 @@ func _draw_levelup() -> void:
 		var desc: String = SKILL_STATS[i][1]
 		var box := Rect2(px + 16, cy, W - 32, 52)
 		var hot := _hover(box)
-		draw_rect(box, Color(0.18, 0.15, 0.07, 0.95) if hot else Color(0.12, 0.11, 0.08, 0.9))
-		draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
-		draw_string(_font, Vector2(px + 28, cy + 22),
+		c.draw_rect(box, Color(0.18, 0.15, 0.07, 0.95) if hot else Color(0.12, 0.11, 0.08, 0.9))
+		c.draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
+		c.draw_string(_font, Vector2(px + 28, cy + 22),
 			"%d.  %s  —  %d" % [i + 1, desc, int(p.stats.get(stat, 0))],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 16, COL_BRIGHT)
-		draw_string(_font, Vector2(px + 28, cy + 42),
+		c.draw_string(_font, Vector2(px + 28, cy + 42),
 			"obecny modyfikator: +%d" % p.stat_mod(stat),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 		_zone(box, "levelup_stat", i, stat)
 		cy += 58.0
 	var done := Rect2(px + W - 180, py + H - 44, 160, 30)
 	var dhot := _hover(done)
-	draw_rect(done, COL_GRID if dhot else Color(0.10, 0.13, 0.17, 0.9))
-	draw_rect(done, COL_AMBER if dhot else COL_GRID, false, 1.0)
-	draw_string(_font, Vector2(done.position.x + 14, done.position.y + 21),
+	c.draw_rect(done, COL_GRID if dhot else Color(0.10, 0.13, 0.17, 0.9))
+	c.draw_rect(done, COL_AMBER if dhot else COL_GRID, false, 1.0)
+	c.draw_string(_font, Vector2(done.position.x + 14, done.position.y + 21),
 		"Zachowaj punkty [Esc]", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_BRIGHT)
 	_zone(done, "levelup_close")
 
 ## End-of-run results screen: victory/death header, run tallies, sponsors, and
 ## any meta options the season unlocked.
-func _draw_run_summary() -> void:
-	draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+func _draw_run_summary(c: CanvasItem) -> void:
+	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 	var victory: bool = _summary.get("victory", false)
 	var title := "FINAŁ ODCINKA" if victory else "KONIEC TRANSMISJI"
 	var tcol := COL_GREEN if victory else COL_RED
-	draw_string(_font, Vector2(120, 96), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 46, tcol)
+	c.draw_string(_font, Vector2(120, 96), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 46, tcol)
 	var y := 168.0
 	for line in _summary_lines:
 		var col := COL_BRIGHT
@@ -3472,22 +3539,22 @@ func _draw_run_summary() -> void:
 			col = COL_CYAN
 		elif ls.begins_with("Konferansjer") or ls.begins_with("FINAŁ"):
 			col = COL_GREEN if victory else COL_DIM
-		draw_string(_font, Vector2(140, y), ls, HORIZONTAL_ALIGNMENT_LEFT, 1000, 18, col)
+		c.draw_string(_font, Vector2(140, y), ls, HORIZONTAL_ALIGNMENT_LEFT, 1000, 18, col)
 		y += 26.0
-	draw_string(_font, Vector2(140, 690),
+	c.draw_string(_font, Vector2(140, 690),
 		"Odblokowano łącznie opcji: %d   ·   kliknij lub [Enter] — od nowa" % Meta.unlocked_count(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 	_zone(Rect2(0, 0, 1280, 720), "summary_continue")   # click anywhere to restart
 
 ## The Syndicate's class pitch: 3 candidates, pick with number keys.
-func _draw_class_offer() -> void:
+func _draw_class_offer(c: CanvasItem) -> void:
 	var W := 980.0; var H := 500.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	draw_rect(Rect2(px, py, W, H), Color(0.07, 0.08, 0.12, 0.98))
-	draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
-	draw_string(_font, Vector2(px + 20, py + 30), "SYNDYKAT MA PROPOZYCJĘ",
+	c.draw_rect(Rect2(px, py, W, H), Color(0.07, 0.08, 0.12, 0.98))
+	c.draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	c.draw_string(_font, Vector2(px + 20, py + 30), "SYNDYKAT MA PROPOZYCJĘ",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_AMBER)
-	draw_string(_font, Vector2(px + 20, py + 54),
+	c.draw_string(_font, Vector2(px + 20, py + 54),
 		"Tak grałeś: %s.  Te klasy pasują najlepiej — wybierz:" %
 		Classes.style_summary(floor.player, 3),
 		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 14, COL_DIM)
@@ -3496,18 +3563,18 @@ func _draw_class_offer() -> void:
 		var key: String = _class_offer[i]
 		var box := Rect2(px + 16, cy, W - 32, 118)
 		var hot := _hover(box)
-		draw_rect(box, Color(0.16, 0.14, 0.10, 0.95) if hot else Color(0.10, 0.12, 0.17, 0.9))
-		draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
-		draw_string(_font, Vector2(px + 28, cy + 26),
+		c.draw_rect(box, Color(0.16, 0.14, 0.10, 0.95) if hot else Color(0.10, 0.12, 0.17, 0.9))
+		c.draw_rect(box, COL_AMBER if hot else COL_GRID, false, 2.0 if hot else 1.0)
+		c.draw_string(_font, Vector2(px + 28, cy + 26),
 			"%d.  %s" % [i + 1, Classes.name_of(key)],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_BRIGHT)
-		draw_string(_font, Vector2(px + 28, cy + 48), Classes.desc_of(key),
+		c.draw_string(_font, Vector2(px + 28, cy + 48), Classes.desc_of(key),
 			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 14, COL_DIM)
-		draw_string(_font, Vector2(px + 28, cy + 70),
+		c.draw_string(_font, Vector2(px + 28, cy + 70),
 			"Pasuje, bo: %s" % Classes.fit_reason(floor.player, key),
 			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 13, COL_GREEN)
 		var pas := _passive_summary(key)
-		draw_string(_font, Vector2(px + 28, cy + 92),
+		c.draw_string(_font, Vector2(px + 28, cy + 92),
 			"Pasywka: %s    Umiejętność: %s" % [pas, ClassFeatures.active_name(key)],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 80, 13, COL_CYAN)
 		_zone(box, "class", i)
@@ -3522,21 +3589,21 @@ func _passive_summary(key: String) -> String:
 
 ## The large combat readout: the focused enemy's procedural body, part by part,
 ## colored by severity, marked with wound icons, with the aimed zone highlighted.
-func _draw_body_readout(lx: float, lw: float) -> void:
+func _draw_body_readout(c: CanvasItem, lx: float, lw: float) -> void:
 	var e := _focused_enemy()
 	var top := 484.0
-	draw_rect(Rect2(lx, top, lw, 224), Color(0.08, 0.10, 0.13, 0.9))
-	draw_rect(Rect2(lx, top, lw, 224), COL_GRID, false, 1.0)
+	c.draw_rect(Rect2(lx, top, lw, 224), Color(0.08, 0.10, 0.13, 0.9))
+	c.draw_rect(Rect2(lx, top, lw, 224), COL_GRID, false, 1.0)
 	if e == null:
-		draw_string(_font, Vector2(lx + 12, top + 24), "CIAŁO — brak celu",
+		c.draw_string(_font, Vector2(lx + 12, top + 24), "CIAŁO — brak celu",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 		return
 	var st := "śpi" if not e.aware else "ściga cię"
-	draw_string(_font, Vector2(lx + 12, top + 22),
+	c.draw_string(_font, Vector2(lx + 12, top + 22),
 		"CIAŁO: %s  ·  HP %d/%d  ·  %s" % [e.name_pl, e.hp, e.max_hp, st],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	if e.body == null:
-		draw_string(_font, Vector2(lx + 12, top + 46),
+		c.draw_string(_font, Vector2(lx + 12, top + 46),
 			"(prosta istota — brak stref trafień)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 		return
 	var y := top + 48.0
@@ -3549,9 +3616,9 @@ func _draw_body_readout(lx: float, lw: float) -> void:
 		# Aim highlight box (click a part to aim there, no need to cycle T)
 		var prect := Rect2(lx + 8, y - 13, lw - 16, 20)
 		if aimed:
-			draw_rect(prect, Color(COL_AMBER, 0.16))
+			c.draw_rect(prect, Color(COL_AMBER, 0.16))
 		elif _hover(prect) and not p["severed"]:
-			draw_rect(prect, Color(COL_CYAN, 0.10))
+			c.draw_rect(prect, Color(COL_CYAN, 0.10))
 		if not p["severed"]:
 			_zone(prect, "aim_part", 0, pkey)
 		# Part name + severity
@@ -3560,26 +3627,26 @@ func _draw_body_readout(lx: float, lw: float) -> void:
 		var sev_txt := "—" if sev == BodyState.SEV_INTACT else sev_pl
 		if p["severed"]:
 			sev_txt = "odcięte"
-		draw_string(_font, Vector2(lx + 12, y + 2), prefix + p["label_pl"],
+		c.draw_string(_font, Vector2(lx + 12, y + 2), prefix + p["label_pl"],
 			HORIZONTAL_ALIGNMENT_LEFT, 150, 13, COL_BRIGHT if not flashing else COL_RED)
-		draw_string(_font, Vector2(lx + 150, y + 2), sev_txt,
+		c.draw_string(_font, Vector2(lx + 150, y + 2), sev_txt,
 			HORIZONTAL_ALIGNMENT_LEFT, 120, 13, col)
 		# HP pip bar for the part
 		var bx := lx + lw - 150.0
 		var bw := 96.0
 		var frac := float(p["hp"]) / float(maxi(1, int(p["max_hp"])))
-		draw_rect(Rect2(bx, y - 9, bw, 10), Color(0.15, 0.15, 0.18))
+		c.draw_rect(Rect2(bx, y - 9, bw, 10), Color(0.15, 0.15, 0.18))
 		if not p["severed"]:
-			draw_rect(Rect2(bx, y - 9, bw * clampf(frac, 0.0, 1.0), 10), col)
+			c.draw_rect(Rect2(bx, y - 9, bw * clampf(frac, 0.0, 1.0), 10), col)
 		# Wound icons
 		var wx := bx + bw + 8.0
 		for w in p["wounds"]:
-			draw_string(_font, Vector2(wx, y + 2), _wound_glyph(w),
+			c.draw_string(_font, Vector2(wx, y + 2), _wound_glyph(w),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, _wound_color(w))
 			wx += 16.0
 		y += 22.0
 	# Aim hint
-	draw_string(_font, Vector2(lx + 12, top + 210),
+	c.draw_string(_font, Vector2(lx + 12, top + 210),
 		"kliknij część lub [T] — celuj (teraz: %s)" % (_aim_zone_label(e)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_AMBER)
 
@@ -3609,28 +3676,28 @@ func _aim_zone_label(e: CombatEntity) -> String:
 
 # ── Craft panel ───────────────────────────────────────────────────────────────
 
-func _draw_craft_panel() -> void:
+func _draw_craft_panel(c: CanvasItem) -> void:
 	var W := 1160.0; var H := 560.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
 	# Background
-	draw_rect(Rect2(px, py, W, H), Color(0.08, 0.09, 0.13, 0.97))
-	draw_rect(Rect2(px, py, W, H), COL_CYAN, false, 2.0)
+	c.draw_rect(Rect2(px, py, W, H), Color(0.08, 0.09, 0.13, 0.97))
+	c.draw_rect(Rect2(px, py, W, H), COL_CYAN, false, 2.0)
 	# Title + mode tabs
 	var mode_bench := _craft_mode == "bench"
-	draw_string(_font, Vector2(px + 16, py + 24), "WARSZTAT", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_CYAN)
+	c.draw_string(_font, Vector2(px + 16, py + 24), "WARSZTAT", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_CYAN)
 	var tab1_col := COL_BRIGHT if mode_bench else COL_DIM
 	var tab2_col := COL_BRIGHT if not mode_bench else COL_DIM
-	draw_string(_font, Vector2(px + 200, py + 24), "Stół",
+	c.draw_string(_font, Vector2(px + 200, py + 24), "Stół",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, tab1_col)
 	_zone(Rect2(px + 196, py + 6, 90, 26), "tab_bench")
-	draw_string(_font, Vector2(px + 300, py + 24), "Kieszeń",
+	c.draw_string(_font, Vector2(px + 300, py + 24), "Kieszeń",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, tab2_col)
 	_zone(Rect2(px + 296, py + 6, 110, 26), "tab_items")
 	# Close button
-	draw_string(_font, Vector2(px + W - 24, py + 24), "✕  zamknij",
+	c.draw_string(_font, Vector2(px + W - 24, py + 24), "✕  zamknij",
 		HORIZONTAL_ALIGNMENT_RIGHT, -1, 14, COL_DIM)
 	_zone(Rect2(px + W - 130, py + 6, 120, 26), "craft_close")
-	draw_line(Vector2(px + 12, py + 42), Vector2(px + W - 12, py + 42), COL_GRID, 1.0)
+	c.draw_line(Vector2(px + 12, py + 42), Vector2(px + W - 12, py + 42), COL_GRID, 1.0)
 
 	if mode_bench:
 		_draw_bench_panel(px, py, W, H)
