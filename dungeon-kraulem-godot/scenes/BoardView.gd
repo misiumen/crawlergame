@@ -180,6 +180,7 @@ func _offer_routes() -> void:
 ## kit, audience, sponsors, recipes). Death is the only thing that ends a run early.
 func _descend_into(biome_key: String) -> void:
 	_route_offer = []
+	_ach_floor_complete(floor.biome)   # judge the floor being LEFT (biome, restraint…)
 	var next_depth: int = floor.depth + 1
 	var mods := Routes.mods_for(biome_key)
 	var is_boss: bool = next_depth == FINAL_FLOOR    # the finale floor is a boss arena
@@ -378,7 +379,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Achievements gallery (opened from the title): scroll + Esc/back returns.
 	if _ach_screen:
-		if kc == KEY_ESCAPE or kc == KEY_A:
+		if kc == KEY_ESCAPE or kc == KEY_A or kc == KEY_O:
 			_ach_screen = false; queue_redraw()
 		elif kc == KEY_DOWN: _ach_scroll += 84.0; queue_redraw()
 		elif kc == KEY_UP:   _ach_scroll = maxf(0.0, _ach_scroll - 84.0); queue_redraw()
@@ -504,6 +505,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	# [K] speak to the nearest mind — freeform social engineering (hidden road)
 	if kc == KEY_K:
 		_open_speak(); return
+
+	# [O] view achievements mid-run ([A] is taken by movement; on the title it's [A])
+	if kc == KEY_O:
+		_open_ach_screen(); return
 
 	# [L] open the skill-point allocation modal (if you've banked any)
 	if kc == KEY_L:
@@ -997,7 +1002,14 @@ func _bench_remove_at(i: int) -> void:
 func _bench_attempt_now() -> void:
 	if _bench_slots.is_empty():
 		return
-	_animate(sim.bench_attempt(_bench_slots))
+	var used_rag := "szmata" in _bench_slots
+	var evs := sim.bench_attempt(_bench_slots)
+	_animate(evs)
+	# Serious results from the cheapest junk: a success that ran on a rag.
+	if used_rag:
+		for e in evs:
+			if e.get("type") == "craft_attempt" and str(e.get("outcome", "")) in ["sukces", "krytyk"]:
+				_unlock_ach("smiec_wartosciowy")
 	for b in floor.sponsors.drain_boxes():
 		floor.boxes.append(b)
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
@@ -1140,16 +1152,32 @@ func _ach_scan(evs: Array) -> void:
 				var g: Dictionary = e.get("gained", {})
 				if g.has("drewno"): _unlock_ach("meble_tez_krwawia")
 				if g.has("przewód") or g.has("złom"): _unlock_ach("technicznie_to_loot")
+				# the battlefield as a parts bin: salvaging after you've made corpses
+				if p.run_kills >= 1: _unlock_ach("rozbiorka_zwlok")
+				# tech strip-mining: 5 electronics-bearing wrecks in one run
+				if g.has("przewód") or g.has("bateria"):
+					p.flags["run_tech_salv"] = int(p.flags.get("run_tech_salv", 0)) + 1
+					if int(p.flags["run_tech_salv"]) >= 5: _unlock_ach("kompletny_hacker")
 			"craft_attempt":
 				var oc: String = e.get("outcome", "")
 				if oc == "sukces" or oc == "krytyk": _unlock_ach("rzemieslnik_z_paniki")
 				if oc == "krytyk": _unlock_ach("dzielo_mistrzowskie")
 				if oc == "backfire": _unlock_ach("inzynieria_odwagi")
 				if oc == "czesciowy": _unlock_ach("obrzydliwe_ale_dziala")
+				if oc == "sukces" or oc == "krytyk" or oc == "czesciowy":
+					p.flags["run_crafts"] = int(p.flags.get("run_crafts", 0)) + 1
+					if int(p.flags["run_crafts"]) >= 10: _unlock_ach("zlota_raczka_lochu")
 			"trap_armed":
 				_unlock_ach("pulapka_z_niczego")
+			"damage":
+				# a brutal hit landed on a public shot (the crowd is HOT) = the finisher cam
+				var dv = sim.entities.get(int(e.get("target", -1)))
+				if dv != null and dv.faction == "enemy" and int(e.get("amount", 0)) >= 12 \
+						and floor.audience != null and floor.audience.band() in ["hot", "viral"]:
+					_unlock_ach("finiszer_kanalu")
 			"death":
 				if p.run_kills >= 1: _unlock_ach("pierwsza_krew")
+				if p.run_kills >= 50: _unlock_ach("rzeznia_kontrolowana")
 				var t = sim.entities.get(e.get("target"))
 				if t != null and t.faction == "enemy":
 					enemy_died = true
@@ -1157,6 +1185,10 @@ func _ach_scan(evs: Array) -> void:
 					elif "miniboss" in t.tags: _unlock_ach("klepacz_minibossow")
 			"systemic":
 				if e.get("element") == "electric": sys_electric = true
+				# a hazard bit YOU: that clip plays forever (and marks the floor dirty)
+				if int(e.get("target", -1)) == sim.player_id:
+					p.flags["floor_hazard"] = true
+					_unlock_ach("samo_sie_rozstawilo")
 			"audience_band_crossed":
 				if e.get("to_band") == "hot": _unlock_ach("widownia_gorzej_bije")
 				if e.get("to_band") == "viral": _unlock_ach("kult_jednostki")
@@ -1168,10 +1200,20 @@ func _ach_scan(evs: Array) -> void:
 	if not floor.discovered_recipes.is_empty():
 		_unlock_ach("przepis_jaki_przepis")
 	# loot in your pocket
+	var rarities := {}
 	for it in floor.items:
+		rarities[(it as GameItem).rarity] = true
 		if (it as GameItem).rarity == Rarity.LEGENDARY: _unlock_ach("widzialem_legende")
 		elif (it as GameItem).rarity == Rarity.EPIC: _unlock_ach("niezwykly_zbieracz")
 		if (it as GameItem).category == GameItem.CAT_MEDICAL: _unlock_ach("apteka_w_plecaku")
+	for slot in p.equipment:
+		if p.equipment[slot] != null:
+			rarities[(p.equipment[slot] as GameItem).rarity] = true
+	if rarities.size() >= Rarity.ALL.size():
+		_unlock_ach("cala_paleta")
+	# the last stand: down to exactly 1 HP and still breathing
+	if p.is_alive() and p.hp == 1:
+		_unlock_ach("anty_host_warknal")
 	# a sponsor really likes you
 	if floor.sponsors != null:
 		for k in floor.sponsors.all_keys():
@@ -1181,7 +1223,44 @@ func _ach_scan(evs: Array) -> void:
 func _ach_descend(depth: int) -> void:
 	if depth >= 2: _unlock_ach("dno_jeszcze_dalej")
 	if depth >= 5: _unlock_ach("piaty_set")
-	if depth >= 10: _unlock_ach("dziesiate_pietro")
+	# A 6-floor season can't reach depth 10 — "Dziesiąte piętro" is a CAREER tally.
+	_ach_bump("floors", 1)
+	if Achievements.stat("floors") >= 10: _unlock_ach("dziesiate_pietro")
+
+## Achievements judged when you COMPLETE a floor (called just before the descent
+## swaps the floor out). `done_biome` is the biome of the floor being left.
+func _ach_floor_complete(done_biome: String) -> void:
+	var p := floor.player
+	var depth := floor.depth
+	match done_biome:
+		"okopy_frontowe":   _unlock_ach("okopowiec")
+		"zoo_korporacyjne": _unlock_ach("zoofobia_skonczona")
+		"muzeum_spektakli": _unlock_ach("archiwista")
+		"bar_skurczybyk":   _unlock_ach("karaoke_killer")
+	# globtroter: five distinct biomes toured in one season
+	if done_biome != "":
+		var seen: Array = p.flags.get("biomes_seen", [])
+		if done_biome not in seen:
+			seen.append(done_biome)
+			p.flags["biomes_seen"] = seen
+		if seen.size() >= 5: _unlock_ach("globtroter")
+	if depth >= 2:
+		# danced around every hazard on the floor
+		if not p.flags.get("floor_hazard", false): _unlock_ach("taneczny_krok")
+		# a full wallet and iron discipline: spent nothing while holding 20+ scrap
+		if int(p.flags.get("floor_zlom_spent", 0)) == 0 and _zlom() >= 20:
+			_unlock_ach("nadzwyczajne_oszczednosci")
+		# no armor, all scars
+		var bare := true
+		for slot in p.equipment:
+			if p.equipment[slot] != null: bare = false
+		if bare: _unlock_ach("bez_zbroi_bez_smutku")
+	# every kill stripped for parts
+	if p.run_kills >= 3 and p.run_corpses_salvaged >= p.run_kills:
+		_unlock_ach("kazdy_ma_imie")
+	# per-floor trackers reset for the next floor
+	p.flags["floor_hazard"] = false
+	p.flags["floor_zlom_spent"] = 0
 
 ## Event-driven achievements + lifetime counters from a batch of sim events.
 ## (Kept separate from _ach_scan so the wiring stays legible.)
@@ -1432,19 +1511,30 @@ func _open_box(idx: int) -> void:
 
 func handle_dir(dir: Vector2i) -> void:
 	if _done: return
+	floor.player.flags["consec_waits"] = 0
 	_animate(sim.player_move(dir))
 	_advance_floor_turn()
 	_check_transition()
 
 func handle_shove(dir: Vector2i) -> void:
+	floor.player.flags["consec_waits"] = 0
 	_animate(sim.player_shove(dir))
 	_advance_floor_turn()
 
 func handle_wait() -> void:
+	# Stalling on camera: five turtled rounds in a live fight forces an ad break.
+	var cw := int(floor.player.flags.get("consec_waits", 0)) + 1
+	floor.player.flags["consec_waits"] = cw
+	var fight := false
+	for e in sim.enemies_alive():
+		if e.aware: fight = true
+	if fight and cw >= 5:
+		_unlock_ach("reklama_przerywa_walke")
 	_animate(sim.player_wait())
 	_advance_floor_turn()
 
 func handle_interact() -> void:
+	floor.player.flags["consec_waits"] = 0
 	_animate(sim.player_interact())
 	_advance_floor_turn()
 
@@ -1664,6 +1754,7 @@ func _spend_zlom(n: int) -> bool:
 		_log_push("Za mało złomu (masz %d, trzeba %d)." % [_zlom(), n])
 		return false
 	sim.materials["złom"] = _zlom() - n   # sim.materials is the live run-inventory ref
+	floor.player.flags["floor_zlom_spent"] = int(floor.player.flags.get("floor_zlom_spent", 0)) + n
 	return true
 
 func _open_safehouse(id: int) -> void:
@@ -1802,6 +1893,12 @@ func _crawler_action(action: String) -> void:
 					parts.append("%s x%d" % [mk, int(carried[mk])])
 				_log_push("Okradasz %s i znika w mroku. Łup: %s." % [cr.name_pl, ", ".join(parts) if not parts.is_empty() else "nic"])
 				_add_floater(sim.player_id, "OKRADZIONY", COL_AMBER)
+				_unlock_ach("kradziez_armatury")
+				# robbing while a sponsor is invested = a compliance incident
+				if floor.sponsors != null:
+					for sk in floor.sponsors.all_keys():
+						if floor.sponsors.get_attention(sk) >= 5:
+							_unlock_ach("sponsor_nie_pochwala"); break
 				sim.board.clear(cr.cell)
 				cr.alive = false
 				sim.entities.erase(id)
@@ -2566,7 +2663,7 @@ func _draw_hud() -> void:
 	# Controls hint (mouse-first) — clipped to 580px so it can't run under the
 	# top-right level/species readout.
 	draw_string(_font, Vector2(40, 60),
-		"Ruch: WSAD / LPM  ·  PPM pchnij  ·  E rozbierz  ·  I warsztat  ·  K/J/Z panele",
+		"Ruch: WSAD / LPM  ·  PPM pchnij  ·  E rozbierz  ·  I warsztat  ·  K/J/Z/O panele",
 		HORIZONTAL_ALIGNMENT_LEFT, 580, 13, COL_DIM)
 	# Weapon / coating / armor — led by your own HP so it's always on screen.
 	var wln := "HP %d/%d   ·   Broń: nóż" % [p.hp, p.max_hp]

@@ -52,6 +52,11 @@ func _initialize() -> void:
 	an_item.affix_names_pl = ["natrysk"]
 	floor.items = [an_item]
 	floor.class_offered = true
+	floor.player.mana = 2
+	floor.player.max_mana = 7
+	var a_box := GameBox.new("sponsor", "NovaChem", Rarity.RARE)
+	a_box.contents.append({"type": "material", "key": "złom", "qty": 3})
+	floor.boxes = [a_box]
 
 	Save.write(floor, 12345)
 	_ck(Save.has_save(), "write creates a save file")
@@ -85,6 +90,10 @@ func _initialize() -> void:
 	_ck(bool(p2.flags.get("polimer_wierny", false)), "dialogue flags restored")
 	_ck(int(p2.relationships.get("handlarz_szrotu", 0)) == 2, "NPC relationships restored")
 	_ck(int(p2.stats.get("CHA", 0)) == 4, "player stats restored")
+	_ck(p2.mana == 2 and p2.max_mana == 7, "mana restored (was silently reset before)")
+	_ck(fl2.boxes.size() == 1, "unopened lootboxes survive a resume")
+	_ck((fl2.boxes[0] as GameBox).rarity == Rarity.RARE and (fl2.boxes[0] as GameBox).source_name == "NovaChem",
+		"box tier + sponsor restored")
 
 	# --- determinism: the rebuilt floor matches a fresh generate of (seed, depth) ---
 	var fresh := FloorGen.generate(3, 12345, content)

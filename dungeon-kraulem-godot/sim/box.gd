@@ -50,6 +50,19 @@ func _init(_source: String = "mob", _source_name: String = "",
 	source_name = _source_name
 	rarity = _rarity
 
+# ── Serialization — unopened boxes survive a checkpoint resume ────────────────
+
+func to_dict() -> Dictionary:
+	return {"source": source, "source_name": source_name, "rarity": rarity,
+		"contents": contents.duplicate(true), "sponsor_tagline": sponsor_tagline}
+
+static func from_dict(d: Dictionary) -> GameBox:
+	var b := GameBox.new(d.get("source", "mob"), d.get("source_name", ""),
+		d.get("rarity", Rarity.COMMON))
+	b.contents = (d.get("contents", []) as Array).duplicate(true)
+	b.sponsor_tagline = d.get("sponsor_tagline", "")
+	return b
+
 func tier_label() -> String:
 	return Rarity.box_label(rarity)
 

@@ -302,6 +302,7 @@ func _initialize() -> void:
 		bv._crawler_action("rob")
 		_ck(int(bv.sim.materials.get("złom", 0)) == z_pre + 5, "a successful robbery lifts their scrap")
 		_ck(not bv.sim.entities.has(860), "the robbed rival flees the board")
+		_ck(Achievements.is_unlocked("kradziez_armatury"), "a robbery unlocks the theft achievement")
 	# a second crawler: fighting it converts it into a real enemy
 	var spot2: Vector2i = bv._free_cell_for_spawn(bv.sim.player().cell)
 	if spot2 != Vector2i(-1, -1):
@@ -368,6 +369,14 @@ func _initialize() -> void:
 	_ck(Flavor.fail_line("failure", bv._narr_rng) != "", "a procedural craft-failure line is available")
 	var celeb: Dictionary = Flavor.celebrity_for(2, bv._narr_rng)
 	_ck(not celeb.is_empty() and celeb.has("intro"), "a depth-appropriate celebrity cameo is available")
+
+	# achievements newly wired to real mechanics
+	bv.floor.biome = "bar_skurczybyk"
+	bv._ach_floor_complete(bv.floor.biome)
+	_ck(Achievements.is_unlocked("karaoke_killer"), "finishing a Bar U Skurczybyka floor unlocks its achievement")
+	Achievements.bump("floors", 8)              # career floors: push the lifetime tally to 9
+	bv._ach_descend(2)                          # +1 → 10 → career milestone
+	_ck(Achievements.is_unlocked("dziesiate_pietro"), "10 career floors unlock Dziesiąte piętro")
 
 	# banner auto-clears (was sticking forever — "zadanie wykonane" never vanished)
 	bv._add_banner("TEST BANNER")

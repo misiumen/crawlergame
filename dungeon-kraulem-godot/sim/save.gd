@@ -22,6 +22,10 @@ static func write(floor, seed_value: int) -> void:
 	var item_dicts: Array = []
 	for it in floor.items:
 		item_dicts.append((it as GameItem).to_dict())
+	var box_dicts: Array = []
+	for b in floor.boxes:
+		if not (b as GameBox).opened:
+			box_dicts.append((b as GameBox).to_dict())
 	var data := {
 		"seed": seed_value,
 		"depth": floor.depth,
@@ -32,6 +36,7 @@ static func write(floor, seed_value: int) -> void:
 		"player": _player_dict(p),
 		"inv": floor.inv.duplicate(true),
 		"items": item_dicts,
+		"boxes": box_dicts,
 		"discovered": floor.discovered_recipes.duplicate(true),
 		"audience": {
 			"rating": floor.audience.rating, "peak": floor.audience.peak,
@@ -56,6 +61,7 @@ static func _player_dict(p) -> Dictionary:
 		"run_traps_armed": p.run_traps_armed,
 		"stats": p.stats.duplicate(true),
 		"level": p.level, "xp": p.xp, "skill_points": p.skill_points,
+		"mana": p.mana, "max_mana": p.max_mana,
 		"species_key": p.species_key, "origin_key": p.origin_key, "trait": p.species_trait,
 		"magic_affinity": p.magic_affinity,
 		"equipment": _equipment_dict(p.equipment),
@@ -118,6 +124,8 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 	p.origin_key = str(pd.get("origin_key", ""))
 	p.species_trait = str(pd.get("trait", ""))
 	p.magic_affinity = str(pd.get("magic_affinity", ""))
+	p.max_mana = int(pd.get("max_mana", 3))
+	p.mana = int(pd.get("mana", p.max_mana))
 	p.equipment = {}
 	for slot in (pd.get("equipment", {}) as Dictionary):
 		p.equipment[slot] = GameItem.from_dict(pd["equipment"][slot])
@@ -130,6 +138,10 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 	for idict in save_dict.get("items", []):
 		items.append(GameItem.from_dict(idict))
 	fdata["items"] = items
+	var boxes: Array = []
+	for bdict in save_dict.get("boxes", []):
+		boxes.append(GameBox.from_dict(bdict))
+	fdata["boxes"] = boxes
 	fdata["discovered"] = (save_dict.get("discovered", []) as Array).duplicate(true)
 	fdata["class_offered"] = bool(save_dict.get("class_offered", false))
 	fdata["objective"] = (save_dict.get("objective", {}) as Dictionary).duplicate(true)

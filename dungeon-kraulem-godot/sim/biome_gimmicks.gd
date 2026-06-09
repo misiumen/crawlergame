@@ -19,6 +19,25 @@ static func tick(floor, sim, rng: RandomNumberGenerator) -> Array:
 		"konflikt", "biome_oboz_goblinski", "biome_tunel_karnawalowy", "biome_redakcja_krawedzi":
 			if floor.audience != null: floor.audience.change(2, "biome")
 			return [_line("Widownia wyje na widok rywalizacji. (+widownia)")]
+		"okopy_frontowe":
+			# Trenches: distant artillery shakes loose rubble (the pygame gimmick).
+			if p.hp > 1:
+				p.hp -= 1
+				return [{"type": "damage", "target": sim.player_id, "amount": 1, "dmg_type": "physical"},
+					_line("Daleki wybuch wstrząsa stropem. Spada gruz. (−1 HP)")]
+			return [_line("Artyleria dudni gdzieś nad sufitem.")]
+		"zoo_korporacyjne":
+			if floor.audience != null: floor.audience.change(2, "biome")
+			return [_line("Klatki w korytarzu wybuchają piskiem zachwytu. (+widownia)")]
+		"muzeum_spektakli":
+			if floor.audience != null: floor.audience.change(1, "biome")
+			return [_line("Z głośnika: nagranie najlepszych zgonów poprzednich sezonów.")]
+		"bar_skurczybyk":
+			if p.hp < p.max_hp:
+				var bh := mini(2, p.max_hp - p.hp); p.hp += bh
+				return [{"type": "heal", "target": sim.player_id, "amount": bh},
+					_line("Barman „Skurczybyk” podsuwa szot. Niby bezalkoholowy. (+%d HP)" % bh)]
+			return [_line("Z baru niesie się czyjeś karaoke. Ktoś cierpi.")]
 		"swiatynia_konferansjera", "biome_swiatynia_konferansjera":
 			if floor.audience != null: floor.audience.change(4, "biome")
 			return [_line("Z głośników grzmi hymn Konferansjera. Tłum szaleje. (+widownia)")]

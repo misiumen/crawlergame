@@ -266,6 +266,11 @@ func _initialize() -> void:
 	var top := Highlights.top(reel, 2)
 	_ck(top.size() == 2 and top[0] == "BOSS PADŁ!", "the reel surfaces the highest-value moments first")
 
+	# ── Show-floor biomes exist (each backs an achievement) ───────────────────
+	for bk in ["okopy_frontowe", "zoo_korporacyjne", "muzeum_spektakli", "bar_skurczybyk"]:
+		_ck(Routes.BIOMES.has(bk), "biome %s is a real route" % bk)
+	_ck(Routes.mods_for("bar_skurczybyk")["label"] == "Bar U Skurczybyka", "new biome resolves its mods")
+
 	# ── Biome gimmicks ────────────────────────────────────────────────────────
 	var bf := Floor.new(FloorGen.generate(2, 5, _content()))
 	var grng := RandomNumberGenerator.new(); grng.seed = 3

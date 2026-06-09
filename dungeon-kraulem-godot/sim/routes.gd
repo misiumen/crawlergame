@@ -45,6 +45,31 @@ const BIOMES: Dictionary = {
 		"enemy_mul": 1.3, "object_mul": 1.3, "trap_mul": 1.3,
 		"object_tags": [],
 	},
+	# Show-floor biomes from the pygame floor catalog (each carries an achievement).
+	"okopy_frontowe": {
+		"label": "Frontowe Okopy",
+		"blurb": "Artyleria gdzieś nad sufitem. Gruz, błoto i propaganda.",
+		"enemy_mul": 1.4, "object_mul": 0.9, "trap_mul": 1.4,
+		"object_tags": ["metal", "hazard"],
+	},
+	"zoo_korporacyjne": {
+		"label": "Zoo Korporacyjne",
+		"blurb": "Klatki, wybiegi i sponsorskie pawie. Zwierzyna kibicuje.",
+		"enemy_mul": 1.3, "object_mul": 1.1, "trap_mul": 0.8,
+		"object_tags": ["organic", "fragile"],
+	},
+	"muzeum_spektakli": {
+		"label": "Muzeum Spektakli",
+		"blurb": "Eksponaty z poprzednich sezonów. Kurator nie pyta.",
+		"enemy_mul": 0.9, "object_mul": 1.5, "trap_mul": 1.1,
+		"object_tags": ["furniture", "fragile", "salvageable"],
+	},
+	"bar_skurczybyk": {
+		"label": "Bar U Skurczybyka",
+		"blurb": "Neon, kleista podłoga i wieczór karaoke. Mikrofon czeka.",
+		"enemy_mul": 1.0, "object_mul": 1.2, "trap_mul": 0.9,
+		"object_tags": ["furniture", "wood"],
+	},
 }
 
 ## Meta-progression biomes (unlocked via the catalog) register here so they join

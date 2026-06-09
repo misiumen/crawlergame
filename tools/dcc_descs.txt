@@ -1,7 +1,7 @@
 wszystko_jest_surowcem:::Pierwsza rozbiórka zaliczona. System przekwalifikował twój świat na zasoby. Witaj w gospodarce.
 meble_tez_krwawia:::Rozłożyłeś krzesło na czynniki pierwsze. Gdzieś we wszechświecie widz obstawia, ile jeszcze wytrzymasz.
 recykling_agresywny:::Pięć obiektów rozebranych. Syndykat dziękuje za obniżenie kosztów utrzymania Lochu.
-rozbiorka_zwlok:::Potraktowałeś zwłoki jak skrzynkę z częściami. Połowa widowni wyłączyła. Druga zrobiła głośniej.
+rozbiorka_zwlok:::Po walce potraktowałeś arenę jak skład części. Połowa widowni wyłączyła. Druga zrobiła głośniej.
 technicznie_to_loot:::To był fragment ściany. Teraz jest w twoim plecaku. System klasyfikuje to jako inicjatywę.
 kradziez_armatury:::Ukradłeś armaturę z kryjówki. Portier zapamięta. Portierzy zawsze pamiętają.
 sponsor_nie_pochwala:::Naruszyłeś własność sponsora na wizji. Dział prawny Kanału 7 nadał ci właśnie numer sprawy.
@@ -23,7 +23,7 @@ reklama_przerywa_walke:::Pięć rund w defensywie. Tak nudno, że System puści�
 brak_zwlok_brak_problemu:::Całe piętro bez jednego trupa. Pacyfizm na arenie śmierci. Widzowie są zdezorientowani.
 dno_jeszcze_dalej:::Drugie zejście po schodach. Loch zaczyna zapamiętywać twój numer startowy.
 piaty_set:::Piętro 5. Wskaźniki oglądalności drgnęły. Ktoś z innej galaktyki obstawił na ciebie.
-dziesiate_pietro:::Połowa Lochu za tobą. Konferansjer nagrał ci osobny jingiel. To nie znaczy, że cię lubi.
+dziesiate_pietro:::Dziesiąte zaliczone piętro w karierze. Loch zaczyna podejrzewać, że robisz to specjalnie.
 finalista_sezonu:::Pokonałeś finał. Dyrektor generalny Kanału 7 chce znać twoje plany. To pytanie retoryczne.
 pakiet_z_sufitu:::Pierwsza paczka spadła z sufitu. Marka cię polubiła. Marki kochają zwycięzców i męczenników.
 markowy_uczestnik:::Sponsorski przepis odblokowany. Masz teraz logo na rękawie i cenę na głowie.
@@ -42,9 +42,9 @@ niezwykly_zbieracz:::Trzy epiki w jednym runie. Sponsor pyta o nazwę twojej fir
 klepacz_minibossow:::Trzech minibossów na jednym piętrze. Mapa układa się sama, byle dalej od ciebie.
 czystka_srodowiska:::Zabiłeś środowiskiem. Sponsor klaszcze — nie jego budżet i nie jego sprzątanie.
 taneczny_krok:::Piętro bez wejścia w hazard. Ostrożnie. Nudno. Konferansjer woli inne reportaże.
-kompletny_hacker:::Pięć terminali zhakowanych. System cię nie lubi, ale zna już twój login.
+kompletny_hacker:::Piąty wrak elektroniki rozebrany do zera w jednym sezonie. System cię nie lubi, ale zna już twój login.
 bez_zbroi_bez_smutku:::Piętro bez zbroi. Każda blizna ma teraz imię i numer odcinka.
-nadzwyczajne_oszczednosci:::Piętro bez jednego kredytu. Sponsor nie wie, czy płakać, czy cię pozwać.
+nadzwyczajne_oszczednosci:::Pełna kieszeń złomu i ani grama wydane przez całe piętro. Sponsor nie wie, czy płakać, czy cię pozwać.
 kazdy_ma_imie:::Wypatroszyłeś każde ciało, które po sobie zostawiłeś. Inspektor sponsorski jest pod wrażeniem. I w szoku.
 aw_poziom_2:::Poziom 2. Awansowałeś. System odnotował, produkcja udaje entuzjazm.
 aw_poziom_5:::Poziom 5. Widzowie zaczynają zapamiętywać twój numer startowy. Niektórzy nawet kibicują.
