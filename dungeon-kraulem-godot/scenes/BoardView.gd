@@ -99,6 +99,8 @@ const BOX_BONUS_MATS := ["złom", "drewno", "szmata", "przewód", "plastik", "ba
 
 var _cam: Camera2D = null            # world camera (smooth follow + shake)
 var _ui: Control = null              # screen-fixed UI painter on a CanvasLayer
+var _cmod: CanvasModulate = null     # biome ambient colour grade (world only)
+var _plight: PointLight2D = null     # soft light following the player
 var _smoke := false                  # --smoke: scripted draw-path autotest, then quit
 var _smoke_frames := 0
 
@@ -119,6 +121,24 @@ func _ready() -> void:
 	_ui = preload("res://scenes/UIView.gd").new()
 	_ui.controller = self
 	layer.add_child(_ui)
+	# Biome mood: a world-only colour grade + a soft light following the player
+	# (dark biomes like Lawowe Tunele lean on it; bright ones barely use it).
+	_cmod = CanvasModulate.new()
+	_cmod.color = Color(1, 1, 1)
+	add_child(_cmod)
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([Color(1, 0.95, 0.85, 0.5), Color(1, 1, 1, 0.0)])
+	var ltex := GradientTexture2D.new()
+	ltex.gradient = grad
+	ltex.fill = GradientTexture2D.FILL_RADIAL
+	ltex.fill_from = Vector2(0.5, 0.5)
+	ltex.fill_to = Vector2(0.5, 0.0)
+	ltex.width = 512
+	ltex.height = 512
+	_plight = PointLight2D.new()
+	_plight.texture = ltex
+	_plight.energy = 0.0
+	add_child(_plight)
 	if "--smoke" in OS.get_cmdline_user_args():
 		_smoke = true
 	set_process(true)
@@ -2376,6 +2396,13 @@ func _process(dt: float) -> void:
 	if _cam != null:
 		_cam.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) \
 			if _shake > 0.0 else Vector2.ZERO
+	# Biome mood: ambient grade + the player light track the active theme.
+	if _cmod != null and sim != null and not _title:
+		var th := BiomeThemes.theme_for(floor.biome if floor != null else "")
+		_cmod.color = th.ambient
+		if _plight != null:
+			_plight.energy = th.light
+			_plight.position = _vpos.get(sim.player_id, _cell_px(sim.player().cell))
 	if _smoke:
 		_smoke_tick()
 	queue_redraw()
@@ -2395,7 +2422,13 @@ func _smoke_tick() -> void:
 		130: _craft_open = false; _open_ach_screen()
 		150: _ach_screen = false; _meta_screen = true
 		170: _meta_screen = false
-		190:
+		# Cycle the most distinct biome themes so every set-dressing path paints.
+		185: floor.biome = "bar_skurczybyk"
+		200: floor.biome = "biome_lawowe_tunele"
+		215: floor.biome = "muzeum_spektakli"
+		230: floor.biome = "biome_siec_kanalizacyjna"
+		245: floor.biome = "okopy_frontowe"
+		260:
 			print("SMOKE OK")
 			get_tree().quit(0)
 
@@ -2432,16 +2465,22 @@ func _draw() -> void:
 			or not _summary.is_empty():
 		return   # a full-screen menu owns the frame; the UI layer paints it
 	var b: Board = sim.board
+	var th := BiomeThemes.theme_for(floor.biome if floor != null else "")
+	# Biome signature frame around the arena.
+	draw_rect(Rect2(-4, -4, b.w * TILE + 7, b.h * TILE + 7), Color(th.accent, 0.55), false, 2.0)
 	for y in b.h:
 		for x in b.w:
 			var c := Vector2i(x, y)
 			var r := Rect2(_origin + Vector2(x * TILE, y * TILE), Vector2(TILE - 1, TILE - 1))
 			if b.is_wall(c):
-				draw_rect(r, COL_WALL)
-				draw_line(r.position, r.position + Vector2(TILE - 1, 0), COL_WALLHI, 1.0)
+				draw_rect(r, th.wall)
+				draw_line(r.position, r.position + Vector2(TILE - 1, 0), th.wall_hi, 1.0)
+				_draw_wall_prop(r, c, th)
 				continue
-			draw_rect(r, COL_FLOOR2 if (x + y) % 2 == 0 else COL_FLOOR)
-			draw_rect(r, COL_GRID, false, 1.0)
+			draw_rect(r, th.floor_b if (x + y) % 2 == 0 else th.floor_a)
+			draw_rect(r, th.grid, false, 1.0)
+			_draw_floor_pattern(r, c, th)
+			_draw_floor_prop(r, c, th)
 			match b.hazard_at(c):
 				"water": draw_rect(Rect2(r.position + Vector2(3, 3), Vector2(TILE - 7, TILE - 7)), COL_WATER)
 				"wire":  _draw_glyph("|", c, COL_WIRE)
@@ -2504,6 +2543,153 @@ func _draw_ui(c: CanvasItem) -> void:
 
 func _draw_glyph(s: String, c: Vector2i, col: Color) -> void:
 	draw_string(_font, _cell_px(c) + Vector2(-6, 8), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, col)
+
+# ── Biome set-dressing (Phase B.1) ───────────────────────────────────────────
+# Everything below is DETERMINISTIC per (run seed, depth, cell) so a floor's
+# look is stable across frames, saves and resumes — décor, not noise.
+
+func _chash(cx: int, cy: int) -> int:
+	var h: int = cx * 374761393 + cy * 668265263 + _run_seed * 31 \
+		+ (floor.depth if floor != null else 0) * 97
+	h = (h ^ (h >> 13)) * 1274126177
+	return absi(h ^ (h >> 16))
+
+## Floor motif: a per-biome texture stamped on cells (cheap primitives).
+func _draw_floor_pattern(r: Rect2, c: Vector2i, th: Dictionary) -> void:
+	var h := _chash(c.x, c.y)
+	var col: Color = th.pattern_col
+	match th.pattern:
+		"tiles":
+			draw_rect(r.grow(-8), col, false, 1.0)
+		"planks":
+			draw_line(r.position + Vector2(0, TILE / 3.0), r.position + Vector2(TILE - 1, TILE / 3.0), col, 1.0)
+			draw_line(r.position + Vector2(0, TILE * 2 / 3.0), r.position + Vector2(TILE - 1, TILE * 2 / 3.0), col, 1.0)
+			if h % 3 == 0:
+				draw_line(r.position + Vector2(TILE * 0.5, TILE / 3.0), r.position + Vector2(TILE * 0.5, TILE * 2 / 3.0), col, 1.0)
+		"hatch":
+			draw_line(r.position + Vector2(2, TILE - 4), r.position + Vector2(TILE - 4, 2), col, 1.0)
+			if h % 2 == 0:
+				draw_line(r.position + Vector2(2, TILE * 0.5), r.position + Vector2(TILE * 0.5, 2), col, 1.0)
+		"rubble":
+			if h % 10 < 3:
+				var p1 := r.position + Vector2(6 + h % 24, 8 + (h / 7) % 24)
+				draw_colored_polygon(PackedVector2Array([p1, p1 + Vector2(7, 2), p1 + Vector2(3, 7)]), col)
+			if h % 7 == 0:
+				draw_circle(r.position + Vector2(10 + (h / 3) % 26, 30), 2.0, col)
+		"cracks":
+			if h % 10 < 4:
+				var a := r.position + Vector2(4 + h % 12, 4 + (h / 5) % 14)
+				var m := a + Vector2(10 + h % 8, 8 + (h / 11) % 10)
+				var z := m + Vector2(8 - (h % 16), 10)
+				draw_polyline(PackedVector2Array([a, m, z]), col, 1.6)
+		"dots":
+			if h % 10 < 4:
+				for k in 3:
+					var dh := _chash(c.x * 5 + k, c.y * 3 + k)
+					draw_circle(r.position + Vector2(5 + dh % 38, 5 + (dh / 9) % 38), 1.4, col)
+		"stripes":
+			if (c.x + c.y) % 2 == 0:
+				draw_line(r.position + Vector2(0, TILE - 2), r.position + Vector2(TILE - 2, 0), col, 5.0)
+		"puddles":
+			if h % 10 < 2:
+				_draw_ellipse(r.position + Vector2(TILE * 0.5, TILE * 0.6), 12, 6, col)
+
+## Scattered floor props — the biome's furniture (drawn under entities).
+func _draw_floor_prop(r: Rect2, c: Vector2i, th: Dictionary) -> void:
+	var props: Array = th.props
+	if props.is_empty():
+		return
+	var h := _chash(c.x * 13, c.y * 17)
+	var pick: Dictionary = props[h % props.size()]
+	if h % 100 >= int(pick.chance):
+		return
+	var col: Color = pick.col
+	var col2: Color = pick.get("col2", col)
+	var ctr := r.position + Vector2(TILE * 0.5, TILE * 0.5)
+	match pick.kind:
+		"scrap":
+			draw_rect(Rect2(ctr + Vector2(-9, 0), Vector2(11, 7)), col)
+			draw_rect(Rect2(ctr + Vector2(-3, -6), Vector2(9, 6)), col2)
+		"scorch":
+			draw_circle(ctr, 9.0, Color(col, 0.8))
+			draw_arc(ctr, 11.0, 0, TAU, 14, Color(col, 0.4), 2.0)
+		"sandbag":
+			draw_rect(Rect2(ctr + Vector2(-10, -1), Vector2(20, 7)), col)
+			draw_rect(Rect2(ctr + Vector2(-7, -7), Vector2(14, 6)), col2)
+		"paw":
+			draw_circle(ctr, 2.6, col)
+			draw_circle(ctr + Vector2(-4, -5), 1.5, col)
+			draw_circle(ctr + Vector2(4, -5), 1.5, col)
+		"pedestal":
+			draw_rect(Rect2(ctr + Vector2(-6, -10), Vector2(12, 20)), col)
+			draw_rect(Rect2(ctr + Vector2(-9, -13), Vector2(18, 4)), col2)
+		"bottle":
+			draw_rect(Rect2(ctr + Vector2(-2, -4), Vector2(5, 10)), col)
+			draw_rect(Rect2(ctr + Vector2(-1, -8), Vector2(3, 4)), col2)
+		"candle":
+			draw_circle(ctr + Vector2(0, -4), 7.0, Color(col, 0.18))
+			draw_rect(Rect2(ctr + Vector2(-2, -2), Vector2(4, 8)), Color("d8d0c0"))
+			draw_circle(ctr + Vector2(0, -4), 2.2, col)
+		"puddle":
+			_draw_ellipse(ctr + Vector2(0, 4), 13, 6, col)
+		"leaf":
+			draw_circle(ctr + Vector2(-3, 1), 2.4, col)
+			draw_circle(ctr + Vector2(3, -2), 2.0, col)
+		"tree":
+			draw_rect(Rect2(ctr + Vector2(-2, 0), Vector2(5, 10)), col2)
+			draw_circle(ctr + Vector2(0, -5), 8.0, col)
+		"vat":
+			draw_arc(ctr, 9.0, 0, TAU, 16, col, 2.0)
+			draw_circle(ctr, 6.0, Color(col2, 0.5))
+		"desk":
+			draw_rect(Rect2(ctr + Vector2(-11, -3), Vector2(22, 5)), col)
+			draw_rect(Rect2(ctr + Vector2(-5, -9), Vector2(10, 6)), col2)
+		"confetti":
+			for k in 4:
+				var dh := _chash(c.x * 7 + k, c.y * 11 + k)
+				draw_circle(r.position + Vector2(6 + dh % 36, 6 + (dh / 13) % 36),
+					1.6, col if k % 2 == 0 else col2)
+		"ember":
+			draw_circle(ctr, 6.0, Color(col, 0.16))
+			draw_circle(ctr, 2.0, col)
+		"cable":
+			draw_polyline(PackedVector2Array([r.position + Vector2(2, TILE - 8),
+				ctr + Vector2(-4, 2), r.position + Vector2(TILE - 4, 10)]), col, 1.6)
+		"tape":
+			draw_line(r.position + Vector2(2, 6), r.position + Vector2(TILE - 4, 6), col, 2.5)
+		"bone":
+			draw_line(ctr + Vector2(-5, 3), ctr + Vector2(5, -3), col, 2.0)
+			draw_circle(ctr + Vector2(-5, 3), 1.8, col)
+			draw_circle(ctr + Vector2(5, -3), 1.8, col)
+
+## Wall décor — frames, pipes, neon, cage bars, posters.
+func _draw_wall_prop(r: Rect2, c: Vector2i, th: Dictionary) -> void:
+	var props: Array = th.wall_props
+	if props.is_empty():
+		return
+	var h := _chash(c.x * 29, c.y * 23)
+	var pick: Dictionary = props[h % props.size()]
+	if h % 100 >= int(pick.chance):
+		return
+	var col: Color = pick.col
+	var col2: Color = pick.get("col2", col)
+	match pick.kind:
+		"frame":
+			draw_rect(Rect2(r.position + Vector2(10, 10), Vector2(TILE - 21, TILE - 24)), col, false, 2.0)
+			draw_rect(Rect2(r.position + Vector2(15, 15), Vector2(TILE - 31, TILE - 34)), Color(col, 0.35))
+		"pipe":
+			draw_line(r.position + Vector2(0, 14), r.position + Vector2(TILE - 1, 14), col, 3.0)
+			draw_circle(r.position + Vector2(TILE * 0.5, 14), 3.0, col)
+		"neon":
+			draw_rect(Rect2(r.position + Vector2(4, TILE - 10), Vector2(TILE - 9, 4)), col)
+			draw_rect(Rect2(r.position + Vector2(4, TILE - 14), Vector2(TILE - 9, 10)), Color(col2, 0.18))
+		"bars":
+			for k in 3:
+				var bx := r.position.x + 10 + k * 12
+				draw_line(Vector2(bx, r.position.y + 8), Vector2(bx, r.position.y + TILE - 9), col, 2.0)
+		"poster":
+			draw_rect(Rect2(r.position + Vector2(12, 9), Vector2(TILE - 25, TILE - 19)), col)
+			draw_rect(Rect2(r.position + Vector2(16, 13), Vector2(TILE - 33, 8)), Color(col2, 0.7))
 
 func _draw_player(e: CombatEntity, pos: Vector2, fade: float) -> void:
 	var col := COL_PLAYER; col.a = fade
@@ -2641,6 +2827,13 @@ func _draw_minimap(c: CanvasItem) -> void:
 	if floor == null: return
 	var n: int = floor.rooms.size()
 	var bx: float = 1280 - 28 - n * 46
+	# Biome badge in its signature colour, left of the sector chips.
+	if floor.biome != "":
+		var th := BiomeThemes.theme_for(floor.biome)
+		var lbl: String = "▌" + Routes.label_of(floor.biome)
+		var lw2: float = _font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+		c.draw_string(_font, Vector2(bx - lw2 - 18, 44), lbl,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 15, th.accent)
 	for i in n:
 		var rx: float = bx + i * 46
 		var col: Color = COL_CYAN if i == floor.current else COL_DIM

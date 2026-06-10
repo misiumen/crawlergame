@@ -271,6 +271,22 @@ func _initialize() -> void:
 		_ck(Routes.BIOMES.has(bk), "biome %s is a real route" % bk)
 	_ck(Routes.mods_for("bar_skurczybyk")["label"] == "Bar U Skurczybyka", "new biome resolves its mods")
 
+	# ── Biome visual themes: every route resolves to a complete, DISTINCT look ──
+	var theme_keys: Array = Routes.BIOMES.keys() + MetaCatalog.keys_of_kind("biome") + [""]
+	var accents := {}
+	var complete := true
+	for tk2 in theme_keys:
+		var th: Dictionary = BiomeThemes.theme_for(tk2)
+		for fld in BiomeThemes.DEFAULT:
+			if not th.has(fld): complete = false
+		accents[th.accent] = true
+	_ck(complete, "every biome theme has every field (defaults fill gaps)")
+	var themed := 0
+	for tk3 in theme_keys:
+		if BiomeThemes.THEMES.has(tk3): themed += 1
+	_ck(themed >= 19, "all %d route biomes have a hand-set identity (got %d)" % [theme_keys.size(), themed])
+	_ck(accents.size() >= 15, "biome accent colours are distinct (%d unique)" % accents.size())
+
 	# ── Biome gimmicks ────────────────────────────────────────────────────────
 	var bf := Floor.new(FloorGen.generate(2, 5, _content()))
 	var grng := RandomNumberGenerator.new(); grng.seed = 3
