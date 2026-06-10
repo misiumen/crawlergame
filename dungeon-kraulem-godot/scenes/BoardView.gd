@@ -101,6 +101,7 @@ var _cam: Camera2D = null            # world camera (smooth follow + shake)
 var _ui: Control = null              # screen-fixed UI painter on a CanvasLayer
 var _cmod: CanvasModulate = null     # biome ambient colour grade (world only)
 var _plight: PointLight2D = null     # soft light following the player
+var _sfx: Node = null               # procedural audio (SFX + music)
 var _light_tex: Texture2D = null     # shared radial gradient for all 2D lights
 var _lights_root: Node2D = null      # pooled hazard/safehouse lights
 var _lunge: Dictionary = {}          # id -> {dir: Vector2, t: float} attack lunges
@@ -149,6 +150,8 @@ func _ready() -> void:
 	add_child(_plight)
 	_lights_root = Node2D.new()
 	add_child(_lights_root)
+	_sfx = preload("res://scenes/Sfx.gd").new()
+	add_child(_sfx)
 	if "--smoke" in OS.get_cmdline_user_args():
 		_smoke = true
 	set_process(true)
@@ -279,6 +282,7 @@ func _descend_into(biome_key: String) -> void:
 	_spawn_safehouse()
 	_maybe_spawn_crawler()
 	_wipe = 1.0                    # descent fade-in
+	_play("descend")
 	_arm_floor_traits()            # re-arm per-floor species traits (e.g. first strike)
 	sim.refill_mana()              # mana tops up each floor
 	floor.objective = Objectives.pick(next_depth, _narr_rng)   # a fresh segment goal
@@ -369,6 +373,7 @@ func _check_transition() -> void:
 	_recenter()
 	_reset_visuals()
 	_wipe = 1.0   # quick fade-in as you step through the door
+	_play("door")
 	_log_push("Przechodzisz do: %s." % r.get("name", "?"))
 
 func _cell_px(c: Vector2i) -> Vector2:
@@ -702,6 +707,7 @@ func _sponsor_reaction(e: Dictionary) -> void:
 		_log_push("%s ma cię na oku — i nie w dobrym sensie." % e.get("name", key))
 
 func _dispatch_zone(z: Dictionary) -> void:
+	_play("click")
 	var i: int = int(z.get("i", 0))
 	match z.get("kind", ""):
 		"title_continue", "title_start": _build()
@@ -760,6 +766,7 @@ func _award_xp(amount: int) -> void:
 func _on_level_up(e: Dictionary) -> void:
 	var lv: int = int(e.get("level", sim.player().level))
 	_add_floater(sim.player_id, "AWANS! POZIOM %d" % lv, COL_AMBER)
+	_play("fanfare")
 	_add_banner("POZIOM %d" % lv)
 	_shake = maxf(_shake, 6.0)
 	_log_push("Awans na poziom %d! +5 HP, +%d pkt umiejętności." % [lv, int(e.get("levels", 1))])
@@ -893,6 +900,7 @@ func _spawn_hunter(hunter_name: String) -> void:
 	_attach_bodies()                                  # only the new (body-less) hunter
 	var px := _cell_px(spot)
 	_vpos[id] = px; _vtarget[id] = px
+	_play("sting")
 	_log_push("%s wpada na planszę — sponsor wysłał łowcę nagród!" % hunter_name)
 	_add_banner("ŁOWCA SPONSORA")
 	_shake = maxf(_shake, 7.0)
@@ -1137,6 +1145,7 @@ func _box_anim_advance() -> void:
 ## golden screen burst for the rare ones.
 func _push_ach_toast(d: Dictionary) -> void:
 	var tier := str(d.get("tier", "bronze"))
+	_play("chime")
 	_toasts.append({"name": d.get("name", "?"), "desc": d.get("desc", ""),
 		"category": d.get("category", "general"), "tier": tier,
 		"points": int(Achievements.TIER_POINTS.get(tier, 1)), "t": 0.0, "ttl": 5.2})
@@ -1603,6 +1612,7 @@ func handle_dir(dir: Vector2i) -> void:
 
 func handle_shove(dir: Vector2i) -> void:
 	floor.player.flags["consec_waits"] = 0
+	_play("shove")
 	_animate(sim.player_shove(dir))
 	_advance_floor_turn()
 
@@ -1729,6 +1739,7 @@ func _open_speak() -> void:
 		_log_push("Nie ma kogo przekonywać — nikt nie jest w zasięgu głosu.")
 		queue_redraw(); return
 	_speak = {"target_id": t.id, "text": "", "mode": "type"}
+	_play("speak")
 	queue_redraw()
 
 func _speak_submit() -> void:
@@ -2116,6 +2127,7 @@ func _animate(evs: Array) -> void:
 				_flash[tid] = 0.24
 				var col: Color = COL_CYAN if e.get("dmg_type") == "electric" else COL_RED
 				_add_floater(tid, "-%d" % e["amount"], col)
+				_play("crit" if int(e["amount"]) >= 12 else "hit")
 				_shake = maxf(_shake, 5.0 if e["amount"] >= 12 else 2.5)
 				_spawn_parts(_vpos.get(tid, _cell_px(Vector2i.ZERO)),
 					mini(4 + int(e["amount"]) / 3, 12), _dmg_spark_color(str(e.get("dmg_type", ""))))
@@ -2139,9 +2151,11 @@ func _animate(evs: Array) -> void:
 			"systemic":
 				if e.get("element") == "electric":
 					_add_floater(e["target"], "PRĄD!", COL_CYAN)
+					_play("zap")
 					_shake = maxf(_shake, 6.0)
 			"death":
 				_dying[e["target"]] = 1.0
+				_play("death")
 				var dent = sim.entities.get(int(e["target"]))
 				if dent != null:
 					var dcol := _enemy_hue(dent, _enemy_body_kind(dent)) \
@@ -2149,22 +2163,28 @@ func _animate(evs: Array) -> void:
 					_spawn_parts(_vpos.get(int(e["target"]), _cell_px(dent.cell)), 14, dcol, 95.0)
 			"miss":
 				_add_floater(e["target"], "pudło", COL_DIM)
+				_play("whoosh")
 			"guard":
 				_add_floater(int(e["id"]), "GARDA", COL_CYAN)
+				_play("clang")
 				_log_push("%s podnosi gardę — pchnięcie ją łamie." % e.get("name", "Wróg"))
 			"guard_break":
 				_add_floater(int(e["id"]), "GARDA PĘKA", COL_AMBER)
 			"enrage":
 				_add_floater(int(e["id"]), "SZAŁ!", COL_RED)
+				_play("growl")
 				_log_push("%s wpada w szał!" % e.get("name", "Wróg"))
 				_shake = maxf(_shake, 4.0)
 			"pounce":
 				_add_floater(int(e["id"]), "SKOK!", COL_AMBER)
+				_play("pounce")
 			"phase":
 				_add_floater(int(e["id"]), "PRZENIKA", COL_DIM)
+				_play("phase")
 				_log_push("Ostrze przechodzi przez %s — to nie jest ciało." % e.get("name", "zjawę"))
 			"salvage":
 				_dying[e["target"]] = 1.0
+				_play("crunch")
 				var parts: Array = []
 				for k in e["gained"]:
 					parts.append("+%s" % k)
@@ -2191,11 +2211,11 @@ func _animate(evs: Array) -> void:
 				if e.get("item_name", "") != "":
 					_add_floater(sim.player_id, "+" + e["item_name"], COL_GREEN)
 				match outcome:
-					"krytyk":    _narrate("clever_craft")
-					"sukces":    _narrate("craft_success")
-					"czesciowy": _narrate("craft_partial")
-					"porazka":   _narrate("craft_fail")
-					"backfire":  _narrate("craft_critical_fail")
+					"krytyk":    _narrate("clever_craft"); _play("craft_ok")
+					"sukces":    _narrate("craft_success"); _play("craft_ok")
+					"czesciowy": _narrate("craft_partial"); _play("craft_bad")
+					"porazka":   _narrate("craft_fail"); _play("craft_bad")
+					"backfire":  _narrate("craft_critical_fail"); _play("explode")
 				# A procedural failure line (from failure_templates.json) on a botch.
 				var flvl: String = {"czesciowy": "partial", "porazka": "failure", "backfire": "critical_failure"}.get(outcome, "")
 				if flvl != "":
@@ -2209,6 +2229,7 @@ func _animate(evs: Array) -> void:
 				_add_floater(sim.player_id, "+powłoka x%d" % e["charges"], COL_CYAN)
 			"heal":
 				_add_floater(sim.player_id, "+%d HP" % e["amount"], COL_GREEN)
+				_play("heal")
 				_spawn_parts(_vpos.get(sim.player_id, Vector2.ZERO), 5, COL_GREEN, 38.0, -70.0, 0.7, 2.0)
 			"weapon_upgrade":
 				_add_floater(sim.player_id, "+%d obr." % e["bonus"], COL_AMBER)
@@ -2218,6 +2239,7 @@ func _animate(evs: Array) -> void:
 				_on_level_up(e)
 			"armor_equipped":
 				_add_floater(sim.player_id, "+%d AC" % e.get("ac_bonus", 1), COL_CYAN)
+				_play("clang")
 				_log_push("Zakładasz: %s. Pancerz +%d AC (%s)." % [
 					e.get("name", "?"), e.get("ac_bonus", 1), e.get("slot", "ciało")])
 			"recipe_learned":
@@ -2225,6 +2247,7 @@ func _animate(evs: Array) -> void:
 					_add_floater(sim.player_id, "+przepis", COL_GREEN)
 					_log_push("Nowy przepis: %s." % e.get("name", "?"))
 			"spell_learned":
+				_play("chime")
 				if e.get("fizzle", false):
 					_add_floater(sim.player_id, "ZWÓJ ROZSYPUJE SIĘ", COL_DIM)
 					_log_push("Litery rozpływają ci się przed oczami. Magia nie dla ciebie.")
@@ -2248,6 +2271,7 @@ func _animate(evs: Array) -> void:
 				_log_push(str(e.get("reason", "Towarzysz nie może teraz pomóc.")))
 			"spell_cast":
 				_add_floater(sim.player_id, "✦ " + str(e.get("name", "Zaklęcie")), COL_PURPLE)
+				_play("cast")
 				_log_push("Rzucasz: %s." % e.get("name", "?"))
 				_shake = maxf(_shake, 3.0)
 				_spawn_parts(_vpos.get(sim.player_id, Vector2.ZERO), 8, COL_PURPLE, 60.0, -30.0, 0.6)
@@ -2261,6 +2285,7 @@ func _animate(evs: Array) -> void:
 			"convert":
 				# a zealot spread the faith on its own — the crusade chains
 				_add_floater(int(e.get("id", sim.player_id)), "NAWRÓCONY", COL_GREEN)
+				_play("holy")
 				_spawn_parts(_vpos.get(int(e.get("id", -1)), Vector2.ZERO), 10,
 					Color("ffd24a"), 70.0, -40.0, 0.7)
 				_log_push("%s przyjmuje wiarę od współwyznawcy!" % e.get("name", "Ktoś"))
@@ -2298,6 +2323,7 @@ func _animate(evs: Array) -> void:
 			"sponsor_attention":
 				_sponsor_reaction(e)
 			"sponsor_gift":
+				_play("gift")
 				_log_push("%s zauważył cię. Paczka!" % e.get("name", "Sponsor"))
 			"combat_end":
 				_add_banner("ZWYCIĘSTWO" if e["outcome"] == "win" else "KONIEC")
@@ -2371,6 +2397,7 @@ func _narrate(category: String) -> void:
 	var line := Narrator.say(category, _narr_rng)
 	if line != "":
 		_log_push("Konferansjer: " + line)
+		_play("blip")   # the host's voice, Animal-Crossing style
 
 func _log_push(line: String) -> void:
 	_log.append(line)
@@ -2433,6 +2460,11 @@ var _banner_t := 0.0          # seconds the current banner stays before fading o
 func _add_banner(txt: String) -> void:
 	_banner = txt
 	_banner_t = 2.2
+
+## Play a synthesized sound if the audio node exists (it doesn't in headless tests).
+func _play(sname: String) -> void:
+	if _sfx != null:
+		_sfx.play(sname)
 
 func _add_floater(id: int, text: String, color: Color) -> void:
 	var pos: Vector2 = _vpos.get(id, _cell_px(Vector2i.ZERO))
@@ -2544,6 +2576,19 @@ func _process(dt: float) -> void:
 				if str(sim.board.hazards[cell]) == "fire" and _parts.size() < 200:
 					_spawn_parts(_cell_px(cell) + Vector2(randf_range(-12, 12), 8),
 						1, Color("ff9a4a"), 14.0, -55.0, 1.1, 2.2)
+	# Soundtrack mood: title / explore / combat / boss, crossfaded.
+	if _sfx != null:
+		var mood := "title"
+		if not _title and _summary.is_empty() and sim != null:
+			if floor != null and floor.depth >= FINAL_FLOOR:
+				mood = "boss"
+			else:
+				mood = "explore"
+				for me in sim.enemies_alive():
+					if me.aware:
+						mood = "combat"
+						break
+		_sfx.music(mood)
 	# Biome mood: ambient grade + the player light track the active theme.
 	if _cmod != null and sim != null and not _title:
 		var th := BiomeThemes.theme_for(floor.biome if floor != null else "")
@@ -2589,13 +2634,20 @@ func _smoke_tick() -> void:
 func _tick_box_anim(dt: float) -> void:
 	if _box_anim.is_empty():
 		return
-	_box_anim["t"] = float(_box_anim["t"]) + dt
+	var t_prev: float = float(_box_anim["t"])
+	_box_anim["t"] = t_prev + dt
 	var t: float = _box_anim["t"]
 	match _box_anim["phase"]:
 		"spin":
+			# reel ticks ratchet the tension (one per notch passed)
+			if int(t * 10.0) != int(t_prev * 10.0):
+				_play("tick")
 			if t >= BOX_SPIN:
 				_box_anim["phase"] = "pop"; _box_anim["t"] = 0.0
 				_shake = maxf(_shake, 9.0)        # the SNAP
+				_play("snap")
+				if int(_box_anim.get("tier", 1)) >= 3:
+					_play("jackpot")
 		"pop":
 			if t >= BOX_POP:
 				_box_anim["phase"] = "reveal"; _box_anim["t"] = 0.0

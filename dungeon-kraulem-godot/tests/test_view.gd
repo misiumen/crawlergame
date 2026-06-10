@@ -397,6 +397,21 @@ func _initialize() -> void:
 	_ck(bv._parts.is_empty(), "particles decay and cull")
 	_ck(bv._wipe >= 0.0, "transition wipe state is sane")
 
+	# procedural audio: every SFX def renders to a stream; music loops render too
+	var sfx = preload("res://scenes/Sfx.gd").new()
+	get_root().add_child(sfx)
+	var all_ok := true
+	for sname in sfx.SFX:
+		if sfx._sfx_stream(sname) == null: all_ok = false
+	_ck(all_ok, "all %d SFX defs synthesize to streams" % sfx.SFX.size())
+	_ck(sfx._music_stream("combat") != null, "a music mood renders to a looping stream")
+	_ck((sfx._music_stream("combat") as AudioStreamWAV).loop_mode == AudioStreamWAV.LOOP_FORWARD,
+		"music streams loop")
+	sfx.play("hit")                     # headless: must not crash
+	sfx.music("explore")
+	_ck(true, "play + music calls are headless-safe")
+	sfx.queue_free()
+
 	# banner auto-clears (was sticking forever — "zadanie wykonane" never vanished)
 	bv._add_banner("TEST BANNER")
 	_ck(bv._banner == "TEST BANNER", "a banner shows when triggered")
