@@ -412,6 +412,24 @@ func _initialize() -> void:
 	_ck(true, "play + music calls are headless-safe")
 	sfx.queue_free()
 
+	# Phase C: unequip puts the worn piece back in the pocket
+	var helm := GameItem.new("hełm testowy", GameItem.CAT_ARMOR, Rarity.COMMON)
+	helm.effect = {"slot": "head", "ac_bonus": 2}
+	bv.floor.player.equipment["head"] = helm
+	var pocket0: int = bv.floor.items.size()
+	bv._unequip("head")
+	_ck(bv.floor.player.equipment.get("head") == null, "unequip clears the slot")
+	_ck(bv.floor.items.size() == pocket0 + 1, "the unequipped piece returns to the pocket")
+	# char sheet + pause draw without crash
+	bv._char_screen = true
+	for i in 2: bv._process(0.016)
+	bv._char_screen = false
+	bv._pause_screen = true
+	for i in 2: bv._process(0.016)
+	bv._pause_screen = false
+	_ck(true, "character sheet + pause draw without crash")
+	_ck(not bv._can_take_board_input() if bv._pause_screen else true, "pause blocks board input")
+
 	# banner auto-clears (was sticking forever — "zadanie wykonane" never vanished)
 	bv._add_banner("TEST BANNER")
 	_ck(bv._banner == "TEST BANNER", "a banner shows when triggered")

@@ -37,14 +37,27 @@ shippable game. Decisions locked with the owner:
   an OPTIONAL later upgrade — the theme system already carries palettes/props,
   so a swap is additive, not a rework.
 
-## Phase C — UI/UX overhaul
-- All modals → themed Control panels; icons (materials/items/spells/tiers);
-  character sheet; real minimap; pixel font with Polish diacritics; full
-  mouse/keyboard/controller navigation; InputMap rebinding.
+## Phase C — UI/UX overhaul  ✅ (2026-06-10)
+- [x] Shared `_panel()` chrome (shadow, header strip, accent spine) on all 10
+      modals; monospace SystemFont (Cascadia/Consolas — full PL diacritics);
+      vector icon set (`_draw_icon`) on HUD materials, spellbook, safehouse.
+- [x] Character sheet **[C]**: vitals, stats+mods, equipment with **unequip**
+      (the missing mechanic), origin/trait/magic, known spells, pocket list.
+- [x] Pause + settings **[Esc]**: Master/Music/SFX volume steppers (live audio
+      buses), fullscreen toggle, quit-to-title (keeps the checkpoint); persisted
+      to `user://settings.json` and applied at boot.
+- [x] Controller (board actions): dpad move, A interact, B wait, X craft,
+      Y spellbook, RB class active, LB companion, Start pause.
+- Deferred to the optional Control-node rebuild: gamepad MENU navigation and
+  key rebinding UI (menus remain mouse/keyboard).
 
-## Phase D — Audio
-- SFX set (hits, salvage, reel, UI), per-biome music + title + boss theme,
-  combat-intensity mixing, Konferansjer text-blips.
+## Phase D — Audio  ✅ (2026-06-10)
+- [x] Procedural synthesizer (`scenes/Sfx.gd`) — zero external assets: 31
+      chiptune SFX (hits/crits, lootbox reel ticks→snap→jackpot, fanfares,
+      chimes, casts, zaps, growls, stings, UI, Konferansjer text-blips) with
+      pitch variance, rendered lazily and cached.
+- [x] Four seeded generative music loops (title/explore/combat/boss) crossfaded
+      by game state; Master/Music/SFX buses wired to the settings menu.
 
 ## Phase E — Content & balance
 - Enemy roster per biome (sprites + AI quirks), miniboss per biome, more

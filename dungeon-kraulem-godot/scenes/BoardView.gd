@@ -108,12 +108,18 @@ var _lunge: Dictionary = {}          # id -> {dir: Vector2, t: float} attack lun
 var _parts: Array = []               # particles: {pos, vel, life, ttl, size, col, grav}
 var _wipe := 0.0                     # floor/room transition fade (1 → 0)
 var _summary_lock := 0.0             # results-screen input lockout (no accidental restart)
+var _char_screen := false            # character sheet overlay [C]
+var _pause_screen := false           # pause + settings overlay [Esc]
 var _ember_cd := 0.0                 # fire-hazard ember spawn cooldown
 var _smoke := false                  # --smoke: scripted draw-path autotest, then quit
 var _smoke_frames := 0
 
 func _ready() -> void:
-	_font = ThemeDB.fallback_font
+	# Phase C: a monospace system font — crisp terminal aesthetic that matches the
+	# vector-neon look, with full Polish diacritics (Windows ships all of these).
+	var sysf := SystemFont.new()
+	sysf.font_names = PackedStringArray(["Cascadia Mono", "Consolas", "Lucida Console"])
+	_font = sysf
 	RenderingServer.set_default_clear_color(COL_BG)
 	# World camera: the board lives in world space; the camera frames it (and will
 	# follow the player on bigger boards in Phase B).
@@ -152,6 +158,7 @@ func _ready() -> void:
 	add_child(_lights_root)
 	_sfx = preload("res://scenes/Sfx.gd").new()
 	add_child(_sfx)
+	_load_settings.call_deferred()   # after the Sfx buses exist
 	if "--smoke" in OS.get_cmdline_user_args():
 		_smoke = true
 	set_process(true)
@@ -411,6 +418,27 @@ func _unhandled_input(event: InputEvent) -> void:
 			if ch >= 32 and str(_speak.get("text", "")).length() < 64:
 				_speak["text"] = str(_speak.get("text", "")) + String.chr(ch); queue_redraw()
 		return
+	# Controller: dpad moves, A interact, B wait, X craft, Y spellbook, Start pause.
+	if event is InputEventJoypadButton and event.pressed:
+		var jb := (event as InputEventJoypadButton).button_index
+		if _pause_screen and jb == JOY_BUTTON_START:
+			_pause_screen = false; _play("close"); queue_redraw(); return
+		if _can_take_board_input():
+			match jb:
+				JOY_BUTTON_START:
+					_pause_screen = true; _play("open"); queue_redraw(); return
+				JOY_BUTTON_DPAD_LEFT: handle_dir(Vector2i.LEFT); return
+				JOY_BUTTON_DPAD_RIGHT: handle_dir(Vector2i.RIGHT); return
+				JOY_BUTTON_DPAD_UP: handle_dir(Vector2i.UP); return
+				JOY_BUTTON_DPAD_DOWN: handle_dir(Vector2i.DOWN); return
+				JOY_BUTTON_A: handle_interact(); return
+				JOY_BUTTON_B: handle_wait(); return
+				JOY_BUTTON_X:
+					_craft_open = true; _craft_mode = "bench"; _play("open"); queue_redraw(); return
+				JOY_BUTTON_Y:
+					_spellbook = true; _play("open"); queue_redraw(); return
+				JOY_BUTTON_RIGHT_SHOULDER: _use_class_active(); return
+				JOY_BUTTON_LEFT_SHOULDER: _use_companion_ability(); return
 	# Lootbox reveal grabs all input: a click/key skips the spin or collects the loot.
 	if not _box_anim.is_empty():
 		if (event is InputEventMouseButton and event.pressed) \
@@ -493,6 +521,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _summary_lock <= 0.0 and (kc == KEY_ENTER or kc == KEY_KP_ENTER):
 			_summary = {}; _summary_lines = []; _done = false
 			_build()
+		return
+
+	# Character sheet: Esc/C closes.
+	if _char_screen:
+		if kc == KEY_ESCAPE or kc == KEY_C:
+			_char_screen = false; _play("close"); queue_redraw()
+		return
+
+	# Pause + settings: Esc resumes.
+	if _pause_screen:
+		if kc == KEY_ESCAPE:
+			_pause_screen = false; _play("close"); queue_redraw()
 		return
 
 	# Safehouse menu grabs input until you leave (Esc).
@@ -598,6 +638,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if kc == KEY_O:
 		_open_ach_screen(); return
 
+	# [C] character sheet (stats, equipment with unequip, traits, spells)
+	if kc == KEY_C:
+		_char_screen = not _char_screen
+		_play("open" if _char_screen else "close")
+		queue_redraw(); return
+
+	# [Esc] pause + settings (only when nothing else holds the input)
+	if kc == KEY_ESCAPE and _can_take_board_input():
+		_pause_screen = true; _play("open"); queue_redraw(); return
+
 	# [L] open the skill-point allocation modal (if you've banked any)
 	if kc == KEY_L:
 		if sim != null and sim.player().skill_points > 0:
@@ -642,7 +692,8 @@ func _can_take_board_input() -> bool:
 		and _route_offer.is_empty() and _class_offer.is_empty() and not _craft_open \
 		and _levelup.is_empty() and not _ach_screen and not _meta_screen \
 		and _safehouse.is_empty() and _crawler.is_empty() and not _spellbook \
-		and not _journal_screen and _event.is_empty() and _speak.is_empty()
+		and not _journal_screen and _event.is_empty() and _speak.is_empty() \
+		and not _char_screen and not _pause_screen
 
 ## Mouse -> board cell, through the camera (the board lives in world space now).
 func _cell_from_mouse(_pos: Vector2) -> Vector2i:
@@ -683,6 +734,62 @@ func _click_shove(cell: Vector2i) -> void:
 
 func _zone(r: Rect2, kind: String, i: int = 0, s: String = "") -> void:
 	_click_zones.append({"rect": r, "kind": kind, "i": i, "s": s})
+
+## Phase C panel chrome: drop shadow, header strip, accent spine + border — one
+## consistent frame for every modal instead of ad-hoc rectangles.
+func _panel(c: CanvasItem, r: Rect2, accent: Color, title: String = "") -> void:
+	c.draw_rect(Rect2(r.position + Vector2(5, 6), r.size), Color(0, 0, 0, 0.45))
+	c.draw_rect(r, Color(0.055, 0.075, 0.095, 0.985))
+	c.draw_rect(Rect2(r.position, Vector2(r.size.x, 40.0)), Color(accent, 0.10))
+	c.draw_rect(r, accent, false, 2.0)
+	c.draw_rect(Rect2(r.position, Vector2(5, r.size.y)), Color(accent, 0.8))
+	if title != "":
+		c.draw_string(_font, r.position + Vector2(20, 27), title,
+			HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 36, 20, accent)
+
+## Tiny vector icons (Phase C): materials, item categories, spells, coin.
+func _draw_icon(c: CanvasItem, kind: String, pos: Vector2, col: Color) -> void:
+	match kind:
+		"złom":
+			c.draw_arc(pos, 5.0, 0, TAU, 10, col, 1.6)
+			for k in 4:
+				var a := TAU * k / 4.0
+				c.draw_line(pos + Vector2(cos(a), sin(a)) * 5.0, pos + Vector2(cos(a), sin(a)) * 7.5, col, 1.6)
+		"drewno":
+			c.draw_rect(Rect2(pos + Vector2(-6, -4), Vector2(12, 3)), col)
+			c.draw_rect(Rect2(pos + Vector2(-6, 1), Vector2(12, 3)), Color(col, 0.6))
+		"szmata":
+			c.draw_polyline(PackedVector2Array([pos + Vector2(-6, -3), pos + Vector2(-2, 1),
+				pos + Vector2(2, -3), pos + Vector2(6, 1)]), col, 1.8)
+		"przewód":
+			c.draw_arc(pos + Vector2(-3, 0), 3.0, 0, TAU, 8, col, 1.4)
+			c.draw_arc(pos + Vector2(3, 0), 3.0, 0, TAU, 8, col, 1.4)
+		"plastik":
+			c.draw_rect(Rect2(pos + Vector2(-5, -5), Vector2(10, 10)), col, false, 1.6)
+		"bateria":
+			c.draw_rect(Rect2(pos + Vector2(-4, -6), Vector2(8, 12)), col, false, 1.6)
+			c.draw_rect(Rect2(pos + Vector2(-2, -8), Vector2(4, 2)), col)
+		"rurka":
+			c.draw_line(pos + Vector2(-6, 2), pos + Vector2(6, -2), col, 3.0)
+		"weapon":
+			c.draw_line(pos + Vector2(-5, 5), pos + Vector2(5, -5), col, 2.0)
+			c.draw_line(pos + Vector2(-2, 0), pos + Vector2(0, 2), col, 2.0)
+		"armor":
+			c.draw_polyline(PackedVector2Array([pos + Vector2(-5, -5), pos + Vector2(5, -5),
+				pos + Vector2(5, 1), pos + Vector2(0, 6), pos + Vector2(-5, 1), pos + Vector2(-5, -5)]), col, 1.6)
+		"medical":
+			c.draw_rect(Rect2(pos + Vector2(-2, -6), Vector2(4, 12)), col)
+			c.draw_rect(Rect2(pos + Vector2(-6, -2), Vector2(12, 4)), col)
+		"spell":
+			for k in 4:
+				var a2 := TAU * k / 4.0 + PI / 4.0
+				c.draw_line(pos, pos + Vector2(cos(a2), sin(a2)) * 6.0, col, 1.6)
+			c.draw_circle(pos, 2.0, col)
+		"coin":
+			c.draw_arc(pos, 5.5, 0, TAU, 12, col, 1.6)
+			c.draw_line(pos + Vector2(0, -3), pos + Vector2(0, 3), col, 1.6)
+		_:
+			c.draw_circle(pos, 3.0, col)
 
 func _hover(r: Rect2) -> bool:
 	return r.has_point(_mouse)
@@ -740,6 +847,25 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"cast":              _cast_spell(z.get("s", ""))
 		"event_fork":        _event_choose(i)
 		"speak_pick":        _speak_pick(i)
+		"char_unequip":      _unequip(z.get("s", ""))
+		"pause_resume":      _pause_screen = false; _play("close"); queue_redraw()
+		"pause_full":
+			var wm2 := DisplayServer.window_get_mode()
+			DisplayServer.window_set_mode(
+				DisplayServer.WINDOW_MODE_WINDOWED if wm2 == DisplayServer.WINDOW_MODE_FULLSCREEN
+				else DisplayServer.WINDOW_MODE_FULLSCREEN)
+			_save_settings()
+		"pause_quit":
+			_pause_screen = false
+			if floor != null:
+				Save.write(floor, _run_seed)
+			_title = true
+			queue_redraw()
+		"vol":
+			if _sfx != null:
+				var vbus: String = z.get("s", "Master")
+				_sfx.set_volume(vbus, clampf(_sfx.get_volume(vbus) + float(i) * 4.0, -40.0, 0.0))
+				_save_settings()
 		"levelup_stat":      _spend_skill_point(z.get("s", ""))
 		"levelup_close":     _levelup = {}; queue_redraw()
 
@@ -2626,7 +2752,10 @@ func _smoke_tick() -> void:
 		215: floor.biome = "muzeum_spektakli"
 		230: floor.biome = "biome_siec_kanalizacyjna"
 		245: floor.biome = "okopy_frontowe"
-		260:
+		255: _char_screen = true
+		270: _char_screen = false; _pause_screen = true
+		285: _pause_screen = false
+		300:
 			print("SMOKE OK")
 			get_tree().quit(0)
 
@@ -2743,6 +2872,9 @@ func _draw_ui(c: CanvasItem) -> void:
 	if _journal_screen and sim != null:
 		_draw_journal(c)
 		return
+	if _char_screen and sim != null:
+		_draw_char(c)
+		return
 	if _ach_screen:
 		_draw_ach_screen(c)
 		return
@@ -2755,9 +2887,154 @@ func _draw_ui(c: CanvasItem) -> void:
 		_draw_run_summary(c)
 		return
 	_draw_hud(c)
+	if _pause_screen:
+		_draw_pause(c)
 	# Floor/room transition: a quick fade-in from black over everything.
 	if _wipe > 0.0:
 		c.draw_rect(Rect2(0, 0, 1280, 720), Color(0, 0, 0, clampf(_wipe, 0.0, 1.0)))
+
+## Take a worn piece off and put it back in the pocket (Phase C gap-fix).
+func _unequip(slot: String) -> void:
+	if floor == null:
+		return
+	var it = floor.player.equipment.get(slot)
+	if it == null:
+		return
+	floor.player.equipment.erase(slot)
+	floor.items.append(it)
+	_play("clang")
+	_log_push("Zdejmujesz: %s." % (it as GameItem).name_pl)
+	queue_redraw()
+
+const SETTINGS_PATH := "user://settings.json"
+
+func _save_settings() -> void:
+	if _sfx == null:
+		return
+	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify({
+			"master": _sfx.get_volume("Master"), "music": _sfx.get_volume("Music"),
+			"sfx": _sfx.get_volume("SFX"),
+			"fullscreen": DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN}))
+
+func _load_settings() -> void:
+	if _sfx == null or not FileAccess.file_exists(SETTINGS_PATH):
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
+	if not (parsed is Dictionary):
+		return
+	_sfx.set_volume("Master", float(parsed.get("master", 0.0)))
+	_sfx.set_volume("Music", float(parsed.get("music", -8.0)))
+	_sfx.set_volume("SFX", float(parsed.get("sfx", 0.0)))
+	if bool(parsed.get("fullscreen", false)):
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+## Character sheet: who you are, what you wear (with unequip), what you know.
+func _draw_char(c: CanvasItem) -> void:
+	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+	var p := sim.player()
+	_panel(c, Rect2(50, 40, 1180, 640), COL_CYAN, "KARTA POSTACI — %s  ·  POZIOM %d" % [
+		MetaCatalog.def_of(p.species_key).get("label", "Bezimienny"), p.level])
+	var x := 80.0
+	var y := 110.0
+	c.draw_string(_font, Vector2(x, y), "HP %d/%d   ·   Mana %d/%d   ·   AC %d   ·   XP %d/%d" % [
+		p.hp, p.max_hp, p.mana, p.max_mana, p.ac + p.armor_bonus(), p.xp, p.xp_to_next()],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_BRIGHT)
+	y += 34.0
+	for st in ["STR", "DEX", "INT", "WIS", "CHA"]:
+		c.draw_string(_font, Vector2(x, y), "%s  %d  (mod %+d)" % [st, int(p.stats.get(st, 0)), p.stat_mod(st)],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 15, COL_AMBER)
+		y += 24.0
+	y += 10.0
+	c.draw_string(_font, Vector2(x, y), "Pochodzenie: %s   ·   Cecha: %s   ·   Magia: %s" % [
+		MetaCatalog.def_of(p.origin_key).get("label", "Debiutant"),
+		p.species_trait if p.species_trait != "" else "—",
+		p.magic_affinity if p.magic_affinity != "" else "zwykła"],
+		HORIZONTAL_ALIGNMENT_LEFT, 520, 13, COL_DIM)
+	y += 30.0
+	c.draw_string(_font, Vector2(x, y), "Bieg: zabójstwa %d · rozbiórki %d · pułapki %d" % [
+		p.run_kills, p.run_corpses_salvaged, p.run_traps_armed],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+	var ex := 560.0
+	var ey := 110.0
+	c.draw_string(_font, Vector2(ex, ey), "EKWIPUNEK", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_CYAN)
+	ey += 28.0
+	var slot_pl := {"head": "Głowa", "body": "Tułów", "legs": "Nogi"}
+	for slot in ["head", "body", "legs"]:
+		var worn = p.equipment.get(slot)
+		_draw_icon(c, "armor", Vector2(ex + 8, ey - 5), COL_CYAN if worn != null else COL_DIM)
+		c.draw_string(_font, Vector2(ex + 22, ey), "%s: %s" % [slot_pl[slot],
+			(worn as GameItem).name_pl if worn != null else "—"],
+			HORIZONTAL_ALIGNMENT_LEFT, 280, 14, COL_BRIGHT if worn != null else COL_DIM)
+		if worn != null:
+			var ub := Rect2(ex + 310, ey - 16, 110, 24)
+			var uh := _hover(ub)
+			c.draw_rect(ub, Color(COL_RED, 0.25 if uh else 0.1))
+			c.draw_rect(ub, COL_RED if uh else COL_GRID, false, 1.0)
+			c.draw_string(_font, Vector2(ub.position.x + 10, ub.position.y + 17), "ZDEJMIJ",
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_BRIGHT)
+			_zone(ub, "char_unequip", 0, slot)
+		ey += 32.0
+	ey += 12.0
+	c.draw_string(_font, Vector2(ex, ey), "Klasa: %s   ·   Styl: %s" % [
+		Classes.name_of(p.class_key) if p.class_key != "" else "—",
+		Classes.style_summary(p, 2)],
+		HORIZONTAL_ALIGNMENT_LEFT, 420, 13, COL_DIM)
+	var sx := 980.0
+	var sy := 110.0
+	c.draw_string(_font, Vector2(sx, sy), "ZAKLĘCIA", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_PURPLE)
+	sy += 26.0
+	var ks2: Array = Spells.known(p)
+	if ks2.is_empty():
+		c.draw_string(_font, Vector2(sx, sy), "— żadnych —", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+		sy += 22.0
+	for sk in ks2:
+		_draw_icon(c, "spell", Vector2(sx + 7, sy - 5), COL_PURPLE)
+		c.draw_string(_font, Vector2(sx + 20, sy), Spells.def_of(sk).get("name", sk),
+			HORIZONTAL_ALIGNMENT_LEFT, 220, 14, COL_BRIGHT)
+		sy += 24.0
+	sy += 14.0
+	c.draw_string(_font, Vector2(sx, sy), "KIESZEŃ (%d)" % floor.items.size(),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_AMBER)
+	sy += 26.0
+	for ii in mini(floor.items.size(), 14):
+		var itx := floor.items[ii] as GameItem
+		c.draw_string(_font, Vector2(sx, sy), "• " + itx.name_pl,
+			HORIZONTAL_ALIGNMENT_LEFT, 240, 12, itx.rarity_color())
+		sy += 20.0
+	c.draw_string(_font, Vector2(80, 660), "[C]/[Esc] zamknij",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+
+## Pause + settings: volumes (the Sfx buses), fullscreen, quit to title.
+func _draw_pause(c: CanvasItem) -> void:
+	c.draw_rect(Rect2(0, 0, 1280, 720), Color(0, 0, 0, 0.6))
+	var r := Rect2(440, 180, 400, 372)
+	_panel(c, r, COL_CYAN, "PAUZA")
+	var y := r.position.y + 72.0
+	for row in [["Master", "Głośność"], ["Music", "Muzyka"], ["SFX", "Efekty"]]:
+		var vol: float = _sfx.get_volume(row[0]) if _sfx != null else 0.0
+		c.draw_string(_font, Vector2(r.position.x + 24, y), "%s:  %d dB" % [row[1], int(vol)],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
+		for pair in [[-1, "-", 270.0], [1, "+", 312.0]]:
+			var vb := Rect2(r.position.x + float(pair[2]), y - 16, 32, 24)
+			var vh := _hover(vb)
+			c.draw_rect(vb, Color(COL_CYAN, 0.25 if vh else 0.1))
+			c.draw_rect(vb, COL_CYAN if vh else COL_GRID, false, 1.0)
+			c.draw_string(_font, Vector2(vb.position.x + 12, vb.position.y + 17), str(pair[1]),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
+			_zone(vb, "vol", int(pair[0]), str(row[0]))
+		y += 42.0
+	for r2 in [["Pełny ekran [F11]", "pause_full"], ["Wznów [Esc]", "pause_resume"],
+			["Wyjdź do tytułu (zapis zostaje)", "pause_quit"]]:
+		var b2 := Rect2(r.position.x + 24, y - 16, r.size.x - 48, 30)
+		var h2 := _hover(b2)
+		c.draw_rect(b2, Color(COL_CYAN, 0.18 if h2 else 0.07))
+		c.draw_rect(b2, COL_CYAN if h2 else COL_GRID, false, 1.0)
+		c.draw_string(_font, Vector2(b2.position.x + 12, b2.position.y + 21), str(r2[0]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
+		_zone(b2, str(r2[1]))
+		y += 40.0
 
 func _draw_glyph(s: String, c: Vector2i, col: Color) -> void:
 	draw_string(_font, _cell_px(c) + Vector2(-6, 8), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, col)
@@ -3263,13 +3540,17 @@ func _draw_hud(c: CanvasItem) -> void:
 		c.draw_string(_font, Vector2(220, 98),
 			"Styl: %s   (→ klasa)" % Classes.style_summary(p, 3),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	# Materials
-	var mats: Array = []
+	# Materials — icon chips instead of a text wall
+	c.draw_string(_font, Vector2(40, 116), "Materiały:", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
+	var mx := 130.0
+	if sim.materials.is_empty():
+		c.draw_string(_font, Vector2(mx, 116), "—", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 	for k in sim.materials:
-		mats.append("%s x%d" % [k, sim.materials[k]])
-	c.draw_string(_font, Vector2(40, 116),
-		"Materiały: " + ("—" if mats.is_empty() else ", ".join(mats)),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
+		if mx > 760.0: break
+		_draw_icon(c, str(k), Vector2(mx + 7, 111), COL_AMBER)
+		var cnt := "x%d" % int(sim.materials[k])
+		c.draw_string(_font, Vector2(mx + 17, 116), cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_BRIGHT)
+		mx += 24.0 + _font.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
 	# Inventory: list the actual item names (not just a count) so you can see what
 	# you're carrying without opening the workshop.
 	var inv_parts: Array = []
@@ -3697,8 +3978,7 @@ func _draw_box_open(c: CanvasItem) -> void:
 func _draw_dialogue(c: CanvasItem) -> void:
 	var W := 1040.0; var H := 440.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.07, 0.07, 0.11, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_PURPLE)
 	var n := Dialogue.node(_dlg)
 	# Speaker + relationship standing
 	var tk: String = _dlg.get("tree_key", "")
@@ -3741,8 +4021,7 @@ func _draw_dialogue(c: CanvasItem) -> void:
 func _draw_route_offer(c: CanvasItem) -> void:
 	var W := 1000.0; var H := 360.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.07, 0.09, 0.12, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_GREEN, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_GREEN)
 	c.draw_string(_font, Vector2(px + 20, py + 30), "SCHODY W DÓŁ — WYBIERZ TRASĘ",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GREEN)
 	c.draw_string(_font, Vector2(px + 20, py + 54),
@@ -3805,8 +4084,7 @@ func _draw_speak(c: CanvasItem) -> void:
 	var tname: String = t.name_pl if t != null else "?"
 	var W := 760.0; var H := 280.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.06, 0.09, 0.08, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_GAS)
 	c.draw_string(_font, Vector2(px + 20, py + 32), "MÓWISZ DO: %s" % tname,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GAS)
 	if _speak.get("mode", "") == "fallback":
@@ -3843,8 +4121,7 @@ func _draw_spellbook(c: CanvasItem) -> void:
 	var p := sim.player()
 	var W := 640.0; var H := 470.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.07, 0.05, 0.11, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_PURPLE, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_PURPLE)
 	c.draw_string(_font, Vector2(px + 20, py + 32), "KSIĘGA ZAKLĘĆ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_PURPLE)
 	c.draw_string(_font, Vector2(px + W - 180, py + 32), "Mana: %d / %d" % [p.mana, p.max_mana],
 		HORIZONTAL_ALIGNMENT_LEFT, 170, 18, COL_CYAN)
@@ -3867,7 +4144,8 @@ func _draw_spellbook(c: CanvasItem) -> void:
 		c.draw_rect(box, COL_PURPLE if hot else (COL_GRID if castable else Color(COL_GRID, 0.5)), false, 1.0)
 		var lcol := COL_BRIGHT if castable else COL_DIM
 		var costtxt := "%d many" % cost if hp_cost == 0 else "%d HP" % hp_cost
-		c.draw_string(_font, Vector2(px + 28, cy + 16), "%d. %s  —  %s" % [i + 1, sp.get("name", key), costtxt],
+		_draw_icon(c, "spell", Vector2(px + 30, cy + 12), Color(COL_PURPLE, 1.0 if castable else 0.4))
+		c.draw_string(_font, Vector2(px + 44, cy + 16), "%d. %s  —  %s" % [i + 1, sp.get("name", key), costtxt],
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 15, lcol)
 		c.draw_string(_font, Vector2(px + 28, cy + 31), sp.get("desc", ""),
 			HORIZONTAL_ALIGNMENT_LEFT, W - 60, 11, COL_DIM)
@@ -3881,8 +4159,7 @@ func _draw_spellbook(c: CanvasItem) -> void:
 func _draw_event_modal(c: CanvasItem) -> void:
 	var W := 720.0; var H := 280.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.05, 0.07, 0.11, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_GAS, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_GAS)
 	c.draw_string(_font, Vector2(px + 20, py + 32), "PRZERWA W AKCJI", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_GAS)
 	c.draw_string(_font, Vector2(px + 20, py + 60), _event.get("intro", ""),
 		HORIZONTAL_ALIGNMENT_LEFT, W - 40, 15, COL_BRIGHT)
@@ -3908,8 +4185,7 @@ func _draw_crawler_modal(c: CanvasItem) -> void:
 	var hostile: bool = desc.get("disposition", "neutral") == "hostile"
 	var W := 620.0; var H := 300.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.10, 0.08, 0.05, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_AMBER)
 	c.draw_string(_font, Vector2(px + 20, py + 32), "RYWAL: " + cr.name_pl,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_AMBER)
 	c.draw_string(_font, Vector2(px + 20, py + 58),
@@ -3939,8 +4215,7 @@ func _draw_safehouse(c: CanvasItem) -> void:
 	var sub: String = _safehouse.get("subtype", "")
 	var W := 760.0; var H := 460.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.06, 0.08, 0.10, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_CYAN, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_CYAN)
 	c.draw_string(_font, Vector2(px + 20, py + 32), Safehouse.name_of(sub).to_upper(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_CYAN)
 	c.draw_string(_font, Vector2(px + 20, py + 56), Safehouse.blurb_of(sub),
@@ -3974,9 +4249,11 @@ func _draw_safehouse(c: CanvasItem) -> void:
 		c.draw_rect(box, COL_CYAN if hot else (COL_GRID if affordable else Color(COL_GRID, 0.5)), false, 1.0)
 		var lcol := COL_BRIGHT if affordable else COL_DIM
 		c.draw_string(_font, Vector2(px + 28, cy + 21), r["label"], HORIZONTAL_ALIGNMENT_LEFT, W - 200, 15, lcol)
-		var ctxt := "za darmo" if cost == 0 else ("+%d złomu" % (-cost) if cost < 0 else "−%d złomu" % cost)
+		var ctxt := "za darmo" if cost == 0 else ("+%d" % (-cost) if cost < 0 else "−%d" % cost)
 		var ccol := COL_GREEN if cost < 0 else (COL_AMBER if affordable else COL_DIM)
-		c.draw_string(_font, Vector2(px + W - 150, cy + 21), ctxt, HORIZONTAL_ALIGNMENT_LEFT, 130, 14, ccol)
+		if cost != 0:
+			_draw_icon(c, "coin", Vector2(px + W - 158, cy + 16), ccol)
+		c.draw_string(_font, Vector2(px + W - 146, cy + 21), ctxt, HORIZONTAL_ALIGNMENT_LEFT, 130, 14, ccol)
 		if affordable:
 			_zone(box, "safe_action", int(r["arg"]), r["action"])
 		cy += rh
@@ -3993,8 +4270,7 @@ func _draw_levelup(c: CanvasItem) -> void:
 	var p := sim.player()
 	var W := 720.0; var H := 420.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.08, 0.07, 0.04, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_AMBER)
 	c.draw_string(_font, Vector2(px + 20, py + 32),
 		"AWANS — POZIOM %d" % p.level, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_AMBER)
 	c.draw_string(_font, Vector2(px + 20, py + 58),
@@ -4053,8 +4329,7 @@ func _draw_run_summary(c: CanvasItem) -> void:
 func _draw_class_offer(c: CanvasItem) -> void:
 	var W := 980.0; var H := 500.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
-	c.draw_rect(Rect2(px, py, W, H), Color(0.07, 0.08, 0.12, 0.98))
-	c.draw_rect(Rect2(px, py, W, H), COL_AMBER, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_AMBER)
 	c.draw_string(_font, Vector2(px + 20, py + 30), "SYNDYKAT MA PROPOZYCJĘ",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_AMBER)
 	c.draw_string(_font, Vector2(px + 20, py + 54),
@@ -4183,8 +4458,7 @@ func _draw_craft_panel(c: CanvasItem) -> void:
 	var W := 1160.0; var H := 560.0
 	var px := (1280 - W) / 2.0; var py := (720 - H) / 2.0
 	# Background
-	c.draw_rect(Rect2(px, py, W, H), Color(0.08, 0.09, 0.13, 0.97))
-	c.draw_rect(Rect2(px, py, W, H), COL_CYAN, false, 2.0)
+	_panel(c, Rect2(px, py, W, H), COL_CYAN)
 	# Title + mode tabs
 	var mode_bench := _craft_mode == "bench"
 	c.draw_string(_font, Vector2(px + 16, py + 24), "WARSZTAT", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_CYAN)
