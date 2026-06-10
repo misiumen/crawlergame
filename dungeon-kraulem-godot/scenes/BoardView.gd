@@ -106,6 +106,7 @@ var _lights_root: Node2D = null      # pooled hazard/safehouse lights
 var _lunge: Dictionary = {}          # id -> {dir: Vector2, t: float} attack lunges
 var _parts: Array = []               # particles: {pos, vel, life, ttl, size, col, grav}
 var _wipe := 0.0                     # floor/room transition fade (1 → 0)
+var _summary_lock := 0.0             # results-screen input lockout (no accidental restart)
 var _ember_cd := 0.0                 # fire-hazard ember spawn cooldown
 var _smoke := false                  # --smoke: scripted draw-path autotest, then quit
 var _smoke_frames := 0
@@ -231,6 +232,14 @@ func _offer_routes() -> void:
 func _descend_into(biome_key: String) -> void:
 	_route_offer = []
 	_ach_floor_complete(floor.biome)   # judge the floor being LEFT (biome, restraint…)
+	# The crusade follows you down: up to 3 of your converts take the stairs too.
+	var crusade: Array = []
+	if sim != null:
+		for aid in sim.entities:
+			var ae: CombatEntity = sim.entities[aid]
+			if ae.faction == "ally" and ae.is_alive() and ae.tags.has("convert") \
+					and crusade.size() < 3:
+				crusade.append(ae)
 	var next_depth: int = floor.depth + 1
 	var mods := Routes.mods_for(biome_key)
 	var is_boss: bool = next_depth == FINAL_FLOOR    # the finale floor is a boss arena
@@ -255,6 +264,13 @@ func _descend_into(biome_key: String) -> void:
 	data["companion"] = _make_companion()   # a fresh mascot is sent down each floor
 	floor = Floor.new(data)
 	sim = floor.sim
+	# Re-seat the crusade on the new floor (fresh ids clear of the new floor's range).
+	for ci in crusade.size():
+		var conv: CombatEntity = crusade[ci]
+		conv.id = 900 + ci
+		floor.attach_follower(conv)
+	if not crusade.is_empty():
+		_log_push("Twoja krucjata schodzi z tobą: %d wyznawców." % crusade.size())
 	_hint = data.get("hint", "")
 	_aim_zone = ""; sim.aim_zone = ""
 	_attach_bodies()
@@ -467,9 +483,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_build()
 		return
 
-	# Results screen: Enter starts a fresh run.
+	# Results screen: Enter starts a fresh run (after the read-your-death lockout).
 	if not _summary.is_empty():
-		if kc == KEY_ENTER or kc == KEY_KP_ENTER:
+		if _summary_lock <= 0.0 and (kc == KEY_ENTER or kc == KEY_KP_ENTER):
 			_summary = {}; _summary_lines = []; _done = false
 			_build()
 		return
@@ -690,7 +706,9 @@ func _dispatch_zone(z: Dictionary) -> void:
 	match z.get("kind", ""):
 		"title_continue", "title_start": _build()
 		"title_new":         Save.clear(); _build()
-		"summary_continue":  _summary = {}; _summary_lines = []; _done = false; _build()
+		"summary_continue":
+			if _summary_lock <= 0.0:
+				_summary = {}; _summary_lines = []; _done = false; _build()
 		"dlg":               _dlg_advance(i)
 		"route":             if i < _route_offer.size(): _descend_into(_route_offer[i])
 		"class":             _accept_class(i)
@@ -1615,6 +1633,9 @@ func _end_run(victory: bool) -> void:
 	_summary_lines = RunSummary.render_lines(_summary)
 	Save.clear()   # the run is over; next launch starts fresh
 	_done = true
+	# Input lockout: you were probably mid-click when you died — without this the
+	# next click instantly restarted the run and you never saw the death recap.
+	_summary_lock = 1.2
 	queue_redraw()
 
 func _advance_floor_turn() -> void:
@@ -2128,6 +2149,20 @@ func _animate(evs: Array) -> void:
 					_spawn_parts(_vpos.get(int(e["target"]), _cell_px(dent.cell)), 14, dcol, 95.0)
 			"miss":
 				_add_floater(e["target"], "pudło", COL_DIM)
+			"guard":
+				_add_floater(int(e["id"]), "GARDA", COL_CYAN)
+				_log_push("%s podnosi gardę — pchnięcie ją łamie." % e.get("name", "Wróg"))
+			"guard_break":
+				_add_floater(int(e["id"]), "GARDA PĘKA", COL_AMBER)
+			"enrage":
+				_add_floater(int(e["id"]), "SZAŁ!", COL_RED)
+				_log_push("%s wpada w szał!" % e.get("name", "Wróg"))
+				_shake = maxf(_shake, 4.0)
+			"pounce":
+				_add_floater(int(e["id"]), "SKOK!", COL_AMBER)
+			"phase":
+				_add_floater(int(e["id"]), "PRZENIKA", COL_DIM)
+				_log_push("Ostrze przechodzi przez %s — to nie jest ciało." % e.get("name", "zjawę"))
 			"salvage":
 				_dying[e["target"]] = 1.0
 				var parts: Array = []
@@ -2498,6 +2533,8 @@ func _process(dt: float) -> void:
 	# Floor-transition wipe.
 	if _wipe > 0.0:
 		_wipe = maxf(0.0, _wipe - dt * 2.2)
+	if _summary_lock > 0.0:
+		_summary_lock = maxf(0.0, _summary_lock - dt)
 	# Fire hazards exhale embers (only while playing, and only a few at a time).
 	if sim != null and not _title and _summary.is_empty():
 		_ember_cd -= dt
@@ -2943,18 +2980,22 @@ func _draw_rat(pos: Vector2, fade: float, flashing: bool) -> void:
 
 # ── Enemy silhouettes (Phase B): each template class reads at a glance ────────
 
-## Body class from tags: 83 monster templates collapse into 7 readable shapes.
+## Body class from tags — shared source of truth lives on CombatEntity, since it
+## drives both the silhouette here and the fighting style in the sim AI.
 func _enemy_body_kind(e: CombatEntity) -> String:
-	if "boss" in e.tags: return "boss"
-	if "miniboss" in e.tags or "mini_boss" in e.tags: return "elite"
-	for t in ["machine", "robot", "drone", "camera", "mechanical", "construct"]:
-		if t in e.tags: return "mech"
-	for t in ["undead", "ghost"]:
-		if t in e.tags: return "spectral"
-	for t in ["robactwo", "insect"]:
-		if t in e.tags: return "bug"
-	if "humanoid" in e.tags: return "humanoid"
-	return "beast"
+	return e.body_kind()
+
+## The counterplay line for each fighting style (shown in the target readout).
+func _kind_hint(kind: String) -> String:
+	match kind:
+		"humanoid": return "podnosi gardę po ciosie — pchnięcie [PPM] ją łamie"
+		"mech":     return "razi prądem z dystansu — zerwij linię wzroku lub doskocz"
+		"spectral": return "fizyczne ciosy przenikają — żywioły i powłoki działają"
+		"beast":    return "doskakuje z 2 pól — nie stój w jego linii"
+		"bug":      return "gryzie mocniej w stadzie — rozdzielaj je"
+		"elite":    return "poniżej połowy HP wpada w SZAŁ (+obrażenia)"
+		"boss":     return "finał piętra — pełna uwaga"
+	return "obserwuj i ucz się"
 
 ## Species colour: a stable hue from the monster key, around a per-class base —
 ## same species always matches, different species always differ.
@@ -3222,13 +3263,14 @@ func _draw_hud(c: CanvasItem) -> void:
 				parts2.append("%s %s%s" % [nm, floor.sponsors.mood(skey), prog])
 			c.draw_string(_font, Vector2(40, 168), "Sponsorzy: " + " | ".join(parts2),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
-	# Target readout
-	var rat: CombatEntity = sim.entities.get(2)
-	if rat != null and rat.is_alive():
-		var st := "śpi" if not rat.aware else "ściga cię"
+	# Focused-target readout: who you're fighting + HOW to fight it. The hint is
+	# the counterplay for its body class — combat depth has to be legible.
+	var foe := _focused_enemy()
+	if foe != null and foe.is_alive():
+		var st := "śpi" if not foe.aware else ("GARDA" if foe.has_status("guard") else "ściga cię")
 		c.draw_string(_font, Vector2(40, 676),
-			"%s  HP %d/%d  [%s]  ·  gruba skóra, słaby na PRĄD"
-			% [rat.name_pl, rat.hp, rat.max_hp, st],
+			"%s  HP %d/%d  [%s]  ·  %s"
+			% [foe.name_pl, foe.hp, foe.max_hp, st, _kind_hint(foe.body_kind())],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
 	# Tracked floor objective (real, with progress + payout) — and a nav hint below.
 	if floor != null and not floor.objective.is_empty():

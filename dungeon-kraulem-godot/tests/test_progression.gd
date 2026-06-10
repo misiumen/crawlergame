@@ -247,6 +247,90 @@ func _initialize() -> void:
 	_ck(Objectives.advance_for({"key": "kill", "done": false}, "salvage") == 0, "an unrelated event does not")
 	_ck(Objectives.advance_for({"key": "kill", "done": true}, "kill") == 0, "a finished objective stops advancing")
 
+	# ── XP exploit: re-entering a sector must NOT re-pay old corpses ──────────
+	var xb2 := Board.new(5, 5)
+	var xp_p := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); xp_p.faction = "player"; xp_p.cell = Vector2i(1, 1)
+	var xp_f := CombatEntity.new(2, "Szczur", 1, 1, ["organic"]); xp_f.faction = "enemy"; xp_f.cell = Vector2i(2, 1); xp_f.aware = true
+	var shared := {1: xp_p, 2: xp_f}
+	var sim_a := CombatSim.new(xb2, shared, 1, 3)
+	xb2.place(1, xp_p.cell); xb2.place(2, xp_f.cell)
+	sim_a.player_move(Vector2i.RIGHT)               # kill → XP paid once
+	var xp_after_kill := xp_p.xp + xp_p.level * 1000
+	var sim_b := CombatSim.new(xb2, shared, 1, 9)   # "re-entering the sector"
+	sim_b.player_wait()
+	_ck(xp_p.xp + xp_p.level * 1000 == xp_after_kill,
+		"a rebuilt sim does not re-pay XP for old corpses (sector-switch exploit)")
+
+	# ── Combat depth: per-class fighting styles ───────────────────────────────
+	# humanoid guard: a surviving humanoid raises guard (+3 AC); a shove breaks it
+	var gb := Board.new(6, 3)
+	var gp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); gp.faction = "player"; gp.cell = Vector2i(1, 1)
+	gp.stats["STR"] = -2
+	var gh := CombatEntity.new(2, "Łowca", 60, 1, ["monster", "humanoid"]); gh.faction = "enemy"
+	gh.cell = Vector2i(2, 1); gh.aware = true
+	var gcs := CombatSim.new(gb, {1: gp, 2: gh}, 1, 4)
+	gb.place(1, gp.cell); gb.place(2, gh.cell)
+	for i in 6:
+		if not gh.has_status("guard") and gh.is_alive():
+			gcs.player_move(Vector2i.RIGHT)
+	_ck(gh.has_status("guard"), "a hit humanoid raises its guard")
+	var ac_guarded := gcs._eff_ac(gh)
+	gh.statuses.erase("guard")
+	_ck(ac_guarded == gcs._eff_ac(gh) + 3, "guard is worth +3 effective AC")
+	gh.add_status("guard", 99)
+	gcs.player_shove(Vector2i.RIGHT)
+	_ck(not gh.has_status("guard"), "a shove breaks the guard stance")
+
+	# mech: zaps from range through line of sight (no adjacency needed)
+	var zb := Board.new(7, 3)
+	var zp := CombatEntity.new(1, "Ty", 100, -10, ["humanoid"]); zp.faction = "player"; zp.cell = Vector2i(1, 1)
+	var zm := CombatEntity.new(2, "Kamera", 20, 10, ["monster", "camera"]); zm.faction = "enemy"
+	zm.cell = Vector2i(4, 1); zm.aware = true
+	var zcs := CombatSim.new(zb, {1: zp, 2: zm}, 1, 5)
+	zb.place(1, zp.cell); zb.place(2, zm.cell)
+	var zhp := zp.hp
+	zcs._enemy_turn()
+	_ck(zp.hp < zhp, "a mech zaps the player from 3 tiles away")
+	_ck(maxi(absi(zm.cell.x - zp.cell.x), absi(zm.cell.y - zp.cell.y)) >= 2, "the mech keeps its distance")
+
+	# beast: pounces two straight tiles into melee
+	var pb := Board.new(7, 3)
+	var pp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); pp.faction = "player"; pp.cell = Vector2i(1, 1)
+	var pbeast := CombatEntity.new(2, "Kot", 20, 10, ["monster", "beast"]); pbeast.faction = "enemy"
+	pbeast.cell = Vector2i(3, 1); pbeast.aware = true
+	var pcs := CombatSim.new(pb, {1: pp, 2: pbeast}, 1, 6)
+	pb.place(1, pp.cell); pb.place(2, pbeast.cell)
+	var p_evs := pcs._enemy_turn()
+	var pounced := false
+	for ev in p_evs:
+		if ev.get("type") == "pounce": pounced = true
+	_ck(pounced and pb.is_adjacent(pbeast.cell, pp.cell), "a beast pounces from 2 tiles into melee")
+
+	# spectral: bare physical swings sometimes pass straight through
+	var phb := Board.new(5, 3)
+	var php := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); php.faction = "player"; php.cell = Vector2i(1, 1)
+	var ghost := CombatEntity.new(2, "Duch", 100000, 10, ["monster", "ghost"]); ghost.faction = "enemy"
+	ghost.cell = Vector2i(2, 1); ghost.aware = true
+	var phcs := CombatSim.new(phb, {1: php, 2: ghost}, 1, 7)
+	phb.place(1, php.cell); phb.place(2, ghost.cell)
+	var phased := false
+	for i in 40:
+		for ev in phcs.player_move(Vector2i.RIGHT):
+			if ev.get("type") == "phase": phased = true
+	_ck(phased, "physical swings sometimes phase through a spectral enemy")
+
+	# converts follow you through doors (the crusade walks with you)
+	var ffl := Floor.new(Encounters.floor())
+	for i in 7:
+		ffl.sim.player_move(Vector2i.RIGHT)
+	ffl.try_transition()                              # into Hala (the rat's room)
+	var frat = ffl.sim.entities.get(2)
+	_ck(frat != null, "the rat is in Hala")
+	ffl.sim.convert_enemy(frat)
+	ffl.player.cell = Vector2i(1, 3)                  # back door west
+	ffl.try_transition()                              # return to Magazyn
+	_ck(ffl.sim.allies_alive().size() >= 1, "a convert follows you through the door")
+
 	# ── Titles + highlight reel (run-end) ─────────────────────────────────────
 	var tf := Floor.new(FloorGen.generate(2, 11, _content()))
 	tf.player.run_kills = 25

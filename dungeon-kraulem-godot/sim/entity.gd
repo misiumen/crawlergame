@@ -116,6 +116,20 @@ func _init(_id: int = 0, _name: String = "", _hp: int = 1, _ac: int = 10, _tags:
 func is_alive() -> bool:
 	return alive and hp > 0
 
+## Combat body class: 83 monster templates collapse into 7 archetypes that drive
+## BOTH the silhouette (presentation) and the fighting style (sim AI).
+func body_kind() -> String:
+	if "boss" in tags: return "boss"
+	if "miniboss" in tags or "mini_boss" in tags: return "elite"
+	for t in ["machine", "robot", "drone", "camera", "mechanical", "construct"]:
+		if t in tags: return "mech"
+	for t in ["undead", "ghost"]:
+		if t in tags: return "spectral"
+	for t in ["robactwo", "insect"]:
+		if t in tags: return "bug"
+	if "humanoid" in tags: return "humanoid"
+	return "beast"
+
 func properties() -> Dictionary:
 	return Tags.properties_for(tags)
 

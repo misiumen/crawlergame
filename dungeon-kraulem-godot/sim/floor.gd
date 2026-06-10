@@ -53,10 +53,23 @@ func exit_at(cell: Vector2i) -> Variant:
 	return rooms[current]["exits"].get(cell, null)
 
 func enter(idx: int, entry: Vector2i) -> void:
+	# Converts/charmed-to-your-side allies FOLLOW you through doors: lift them out
+	# of the room they were recruited in before switching (they're room entities,
+	# unlike the companion which the Floor carries directly).
+	var followers: Array = []
 	if current >= 0:
-		(rooms[current]["board"] as Board).clear(player.cell)
+		var old_board: Board = rooms[current]["board"]
+		old_board.clear(player.cell)
 		if companion != null:
-			(rooms[current]["board"] as Board).clear(companion.cell)
+			old_board.clear(companion.cell)
+		var old_ents: Dictionary = rooms[current]["entities"]
+		for fid in old_ents.keys():
+			var fe = old_ents[fid]
+			if fe is CombatEntity and fe.faction == "ally" and fe.is_alive() \
+					and (companion == null or fe.id != companion.id):
+				followers.append(fe)
+				old_board.clear(fe.cell)
+				old_ents.erase(fid)
 	current = idx
 	var room: Dictionary = rooms[idx]
 	var board: Board = room["board"]
@@ -74,6 +87,15 @@ func enter(idx: int, entry: Vector2i) -> void:
 			companion.cell = spot
 			board.place(companion.id, spot)
 			ents[companion.id] = companion
+	# Recruited allies file in behind you and become entities of THIS room.
+	for fe2 in followers:
+		var fspot := _free_cell_near(board, entry, ents)
+		if fspot == Vector2i(-1, -1):
+			continue
+		fe2.cell = fspot
+		board.place(fe2.id, fspot)
+		ents[fe2.id] = fe2
+		room["entities"][fe2.id] = fe2
 	sim = CombatSim.new(board, ents, player.id, 1337 + idx,
 			inv, items, discovered_recipes, audience, sponsors)
 
@@ -89,6 +111,21 @@ func attach_companion(c: CombatEntity) -> void:
 		c.cell = spot
 		board.place(c.id, spot)
 		sim.entities[c.id] = c
+
+## Inject a recruited ally (a convert) into the current room — used when the
+## crusade follows you down a floor. Registers it as a room entity so it
+## persists and keeps following through doors.
+func attach_follower(f: CombatEntity) -> void:
+	if f == null or sim == null or current < 0:
+		return
+	var board: Board = rooms[current]["board"]
+	var spot := _free_cell_near(board, player.cell, sim.entities)
+	if spot == Vector2i(-1, -1):
+		return
+	f.cell = spot
+	board.place(f.id, spot)
+	sim.entities[f.id] = f
+	rooms[current]["entities"][f.id] = f
 
 ## A walkable, unoccupied cell adjacent (then near) `origin`, or (-1,-1) if none.
 func _free_cell_near(board: Board, origin: Vector2i, ents: Dictionary) -> Vector2i:

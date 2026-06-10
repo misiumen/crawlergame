@@ -415,6 +415,11 @@ func _initialize() -> void:
 	bv._end_run(false)
 	_ck(not bv._summary.is_empty(), "ending the run builds a summary")
 	_ck(not bv._summary_lines.is_empty(), "the results screen has rendered lines")
+	# input lockout: the click you were spamming when you died must NOT skip the recap
+	bv._dispatch_zone({"kind": "summary_continue"})
+	_ck(not bv._summary.is_empty(), "an immediate click cannot skip the death recap")
+	bv._process(2.0)                       # the lockout expires
+	_ck(bv._summary_lock <= 0.0, "the recap lockout expires after a moment")
 	for i in 3:
 		bv._process(0.016)              # draws the full-screen summary
 	_ck(true, "results screen draws without crash")

@@ -97,9 +97,12 @@ func effective_damage(target: CombatEntity, base: int, dmg_type: String) -> int:
 ## Status effects shorthand: which DoT a status deals per turn, by type.
 const STATUS_DOT := {"burning": [3, "fire"], "poisoned": [2, "physical"], "corroded": [1, "acid"]}
 
-## Effective AC, reduced while the target is corroded (armor eaten away).
+## Effective AC, reduced while the target is corroded (armor eaten away) and
+## raised while a humanoid holds its guard (break it with a shove).
 func _eff_ac(target: CombatEntity) -> int:
-	return target.ac + target.armor_bonus() - (2 if target.has_status("corroded") else 0)
+	return target.ac + target.armor_bonus() \
+		+ (3 if target.has_status("guard") else 0) \
+		- (2 if target.has_status("corroded") else 0)
 
 ## Apply damage. If the target carries a procedural body, the blow is LOCATED:
 ## a zone is chosen (or the aimed one used), the part's damage multiplier scales
@@ -184,6 +187,12 @@ func _player_attack(target: CombatEntity) -> Array:
 		"aim": zone, "target_unaware": was_unaware}]
 	var p: CombatEntity = player()
 	_add_affinity("melee", 1)
+	# A spectre lets bare steel pass straight through — elements and coatings bite.
+	if target.body_kind() == "spectral" and p.coating == "" and rng.randf() < 0.35:
+		evs.append({"type": "phase", "id": target.id, "name": target.name_pl})
+		aim_zone = ""
+		evs += _after_player_action(1)
+		return evs
 	# Ranger's precise shot (active) forces the hit to land.
 	var autohit: bool = p.next_attack_autohit
 	if autohit:
@@ -208,6 +217,12 @@ func _player_attack(target: CombatEntity) -> Array:
 		var heavy: bool = dtype == DMG_PHYSICAL and base >= 9
 		evs += _apply_damage(target, base, dtype, zone, heavy)
 		aim_zone = ""   # the aim is spent on this swing
+		# A surviving humanoid raises its guard (+3 AC). Trading bumps stops
+		# working — break the stance with a shove, or aim past it.
+		if target.is_alive() and target.faction == "enemy" \
+				and target.body_kind() == "humanoid" and not target.has_status("guard"):
+			target.add_status("guard", 3)   # a 3-round stance; shove to break it early
+			evs.append({"type": "guard", "id": target.id, "name": target.name_pl})
 		# Spectacle tags for dead enemies.
 		if not target.is_alive():
 			p.run_kills += 1
@@ -235,6 +250,9 @@ func player_shove(dir: Vector2i) -> Array:
 	var target: CombatEntity = entities[occ]
 	var land: Vector2i = adj + dir
 	var evs: Array = [{"type": "shove", "target": target.id, "dir": dir}]
+	if target.has_status("guard"):
+		target.statuses.erase("guard")   # a shove breaks the stance
+		evs.append({"type": "guard_break", "id": target.id})
 	if board.is_free(land):
 		board.move(target.cell, land)
 		target.cell = land
@@ -841,9 +859,12 @@ func _award_kill_xp() -> Array:
 	var evs: Array = []
 	for id in entities:
 		var e: CombatEntity = entities[id]
-		if e.faction != "enemy" or e.is_alive() or _xp_done.has(id):
+		# The paid-out marker lives ON THE ENTITY, not on the sim: each room change
+		# builds a fresh CombatSim over the same persistent entities, so a sim-local
+		# ledger let you farm XP from old corpses by pacing between sectors.
+		if e.faction != "enemy" or e.is_alive() or e.flags.get("xp_granted", false):
 			continue
-		_xp_done[id] = true
+		e.flags["xp_granted"] = true
 		var amt: int = 4 + e.max_hp + (12 if e.tags.has("boss") else 0)
 		evs += _grant_xp(amt)
 	return evs
@@ -958,6 +979,44 @@ func _enemy_turn() -> Array:
 			else:
 				evs.append({"type": "skip", "id": e.id, "reason": "charmed"})
 			continue
+		# ── Fighting styles by body class (combat depth: each archetype demands a
+		# different answer — see the focused-target hint in the HUD). ────────────
+		var kind: String = e.body_kind()
+		var pd: int = maxi(absi(p.cell.x - e.cell.x), absi(p.cell.y - e.cell.y))
+		# Elite: enrages below half HP (+2 damage for the rest of the fight).
+		if kind == "elite" and e.hp * 2 < e.max_hp and not e.flags.get("enraged", false):
+			e.flags["enraged"] = true
+			evs.append({"type": "enrage", "id": e.id, "name": e.name_pl})
+		# Mech: a ranged shooter — keeps its distance and zaps through line of sight.
+		# Break LOS or close the gap; standing in the open is what kills you.
+		if kind == "mech" and e.can_move() and not e.is_hobbled():
+			if pd <= 1:
+				var back: Vector2i = e.cell + Vector2i(signi(e.cell.x - p.cell.x), signi(e.cell.y - p.cell.y))
+				if board.is_free(back):
+					board.move(e.cell, back); e.cell = back
+					evs.append({"type": "move", "id": e.id, "to": back})
+					evs += _on_enter_cell(e)   # backing onto a hazard still hurts
+					pd = maxi(absi(p.cell.x - e.cell.x), absi(p.cell.y - e.cell.y))
+			if pd >= 2 and pd <= 3 and board.has_los(e.cell, p.cell):
+				evs.append({"type": "attack", "attacker": e.id, "target": player_id, "ranged": true})
+				if _roll_hit(e.to_hit if e.dmg_dice != "" else 2,
+						_eff_ac(p) + ClassFeatures.passive_bonus(p, "ac") + _curse_to_hit):
+					evs += _apply_damage(p, rng.randi_range(2, 5), DMG_ELECTRIC)
+				else:
+					evs.append({"type": "miss", "attacker": e.id, "target": player_id})
+				if not p.is_alive():
+					break
+				continue
+		# Beast: pounces two straight tiles onto you — don't stand in its lane.
+		if kind == "beast" and pd == 2 and e.can_move() and not e.is_hobbled():
+			var dvec: Vector2i = p.cell - e.cell
+			if dvec.x == 0 or dvec.y == 0 or absi(dvec.x) == absi(dvec.y):
+				var mid: Vector2i = e.cell + Vector2i(signi(dvec.x), signi(dvec.y))
+				if board.is_free(mid):
+					board.move(e.cell, mid); e.cell = mid
+					evs.append({"type": "pounce", "id": e.id, "name": e.name_pl})
+					evs.append({"type": "move", "id": e.id, "to": mid})
+					evs += _on_enter_cell(e)   # a pounce onto a hazard is its problem
 		# Target the player if adjacent; otherwise swat your pet if IT is adjacent
 		# (the "protect the mascot" tension — the companion can be downed).
 		var victim: CombatEntity = null
@@ -983,6 +1042,15 @@ func _enemy_turn() -> Array:
 				var base: int = Dice.roll(e.dmg_dice, rng) if e.dmg_dice != "" else rng.randi_range(1, 4) + 1
 				if e.has_status("disarmed"):
 					base = maxi(1, base - 2)
+				if e.flags.get("enraged", false):
+					base += 2
+				# Vermin swarm: each other bug ganging the same victim feeds the bite.
+				if kind == "bug":
+					var pack := 0
+					for o in enemies_alive():
+						if o.id != e.id and o.body_kind() == "bug" and board.is_adjacent(o.cell, victim.cell):
+							pack += 1
+					base += mini(pack, 2)
 				evs += _apply_damage(victim, base, DMG_PHYSICAL)
 				if victim != p and not victim.is_alive():
 					evs.append({"type": "ally_down", "id": victim.id, "name": victim.name_pl})
