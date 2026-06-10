@@ -18,11 +18,24 @@ shippable game. Decisions locked with the owner:
 - [x] `--smoke` autotest: windowed run through every panel's draw path, quits 0.
 - [ ] InputMap actions for all keys (rebinding + controller groundwork) → with C.
 
-## Phase B — The board comes alive (next)
-- TileMapLayer floors/walls/props per biome (autotiling), entity sprites with
-  idle/walk/attack/death frames, 2D lights + occluders (fire glows, dark halls),
-  tweened movement, hit-stop, particles (sparks/blood/confetti), floor wipes.
-- Asset base: 0x72 Dungeon Tileset II (CC0) + Kenney; biome palettes via shader.
+## Phase B — The board comes alive  ✅ (2026-06-10)
+- [x] **B.1 Biome identities**: all 20 routes have hand-set palettes, floor
+      patterns (tiles/planks/hatch/rubble/cracks/dots/stripes/puddles), floor
+      props (17 kinds) + wall décor (frames/pipes/neon/bars/posters), a biome
+      accent frame + HUD badge, ambient colour grade + player light. All décor
+      deterministic per (seed, depth, cell). `scenes/BiomeThemes.gd`.
+- [x] **B.2 Entity identity**: 83 monster templates collapse into 7 readable
+      silhouettes (humanoid/beast/bug/mech/spectral/elite/boss) with stable
+      per-species hues; damage bars on hurt enemies.
+- [x] **B.3 Juice**: attack lunges, movement bob, particle system (damage sparks
+      by element, death bursts, sever spray, heal motes, spell glitter, convert
+      bursts, fire-hazard embers), floor/room transition wipes.
+- [x] **B.4 World lights**: fire hazards + safehouse glow (pooled PointLight2D),
+      player light scaled by biome darkness.
+- **Art direction call**: the clean procedural vector-neon style proved coherent
+  and is the shipped look. An external tileset/sprite swap (0x72/Kenney) remains
+  an OPTIONAL later upgrade — the theme system already carries palettes/props,
+  so a swap is additive, not a rework.
 
 ## Phase C — UI/UX overhaul
 - All modals → themed Control panels; icons (materials/items/spells/tiers);

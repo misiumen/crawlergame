@@ -378,6 +378,25 @@ func _initialize() -> void:
 	bv._ach_descend(2)                          # +1 → 10 → career milestone
 	_ck(Achievements.is_unlocked("dziesiate_pietro"), "10 career floors unlock Dziesiąte piętro")
 
+	# Phase B juice plumbing (headless logic only — pixels verified by --smoke)
+	var bk1 := CombatEntity.new(700, "Dron", 10, 10, ["monster", "drone"])
+	var bk2 := CombatEntity.new(701, "Duch", 10, 10, ["monster", "ghost"])
+	var bk3 := CombatEntity.new(702, "Robak", 10, 10, ["monster", "robactwo"])
+	var bk4 := CombatEntity.new(703, "Łowca", 10, 10, ["monster", "humanoid"])
+	var bk5 := CombatEntity.new(704, "Alfa", 10, 10, ["monster", "beast", "miniboss"])
+	_ck(bv._enemy_body_kind(bk1) == "mech" and bv._enemy_body_kind(bk2) == "spectral"
+		and bv._enemy_body_kind(bk3) == "bug" and bv._enemy_body_kind(bk4) == "humanoid"
+		and bv._enemy_body_kind(bk5) == "elite", "enemy tags map to distinct silhouettes")
+	_ck(bv._enemy_hue(bk1, "mech") != bv._enemy_hue(bk4, "humanoid"), "species hues differ")
+	bv._parts.clear()
+	bv._animate([{"type": "damage", "target": bv.sim.player_id, "amount": 9, "dmg_type": "electric"}])
+	_ck(bv._parts.size() > 0, "damage events spawn spark particles")
+	bv._animate([{"type": "attack", "attacker": bv.sim.player_id, "target": bv.sim.player_id}])
+	for i in 20:
+		bv._process(0.05)               # particles + lunges decay without crash
+	_ck(bv._parts.is_empty(), "particles decay and cull")
+	_ck(bv._wipe >= 0.0, "transition wipe state is sane")
+
 	# banner auto-clears (was sticking forever — "zadanie wykonane" never vanished)
 	bv._add_banner("TEST BANNER")
 	_ck(bv._banner == "TEST BANNER", "a banner shows when triggered")

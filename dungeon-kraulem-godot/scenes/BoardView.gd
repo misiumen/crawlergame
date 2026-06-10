@@ -101,6 +101,12 @@ var _cam: Camera2D = null            # world camera (smooth follow + shake)
 var _ui: Control = null              # screen-fixed UI painter on a CanvasLayer
 var _cmod: CanvasModulate = null     # biome ambient colour grade (world only)
 var _plight: PointLight2D = null     # soft light following the player
+var _light_tex: Texture2D = null     # shared radial gradient for all 2D lights
+var _lights_root: Node2D = null      # pooled hazard/safehouse lights
+var _lunge: Dictionary = {}          # id -> {dir: Vector2, t: float} attack lunges
+var _parts: Array = []               # particles: {pos, vel, life, ttl, size, col, grav}
+var _wipe := 0.0                     # floor/room transition fade (1 → 0)
+var _ember_cd := 0.0                 # fire-hazard ember spawn cooldown
 var _smoke := false                  # --smoke: scripted draw-path autotest, then quit
 var _smoke_frames := 0
 
@@ -135,10 +141,13 @@ func _ready() -> void:
 	ltex.fill_to = Vector2(0.5, 0.0)
 	ltex.width = 512
 	ltex.height = 512
+	_light_tex = ltex
 	_plight = PointLight2D.new()
 	_plight.texture = ltex
 	_plight.energy = 0.0
 	add_child(_plight)
+	_lights_root = Node2D.new()
+	add_child(_lights_root)
 	if "--smoke" in OS.get_cmdline_user_args():
 		_smoke = true
 	set_process(true)
@@ -253,6 +262,7 @@ func _descend_into(biome_key: String) -> void:
 	_reset_visuals()
 	_spawn_safehouse()
 	_maybe_spawn_crawler()
+	_wipe = 1.0                    # descent fade-in
 	_arm_floor_traits()            # re-arm per-floor species traits (e.g. first strike)
 	sim.refill_mana()              # mana tops up each floor
 	floor.objective = Objectives.pick(next_depth, _narr_rng)   # a fresh segment goal
@@ -316,10 +326,12 @@ func _reset_visuals() -> void:
 	if floor != null:
 		_ach_recipes_seen = floor.discovered_recipes.size()   # baseline for recipe-goal tracking
 	_vpos.clear(); _vtarget.clear(); _flash.clear(); _dying.clear(); _floaters.clear()
+	_parts.clear(); _lunge.clear()
 	for id in sim.entities:
 		var c: Vector2 = _cell_px(sim.entities[id].cell)
 		_vpos[id] = c
 		_vtarget[id] = c
+	_rebuild_world_lights()
 	queue_redraw()
 
 func _check_transition() -> void:
@@ -340,6 +352,7 @@ func _check_transition() -> void:
 	_aim_zone = ""; sim.aim_zone = ""
 	_recenter()
 	_reset_visuals()
+	_wipe = 1.0   # quick fade-in as you step through the door
 	_log_push("Przechodzisz do: %s." % r.get("name", "?"))
 
 func _cell_px(c: Vector2i) -> Vector2:
@@ -2068,12 +2081,23 @@ func _animate(evs: Array) -> void:
 		match e.get("type"):
 			"move":
 				_vtarget[e["id"]] = _cell_px(e["to"])
+			"attack":
+				# the attacker darts toward its victim — combat reads as motion
+				var aid: int = int(e.get("attacker", -1))
+				var avictim = sim.entities.get(int(e.get("target", -1)))
+				if aid != -1 and avictim != null:
+					var afrom: Vector2 = _vpos.get(aid, _cell_px(avictim.cell))
+					var dirv: Vector2 = (_cell_px(avictim.cell) - afrom)
+					if dirv.length() > 0.5:
+						_lunge[aid] = {"dir": dirv.normalized(), "t": 0.18}
 			"damage":
 				var tid: int = e["target"]
 				_flash[tid] = 0.24
 				var col: Color = COL_CYAN if e.get("dmg_type") == "electric" else COL_RED
 				_add_floater(tid, "-%d" % e["amount"], col)
 				_shake = maxf(_shake, 5.0 if e["amount"] >= 12 else 2.5)
+				_spawn_parts(_vpos.get(tid, _cell_px(Vector2i.ZERO)),
+					mini(4 + int(e["amount"]) / 3, 12), _dmg_spark_color(str(e.get("dmg_type", ""))))
 				if e.get("zone", "") != "":
 					_part_flash["%d:%s" % [tid, e["zone"]]] = 0.4
 			"body_hit":
@@ -2081,6 +2105,7 @@ func _animate(evs: Array) -> void:
 				if e.get("severed", false):
 					_add_floater(e["target"], "AMPUTACJA: " + e.get("label", ""), COL_RED)
 					_shake = maxf(_shake, 7.0)
+					_spawn_parts(_vpos.get(int(e["target"]), Vector2.ZERO), 12, COL_RED, 110.0, 220.0)
 				elif wound != "":
 					_add_floater(e["target"],
 						BodyState.WOUND_PL.get(wound, wound) + " — " + e.get("label", ""),
@@ -2096,6 +2121,11 @@ func _animate(evs: Array) -> void:
 					_shake = maxf(_shake, 6.0)
 			"death":
 				_dying[e["target"]] = 1.0
+				var dent = sim.entities.get(int(e["target"]))
+				if dent != null:
+					var dcol := _enemy_hue(dent, _enemy_body_kind(dent)) \
+						if dent.faction == "enemy" else COL_RED
+					_spawn_parts(_vpos.get(int(e["target"]), _cell_px(dent.cell)), 14, dcol, 95.0)
 			"miss":
 				_add_floater(e["target"], "pudło", COL_DIM)
 			"salvage":
@@ -2144,6 +2174,7 @@ func _animate(evs: Array) -> void:
 				_add_floater(sim.player_id, "+powłoka x%d" % e["charges"], COL_CYAN)
 			"heal":
 				_add_floater(sim.player_id, "+%d HP" % e["amount"], COL_GREEN)
+				_spawn_parts(_vpos.get(sim.player_id, Vector2.ZERO), 5, COL_GREEN, 38.0, -70.0, 0.7, 2.0)
 			"weapon_upgrade":
 				_add_floater(sim.player_id, "+%d obr." % e["bonus"], COL_AMBER)
 			"xp":
@@ -2184,6 +2215,7 @@ func _animate(evs: Array) -> void:
 				_add_floater(sim.player_id, "✦ " + str(e.get("name", "Zaklęcie")), COL_PURPLE)
 				_log_push("Rzucasz: %s." % e.get("name", "?"))
 				_shake = maxf(_shake, 3.0)
+				_spawn_parts(_vpos.get(sim.player_id, Vector2.ZERO), 8, COL_PURPLE, 60.0, -30.0, 0.6)
 			"cast_blocked":
 				_log_push(str(e.get("reason", "Nie możesz teraz rzucić.")))
 			"scrap_found":
@@ -2191,6 +2223,12 @@ func _animate(evs: Array) -> void:
 			"marked":
 				if int(e.get("id", -1)) != -1:
 					_add_floater(int(e["id"]), "CEL!", COL_CYAN)
+			"convert":
+				# a zealot spread the faith on its own — the crusade chains
+				_add_floater(int(e.get("id", sim.player_id)), "NAWRÓCONY", COL_GREEN)
+				_spawn_parts(_vpos.get(int(e.get("id", -1)), Vector2.ZERO), 10,
+					Color("ffd24a"), 70.0, -40.0, 0.7)
+				_log_push("%s przyjmuje wiarę od współwyznawcy!" % e.get("name", "Ktoś"))
 			"distract":
 				_add_floater(int(e.get("id", sim.player_id)), "ROZPROSZONY", COL_GAS)
 				_log_push("%s traci kolejną turę — rozproszony." % e.get("name", "Wróg"))
@@ -2212,6 +2250,7 @@ func _animate(evs: Array) -> void:
 				_add_floater(int(e.get("target", 0)), str(e.get("status", "")), COL_GAS)
 			"hazard_placed":
 				_log_push("Rozlewa się: %s." % e.get("kind", "?"))
+				_rebuild_world_lights()
 			"biome_gimmick":
 				_log_push(str(e.get("text", "")))
 			"trap_armed":
@@ -2364,6 +2403,55 @@ func _add_floater(id: int, text: String, color: Color) -> void:
 	var pos: Vector2 = _vpos.get(id, _cell_px(Vector2i.ZERO))
 	_floaters.append({"pos": pos, "text": text, "color": color, "age": 0.0, "ttl": 0.95})
 
+## Burst `n` particles at a world position (capped pool; cheap circles).
+func _spawn_parts(pos: Vector2, n: int, col: Color, speed: float = 70.0,
+		grav: float = 160.0, ttl: float = 0.55, size: float = 2.6) -> void:
+	for _i in n:
+		if _parts.size() >= 240:
+			return
+		var ang := randf() * TAU
+		_parts.append({"pos": pos, "vel": Vector2(cos(ang), sin(ang)) * speed * randf_range(0.4, 1.0),
+			"life": ttl, "ttl": ttl, "size": size * randf_range(0.7, 1.3), "col": col, "grav": grav})
+
+## Spark colour per damage type (the elements keep their identity in the air).
+func _dmg_spark_color(t: String) -> Color:
+	match t:
+		"electric": return COL_CYAN
+		"fire":     return Color("ff6a2a")
+		"acid":     return COL_GREEN
+		"cold":     return Color("9fd4ff")
+		"void":     return COL_PURPLE
+	return Color("e88a8a")
+
+## Rebuild the pooled world lights: fire hazards flicker orange, the safehouse
+## glows warm. Called on floor/room changes and when a hazard appears.
+func _rebuild_world_lights() -> void:
+	if _lights_root == null or sim == null:
+		return
+	for ch in _lights_root.get_children():
+		ch.queue_free()
+	var made := 0
+	for cell in sim.board.hazards:
+		if made >= 12: break
+		if str(sim.board.hazards[cell]) != "fire": continue
+		var fl := PointLight2D.new()
+		fl.texture = _light_tex
+		fl.color = Color("ff8a3a")
+		fl.energy = 0.9
+		fl.texture_scale = 0.45
+		fl.position = _cell_px(cell)
+		_lights_root.add_child(fl)
+		made += 1
+	for id in sim.entities:
+		if sim.entities[id].faction == "safehouse":
+			var sl := PointLight2D.new()
+			sl.texture = _light_tex
+			sl.color = Color("ffd9a0")
+			sl.energy = 0.7
+			sl.texture_scale = 0.7
+			sl.position = _cell_px(sim.entities[id].cell)
+			_lights_root.add_child(sl)
+
 # ── Per-frame animation ───────────────────────────────────────────────────────
 
 func _process(dt: float) -> void:
@@ -2396,6 +2484,29 @@ func _process(dt: float) -> void:
 	if _cam != null:
 		_cam.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) \
 			if _shake > 0.0 else Vector2.ZERO
+	# Particles: integrate, gravity, cull.
+	for pt in _parts:
+		pt.life = float(pt.life) - dt
+		pt.vel = (pt.vel as Vector2) + Vector2(0, float(pt.grav)) * dt
+		pt.pos = (pt.pos as Vector2) + (pt.vel as Vector2) * dt
+	_parts = _parts.filter(func(pt2): return float(pt2.life) > 0.0)
+	# Attack lunges decay quickly.
+	for id in _lunge.keys():
+		_lunge[id]["t"] = float(_lunge[id]["t"]) - dt
+		if float(_lunge[id]["t"]) <= 0.0:
+			_lunge.erase(id)
+	# Floor-transition wipe.
+	if _wipe > 0.0:
+		_wipe = maxf(0.0, _wipe - dt * 2.2)
+	# Fire hazards exhale embers (only while playing, and only a few at a time).
+	if sim != null and not _title and _summary.is_empty():
+		_ember_cd -= dt
+		if _ember_cd <= 0.0:
+			_ember_cd = 0.22
+			for cell in sim.board.hazards:
+				if str(sim.board.hazards[cell]) == "fire" and _parts.size() < 200:
+					_spawn_parts(_cell_px(cell) + Vector2(randf_range(-12, 12), 8),
+						1, Color("ff9a4a"), 14.0, -55.0, 1.1, 2.2)
 	# Biome mood: ambient grade + the player light track the active theme.
 	if _cmod != null and sim != null and not _title:
 		var th := BiomeThemes.theme_for(floor.biome if floor != null else "")
@@ -2416,6 +2527,11 @@ func _smoke_tick() -> void:
 	match _smoke_frames:
 		20: _build()
 		50: handle_dir(Vector2i.RIGHT)
+		60:
+			# light + particle paths: a burning tile next to the player
+			sim.board.set_hazard(sim.player().cell + Vector2i(0, 1), "fire")
+			_rebuild_world_lights()
+			_spawn_parts(_vpos.get(sim.player_id, Vector2.ZERO), 10, COL_RED)
 		70: _spellbook = true
 		90: _spellbook = false; _journal_screen = true
 		110: _journal_screen = false; _craft_open = true; _craft_mode = "bench"
@@ -2501,6 +2617,13 @@ func _draw() -> void:
 		if not e.is_alive() and not _dying.has(id):
 			continue
 		var pos: Vector2 = _vpos.get(id, _cell_px(e.cell))
+		# Attack lunge: a quick dart toward the victim, decaying in _process.
+		if _lunge.has(id):
+			var lg: Dictionary = _lunge[id]
+			pos += (lg.dir as Vector2) * 12.0 * (float(lg.t) / 0.18)
+		# Movement bob: a light step rhythm while gliding between cells.
+		elif pos.distance_to(_vtarget.get(id, pos)) > 2.0:
+			pos.y += sin(Time.get_ticks_msec() * 0.025 + id * 1.7) * 2.0
 		var fade: float = _dying.get(id, 1.0)
 		var flashing := _flash.has(id)
 		if e.faction == "player":      _draw_player(e, pos, fade)
@@ -2509,8 +2632,11 @@ func _draw() -> void:
 		elif e.faction == "ally":      _draw_ally(e, pos, fade)
 		elif e.faction == "object":    _draw_object(e, pos, fade)
 		elif e.faction == "npc":       _draw_npc(pos, fade)
-		elif "boss" in e.tags:         _draw_boss(pos, fade, flashing)
-		else:                          _draw_rat(pos, fade, flashing)
+		else:                          _draw_enemy(e, pos, fade, flashing)
+	# Particles ride above entities.
+	for pt in _parts:
+		var pa: float = clampf(float(pt.life) / float(pt.ttl), 0.0, 1.0)
+		draw_circle(pt.pos, float(pt.size) * (0.5 + 0.5 * pa), Color(pt.col, pa))
 	for f in _floaters:
 		var a: float = 1.0 - float(f["age"]) / float(f["ttl"])
 		var col: Color = f["color"]; col.a = a
@@ -2540,6 +2666,9 @@ func _draw_ui(c: CanvasItem) -> void:
 		_draw_run_summary(c)
 		return
 	_draw_hud(c)
+	# Floor/room transition: a quick fade-in from black over everything.
+	if _wipe > 0.0:
+		c.draw_rect(Rect2(0, 0, 1280, 720), Color(0, 0, 0, clampf(_wipe, 0.0, 1.0)))
 
 func _draw_glyph(s: String, c: Vector2i, col: Color) -> void:
 	draw_string(_font, _cell_px(c) + Vector2(-6, 8), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, col)
@@ -2811,6 +2940,93 @@ func _draw_rat(pos: Vector2, fade: float, flashing: bool) -> void:
 	draw_line(pos + Vector2(11, 2), pos + Vector2(22, -8), body, 4.0)
 	_draw_ellipse(pos, 15, 9, body)
 	draw_circle(pos + Vector2(-13, 0), 7, body)
+
+# ── Enemy silhouettes (Phase B): each template class reads at a glance ────────
+
+## Body class from tags: 83 monster templates collapse into 7 readable shapes.
+func _enemy_body_kind(e: CombatEntity) -> String:
+	if "boss" in e.tags: return "boss"
+	if "miniboss" in e.tags or "mini_boss" in e.tags: return "elite"
+	for t in ["machine", "robot", "drone", "camera", "mechanical", "construct"]:
+		if t in e.tags: return "mech"
+	for t in ["undead", "ghost"]:
+		if t in e.tags: return "spectral"
+	for t in ["robactwo", "insect"]:
+		if t in e.tags: return "bug"
+	if "humanoid" in e.tags: return "humanoid"
+	return "beast"
+
+## Species colour: a stable hue from the monster key, around a per-class base —
+## same species always matches, different species always differ.
+func _enemy_hue(e: CombatEntity, kind: String) -> Color:
+	var base_h := 0.0
+	match kind:
+		"humanoid": base_h = 0.99   # red family
+		"beast":    base_h = 0.07   # brown-orange
+		"bug":      base_h = 0.16   # olive
+		"mech":     base_h = 0.55   # steel-cyan
+		"spectral": base_h = 0.45   # pale teal
+		_:          base_h = 0.99
+	var h := 0
+	for ch in (e.monster_key if e.monster_key != "" else e.name_pl):
+		h = (h * 31 + ch.unicode_at(0)) % 1000
+	var hue := fposmod(base_h + (float(h) / 1000.0 - 0.5) * 0.12, 1.0)
+	return Color.from_hsv(hue, 0.55, 0.78)
+
+func _draw_enemy(e: CombatEntity, pos: Vector2, fade: float, flashing: bool) -> void:
+	var kind := _enemy_body_kind(e)
+	if kind == "boss":
+		_draw_boss(pos, fade, flashing)
+		return
+	var body := COL_RED if flashing else _enemy_hue(e, kind)
+	body.a = fade
+	var dark := Color(body.r * 0.45, body.g * 0.45, body.b * 0.45, fade)
+	match kind:
+		"humanoid":
+			draw_circle(pos + Vector2(0, 2), 12, dark)
+			draw_arc(pos + Vector2(0, 2), 12, 0, TAU, 18, body, 2.0)
+			draw_circle(pos + Vector2(0, -9), 7, body)
+			draw_line(pos + Vector2(9, 0), pos + Vector2(18, -9), body, 3.0)   # weapon
+			draw_line(pos + Vector2(-10, -2), pos + Vector2(10, -2), dark, 2.0)
+		"bug":
+			_draw_ellipse(pos + Vector2(0, 2), 10, 6, body)
+			for k in 3:
+				var lx := -6.0 + k * 6.0
+				draw_line(pos + Vector2(lx, 4), pos + Vector2(lx - 4, 12), body, 1.5)
+				draw_line(pos + Vector2(lx, 4), pos + Vector2(lx + 4, 12), body, 1.5)
+			draw_line(pos + Vector2(-3, -3), pos + Vector2(-7, -10), body, 1.2)  # antennae
+			draw_line(pos + Vector2(3, -3), pos + Vector2(7, -10), body, 1.2)
+		"mech":
+			draw_rect(Rect2(pos + Vector2(-11, -8), Vector2(22, 18)), dark)
+			draw_rect(Rect2(pos + Vector2(-11, -8), Vector2(22, 18)), body, false, 2.0)
+			draw_circle(pos + Vector2(0, -2), 3.5, Color("60e0ff", fade))        # sensor eye
+			draw_line(pos + Vector2(0, -8), pos + Vector2(0, -16), body, 2.0)    # antenna
+			draw_line(pos + Vector2(-11, 12), pos + Vector2(11, 12), body, 3.0)  # tread
+		"spectral":
+			var gh := Color(body, fade * 0.55)
+			var hover := sin(Time.get_ticks_msec() * 0.004 + pos.x) * 2.0
+			draw_arc(pos + Vector2(0, hover), 12, PI, TAU, 14, gh, 3.0)
+			_draw_ellipse(pos + Vector2(0, -4 + hover), 11, 9, gh)
+			draw_circle(pos + Vector2(-4, -6 + hover), 2.0, Color(0.05, 0.05, 0.1, fade))
+			draw_circle(pos + Vector2(4, -6 + hover), 2.0, Color(0.05, 0.05, 0.1, fade))
+		"elite":
+			_draw_ellipse(pos, 14, 10, body)
+			draw_circle(pos + Vector2(-10, -4), 7, body)
+			for k in 5:                                   # spiked elite ring
+				var ang := -PI * 0.9 + k * (PI * 0.8 / 4.0)
+				var tip := pos + Vector2(cos(ang), sin(ang)) * 20.0
+				draw_line(pos + Vector2(cos(ang), sin(ang)) * 13.0, tip, COL_AMBER, 2.0)
+			draw_arc(pos, 17, 0, TAU, 22, Color(COL_AMBER, fade * 0.7), 1.5)
+		_:   # beast
+			draw_line(pos + Vector2(11, 2), pos + Vector2(22, -8), body, 4.0)   # tail
+			_draw_ellipse(pos, 15, 9, body)
+			draw_circle(pos + Vector2(-13, 0), 7, body)
+			draw_line(pos + Vector2(-16, -5), pos + Vector2(-13, -10), body, 2.0)  # ear
+	# A damage bar appears once the enemy is hurt (mirrors the ally readout).
+	if e.max_hp > 0 and e.hp < e.max_hp:
+		var frac: float = clampf(float(e.hp) / float(e.max_hp), 0.0, 1.0)
+		draw_rect(Rect2(pos.x - 14, pos.y + 16, 28, 4), Color(0.1, 0.1, 0.1, fade))
+		draw_rect(Rect2(pos.x - 14, pos.y + 16, 28 * frac, 4), Color(COL_RED, fade))
 
 func _draw_exits() -> void:
 	if floor == null: return
