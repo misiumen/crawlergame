@@ -3301,92 +3301,85 @@ func _draw_title(c: CanvasItem) -> void:
 	c.draw_rect(Rect2(1014, 36, 230, 78), Color(COL_RED, 0.75), false, 1.0)
 	if fmod(t, 1.2) < 0.72:
 		c.draw_circle(Vector2(1038, 58), 6.0, COL_RED)
-	c.draw_string(_font, Vector2(1052, 64), "NA ŻYWO",
+	c.draw_string(_font, Vector2(1052, 64), "NA \u017bYWO",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 17, COL_BRIGHT)
 	var viewers := 4102336 + Achievements.points_total() * 117 + int(sin(t * 0.7) * 1800.0)
-	c.draw_string(_font, Vector2(1028, 86), "widzów: " + _fmt_int(viewers),
+	c.draw_string(_font, Vector2(1028, 86), "widz\u00f3w: " + _fmt_int(viewers),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
-	c.draw_string(_font, Vector2(1028, 104), "KANAŁ 7 · SEZON 1",
+	c.draw_string(_font, Vector2(1028, 104), "KANA\u0141 7 \u00b7 SEZON 1",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(COL_PURPLE, 0.95))
 	# tiny audio equalizer under the badge - the broadcast is loud
 	for eb in 12:
 		var eh := 5.0 + absf(sin(t * (2.1 + eb * 0.37) + eb)) * 17.0
 		c.draw_rect(Rect2(1030 + eb * 18, 138 - eh, 10, eh), Color(COL_CYAN, 0.4))
 
-	# Neon crown medallion over the logo.
-	var cw := PackedVector2Array([Vector2(186, 150), Vector2(186, 128), Vector2(198, 140),
-		Vector2(210, 120), Vector2(222, 140), Vector2(234, 128), Vector2(234, 150), Vector2(186, 150)])
+	# Neon crown medallion, centered above the logo.
+	var cw := PackedVector2Array([Vector2(616, 134), Vector2(616, 112), Vector2(628, 124),
+		Vector2(640, 104), Vector2(652, 124), Vector2(664, 112), Vector2(664, 134), Vector2(616, 134)])
 	c.draw_polyline(cw, Color(COL_AMBER, 0.30), 6.0)
 	c.draw_polyline(cw, COL_AMBER, 1.6)
 
-	# Logo: layered neon glow + a nervous studio-light flicker.
+	# Logo, centered: layered neon glow + a nervous studio-light flicker.
 	var flick := 0.86 + 0.14 * sin(t * 9.0) * sin(t * 3.7)
 	for off in [Vector2(-3, 0), Vector2(3, 0), Vector2(0, -2), Vector2(0, 3)]:
-		c.draw_string(_font, Vector2(180, 230) + (off as Vector2), "DUNGEON KRAULEM",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 72, Color(COL_PURPLE, 0.16))
+		c.draw_string(_font, Vector2(0, 230) + (off as Vector2), "DUNGEON KRAULEM",
+			HORIZONTAL_ALIGNMENT_CENTER, 1280, 72, Color(COL_PURPLE, 0.16))
 	for off in [Vector2(-1.5, 0.0), Vector2(1.5, 1.0)]:
-		c.draw_string(_font, Vector2(180, 230) + (off as Vector2), "DUNGEON KRAULEM",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 72, Color(COL_CYAN, 0.30 * flick))
-	c.draw_string(_font, Vector2(180, 230), "DUNGEON KRAULEM",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 72, Color(0.86, 0.97, 1.0, flick))
+		c.draw_string(_font, Vector2(0, 230) + (off as Vector2), "DUNGEON KRAULEM",
+			HORIZONTAL_ALIGNMENT_CENTER, 1280, 72, Color(COL_CYAN, 0.30 * flick))
+	c.draw_string(_font, Vector2(0, 230), "DUNGEON KRAULEM",
+		HORIZONTAL_ALIGNMENT_CENTER, 1280, 72, Color(0.86, 0.97, 1.0, flick))
 	# underline with a light sweeping along it
-	c.draw_rect(Rect2(184, 246, 656, 2), Color(COL_CYAN, 0.35))
-	c.draw_rect(Rect2(184 + fmod(t * 260.0, 590.0), 246, 66, 2), COL_BRIGHT)
-	c.draw_string(_font, Vector2(186, 280), "galaktyczne reality show z lochów",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_DIM)
+	c.draw_rect(Rect2(312, 246, 656, 2), Color(COL_CYAN, 0.35))
+	c.draw_rect(Rect2(312 + fmod(t * 260.0, 590.0), 246, 66, 2), COL_BRIGHT)
+	c.draw_string(_font, Vector2(0, 282), "galaktyczne reality show z loch\u00f3w",
+		HORIZONTAL_ALIGNMENT_CENTER, 1280, 20, COL_DIM)
 
-	# Menu rows (click them, or press the key).
+	# Menu: a clean centered list - no boxes. Hover = glow, arrow, and the
+	# entry's one-line description fading in underneath.
 	var has_save := Save.has_save()
 	var lo := MetaCatalog.loadout()
 	var rows: Array = []
 	if has_save:
-		rows.append(["Kontynuuj zjazd", "wracasz na piętro z zapisu", "Enter", "title_continue", COL_CYAN])
+		rows.append(["Kontynuuj zjazd", "wracasz na pi\u0119tro z zapisu", "Enter", "title_continue", COL_CYAN])
 		rows.append(["Nowy bieg", "porzuca obecny zapis", "N", "title_new", COL_AMBER])
 	else:
-		rows.append(["Zacznij bieg", "świeży zjazd do Lochu", "Enter", "title_start", COL_CYAN])
-	rows.append(["Bieg dnia", "wspólny tor całej galaktyki — jeden seed dziennie", "D", "title_daily", COL_PURPLE])
-	rows.append(["Osiągnięcia  %d / %d" % [Achievements.count_unlocked(), Achievements.total()],
-		"galeria trofeów i pasmo prestiżu", "A", "ach_open", COL_AMBER])
-	rows.append(["Ekwipunek sezonu", "%s · %s" % [
+		rows.append(["Zacznij bieg", "\u015bwie\u017cy zjazd do Lochu", "Enter", "title_start", COL_CYAN])
+	rows.append(["Bieg dnia", "wsp\u00f3lny tor ca\u0142ej galaktyki \u2014 jeden seed dziennie", "D", "title_daily", COL_PURPLE])
+	rows.append(["Osi\u0105gni\u0119cia  %d / %d" % [Achievements.count_unlocked(), Achievements.total()],
+		"galeria trofe\u00f3w i pasmo presti\u017cu", "A", "ach_open", COL_AMBER])
+	rows.append(["Ekwipunek sezonu", "%s \u00b7 %s" % [
 		MetaCatalog.def_of(lo["species"]).get("label", "?"),
 		MetaCatalog.def_of(lo["origin"]).get("label", "?")], "M", "meta_open", COL_GREEN])
-	var py := 312.0
-	var phh := rows.size() * 52.0 + 52.0
-	var pr := Rect2(150, py, 600, phh)
-	_panel(c, pr, COL_CYAN, "PANEL UCZESTNIKA")
-	var y := py + 40.0
+	var y := 360.0
 	for row in rows:
-		var rc := Rect2(pr.position.x + 16, y, pr.size.x - 32, 44)
-		var hov := _hover(rc)
+		var label: String = str(row[0])
 		var ac: Color = row[4]
-		c.draw_rect(rc, Color(ac, 0.16 if hov else 0.05))
-		c.draw_rect(rc, Color(ac, 0.9 if hov else 0.25), false, 1.0)
+		var rc := Rect2(400, y - 26, 480, 50)
+		var hov := _hover(rc)
+		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
 		if hov:
-			c.draw_rect(Rect2(rc.position.x, rc.position.y, 3, rc.size.y), ac)
-		c.draw_string(_font, Vector2(rc.position.x + 16 + (4.0 if hov else 0.0), y + 19), str(row[0]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, COL_BRIGHT if hov else Color(COL_BRIGHT, 0.88))
-		c.draw_string(_font, Vector2(rc.position.x + 16, y + 36), str(row[1]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
-		var kw := 22.0 + str(row[2]).length() * 9.0
-		var kr := Rect2(rc.position.x + rc.size.x - kw - 10, y + 10, kw, 24)
-		c.draw_rect(kr, Color(0.10, 0.13, 0.18, 0.9))
-		c.draw_rect(kr, Color(ac, 0.6), false, 1.0)
-		c.draw_string(_font, Vector2(kr.position.x + 8, kr.position.y + 17), str(row[2]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ac)
+			# soft glow bar + arrows flanking the hovered entry
+			c.draw_rect(Rect2(640 - lw / 2.0 - 70, y - 22, lw + 140, 32), Color(ac, 0.08))
+			c.draw_string(_font, Vector2(640 - lw / 2.0 - 42, y), "\u25b6",
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 17, ac)
+			c.draw_string(_font, Vector2(0, y + 1), label,
+				HORIZONTAL_ALIGNMENT_CENTER, 1280, 24, Color(ac, 0.45))
+		c.draw_string(_font, Vector2(0, y), label,
+			HORIZONTAL_ALIGNMENT_CENTER, 1280, 24, ac if hov else Color(COL_BRIGHT, 0.92))
+		# key hint, tucked after the label
+		c.draw_string(_font, Vector2(640 + lw / 2.0 + 16, y), "[%s]" % str(row[2]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(ac, 0.8) if hov else Color(COL_DIM, 0.7))
+		if hov:
+			c.draw_string(_font, Vector2(0, y + 22), str(row[1]),
+				HORIZONTAL_ALIGNMENT_CENTER, 1280, 12, COL_DIM)
 		_zone(rc, str(row[3]))
-		y += 52.0
-	c.draw_string(_font, Vector2(166, py + phh + 24),
-		"Prestiż: %d / %d pkt   ·   odblokowane opcje: %d" % [
+		y += 54.0
+	# career strip, centered under the menu
+	c.draw_string(_font, Vector2(0, 660),
+		"Presti\u017c: %d / %d pkt   \u00b7   odblokowane opcje: %d" % [
 			MetaCatalog.available_prestige(), Achievements.points_total(), Meta.unlocked_count()],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ACH_TIER_COL["gold"])
-
-	# Controls primer (mouse-first) + version.
-	c.draw_string(_font, Vector2(166, 666),
-		"MYSZ: lewy = działaj · prawy = pchnięcie      KLAWISZE: WSAD ruch · E użyj · I warsztat",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(COL_CYAN, 0.85))
-	c.draw_string(_font, Vector2(166, 688),
-		"T celuj · F umiejętność · C karta postaci · Spacja czekaj · Esc menu",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+		HORIZONTAL_ALIGNMENT_CENTER, 1280, 14, ACH_TIER_COL["gold"])
 	c.draw_string(_font, Vector2(1180, 700), "v" + VERSION,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	# CRT scanlines over everything - the broadcast look.
