@@ -169,6 +169,9 @@ const FINAL_FLOOR := 6   # descending from here wins the run
 var _run_seed: int = 20260605
 var _pending_daily := false      # title asked for the daily gauntlet
 var _reset_arm := false          # pause debug: achievements-wipe confirm armed
+var _creator_screen := false     # pre-run character creator (identity + looks)
+var _appearance: Dictionary = Appearance.defaults()
+var _cr_hover_desc := ""         # creator: reward text of the hovered identity row
 var _daily_run := false          # this run uses the shared date seed
 
 func _build() -> void:
@@ -517,22 +520,37 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif kc == KEY_PAGEUP:   _ach_scroll = maxf(0.0, _ach_scroll - 480.0); queue_redraw()
 		return
 
-	# Title screen: Enter continues a save (or starts fresh), N forces a new run,
-	# A opens the achievements gallery.
+	# Character creator (sits on top of the title screen).
+	if _creator_screen:
+		if kc == KEY_ESCAPE:
+			_creator_screen = false
+			_play("close")
+			queue_redraw()
+		elif kc == KEY_ENTER or kc == KEY_KP_ENTER:
+			_creator_begin_run()
+		return
+
+	# Title screen: Enter continues a save (or opens the creator), N forces a
+	# new run, D the daily seed — both via the creator. A = achievements.
 	if _title:
 		if kc == KEY_A:
 			_open_ach_screen(); return
 		if kc == KEY_M:
 			_meta_screen = true; _meta_scroll = 0.0; queue_redraw(); return
 		if kc == KEY_D:
-			Save.clear()
 			_pending_daily = true
-			_build()
+			_open_creator()
 			return
 		if kc == KEY_N:
-			Save.clear()
-		if kc == KEY_ENTER or kc == KEY_KP_ENTER or kc == KEY_N or kc == KEY_SPACE:
-			_build()
+			_pending_daily = false
+			_open_creator()
+			return
+		if kc == KEY_ENTER or kc == KEY_KP_ENTER or kc == KEY_SPACE:
+			if Save.has_save():
+				_build()
+			else:
+				_pending_daily = false
+				_open_creator()
 		return
 
 	# Results screen: Enter starts a fresh run (after the read-your-death lockout).
@@ -837,9 +855,18 @@ func _dispatch_zone(z: Dictionary) -> void:
 	_play("click")
 	var i: int = int(z.get("i", 0))
 	match z.get("kind", ""):
-		"title_continue", "title_start": _build()
-		"title_new":         Save.clear(); _build()
-		"title_daily":       Save.clear(); _pending_daily = true; _build()
+		"title_continue":    _build()
+		"title_start":       _pending_daily = false; _open_creator()
+		"title_new":         _pending_daily = false; _open_creator()
+		"title_daily":       _pending_daily = true; _open_creator()
+		"creator_back":      _creator_screen = false; _play("close"); queue_redraw()
+		"creator_start":     _creator_begin_run()
+		"cr_species":        MetaCatalog.set_species(z.get("s", "")); _play("click"); queue_redraw()
+		"cr_origin":         MetaCatalog.set_origin(z.get("s", "")); _play("click"); queue_redraw()
+		"cr_cyc":
+			_appearance = Appearance.cycle(_appearance, str(z.get("s", "")), int(z.get("i", 1)))
+			_play("click")
+			queue_redraw()
 		"summary_continue":
 			if _summary_lock <= 0.0:
 				_summary = {}; _summary_lines = []; _done = false
@@ -993,6 +1020,7 @@ func _make_companion() -> CombatEntity:
 ## into the fresh-run player + run state. The faithful "menu of choices" payoff.
 func _apply_loadout() -> void:
 	var p := floor.player
+	p.flags["appearance"] = _appearance.duplicate()
 	var lo := MetaCatalog.loadout()
 	p.species_key = lo["species"]
 	p.origin_key = lo["origin"]
@@ -1337,11 +1365,11 @@ func _meta_pick(key: String) -> void:
 		MetaCatalog.set_origin(key)
 	queue_redraw()
 
-## Start a fresh run from the loadout screen (abandons any in-progress save).
+## The loadout screen's START goes through the creator (it owns the final
+## confirm + appearance), abandoning any in-progress save on actual start.
 func _start_run_from_meta() -> void:
 	_meta_screen = false
-	Save.clear()
-	_build()
+	_open_creator()
 
 ## Open the achievements gallery. Looking at your own trophies is, itself, an
 ## achievement (a hidden one).
@@ -2832,6 +2860,12 @@ func _smoke_tick() -> void:
 		255: _char_screen = true
 		270: _char_screen = false; _pause_screen = true
 		285: _pause_screen = false
+		288: _open_creator()
+		292:
+			_appearance = Appearance.cycle(_appearance, "hair", 1)
+			_appearance = Appearance.cycle(_appearance, "skin", 1)
+		296:
+			_creator_screen = false
 		300:
 			print("SMOKE OK")
 			get_tree().quit(0)
@@ -2942,6 +2976,9 @@ func _draw() -> void:
 ## zones are rebuilt here so they always match exactly what is on screen.
 func _draw_ui(c: CanvasItem) -> void:
 	_click_zones.clear()
+	if _creator_screen:
+		_draw_creator(c)
+		return
 	# Full-screen content menus own the whole screen — no toasts layered over them.
 	if _meta_screen:
 		_draw_meta_screen(c)
@@ -3279,9 +3316,15 @@ func _draw_wall_prop(r: Rect2, c: Vector2i, th: Dictionary) -> void:
 
 func _draw_player(e: CombatEntity, pos: Vector2, fade: float) -> void:
 	var col := COL_PLAYER; col.a = fade
-	draw_circle(pos, 16, Color(0.11, 0.20, 0.25, fade))
+	var ap: Dictionary = e.flags.get("appearance", {})
+	var suit: Color = Appearance.col(ap, "torso_col") if not ap.is_empty() else Color(0.23, 0.62, 0.72)
+	var skin: Color = Appearance.col(ap, "skin") if not ap.is_empty() else Color(0.85, 0.72, 0.62)
+	draw_circle(pos, 16, Color(suit.darkened(0.55), fade))
 	draw_arc(pos, 16, 0, TAU, 24, col, 2.0)
-	draw_circle(pos + Vector2(0, -3), 9, Color(0.23, 0.70, 0.82, fade))
+	draw_circle(pos + Vector2(0, -3), 9, Color(skin, fade))
+	if not ap.is_empty() and str(Appearance.opt(ap, "hair").get("kind", "bald")) != "bald":
+		draw_arc(pos + Vector2(0, -3), 8.4, PI, TAU, 16,
+			Color(Appearance.col(ap, "hair_col"), fade), 3.0)
 	draw_line(pos + Vector2(-11, 6), pos + Vector2(-18, -10), Color(COL_BRIGHT, fade), 3.0)
 	# HP bar under your own token (green→amber→red) so danger reads at a glance.
 	if e.max_hp > 0:
@@ -3382,7 +3425,7 @@ func _draw_title(c: CanvasItem) -> void:
 		if hov:
 			# soft glow bar + arrows flanking the hovered entry
 			c.draw_rect(Rect2(640 - lw / 2.0 - 70, y - 22, lw + 140, 32), Color(ac, 0.08))
-			c.draw_string(_font, Vector2(640 - lw / 2.0 - 42, y), "\u25b6",
+			c.draw_string(_font, Vector2(640 - lw / 2.0 - 42, y), ">",
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 17, ac)
 			c.draw_string(_font, Vector2(0, y + 1), label,
 				HORIZONTAL_ALIGNMENT_CENTER, 1280, 24, Color(ac, 0.45))
@@ -3982,7 +4025,7 @@ func _draw_meta_screen(c: CanvasItem) -> void:
 	c.draw_rect(start, Color(0.10, 0.20, 0.12, 0.96) if shot else Color(0.08, 0.13, 0.10, 0.9))
 	c.draw_rect(start, COL_GREEN, false, 2.0 if shot else 1.5)
 	c.draw_string(_font, Vector2(start.position.x + 16, start.position.y + 26),
-		"▶  ROZPOCZNIJ BIEG  [Enter]", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_GREEN)
+		">>  ROZPOCZNIJ BIEG  [Enter]", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_GREEN)
 	_zone(start, "meta_start")
 
 	# ── Scrollable two-column list of every catalog entry ──
@@ -4824,3 +4867,194 @@ func _draw_items_panel(c: CanvasItem, px: float, py: float, W: float, _H: float)
 	c.draw_string(_font, Vector2(px + 16, cy + 20),
 		"kliknij przedmiot = użyj · kliknij skrzynkę = otwórz · ([1–9] / Enter też działają)",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+
+
+# ── Character creator (pre-run): identity + looks ─────────────────────────────
+
+func _open_creator() -> void:
+	_appearance = Appearance.load_saved()
+	_creator_screen = true
+	_play("open")
+	queue_redraw()
+
+func _creator_begin_run() -> void:
+	Appearance.save(_appearance)
+	_creator_screen = false
+	Save.clear()
+	_build()
+
+func _draw_creator(c: CanvasItem) -> void:
+	var t := Time.get_ticks_msec() / 1000.0
+	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+	# the title's studio backdrop, minus the logo block
+	for i in 16:
+		c.draw_rect(Rect2(0, i * 12, 1280, 12),
+			Color(0.32, 0.12, 0.42, 0.06 * (1.0 - i / 16.0)))
+	var hor := 560.0
+	c.draw_rect(Rect2(0, hor - 6, 1280, 2), Color(COL_PURPLE, 0.18))
+	for k in 13:
+		var fx := (k - 6) / 6.0
+		c.draw_line(Vector2(640 + fx * 280.0, hor), Vector2(640 + fx * 1400.0, 720),
+			Color(COL_CYAN, 0.06), 1.0)
+	c.draw_string(_font, Vector2(0, 64), "REJESTRACJA UCZESTNIKA",
+		HORIZONTAL_ALIGNMENT_CENTER, 1280, 34, COL_CYAN)
+	c.draw_string(_font, Vector2(0, 92), "Kanał 7 kompletuje twój profil przed zjazdem",
+		HORIZONTAL_ALIGNMENT_CENTER, 1280, 14, COL_DIM)
+	if _pending_daily:
+		c.draw_string(_font, Vector2(0, 116), "— BIEG DNIA: cała galaktyka na tym samym torze —",
+			HORIZONTAL_ALIGNMENT_CENTER, 1280, 13, COL_PURPLE)
+
+	# Identity (left): owned species + origins; click to pick.
+	var lo := MetaCatalog.loadout()
+	var lp := Rect2(56, 130, 350, 540)
+	_panel(c, lp, COL_CYAN, "TOŻSAMOŚĆ")
+	var y := lp.position.y + 44.0
+	for sec in [["GATUNEK", "species", lo["species"], "cr_species"],
+			["POCHODZENIE", "origin", lo["origin"], "cr_origin"]]:
+		c.draw_string(_font, Vector2(lp.position.x + 16, y), str(sec[0]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER)
+		y += 10.0
+		for key in MetaCatalog.ORDER:
+			if MetaCatalog.kind_of(key) != str(sec[1]) or not MetaCatalog.is_owned(key):
+				continue
+			var rc := Rect2(lp.position.x + 12, y, lp.size.x - 24, 22)
+			var sel: bool = key == str(sec[2])
+			var hov := _hover(rc)
+			if sel or hov:
+				c.draw_rect(rc, Color(COL_CYAN, 0.16 if sel else 0.07))
+			if sel:
+				c.draw_string(_font, Vector2(rc.position.x + 6, y + 16), ">",
+					HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_CYAN)
+			c.draw_string(_font, Vector2(rc.position.x + 22, y + 16),
+				str(MetaCatalog.def_of(key).get("label", key)),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+				COL_BRIGHT if sel else (COL_CYAN if hov else COL_DIM))
+			if hov:
+				_cr_hover_desc = str(MetaCatalog.def_of(key).get("reward", ""))
+			_zone(rc, str(sec[3]), 0, key)
+			y += 24.0
+		y += 20.0
+	c.draw_string(_font, Vector2(lp.position.x + 16, lp.position.y + lp.size.y - 16),
+		"Nowe gatunki i pochodzenia kupisz za prestiż [M]",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(COL_DIM, 0.8))
+
+	# Looks (right): a stepper per slot, color slots get a swatch.
+	var rp := Rect2(874, 130, 350, 470)
+	_panel(c, rp, COL_GREEN, "WYGLĄD")
+	var ry := rp.position.y + 56.0
+	for slot in Appearance.SLOT_ORDER:
+		c.draw_string(_font, Vector2(rp.position.x + 16, ry - 8), str(Appearance.SLOT_LABELS[slot]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+		for pair in [[-1, "<", 16.0], [1, ">", rp.size.x - 44.0]]:
+			var ab := Rect2(rp.position.x + float(pair[2]), ry, 28, 24)
+			var ah := _hover(ab)
+			c.draw_rect(ab, Color(COL_GREEN, 0.22 if ah else 0.08))
+			c.draw_rect(ab, Color(COL_GREEN, 0.8 if ah else 0.3), false, 1.0)
+			c.draw_string(_font, Vector2(ab.position.x + 9, ab.position.y + 18), str(pair[1]),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_GREEN)
+			_zone(ab, "cr_cyc", int(pair[0]), slot)
+		var od := Appearance.opt(_appearance, slot)
+		c.draw_string(_font, Vector2(rp.position.x + 50, ry + 17), str(od.get("label", "?")),
+			HORIZONTAL_ALIGNMENT_CENTER, rp.size.x - 100, 14, COL_BRIGHT)
+		if od.has("col"):
+			var sw := Rect2(rp.position.x + rp.size.x - 78, ry + 4, 16, 16)
+			c.draw_rect(sw, od["col"])
+			c.draw_rect(sw, COL_GRID, false, 1.0)
+		ry += 50.0
+
+	# Live preview: the contestant on a neon pedestal, breathing.
+	var ped := Vector2(640, 532)
+	var pts := PackedVector2Array()
+	for i in 28:
+		var a := TAU * i / 28.0
+		pts.append(ped + Vector2(cos(a) * 78.0, sin(a) * 17.0))
+	c.draw_colored_polygon(pts, Color(COL_CYAN, 0.08))
+	pts.append(pts[0])
+	c.draw_polyline(pts, Color(COL_CYAN, 0.45), 1.5)
+	_draw_figure(c, Vector2(640, 524.0 + sin(t * 1.4) * 2.0), 6.0, _appearance)
+	c.draw_string(_font, Vector2(450, 568), str(MetaCatalog.def_of(lo["species"]).get("label", "?")),
+		HORIZONTAL_ALIGNMENT_CENTER, 380, 14, COL_CYAN)
+	# hovered identity reward, under the pedestal
+	if _cr_hover_desc != "":
+		var dl := _wrap_text(_cr_hover_desc, 380.0, 12)
+		for i in mini(dl.size(), 2):
+			c.draw_string(_font, Vector2(450, 596 + i * 16), str(dl[i]),
+				HORIZONTAL_ALIGNMENT_CENTER, 380, 12, COL_DIM)
+		_cr_hover_desc = ""
+
+	# Start + back.
+	var sb := Rect2(490, 636, 300, 46)
+	var sh := _hover(sb)
+	c.draw_rect(sb, Color(COL_GREEN, 0.25 if sh else 0.12))
+	c.draw_rect(sb, COL_GREEN if sh else Color(COL_GREEN, 0.5), false, 2.0)
+	c.draw_string(_font, Vector2(sb.position.x, sb.position.y + 30), ">>  ROZPOCZNIJ ZJAZD   [Enter]",
+		HORIZONTAL_ALIGNMENT_CENTER, sb.size.x, 17, COL_BRIGHT)
+	_zone(sb, "creator_start")
+	var bb := Rect2(56, 684, 180, 26)
+	c.draw_string(_font, Vector2(bb.position.x, bb.position.y + 18), "<  Wróć   [Esc]",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT if _hover(bb) else COL_DIM)
+	_zone(bb, "creator_back")
+
+## The procedural contestant figure. `base` = where the feet touch the ground,
+## `s` = scale (1.0 is roughly a 36 px figure). Reads ONLY the appearance dict,
+## so the creator preview and any future zoomed views stay in sync.
+func _draw_figure(c: CanvasItem, base: Vector2, s: float, ap: Dictionary) -> void:
+	var skin := Appearance.col(ap, "skin")
+	var hairc := Appearance.col(ap, "hair_col")
+	var suit := Appearance.col(ap, "torso_col")
+	var pants := Appearance.col(ap, "legs_col")
+	var tw: float = float(Appearance.opt(ap, "torso").get("w", 1.0))
+	var lwf: float = float(Appearance.opt(ap, "legs").get("w", 1.0))
+	var hk: String = str(Appearance.opt(ap, "hair").get("kind", "bald"))
+	var fk: String = str(Appearance.opt(ap, "feet").get("kind", "boots"))
+	var head_r := 5.0 * s
+	var torso_h := 13.0 * s
+	var leg_h := 12.0 * s
+	var torso_w := 9.0 * s * tw
+	var leg_w := 3.2 * s * lwf
+	var hip := base + Vector2(0, -leg_h)
+	var neck := hip + Vector2(0, -torso_h)
+	# legs + feet
+	for sgn in [-1.0, 1.0]:
+		var lx: float = float(sgn) * torso_w * 0.28
+		c.draw_line(hip + Vector2(lx, 0), base + Vector2(lx, 0), pants, leg_w)
+		match fk:
+			"boots":
+				c.draw_rect(Rect2(base.x + lx - 2.6 * s, base.y - 2.8 * s, 5.2 * s, 3.0 * s),
+					Color(0.20, 0.16, 0.14))
+			"sneakers":
+				c.draw_rect(Rect2(base.x + lx - 2.4 * s, base.y - 1.8 * s, 4.8 * s, 2.0 * s),
+					Color(0.85, 0.85, 0.90))
+			"sandals":
+				c.draw_rect(Rect2(base.x + lx - 2.2 * s, base.y - 1.0 * s, 4.4 * s, 1.2 * s),
+					Color(0.50, 0.36, 0.20))
+	# torso (a trapeze: shoulders wider than hips)
+	c.draw_colored_polygon(PackedVector2Array([
+		neck + Vector2(-torso_w / 2.0, 0), neck + Vector2(torso_w / 2.0, 0),
+		hip + Vector2(torso_w * 0.42, 0), hip + Vector2(-torso_w * 0.42, 0)]), suit)
+	# arms + hands
+	for sgn in [-1.0, 1.0]:
+		var ax: float = float(sgn) * (torso_w / 2.0 + 1.4 * s)
+		c.draw_line(neck + Vector2(float(sgn) * torso_w / 2.0, 1.5 * s),
+			neck + Vector2(ax, torso_h * 0.78), suit.darkened(0.18), 2.6 * s)
+		c.draw_circle(neck + Vector2(ax, torso_h * 0.78), 1.5 * s, skin)
+	# head + face
+	var hc := neck + Vector2(0, -head_r - 1.0 * s)
+	c.draw_circle(hc, head_r, skin)
+	c.draw_rect(Rect2(hc.x - head_r * 0.55, hc.y - 0.8 * s, head_r * 1.1, 1.6 * s),
+		Color(0.10, 0.12, 0.16, 0.9))
+	# hair
+	match hk:
+		"short":
+			c.draw_arc(hc, head_r * 0.98, PI, TAU, 12, hairc, 2.6 * s)
+		"mohawk":
+			c.draw_rect(Rect2(hc.x - 1.2 * s, hc.y - head_r - 2.6 * s, 2.4 * s, 3.4 * s), hairc)
+		"long":
+			c.draw_arc(hc, head_r * 0.98, PI, TAU, 12, hairc, 2.6 * s)
+			for sgn in [-1.0, 1.0]:
+				c.draw_line(hc + Vector2(float(sgn) * head_r * 0.9, 0),
+					hc + Vector2(float(sgn) * head_r * 0.95, head_r * 2.1), hairc, 1.8 * s)
+		"tail":
+			c.draw_arc(hc, head_r * 0.98, PI, TAU, 12, hairc, 2.6 * s)
+			c.draw_line(hc + Vector2(head_r * 0.7, -head_r * 0.4),
+				hc + Vector2(head_r * 1.3, head_r * 1.3), hairc, 1.6 * s)

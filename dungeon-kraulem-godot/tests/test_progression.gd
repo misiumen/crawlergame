@@ -445,5 +445,16 @@ func _initialize() -> void:
 	var prs := CombatSim.new(prb, {1: prp}, 1, 7)
 	_ck(prs.player().origin_trait == "preacher", "the sim sees the preacher trait")
 
+	# ── Character creator data (appearance) ───────────────────────────────────
+	var apd := Appearance.defaults()
+	_ck(apd.size() == Appearance.SLOT_ORDER.size(), "appearance defaults cover every slot")
+	var apc := Appearance.cycle(apd, "hair", -1)
+	_ck(int(apc["hair"]) == Appearance.HAIR.size() - 1, "appearance cycle wraps backwards")
+	_ck(int(Appearance.cycle(apc, "hair", 1)["hair"]) == 0, "appearance cycle wraps forwards")
+	Appearance.save(apc)
+	_ck(int(Appearance.load_saved()["hair"]) == Appearance.HAIR.size() - 1,
+		"appearance persists to disk")
+	Appearance.save(Appearance.defaults())   # leave a clean profile behind
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

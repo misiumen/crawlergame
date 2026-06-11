@@ -54,6 +54,7 @@ func _initialize() -> void:
 	floor.class_offered = true
 	floor.player.mana = 2
 	floor.player.origin_trait = "preacher"
+	floor.player.flags["appearance"] = {"skin": 2, "hair": 1}
 	floor.player.max_mana = 7
 	var a_box := GameBox.new("sponsor", "NovaChem", Rarity.RARE)
 	a_box.contents.append({"type": "material", "key": "złom", "qty": 3})
@@ -93,6 +94,8 @@ func _initialize() -> void:
 	_ck(int(p2.stats.get("CHA", 0)) == 4, "player stats restored")
 	_ck(p2.mana == 2 and p2.max_mana == 7, "mana restored (was silently reset before)")
 	_ck(p2.origin_trait == "preacher", "origin trait survives the checkpoint")
+	_ck(int((p2.flags.get("appearance", {}) as Dictionary).get("skin", -1)) == 2,
+		"appearance flag survives the checkpoint")
 	_ck(fl2.boxes.size() == 1, "unopened lootboxes survive a resume")
 	_ck((fl2.boxes[0] as GameBox).rarity == Rarity.RARE and (fl2.boxes[0] as GameBox).source_name == "NovaChem",
 		"box tier + sponsor restored")
