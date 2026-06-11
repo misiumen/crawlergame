@@ -199,6 +199,10 @@ func _player_attack(target: CombatEntity) -> Array:
 		p.next_attack_autohit = false
 	if autohit or _roll_hit(hit_bonus, _eff_ac(target)):
 		var base: int = rng.randi_range(1, 6) + 2 + p.bonus_damage + p.stat_mod("STR")  # muscle hits harder
+		if was_unaware:
+			# Sneak strike: pillars + line of sight pay off. +50% before multipliers.
+			base += maxi(2, base / 2)
+			evs.append({"type": "sneak", "target": target.id})
 		base += ClassFeatures.passive_bonus(p, "unarmed_dmg")   # bruiser/demoman fists
 		if p.next_attack_mult > 1:                               # bruiser charge (active)
 			base *= p.next_attack_mult

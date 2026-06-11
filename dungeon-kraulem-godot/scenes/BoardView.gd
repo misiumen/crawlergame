@@ -31,6 +31,7 @@ var _flash: Dictionary = {}
 var _dying: Dictionary = {}
 var _floaters: Array = []
 var _shake := 0.0
+var _zoom_punch := 0.0           # brief camera zoom on heavy hits
 var _font: Font
 var _log: Array = []
 var _hint := ""
@@ -2328,6 +2329,9 @@ func _animate(evs: Array) -> void:
 		match e.get("type"):
 			"move":
 				_vtarget[e["id"]] = _cell_px(e["to"])
+				if int(e["id"]) == sim.player_id:
+					_spawn_parts(_vpos.get(sim.player_id, _cell_px(e["to"])) + Vector2(0, 12),
+						2, Color(0.45, 0.48, 0.52), 16.0, -20.0, 0.45, 1.6)
 			"attack":
 				# the attacker darts toward its victim — combat reads as motion
 				var aid: int = int(e.get("attacker", -1))
@@ -2343,6 +2347,8 @@ func _animate(evs: Array) -> void:
 				var col: Color = COL_CYAN if e.get("dmg_type") == "electric" else COL_RED
 				_add_floater(tid, "-%d" % e["amount"], col)
 				_play("crit" if int(e["amount"]) >= 12 else "hit")
+				if int(e["amount"]) >= 12:
+					_zoom_punch = maxf(_zoom_punch, 0.045)   # the camera leans in
 				if tid == sim.player_id and floor.player.hp <= floor.player.max_hp / 4:
 					_hint_once("low_hp",
 						"Mało zdrowia! Warsztat [I] → PRZEDMIOTY i użyj apteczki, albo wycofaj się do innego pokoju.")
@@ -2396,6 +2402,9 @@ func _animate(evs: Array) -> void:
 			"pounce":
 				_add_floater(int(e["id"]), "SKOK!", COL_AMBER)
 				_play("pounce")
+			"sneak":
+				_add_floater(int(e["target"]), "Z ZASKOCZENIA!", COL_CYAN)
+				_log_push("Cios z zaskoczenia — śpiący przeciwnik nie zdążył się zasłonić.")
 			"phase":
 				_add_floater(int(e["id"]), "PRZENIKA", COL_DIM)
 				_play("phase")
@@ -2798,6 +2807,8 @@ func _process(dt: float) -> void:
 	if _cam != null:
 		_cam.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) \
 			if _shake > 0.0 else Vector2.ZERO
+		_zoom_punch = maxf(_zoom_punch - dt * 0.35, 0.0)
+		_cam.zoom = Vector2.ONE * (1.0 + _zoom_punch)
 	# Particles: integrate, gravity, cull.
 	for pt in _parts:
 		pt.life = float(pt.life) - dt
@@ -2942,20 +2953,41 @@ func _draw() -> void:
 			var c := Vector2i(x, y)
 			var r := Rect2(_origin + Vector2(x * TILE, y * TILE), Vector2(TILE - 1, TILE - 1))
 			if b.is_wall(c):
-				draw_rect(r, th.wall)
+				# 2.5D block: a lit top face over a darker front face.
+				var topf := Rect2(r.position, Vector2(TILE - 1, TILE * 0.42))
+				var front := Rect2(r.position + Vector2(0, TILE * 0.42),
+					Vector2(TILE - 1, TILE * 0.58))
+				draw_rect(topf, Color(th.wall).lightened(0.16))
+				draw_rect(front, Color(th.wall).darkened(0.18))
 				draw_line(r.position, r.position + Vector2(TILE - 1, 0), th.wall_hi, 1.0)
+				draw_line(topf.position + Vector2(0, topf.size.y),
+					topf.position + Vector2(TILE - 1, topf.size.y),
+					Color(0, 0, 0, 0.35), 1.0)
 				_draw_wall_prop(r, c, th)
 				continue
 			draw_rect(r, th.floor_b if (x + y) % 2 == 0 else th.floor_a)
 			draw_rect(r, th.grid, false, 1.0)
+			# walls cast a soft shadow onto the floor under them
+			if y > 0 and b.is_wall(Vector2i(x, y - 1)):
+				draw_rect(Rect2(r.position, Vector2(TILE - 1, 9)), Color(0, 0, 0, 0.26))
 			_draw_floor_pattern(r, c, th)
 			_draw_floor_prop(r, c, th)
+			var tnow := Time.get_ticks_msec() / 1000.0
 			match b.hazard_at(c):
-				"water": draw_rect(Rect2(r.position + Vector2(3, 3), Vector2(TILE - 7, TILE - 7)), COL_WATER)
+				"water":
+					draw_rect(Rect2(r.position + Vector2(3, 3), Vector2(TILE - 7, TILE - 7)), COL_WATER)
+					# shimmer: two drifting highlight dashes
+					for sh in 2:
+						var sx := fmod(tnow * 14.0 + sh * 21.0 + float(_chash(x, y) % 17), TILE - 16.0)
+						draw_line(r.position + Vector2(6 + sx, 12 + sh * 16),
+							r.position + Vector2(14 + sx, 12 + sh * 16),
+							Color(0.45, 0.75, 0.85, 0.35), 1.5)
 				"wire":  _draw_glyph("|", c, COL_WIRE)
 				"gas":   _draw_glyph("G", c, COL_GAS)
 				"fire":
-					draw_rect(Rect2(r.position + Vector2(4, 4), Vector2(TILE - 9, TILE - 9)), Color(0.55, 0.18, 0.06, 0.6))
+					var fpulse := 0.5 + 0.18 * sin(tnow * 5.0 + float(_chash(x, y) % 7))
+					draw_rect(Rect2(r.position + Vector2(4, 4), Vector2(TILE - 9, TILE - 9)),
+						Color(0.55, 0.18, 0.06, fpulse))
 					_draw_glyph("^", c, COL_RED)
 	_draw_exits()
 	var p := sim.player()
@@ -2979,6 +3011,11 @@ func _draw() -> void:
 			pos.y += sin(Time.get_ticks_msec() * 0.025 + id * 1.7) * 2.0
 		var fade: float = _dying.get(id, 1.0)
 		var flashing := _flash.has(id)
+		# every actor stands ON the floor: a soft contact shadow
+		_draw_ellipse(pos + Vector2(0, 15), 11, 4, Color(0, 0, 0, 0.30 * fade))
+		# idle breathing keeps the room alive
+		if e.faction == "enemy" and e.is_alive():
+			pos.y += sin(Time.get_ticks_msec() * 0.002 + id * 1.3) * 1.4
 		if e.faction == "player":      _draw_player(e, pos, fade)
 		elif e.faction == "safehouse": _draw_safehouse_token(pos, fade)
 		elif e.faction == "crawler":   _draw_crawler_token(pos, fade)
@@ -3360,16 +3397,10 @@ func _draw_wall_prop(r: Rect2, c: Vector2i, th: Dictionary) -> void:
 			draw_rect(Rect2(r.position + Vector2(16, 13), Vector2(TILE - 33, 8)), Color(col2, 0.7))
 
 func _draw_player(e: CombatEntity, pos: Vector2, fade: float) -> void:
-	var col := COL_PLAYER; col.a = fade
 	var ap: Dictionary = e.flags.get("appearance", {})
-	var suit: Color = Appearance.col(ap, "torso_col") if not ap.is_empty() else Color(0.23, 0.62, 0.72)
-	var skin: Color = Appearance.col(ap, "skin") if not ap.is_empty() else Color(0.85, 0.72, 0.62)
-	draw_circle(pos, 16, Color(suit.darkened(0.55), fade))
-	draw_arc(pos, 16, 0, TAU, 24, col, 2.0)
-	draw_circle(pos + Vector2(0, -3), 9, Color(skin, fade))
-	if not ap.is_empty() and str(Appearance.opt(ap, "hair").get("kind", "bald")) != "bald":
-		draw_arc(pos + Vector2(0, -3), 8.4, PI, TAU, 16,
-			Color(Appearance.col(ap, "hair_col"), fade), 3.0)
+	# identity glow, then the actual created character walking the board
+	draw_circle(pos + Vector2(0, 2), 17.0, Color(COL_PLAYER, 0.10 * fade))
+	_draw_figure(self, pos + Vector2(0, 16), 0.88, ap)
 	draw_line(pos + Vector2(-11, 6), pos + Vector2(-18, -10), Color(COL_BRIGHT, fade), 3.0)
 	# HP bar under your own token (green→amber→red) so danger reads at a glance.
 	if e.max_hp > 0:
@@ -3677,11 +3708,19 @@ func _draw_exits() -> void:
 	if floor == null: return
 	for cell in floor.rooms[floor.current]["exits"]:
 		var ex: Dictionary = floor.rooms[floor.current]["exits"][cell]
+		var ctr := _cell_px(cell)
 		if ex.get("descend", false):
-			draw_rect(Rect2(_cell_px(cell) - Vector2(TILE/2.0-3, TILE/2.0-3), Vector2(TILE-7,TILE-7)),
+			var tb := Time.get_ticks_msec() / 1000.0
+			draw_rect(Rect2(ctr - Vector2(TILE/2.0-3, TILE/2.0-3), Vector2(TILE-7,TILE-7)),
 				Color(COL_GREEN, 0.18))
+			# beacon: expanding rings draw the eye to the goal
+			var ring := fmod(tb * 0.8, 1.0)
+			draw_arc(ctr, 8.0 + ring * 16.0, 0, TAU, 24, Color(COL_GREEN, 0.5 * (1.0 - ring)), 1.5)
 			_draw_glyph(">", cell, COL_GREEN)
 		else:
+			# a framed doorway, not a bare plus
+			draw_rect(Rect2(ctr - Vector2(TILE/2.0-4, TILE/2.0-4), Vector2(TILE-9, TILE-9)),
+				Color(COL_AMBER, 0.5), false, 1.5)
 			_draw_glyph("+", cell, COL_AMBER)
 
 func _draw_minimap(c: CanvasItem) -> void:
@@ -3718,6 +3757,13 @@ func _draw_ellipse(center: Vector2, rx: float, ry: float, col: Color) -> void:
 		pts.append(center + Vector2(cos(a) * rx, sin(a) * ry))
 	draw_colored_polygon(pts, col)
 
+func _intent_pill(pos: Vector2, txt: String, col: Color) -> void:
+	var w: float = _font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 10.0
+	draw_rect(Rect2(pos.x - w / 2.0, pos.y - 10, w, 14), Color(0.03, 0.045, 0.06, 0.88))
+	draw_rect(Rect2(pos.x - w / 2.0, pos.y - 10, w, 14), Color(col, 0.45), false, 1.0)
+	draw_string(_font, Vector2(pos.x - w / 2.0 + 5, pos.y + 1), txt,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+
 func _draw_intent() -> void:
 	var p := sim.player()
 	for id in sim.entities:
@@ -3725,18 +3771,17 @@ func _draw_intent() -> void:
 		if e.faction != "enemy" or not e.is_alive(): continue
 		var ep: Vector2 = _vpos.get(id, _cell_px(e.cell))
 		if not e.aware:
-			draw_string(_font, ep + Vector2(-10, -20), "Zzz",
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
+			_intent_pill(ep + Vector2(0, -24), "śpi", COL_DIM)
 			continue
 		if sim.board.is_adjacent(e.cell, p.cell):
-			draw_string(_font, ep + Vector2(-16, -20), "ugryzie",
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_RED)
+			_intent_pill(ep + Vector2(0, -24), "atak!", COL_RED)
 		else:
+			# only the NEXT step glows — no spaghetti of red lines
 			var step: Vector2i = e.cell + Vector2i(signi(p.cell.x-e.cell.x), signi(p.cell.y-e.cell.y))
 			var sp := _cell_px(step)
 			draw_rect(Rect2(sp - Vector2(TILE/2.0-2, TILE/2.0-2), Vector2(TILE-5,TILE-5)),
-				Color(COL_RED, 0.16))
-			draw_line(ep, sp, Color(COL_RED, 0.7), 2.0)
+				Color(COL_RED, 0.10))
+			draw_circle(ep + Vector2(0, -22), 2.5, Color(COL_RED, 0.85))
 
 func _draw_preview() -> void:
 	var p := sim.player()
@@ -3895,8 +3940,7 @@ func _draw_hud(c: CanvasItem) -> void:
 	var lw := 1280 - lx - 24
 	c.draw_rect(Rect2(lx, 110, lw, 360), Color(0.08, 0.10, 0.13, 0.9))
 	c.draw_rect(Rect2(lx, 110, lw, 360), COL_GRID, false, 1.0)
-	c.draw_string(_font, Vector2(lx + 12, 132), "DZIENNIK",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
+	_draw_tracked(c, Vector2(lx + 12, 132), "DZIENNIK", 13, COL_CYAN, 2.0)
 	var disp: Array = []
 	for i in _log.size():
 		disp += _wrap_text(_log[i], lw - 24, 14)

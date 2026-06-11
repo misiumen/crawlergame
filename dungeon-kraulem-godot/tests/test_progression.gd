@@ -445,6 +445,27 @@ func _initialize() -> void:
 	var prs := CombatSim.new(prb, {1: prp}, 1, 7)
 	_ck(prs.player().origin_trait == "preacher", "the sim sees the preacher trait")
 
+	# ── Sneak strike: an unaware target eats bonus damage ─────────────────────
+	var snb := Board.new(4, 4)
+	var snp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); snp.faction = "player"
+	snp.cell = Vector2i(1, 1); snb.place(1, snp.cell)
+	var snf := CombatEntity.new(2, "Strażnik", 200, 1, ["humanoid"]); snf.faction = "enemy"
+	snf.aware = false; snf.cell = Vector2i(2, 1); snb.place(2, snf.cell)
+	var sns := CombatSim.new(snb, {1: snp, 2: snf}, 1, 11)
+	var sn_evs: Array = sns._player_attack(snf)
+	var sn_found := false
+	for ev in sn_evs:
+		if str(ev.get("type", "")) == "sneak":
+			sn_found = true
+	_ck(sn_found, "attacking a sleeping enemy is a sneak strike")
+	_ck(snf.aware, "the sneak strike wakes the target")
+	var sn_evs2: Array = sns._player_attack(snf)
+	var sn_again := false
+	for ev in sn_evs2:
+		if str(ev.get("type", "")) == "sneak":
+			sn_again = true
+	_ck(not sn_again, "an aware enemy can't be sneak-struck")
+
 	# ── Character creator data (appearance) ───────────────────────────────────
 	var apd := Appearance.defaults()
 	_ck(apd.size() == Appearance.SLOT_ORDER.size(), "appearance defaults cover every slot")
