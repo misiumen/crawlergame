@@ -2,7 +2,10 @@ extends Node2D
 ## Playable tactical board: renders the sim, takes one-key input, animates
 ## events, and draws the crafting bench + inventory panel.
 
-const TILE := 48
+const TILE := 48                 # legacy logical size (font/glyph metrics)
+const ISO_W := 64                # iso diamond width
+const ISO_H := 32                # iso diamond height (2:1)
+const WALL_H := 34               # wall prism height
 const VERSION := "1.0"           # shown on the title screen; bump per release
 const COL_BG      := Color("0b0d12")
 const COL_FLOOR   := Color("161a23")
@@ -32,6 +35,7 @@ var _dying: Dictionary = {}
 var _floaters: Array = []
 var _shake := 0.0
 var _zoom_punch := 0.0           # brief camera zoom on heavy hits
+var _fit_zoom := 1.0             # camera zoom fitted to the stage size
 var _font: Font
 var _log: Array = []
 var _hint := ""
@@ -361,13 +365,18 @@ func _attach_bodies() -> void:
 			e.attach_body(full)
 
 func _recenter() -> void:
-	# The board sits at world origin; the camera frames it centred in the playfield
-	# (the area left of the fixed log panel at x=830 → playfield centre ≈ 415).
-	_origin = Vector2.ZERO
+	# Iso stage: shift the origin right by the board height so the westernmost
+	# corner (0, h-1) keeps positive x; frame the camera on the stage center,
+	# left of the fixed log panel (playfield center ≈ 415).
+	_origin = Vector2(sim.board.h * ISO_W * 0.5 + ISO_W * 0.5, ISO_H * 1.5 + WALL_H)
 	if _cam != null:
-		var bw: int = sim.board.w * TILE
-		var bh: int = sim.board.h * TILE
-		_cam.position = Vector2(bw / 2.0 + (640.0 - 415.0), bh / 2.0 - 10.0)
+		var center := (_cell_px(Vector2i.ZERO)
+			+ _cell_px(Vector2i(sim.board.w - 1, sim.board.h - 1))) * 0.5
+		# fill the playfield (left of the log panel): zoom to fit the stage
+		var ww := (sim.board.w + sim.board.h) * ISO_W * 0.5 + 80.0
+		var wh := (sim.board.w + sim.board.h) * ISO_H * 0.5 + WALL_H + 120.0
+		_fit_zoom = clampf(minf(780.0 / ww, 560.0 / wh), 0.8, 1.5)
+		_cam.position = center + Vector2((640.0 - 415.0) / _fit_zoom, -10.0)
 		_cam.reset_smoothing()
 
 func _reset_visuals() -> void:
@@ -405,7 +414,8 @@ func _check_transition() -> void:
 	_log_push("Przechodzisz do: %s." % r.get("name", "?"))
 
 func _cell_px(c: Vector2i) -> Vector2:
-	return _origin + Vector2(c.x * TILE + TILE / 2.0, c.y * TILE + TILE / 2.0)
+	# 2:1 isometric: screen pos of the cell's floor-diamond CENTER.
+	return _origin + Vector2((c.x - c.y) * (ISO_W / 2.0), (c.x + c.y) * (ISO_H / 2.0))
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 
@@ -738,8 +748,11 @@ func _can_take_board_input() -> bool:
 
 ## Mouse -> board cell, through the camera (the board lives in world space now).
 func _cell_from_mouse(_pos: Vector2) -> Vector2i:
+	# inverse iso: round to the nearest diamond center
 	var local := get_global_mouse_position() - _origin
-	return Vector2i(int(floor(local.x / TILE)), int(floor(local.y / TILE)))
+	var u := local.y / (ISO_H / 2.0)
+	var v := local.x / (ISO_W / 2.0)
+	return Vector2i(int(round((u + v) / 2.0)), int(round((u - v) / 2.0)))
 
 ## LMB on the board is fully contextual: an adjacent enemy → attack (honoring the
 ## aimed zone), an adjacent NPC → talk, an adjacent salvageable object → dismantle,
@@ -2808,7 +2821,7 @@ func _process(dt: float) -> void:
 		_cam.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) \
 			if _shake > 0.0 else Vector2.ZERO
 		_zoom_punch = maxf(_zoom_punch - dt * 0.35, 0.0)
-		_cam.zoom = Vector2.ONE * (1.0 + _zoom_punch)
+		_cam.zoom = Vector2.ONE * _fit_zoom * (1.0 + _zoom_punch)
 	# Particles: integrate, gravity, cull.
 	for pt in _parts:
 		pt.life = float(pt.life) - dt
@@ -2946,83 +2959,86 @@ func _draw() -> void:
 		return   # a full-screen menu owns the frame; the UI layer paints it
 	var b: Board = sim.board
 	var th := BiomeThemes.theme_for(floor.biome if floor != null else "")
-	# Biome signature frame around the arena.
-	draw_rect(Rect2(-4, -4, b.w * TILE + 7, b.h * TILE + 7), Color(th.accent, 0.55), false, 2.0)
+	var tnow := Time.get_ticks_msec() / 1000.0
+	# ── Pass 1: floor diamonds (they never overlap, order is free) ────────────
 	for y in b.h:
 		for x in b.w:
 			var c := Vector2i(x, y)
-			var r := Rect2(_origin + Vector2(x * TILE, y * TILE), Vector2(TILE - 1, TILE - 1))
 			if b.is_wall(c):
-				# 2.5D block: a lit top face over a darker front face.
-				var topf := Rect2(r.position, Vector2(TILE - 1, TILE * 0.42))
-				var front := Rect2(r.position + Vector2(0, TILE * 0.42),
-					Vector2(TILE - 1, TILE * 0.58))
-				draw_rect(topf, Color(th.wall).lightened(0.16))
-				draw_rect(front, Color(th.wall).darkened(0.18))
-				draw_line(r.position, r.position + Vector2(TILE - 1, 0), th.wall_hi, 1.0)
-				draw_line(topf.position + Vector2(0, topf.size.y),
-					topf.position + Vector2(TILE - 1, topf.size.y),
-					Color(0, 0, 0, 0.35), 1.0)
-				_draw_wall_prop(r, c, th)
 				continue
-			draw_rect(r, th.floor_b if (x + y) % 2 == 0 else th.floor_a)
-			draw_rect(r, th.grid, false, 1.0)
-			# walls cast a soft shadow onto the floor under them
+			var ctr := _cell_px(c)
+			var base: Color = th.floor_b if (x + y) % 2 == 0 else th.floor_a
+			base = base.lightened(float(_chash(x, y) % 9) / 9.0 * 0.05)
+			draw_colored_polygon(_diamond(ctr, 0.0), base)
+			# AO where a wall stands behind the tile (NW/NE edges)
 			if y > 0 and b.is_wall(Vector2i(x, y - 1)):
-				draw_rect(Rect2(r.position, Vector2(TILE - 1, 9)), Color(0, 0, 0, 0.26))
-			_draw_floor_pattern(r, c, th)
-			_draw_floor_prop(r, c, th)
-			var tnow := Time.get_ticks_msec() / 1000.0
-			match b.hazard_at(c):
-				"water":
-					draw_rect(Rect2(r.position + Vector2(3, 3), Vector2(TILE - 7, TILE - 7)), COL_WATER)
-					# shimmer: two drifting highlight dashes
-					for sh in 2:
-						var sx := fmod(tnow * 14.0 + sh * 21.0 + float(_chash(x, y) % 17), TILE - 16.0)
-						draw_line(r.position + Vector2(6 + sx, 12 + sh * 16),
-							r.position + Vector2(14 + sx, 12 + sh * 16),
-							Color(0.45, 0.75, 0.85, 0.35), 1.5)
-				"wire":  _draw_glyph("|", c, COL_WIRE)
-				"gas":   _draw_glyph("G", c, COL_GAS)
-				"fire":
-					var fpulse := 0.5 + 0.18 * sin(tnow * 5.0 + float(_chash(x, y) % 7))
-					draw_rect(Rect2(r.position + Vector2(4, 4), Vector2(TILE - 9, TILE - 9)),
-						Color(0.55, 0.18, 0.06, fpulse))
-					_draw_glyph("^", c, COL_RED)
+				draw_colored_polygon(PackedVector2Array([ctr + Vector2(0, -ISO_H / 2.0),
+					ctr + Vector2(ISO_W / 2.0, 0), ctr + Vector2(ISO_W * 0.22, ISO_H * 0.10)]),
+					Color(0, 0, 0, 0.22))
+			if x > 0 and b.is_wall(Vector2i(x - 1, y)):
+				draw_colored_polygon(PackedVector2Array([ctr + Vector2(0, -ISO_H / 2.0),
+					ctr + Vector2(-ISO_W / 2.0, 0), ctr + Vector2(-ISO_W * 0.22, ISO_H * 0.10)]),
+					Color(0, 0, 0, 0.22))
+			draw_polyline(_diamond_closed(ctr, 0.0), Color(th.grid, 0.30), 1.0)
+			_draw_iso_pattern(ctr, c, th)
+			_draw_floor_prop(Rect2(ctr - Vector2(TILE / 2.0, TILE * 0.72), Vector2(TILE, TILE)), c, th)
+			_draw_iso_hazard(ctr, c, b, tnow)
 	_draw_exits()
 	var p := sim.player()
 	for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN,
 			Vector2i(1,1), Vector2i(-1,1), Vector2i(1,-1), Vector2i(-1,-1)]:
 		if b.is_free(p.cell + d):
-			draw_circle(_cell_px(p.cell + d), 3.0, Color(0.29, 0.38, 0.47))
-	_draw_intent()
+			draw_polyline(_diamond_closed(_cell_px(p.cell + d), 8.0), Color(COL_PLAYER, 0.30), 1.0)
 	_draw_preview()
+	# ── Pass 2: solids, far to near (screen y IS depth in 2:1 iso) ────────────
+	var order: Array = []
+	for y in b.h:
+		for x in b.w:
+			var wc := Vector2i(x, y)
+			if b.is_wall(wc):
+				order.append({"y": _cell_px(wc).y, "kind": "wall", "cell": wc})
+	var psum: int = p.cell.x + p.cell.y
+	var ppx: Vector2 = _vpos.get(sim.player_id, _cell_px(p.cell))
 	for id in sim.entities:
 		var e: CombatEntity = sim.entities[id]
 		if not e.is_alive() and not _dying.has(id):
 			continue
 		var pos: Vector2 = _vpos.get(id, _cell_px(e.cell))
-		# Attack lunge: a quick dart toward the victim, decaying in _process.
 		if _lunge.has(id):
 			var lg: Dictionary = _lunge[id]
 			pos += (lg.dir as Vector2) * 12.0 * (float(lg.t) / 0.18)
-		# Movement bob: a light step rhythm while gliding between cells.
 		elif pos.distance_to(_vtarget.get(id, pos)) > 2.0:
 			pos.y += sin(Time.get_ticks_msec() * 0.025 + id * 1.7) * 2.0
-		var fade: float = _dying.get(id, 1.0)
-		var flashing := _flash.has(id)
-		# every actor stands ON the floor: a soft contact shadow
-		_draw_ellipse(pos + Vector2(0, 15), 11, 4, Color(0, 0, 0, 0.30 * fade))
-		# idle breathing keeps the room alive
-		if e.faction == "enemy" and e.is_alive():
-			pos.y += sin(Time.get_ticks_msec() * 0.002 + id * 1.3) * 1.4
-		if e.faction == "player":      _draw_player(e, pos, fade)
-		elif e.faction == "safehouse": _draw_safehouse_token(pos, fade)
-		elif e.faction == "crawler":   _draw_crawler_token(pos, fade)
-		elif e.faction == "ally":      _draw_ally(e, pos, fade)
-		elif e.faction == "object":    _draw_object(e, pos, fade)
-		elif e.faction == "npc":       _draw_npc(pos, fade)
-		else:                          _draw_enemy(e, pos, fade, flashing)
+		order.append({"y": pos.y + 2.0, "kind": "ent", "e": e, "pos": pos, "id": id})
+	order.sort_custom(func(aa, bb): return float(aa["y"]) < float(bb["y"]))
+	for it in order:
+		if it["kind"] == "wall":
+			var wc2: Vector2i = it["cell"]
+			var alpha := 1.0
+			# set pieces never hide the star of the show
+			if wc2.x + wc2.y > psum and wc2.x + wc2.y - psum <= 3 \
+					and absf(_cell_px(wc2).x - ppx.x) < ISO_W * 1.2:
+				alpha = 0.42
+			_draw_wall_prism(_cell_px(wc2), wc2, th, alpha)
+		else:
+			var e3: CombatEntity = it["e"]
+			var pos3: Vector2 = it["pos"]
+			var id3: int = it["id"]
+			var fade: float = _dying.get(id3, 1.0)
+			var flashing := _flash.has(id3)
+			_draw_ellipse(pos3 + Vector2(0, 7), 12, 4.5, Color(0, 0, 0, 0.32 * fade))
+			if e3.faction == "enemy" and e3.is_alive():
+				pos3.y += sin(Time.get_ticks_msec() * 0.002 + id3 * 1.3) * 1.4
+			var apos := pos3 + Vector2(0, -8)   # actors STAND on the diamond
+			if e3.faction == "player":      _draw_player(e3, pos3, fade)
+			elif e3.faction == "safehouse": _draw_safehouse_token(apos, fade)
+			elif e3.faction == "crawler":   _draw_crawler_token(apos, fade)
+			elif e3.faction == "ally":      _draw_ally(e3, apos, fade)
+			elif e3.faction == "object":    _draw_object(e3, apos, fade)
+			elif e3.faction == "npc":       _draw_npc(apos, fade)
+			else:                           _draw_enemy(e3, apos, fade, flashing)
+	_draw_intent()
+	_draw_drone(ppx, tnow)
 	# Particles ride above entities.
 	for pt in _parts:
 		var pa: float = clampf(float(pt.life) / float(pt.ttl), 0.0, 1.0)
@@ -3259,46 +3275,6 @@ func _chash(cx: int, cy: int) -> int:
 	h = (h ^ (h >> 13)) * 1274126177
 	return absi(h ^ (h >> 16))
 
-## Floor motif: a per-biome texture stamped on cells (cheap primitives).
-func _draw_floor_pattern(r: Rect2, c: Vector2i, th: Dictionary) -> void:
-	var h := _chash(c.x, c.y)
-	var col: Color = th.pattern_col
-	match th.pattern:
-		"tiles":
-			draw_rect(r.grow(-8), col, false, 1.0)
-		"planks":
-			draw_line(r.position + Vector2(0, TILE / 3.0), r.position + Vector2(TILE - 1, TILE / 3.0), col, 1.0)
-			draw_line(r.position + Vector2(0, TILE * 2 / 3.0), r.position + Vector2(TILE - 1, TILE * 2 / 3.0), col, 1.0)
-			if h % 3 == 0:
-				draw_line(r.position + Vector2(TILE * 0.5, TILE / 3.0), r.position + Vector2(TILE * 0.5, TILE * 2 / 3.0), col, 1.0)
-		"hatch":
-			draw_line(r.position + Vector2(2, TILE - 4), r.position + Vector2(TILE - 4, 2), col, 1.0)
-			if h % 2 == 0:
-				draw_line(r.position + Vector2(2, TILE * 0.5), r.position + Vector2(TILE * 0.5, 2), col, 1.0)
-		"rubble":
-			if h % 10 < 3:
-				var p1 := r.position + Vector2(6 + h % 24, 8 + (h / 7) % 24)
-				draw_colored_polygon(PackedVector2Array([p1, p1 + Vector2(7, 2), p1 + Vector2(3, 7)]), col)
-			if h % 7 == 0:
-				draw_circle(r.position + Vector2(10 + (h / 3) % 26, 30), 2.0, col)
-		"cracks":
-			if h % 10 < 4:
-				var a := r.position + Vector2(4 + h % 12, 4 + (h / 5) % 14)
-				var m := a + Vector2(10 + h % 8, 8 + (h / 11) % 10)
-				var z := m + Vector2(8 - (h % 16), 10)
-				draw_polyline(PackedVector2Array([a, m, z]), col, 1.6)
-		"dots":
-			if h % 10 < 4:
-				for k in 3:
-					var dh := _chash(c.x * 5 + k, c.y * 3 + k)
-					draw_circle(r.position + Vector2(5 + dh % 38, 5 + (dh / 9) % 38), 1.4, col)
-		"stripes":
-			if (c.x + c.y) % 2 == 0:
-				draw_line(r.position + Vector2(0, TILE - 2), r.position + Vector2(TILE - 2, 0), col, 5.0)
-		"puddles":
-			if h % 10 < 2:
-				_draw_ellipse(r.position + Vector2(TILE * 0.5, TILE * 0.6), 12, 6, col)
-
 ## Scattered floor props — the biome's furniture (drawn under entities).
 func _draw_floor_prop(r: Rect2, c: Vector2i, th: Dictionary) -> void:
 	var props: Array = th.props
@@ -3367,47 +3343,18 @@ func _draw_floor_prop(r: Rect2, c: Vector2i, th: Dictionary) -> void:
 			draw_circle(ctr + Vector2(-5, 3), 1.8, col)
 			draw_circle(ctr + Vector2(5, -3), 1.8, col)
 
-## Wall décor — frames, pipes, neon, cage bars, posters.
-func _draw_wall_prop(r: Rect2, c: Vector2i, th: Dictionary) -> void:
-	var props: Array = th.wall_props
-	if props.is_empty():
-		return
-	var h := _chash(c.x * 29, c.y * 23)
-	var pick: Dictionary = props[h % props.size()]
-	if h % 100 >= int(pick.chance):
-		return
-	var col: Color = pick.col
-	var col2: Color = pick.get("col2", col)
-	match pick.kind:
-		"frame":
-			draw_rect(Rect2(r.position + Vector2(10, 10), Vector2(TILE - 21, TILE - 24)), col, false, 2.0)
-			draw_rect(Rect2(r.position + Vector2(15, 15), Vector2(TILE - 31, TILE - 34)), Color(col, 0.35))
-		"pipe":
-			draw_line(r.position + Vector2(0, 14), r.position + Vector2(TILE - 1, 14), col, 3.0)
-			draw_circle(r.position + Vector2(TILE * 0.5, 14), 3.0, col)
-		"neon":
-			draw_rect(Rect2(r.position + Vector2(4, TILE - 10), Vector2(TILE - 9, 4)), col)
-			draw_rect(Rect2(r.position + Vector2(4, TILE - 14), Vector2(TILE - 9, 10)), Color(col2, 0.18))
-		"bars":
-			for k in 3:
-				var bx := r.position.x + 10 + k * 12
-				draw_line(Vector2(bx, r.position.y + 8), Vector2(bx, r.position.y + TILE - 9), col, 2.0)
-		"poster":
-			draw_rect(Rect2(r.position + Vector2(12, 9), Vector2(TILE - 25, TILE - 19)), col)
-			draw_rect(Rect2(r.position + Vector2(16, 13), Vector2(TILE - 33, 8)), Color(col2, 0.7))
-
 func _draw_player(e: CombatEntity, pos: Vector2, fade: float) -> void:
 	var ap: Dictionary = e.flags.get("appearance", {})
 	# identity glow, then the actual created character walking the board
-	draw_circle(pos + Vector2(0, 2), 17.0, Color(COL_PLAYER, 0.10 * fade))
-	_draw_figure(self, pos + Vector2(0, 16), 0.88, ap)
+	draw_circle(pos + Vector2(0, -12), 16.0, Color(COL_PLAYER, 0.10 * fade))
+	_draw_figure(self, pos + Vector2(0, 8), 0.88, ap)
 	draw_line(pos + Vector2(-11, 6), pos + Vector2(-18, -10), Color(COL_BRIGHT, fade), 3.0)
 	# HP bar under your own token (green→amber→red) so danger reads at a glance.
 	if e.max_hp > 0:
 		var frac: float = clampf(float(e.hp) / float(e.max_hp), 0.0, 1.0)
 		var hpc := COL_GREEN if frac > 0.5 else (COL_AMBER if frac > 0.25 else COL_RED)
-		draw_rect(Rect2(pos.x - 17, pos.y + 18, 34, 5), Color(0.1, 0.1, 0.1, fade))
-		draw_rect(Rect2(pos.x - 17, pos.y + 18, 34 * frac, 5), Color(hpc, fade))
+		draw_rect(Rect2(pos.x - 17, pos.y + 12, 34, 5), Color(0.1, 0.1, 0.1, fade))
+		draw_rect(Rect2(pos.x - 17, pos.y + 12, 34 * frac, 5), Color(hpc, fade))
 
 func _draw_title(c: CanvasItem) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
@@ -3706,21 +3653,22 @@ func _draw_enemy(e: CombatEntity, pos: Vector2, fade: float, flashing: bool) -> 
 
 func _draw_exits() -> void:
 	if floor == null: return
+	var tb := Time.get_ticks_msec() / 1000.0
 	for cell in floor.rooms[floor.current]["exits"]:
 		var ex: Dictionary = floor.rooms[floor.current]["exits"][cell]
 		var ctr := _cell_px(cell)
 		if ex.get("descend", false):
-			var tb := Time.get_ticks_msec() / 1000.0
-			draw_rect(Rect2(ctr - Vector2(TILE/2.0-3, TILE/2.0-3), Vector2(TILE-7,TILE-7)),
-				Color(COL_GREEN, 0.18))
-			# beacon: expanding rings draw the eye to the goal
+			# a hole down into the dark, with steps catching the beacon light
+			draw_colored_polygon(_diamond(ctr, 4.0), Color(0.015, 0.04, 0.025))
+			for st in 3:
+				draw_line(ctr + Vector2(-13 + st * 4, -1 + st * 4),
+					ctr + Vector2(13 - st * 4, -1 + st * 4), Color(COL_GREEN, 0.30), 1.5)
+			draw_polyline(_diamond_closed(ctr, 4.0), Color(COL_GREEN, 0.8), 1.2)
 			var ring := fmod(tb * 0.8, 1.0)
 			draw_arc(ctr, 8.0 + ring * 16.0, 0, TAU, 24, Color(COL_GREEN, 0.5 * (1.0 - ring)), 1.5)
 			_draw_glyph(">", cell, COL_GREEN)
 		else:
-			# a framed doorway, not a bare plus
-			draw_rect(Rect2(ctr - Vector2(TILE/2.0-4, TILE/2.0-4), Vector2(TILE-9, TILE-9)),
-				Color(COL_AMBER, 0.5), false, 1.5)
+			draw_polyline(_diamond_closed(ctr, 7.0), Color(COL_AMBER, 0.55), 1.5)
 			_draw_glyph("+", cell, COL_AMBER)
 
 func _draw_minimap(c: CanvasItem) -> void:
@@ -4724,7 +4672,7 @@ func _draw_body_readout(c: CanvasItem, lx: float, lw: float) -> void:
 	c.draw_string(_font, Vector2(lx + 12, top + 22), "CIAŁO: " + e.name_pl,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	c.draw_string(_font, Vector2(lx + 12, top + 40),
-		"HP %d/%d  ·  %s" % [e.hp, e.max_hp, st],
+		"HP %d/%d  ·  %s  ·  trafienie ~%d%%" % [e.hp, e.max_hp, st, sim.hit_chance(e)],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 	if e.body == null:
 		c.draw_string(_font, Vector2(lx + 12, top + 62),
@@ -5189,3 +5137,119 @@ func _draw_figure(c: CanvasItem, base: Vector2, s: float, ap: Dictionary) -> voi
 			c.draw_arc(hc, head_r * 0.98, PI, TAU, 12, hairc, 2.6 * s)
 			c.draw_line(hc + Vector2(head_r * 0.7, -head_r * 0.4),
 				hc + Vector2(head_r * 1.3, head_r * 1.3), hairc, 1.6 * s)
+
+
+# ── Isometric stage painters ──────────────────────────────────────────────────
+
+func _diamond(ctr: Vector2, inset: float) -> PackedVector2Array:
+	var hw := ISO_W / 2.0 - inset
+	var hh := ISO_H / 2.0 - inset * 0.5
+	return PackedVector2Array([ctr + Vector2(0, -hh), ctr + Vector2(hw, 0),
+		ctr + Vector2(0, hh), ctr + Vector2(-hw, 0)])
+
+func _diamond_closed(ctr: Vector2, inset: float) -> PackedVector2Array:
+	var d := _diamond(ctr, inset)
+	d.append(d[0])
+	return d
+
+## Biome floor motif, adapted to diamond space (same pattern keys as the themes).
+func _draw_iso_pattern(ctr: Vector2, c: Vector2i, th: Dictionary) -> void:
+	var h := _chash(c.x, c.y)
+	var col: Color = th.pattern_col
+	match th.pattern:
+		"tiles":
+			draw_polyline(_diamond_closed(ctr, 7.0), col, 1.0)
+		"planks":
+			draw_line(ctr + Vector2(-ISO_W * 0.30, -ISO_H * 0.15 + 5),
+				ctr + Vector2(ISO_W * 0.30, ISO_H * 0.15 + 5), col, 1.0)
+			draw_line(ctr + Vector2(-ISO_W * 0.30, -ISO_H * 0.15 - 4),
+				ctr + Vector2(ISO_W * 0.30, ISO_H * 0.15 - 4), col, 1.0)
+		"hatch":
+			if h % 2 == 0:
+				draw_line(ctr + Vector2(-10, 4), ctr + Vector2(2, -8), col, 1.0)
+				draw_line(ctr + Vector2(-2, 8), ctr + Vector2(10, -4), col, 1.0)
+		"rubble":
+			if h % 10 < 3:
+				var p1 := ctr + Vector2(-12 + h % 18, -4 + (h / 7) % 8)
+				draw_colored_polygon(PackedVector2Array([p1, p1 + Vector2(6, 1), p1 + Vector2(3, 5)]), col)
+			if h % 7 == 0:
+				draw_circle(ctr + Vector2(6 - (h / 3) % 14, 4), 1.8, col)
+		"cracks":
+			if h % 10 < 4:
+				var a := ctr + Vector2(-10 + h % 8, -3 + (h / 5) % 5)
+				var m := a + Vector2(7 + h % 5, 4)
+				draw_polyline(PackedVector2Array([a, m, m + Vector2(6 - (h % 10), 3)]), col, 1.4)
+		"dots":
+			if h % 10 < 4:
+				for k in 3:
+					var dh := _chash(c.x * 5 + k, c.y * 3 + k)
+					draw_circle(ctr + Vector2(-14 + dh % 28, -6 + (dh / 9) % 12), 1.3, col)
+		"stripes":
+			if (c.x + c.y) % 2 == 0:
+				draw_line(ctr + Vector2(-ISO_W * 0.25, ISO_H * 0.12),
+					ctr + Vector2(ISO_W * 0.25, -ISO_H * 0.12), col, 4.0)
+		"puddles":
+			if h % 10 < 2:
+				_draw_ellipse(ctr + Vector2(0, 3), 10, 4, col)
+
+## Hazard cells on the iso stage (real, shoveable-into).
+func _draw_iso_hazard(ctr: Vector2, c: Vector2i, b: Board, tnow: float) -> void:
+	match b.hazard_at(c):
+		"water":
+			draw_colored_polygon(_diamond(ctr, 5.0), COL_WATER)
+			for sh in 2:
+				var sx := fmod(tnow * 12.0 + sh * 17.0 + float(_chash(c.x, c.y) % 13), 24.0) - 12.0
+				draw_line(ctr + Vector2(sx - 4, -3 + sh * 7), ctr + Vector2(sx + 4, -3 + sh * 7),
+					Color(0.45, 0.75, 0.85, 0.35), 1.4)
+		"wire":
+			_draw_glyph("|", c, COL_WIRE)
+		"gas":
+			_draw_glyph("G", c, COL_GAS)
+		"fire":
+			var fp := 0.5 + 0.18 * sin(tnow * 5.0 + float(_chash(c.x, c.y) % 7))
+			draw_colored_polygon(_diamond(ctr, 6.0), Color(0.55, 0.18, 0.06, fp))
+			_draw_glyph("^", c, COL_RED)
+
+## A volumetric wall block: lit top diamond, two shaded faces, biome seams.
+## alpha < 1 when the prism would hide the player (the show must stay visible).
+func _draw_wall_prism(ctr: Vector2, cell: Vector2i, th: Dictionary, alpha: float) -> void:
+	var hw := ISO_W / 2.0
+	var hh := ISO_H / 2.0
+	var topc := ctr + Vector2(0, -WALL_H)
+	var wcol: Color = th.wall
+	draw_colored_polygon(PackedVector2Array([ctr + Vector2(-hw, 0), ctr + Vector2(0, hh),
+		ctr + Vector2(0, hh - WALL_H), ctr + Vector2(-hw, -WALL_H)]),
+		Color(wcol.darkened(0.32), alpha))
+	draw_colored_polygon(PackedVector2Array([ctr + Vector2(0, hh), ctr + Vector2(hw, 0),
+		ctr + Vector2(hw, -WALL_H), ctr + Vector2(0, hh - WALL_H)]),
+		Color(wcol.darkened(0.10), alpha))
+	draw_colored_polygon(PackedVector2Array([topc + Vector2(0, -hh), topc + Vector2(hw, 0),
+		topc + Vector2(0, hh), topc + Vector2(-hw, 0)]),
+		Color(wcol.lightened(0.20), alpha))
+	draw_polyline(PackedVector2Array([ctr + Vector2(-hw, -WALL_H), topc + Vector2(0, hh),
+		ctr + Vector2(hw, -WALL_H)]), Color(th.wall_hi, alpha * 0.9), 1.0)
+	draw_line(topc + Vector2(0, hh), ctr + Vector2(0, hh), Color(0, 0, 0, 0.30 * alpha), 1.0)
+	# biome seams: a course line on the top face, a panel seam on the SE face
+	var h := _chash(cell.x, cell.y)
+	if h % 3 != 0:
+		draw_line(topc + Vector2(-hw * 0.5, hh * 0.25), topc + Vector2(hw * 0.35, -hh * 0.30),
+			Color(wcol.darkened(0.25), alpha), 1.0)
+	if h % 4 == 0:
+		draw_line(ctr + Vector2(hw * 0.5, -WALL_H + hh * 0.75), ctr + Vector2(hw * 0.5, -hh * 0.2),
+			Color(wcol.darkened(0.30), alpha), 1.0)
+
+## The Channel 7 camera drone shadowing the star. Pure set dressing — and a
+## constant reminder that someone is always watching.
+func _draw_drone(ppos: Vector2, t: float) -> void:
+	var dp := ppos + Vector2(30.0 + sin(t * 0.7) * 6.0, -74.0 + sin(t * 1.7) * 4.0)
+	draw_colored_polygon(PackedVector2Array([dp + Vector2(-4, 4), dp + Vector2(4, 4),
+		ppos + Vector2(10, -20), ppos + Vector2(-10, -20)]), Color(0.35, 0.82, 0.91, 0.045))
+	_draw_ellipse(dp + Vector2(0, 3), 9, 3, Color(0, 0, 0, 0.22))
+	draw_rect(Rect2(dp + Vector2(-9, -4), Vector2(18, 8)), Color(0.10, 0.13, 0.16))
+	draw_rect(Rect2(dp + Vector2(-9, -4), Vector2(18, 8)), Color(0.28, 0.36, 0.42), false, 1.0)
+	draw_circle(dp + Vector2(-3, 0), 2.6, Color(0.05, 0.07, 0.09))
+	draw_circle(dp + Vector2(-3, 0), 1.1, Color(0.35, 0.82, 0.91))
+	draw_line(dp + Vector2(-9, -4), dp + Vector2(-14, -9), Color(0.28, 0.36, 0.42), 1.5)
+	draw_line(dp + Vector2(9, -4), dp + Vector2(14, -9), Color(0.28, 0.36, 0.42), 1.5)
+	if fmod(t, 1.2) < 0.7:
+		draw_circle(dp + Vector2(6, -1), 1.8, COL_RED)

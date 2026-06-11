@@ -99,6 +99,14 @@ const STATUS_DOT := {"burning": [3, "fire"], "poisoned": [2, "physical"], "corro
 
 ## Effective AC, reduced while the target is corroded (armor eaten away) and
 ## raised while a humanoid holds its guard (break it with a shove).
+## Tactical readability: the player's % chance to land a hit on `target`
+## (d20 + bonus vs effective AC, honoring the aimed zone). 5..95 clamp.
+func hit_chance(target: CombatEntity) -> int:
+	var hb: int = 3 + player().stat_mod("DEX")
+	if aim_zone != "" and target.body != null:
+		hb += target.body.to_hit_mod_for(aim_zone)
+	return clampi((21 - (_eff_ac(target) - hb)) * 5, 5, 95)
+
 func _eff_ac(target: CombatEntity) -> int:
 	return target.ac + target.armor_bonus() \
 		+ (3 if target.has_status("guard") else 0) \
