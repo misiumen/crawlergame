@@ -3,6 +3,7 @@ extends Node2D
 ## events, and draws the crafting bench + inventory panel.
 
 const TILE := 48
+const VERSION := "1.0"           # shown on the title screen; bump per release
 const COL_BG      := Color("0b0d12")
 const COL_FLOOR   := Color("161a23")
 const COL_FLOOR2  := Color("1b202b")
@@ -3298,6 +3299,8 @@ func _draw_title(c: CanvasItem) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	c.draw_string(_font, Vector2(184, 678),
 		"           I warsztat · T celuj w strefę · F umiejętność · 1–9 wybór · Esc zamknij",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+	c.draw_string(_font, Vector2(1180, 700), "v" + VERSION,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 
 func _draw_boss(pos: Vector2, fade: float, flashing: bool) -> void:

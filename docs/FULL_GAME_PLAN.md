@@ -59,14 +59,33 @@ shippable game. Decisions locked with the owner:
 - [x] Four seeded generative music loops (title/explore/combat/boss) crossfaded
       by game state; Master/Music/SFX buses wired to the settings menu.
 
-## Phase E — Content & balance
-- Enemy roster per biome (sprites + AI quirks), miniboss per biome, more
-  dialogue trees + mid-floor events, onboarding floor, run modifiers/daily seed,
-  Preacher origin + fleshed-out origins.
+## Phase E — Content & balance ✅
+- ✅ Distinct biome rosters: every biome in `Routes.BIOMES` carries `mob_tags`;
+  FloorGen triples the spawn weight of on-theme monsters (trenches → soldiers/
+  undead, museum → ghosts/constructs, service ducts → vermin/drones, …) and
+  degrades to the flat pool when nothing matches.
+- ✅ Guaranteed elite: from floor 2 up, the strongest enemy of the last room
+  becomes an "Alfa:" miniboss (×1.6 HP, +1 to-hit) — elite silhouette + enrage
+  behavior ride the existing `miniboss` tag.
+- ✅ Preacher origin (Kaznodzieja, 45 prestige): +2 CHA / −1 STR, new
+  `origin_trait` field; +3 on freeform persuasion rolls, converts chain-convert
+  at 35% (vs 22%). Persisted in the save.
+- ✅ Onboarding: one-time PORADNIK hints (first combat, first Alfa, low HP)
+  stored on player flags — teach counterplay in context, no scripted tutorial floor.
+- ✅ Daily seed: title `[D]` (key + click zone) starts a run on a date-derived
+  seed shared by everyone that day.
+- Deferred: more dialogue trees / mid-floor beats (additive content, anytime).
 
-## Phase F — Shell & shipping
-- Title/settings/pause, save slots, playtest balancing, itch.io build (web
-  export preset exists), trailer GIFs; Steam if it has legs (achievements map 1:1).
+## Phase F — Shell & shipping ✅
+- ✅ Title/settings/pause shipped in Phase C; `VERSION` const now shown on title.
+- ✅ Web export verified in a real browser (boots clean, zero console errors,
+  `thread_support=false` → no SharedArrayBuffer needed on itch).
+- ✅ `build-web.bat` exports + zips `builds/dungeon-kraulem-web.zip` for itch.
+- ✅ `docs/SHIPPING.md`: full release checklist (gate → version bump → exe →
+  web zip → itch embed settings → butler).
+- Deferred: save slots (single per-floor checkpoint is the roguelike-honest
+  design; revisit only if runs get long), trailer GIFs (needs hand capture),
+  Steam (only if it has legs).
 
 ## Architecture invariants (do not break)
 - `sim/` stays pure logic (RefCounted, no nodes) — the 600+ GUT checks guard it.
