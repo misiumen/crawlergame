@@ -117,11 +117,13 @@ var _smoke := false                  # --smoke: scripted draw-path autotest, the
 var _smoke_frames := 0
 
 func _ready() -> void:
-	# Phase C: a monospace system font — crisp terminal aesthetic that matches the
-	# vector-neon look, with full Polish diacritics (Windows ships all of these).
-	var sysf := SystemFont.new()
-	sysf.font_names = PackedStringArray(["Cascadia Mono", "Consolas", "Lucida Console"])
-	_font = sysf
+	# Embedded JetBrains Mono (OFL, fonts/): identical crisp monospace on EVERY
+	# platform — the web build's fallback font was proportional and looked cheap.
+	_font = load("res://fonts/JetBrainsMono-Regular.ttf")
+	if _font == null:   # belt-and-braces: fall back to a system mono
+		var sysf := SystemFont.new()
+		sysf.font_names = PackedStringArray(["Cascadia Mono", "Consolas", "Lucida Console"])
+		_font = sysf
 	RenderingServer.set_default_clear_color(COL_BG)
 	# World camera: the board lives in world space; the camera frames it (and will
 	# follow the player on bigger boards in Phase B).
@@ -776,14 +778,22 @@ func _zone(r: Rect2, kind: String, i: int = 0, s: String = "") -> void:
 ## Phase C panel chrome: drop shadow, header strip, accent spine + border — one
 ## consistent frame for every modal instead of ad-hoc rectangles.
 func _panel(c: CanvasItem, r: Rect2, accent: Color, title: String = "") -> void:
-	c.draw_rect(Rect2(r.position + Vector2(5, 6), r.size), Color(0, 0, 0, 0.45))
-	c.draw_rect(r, Color(0.055, 0.075, 0.095, 0.985))
-	c.draw_rect(Rect2(r.position, Vector2(r.size.x, 40.0)), Color(accent, 0.10))
-	c.draw_rect(r, accent, false, 2.0)
-	c.draw_rect(Rect2(r.position, Vector2(5, r.size.y)), Color(accent, 0.8))
+	c.draw_rect(Rect2(r.position + Vector2(3, 4), r.size), Color(0, 0, 0, 0.5))
+	c.draw_rect(r, Color(0.045, 0.062, 0.078, 0.99))
+	c.draw_rect(Rect2(r.position, Vector2(r.size.x, 32.0)), Color(accent, 0.07))
+	c.draw_line(r.position + Vector2(0, 32), r.position + Vector2(r.size.x, 32),
+		Color(accent, 0.35), 1.0)
+	c.draw_rect(r, Color(accent, 0.6), false, 1.0)
+	c.draw_rect(Rect2(r.position, Vector2(2, r.size.y)), Color(accent, 0.85))
+	# corner ticks — quiet, expensive-looking chrome
+	for cnr in [Vector2(r.position.x + r.size.x, r.position.y),
+			r.position + r.size, Vector2(r.position.x, r.position.y + r.size.y)]:
+		var dx: float = -6.0 if cnr.x > r.position.x else 6.0
+		var dy: float = -6.0 if cnr.y > r.position.y else 6.0
+		c.draw_line(cnr, cnr + Vector2(dx, 0), accent, 2.0)
+		c.draw_line(cnr, cnr + Vector2(0, dy), accent, 2.0)
 	if title != "":
-		c.draw_string(_font, r.position + Vector2(20, 27), title,
-			HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 36, 20, accent)
+		_draw_tracked(c, r.position + Vector2(16, 22), title, 14, Color(accent, 0.95), 2.0)
 
 ## Tiny vector icons (Phase C): materials, item categories, spells, coin.
 func _draw_icon(c: CanvasItem, kind: String, pos: Vector2, col: Color) -> void:
@@ -3370,120 +3380,135 @@ func _draw_player(e: CombatEntity, pos: Vector2, fade: float) -> void:
 
 func _draw_title(c: CanvasItem) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
-	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
-	# Studio smoke: purple haze sinking from the lighting rig.
-	for i in 20:
-		c.draw_rect(Rect2(0, i * 12, 1280, 12),
-			Color(0.32, 0.12, 0.42, 0.085 * (1.0 - i / 20.0)))
-	# Synthwave arena floor: glowing horizon + perspective grid rolling at us.
-	var hor := 492.0
-	c.draw_rect(Rect2(0, hor - 26, 1280, 26), Color(COL_PURPLE, 0.05))
-	c.draw_rect(Rect2(0, hor - 8, 1280, 3), Color(COL_PURPLE, 0.22))
+	# Cool charcoal-teal gradient — a studio before the lights come up.
+	c.draw_rect(Rect2(0, 0, 1280, 720), Color(0.024, 0.035, 0.043))
+	for i in 12:
+		c.draw_rect(Rect2(0, 720 - (i + 1) * 22, 1280, 22),
+			Color(0.045, 0.075, 0.09, 0.05 * (12 - i) / 12.0))
+	# Faint perspective stage grid below the horizon.
+	var hor := 528.0
+	c.draw_line(Vector2(0, hor), Vector2(1280, hor), Color(COL_CYAN, 0.10), 1.0)
 	for k in 15:
 		var fx := (k - 7) / 7.0
 		c.draw_line(Vector2(640 + fx * 300.0, hor), Vector2(640 + fx * 1500.0, 720),
-			Color(COL_CYAN, 0.085), 1.0)
-	for k in 9:
-		var phs := fmod(t * 0.22 + k / 9.0, 1.0)
-		var yy := hor + phs * phs * 228.0
-		c.draw_line(Vector2(0, yy), Vector2(1280, yy), Color(COL_CYAN, 0.04 + 0.10 * phs), 1.0)
-	# Drifting studio motes (dust in the spotlights).
-	for i in 36:
+			Color(COL_CYAN, 0.045), 1.0)
+	for k in 7:
+		var phs := fmod(t * 0.16 + k / 7.0, 1.0)
+		var yy := hor + phs * phs * 192.0
+		c.draw_line(Vector2(0, yy), Vector2(1280, yy), Color(COL_CYAN, 0.02 + 0.05 * phs), 1.0)
+	# Sparse drifting dust in the spotlights.
+	for i in 24:
 		var h := (i * 2654435761) & 0x7fffffff
-		var mx := fmod(float(h % 1280) + t * (5.0 + float(h % 7) * 2.5), 1280.0)
-		var my := 30.0 + float((h >> 8) % 430) + sin(t * 0.8 + float(i)) * 6.0
-		var mc := COL_CYAN if i % 3 != 0 else COL_PURPLE
-		c.draw_circle(Vector2(mx, my), 1.0 + float(h % 3) * 0.6, Color(mc, 0.16))
+		var mx := fmod(float(h % 1280) + t * (4.0 + float(h % 5) * 2.0), 1280.0)
+		var my := 40.0 + float((h >> 8) % 420)
+		c.draw_circle(Vector2(mx, my), 1.0, Color(COL_CYAN, 0.10))
 
-	# NA ZYWO badge - the show never stops broadcasting.
-	c.draw_rect(Rect2(1014, 36, 230, 78), Color(0.07, 0.04, 0.07, 0.85))
-	c.draw_rect(Rect2(1014, 36, 230, 78), Color(COL_RED, 0.75), false, 1.0)
-	if fmod(t, 1.2) < 0.72:
-		c.draw_circle(Vector2(1038, 58), 6.0, COL_RED)
-	c.draw_string(_font, Vector2(1052, 64), "NA \u017bYWO",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 17, COL_BRIGHT)
+	# Channel ident, top-left. Broadcast, not monarchy.
+	_draw_tracked(c, Vector2(56, 52), "KANAŁ 7", 13, Color(COL_CYAN, 0.85), 4.0)
+	c.draw_line(Vector2(56, 62), Vector2(150, 62), Color(COL_CYAN, 0.4), 1.0)
+
+	# Minimal on-air ticker, top-right: dot, label, viewers. No box.
+	if fmod(t, 1.6) < 1.0:
+		c.draw_circle(Vector2(1078, 47), 4.0, COL_RED)
+	_draw_tracked(c, Vector2(1092, 52), "NA ŻYWO", 13, Color(0.92, 0.95, 0.97), 3.0)
 	var viewers := 4102336 + Achievements.points_total() * 117 + int(sin(t * 0.7) * 1800.0)
-	c.draw_string(_font, Vector2(1028, 86), "widz\u00f3w: " + _fmt_int(viewers),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
-	c.draw_string(_font, Vector2(1028, 104), "KANA\u0141 7 \u00b7 SEZON 1",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(COL_PURPLE, 0.95))
-	# tiny audio equalizer under the badge - the broadcast is loud
-	for eb in 12:
-		var eh := 5.0 + absf(sin(t * (2.1 + eb * 0.37) + eb)) * 17.0
-		c.draw_rect(Rect2(1030 + eb * 18, 138 - eh, 10, eh), Color(COL_CYAN, 0.4))
+	c.draw_string(_font, Vector2(1092, 72), "widzów " + _fmt_int(viewers),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COL_DIM)
+	c.draw_line(Vector2(1070, 84), Vector2(1224, 84), Color(COL_RED, 0.35), 1.0)
 
-	# Neon crown medallion, centered above the logo.
-	var cw := PackedVector2Array([Vector2(616, 134), Vector2(616, 112), Vector2(628, 124),
-		Vector2(640, 104), Vector2(652, 124), Vector2(664, 112), Vector2(664, 134), Vector2(616, 134)])
-	c.draw_polyline(cw, Color(COL_AMBER, 0.30), 6.0)
-	c.draw_polyline(cw, COL_AMBER, 1.6)
+	# Brand mark: a transmitter radiating up — the show is always broadcasting.
+	var mk := Vector2(640, 142)
+	c.draw_circle(mk, 3.5, COL_CYAN)
+	for r in [11.0, 19.0, 27.0]:
+		c.draw_arc(mk, r, -PI * 0.78, -PI * 0.22, 20,
+			Color(COL_CYAN, 0.75 - r * 0.018), 1.6)
 
-	# Logo, centered: layered neon glow + a nervous studio-light flicker.
-	var flick := 0.86 + 0.14 * sin(t * 9.0) * sin(t * 3.7)
-	for off in [Vector2(-3, 0), Vector2(3, 0), Vector2(0, -2), Vector2(0, 3)]:
-		c.draw_string(_font, Vector2(0, 230) + (off as Vector2), "DUNGEON KRAULEM",
-			HORIZONTAL_ALIGNMENT_CENTER, 1280, 72, Color(COL_PURPLE, 0.16))
-	for off in [Vector2(-1.5, 0.0), Vector2(1.5, 1.0)]:
-		c.draw_string(_font, Vector2(0, 230) + (off as Vector2), "DUNGEON KRAULEM",
-			HORIZONTAL_ALIGNMENT_CENTER, 1280, 72, Color(COL_CYAN, 0.30 * flick))
-	c.draw_string(_font, Vector2(0, 230), "DUNGEON KRAULEM",
-		HORIZONTAL_ALIGNMENT_CENTER, 1280, 72, Color(0.86, 0.97, 1.0, flick))
-	# underline with a light sweeping along it
-	c.draw_rect(Rect2(312, 246, 656, 2), Color(COL_CYAN, 0.35))
-	c.draw_rect(Rect2(312 + fmod(t * 260.0, 590.0), 246, 66, 2), COL_BRIGHT)
-	c.draw_string(_font, Vector2(0, 282), "galaktyczne reality show z loch\u00f3w",
-		HORIZONTAL_ALIGNMENT_CENTER, 1280, 20, COL_DIM)
+	# Logotype: tracked caps, calm dual-tone, a slow breathing glow. No flicker.
+	var pulse := 0.92 + 0.08 * sin(t * 1.1)
+	_draw_tracked(c, Vector2(0, 232) + Vector2(0, 1), "DUNGEON KRAULEM", 58,
+		Color(COL_CYAN, 0.18 * pulse), 10.0, 1280.0)
+	_draw_tracked(c, Vector2(0, 230), "DUNGEON KRAULEM", 58,
+		Color(0.90, 0.96, 0.99, pulse), 10.0, 1280.0)
+	# ident rule with a slow light sweep
+	c.draw_line(Vector2(400, 256), Vector2(880, 256), Color(COL_CYAN, 0.30), 1.0)
+	c.draw_rect(Rect2(400 + fmod(t * 120.0, 432.0), 255, 48, 2), Color(COL_CYAN, 0.9))
+	_draw_tracked(c, Vector2(0, 288), "GALAKTYCZNE REALITY SHOW Z LOCHÓW", 13,
+		COL_DIM, 4.0, 1280.0)
 
-	# Menu: a clean centered list - no boxes. Hover = glow, arrow, and the
-	# entry's one-line description fading in underneath.
+	# Menu: one accent, generous air, tracked labels. Hover = underline + ticks.
 	var has_save := Save.has_save()
 	var lo := MetaCatalog.loadout()
 	var rows: Array = []
 	if has_save:
-		rows.append(["Kontynuuj zjazd", "wracasz na pi\u0119tro z zapisu", "Enter", "title_continue", COL_CYAN])
-		rows.append(["Nowy bieg", "porzuca obecny zapis", "N", "title_new", COL_AMBER])
+		rows.append(["KONTYNUUJ ZJAZD", "wracasz na piętro z zapisu", "Enter", "title_continue"])
+		rows.append(["NOWY BIEG", "porzuca obecny zapis", "N", "title_new"])
 	else:
-		rows.append(["Zacznij bieg", "\u015bwie\u017cy zjazd do Lochu", "Enter", "title_start", COL_CYAN])
-	rows.append(["Bieg dnia", "wsp\u00f3lny tor ca\u0142ej galaktyki \u2014 jeden seed dziennie", "D", "title_daily", COL_PURPLE])
-	rows.append(["Osi\u0105gni\u0119cia  %d / %d" % [Achievements.count_unlocked(), Achievements.total()],
-		"galeria trofe\u00f3w i pasmo presti\u017cu", "A", "ach_open", COL_AMBER])
-	rows.append(["Ekwipunek sezonu", "%s \u00b7 %s" % [
+		rows.append(["ZACZNIJ BIEG", "świeży zjazd do Lochu", "Enter", "title_start"])
+	rows.append(["BIEG DNIA", "jeden wspólny seed dziennie", "D", "title_daily"])
+	rows.append(["OSIĄGNIĘCIA", "%d / %d zdobytych" % [Achievements.count_unlocked(), Achievements.total()], "A", "ach_open"])
+	rows.append(["EKWIPUNEK SEZONU", "%s · %s" % [
 		MetaCatalog.def_of(lo["species"]).get("label", "?"),
-		MetaCatalog.def_of(lo["origin"]).get("label", "?")], "M", "meta_open", COL_GREEN])
-	var y := 360.0
+		MetaCatalog.def_of(lo["origin"]).get("label", "?")], "M", "meta_open"])
+	var y := 372.0
 	for row in rows:
 		var label: String = str(row[0])
-		var ac: Color = row[4]
-		var rc := Rect2(400, y - 26, 480, 50)
+		var rc := Rect2(420, y - 24, 440, 46)
 		var hov := _hover(rc)
-		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
+		var lw := _tracked_width(label, 19, 3.0)
+		var ink := Color(0.90, 0.96, 0.99, 0.92) if not hov else COL_CYAN
+		_draw_tracked(c, Vector2(0, y), label, 19, ink, 3.0, 1280.0)
+		c.draw_string(_font, Vector2(640 + lw / 2.0 + 18, y), "[%s]" % str(row[2]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(COL_DIM, 0.8))
 		if hov:
-			# soft glow bar + arrows flanking the hovered entry
-			c.draw_rect(Rect2(640 - lw / 2.0 - 70, y - 22, lw + 140, 32), Color(ac, 0.08))
-			c.draw_string(_font, Vector2(640 - lw / 2.0 - 42, y), ">",
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 17, ac)
-			c.draw_string(_font, Vector2(0, y + 1), label,
-				HORIZONTAL_ALIGNMENT_CENTER, 1280, 24, Color(ac, 0.45))
-		c.draw_string(_font, Vector2(0, y), label,
-			HORIZONTAL_ALIGNMENT_CENTER, 1280, 24, ac if hov else Color(COL_BRIGHT, 0.92))
-		# key hint, tucked after the label
-		c.draw_string(_font, Vector2(640 + lw / 2.0 + 16, y), "[%s]" % str(row[2]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(ac, 0.8) if hov else Color(COL_DIM, 0.7))
-		if hov:
-			c.draw_string(_font, Vector2(0, y + 22), str(row[1]),
+			var ux := 640.0 - lw / 2.0
+			c.draw_line(Vector2(ux, y + 9), Vector2(ux + lw, y + 9), Color(COL_CYAN, 0.8), 1.0)
+			c.draw_line(Vector2(ux - 14, y - 6), Vector2(ux - 8, y - 6), COL_CYAN, 2.0)
+			c.draw_line(Vector2(ux + lw + 8, y - 6), Vector2(ux + lw + 14, y - 6), COL_CYAN, 2.0)
+			c.draw_string(_font, Vector2(0, y + 26), str(row[1]),
 				HORIZONTAL_ALIGNMENT_CENTER, 1280, 12, COL_DIM)
 		_zone(rc, str(row[3]))
-		y += 54.0
-	# career strip, centered under the menu
-	c.draw_string(_font, Vector2(0, 660),
-		"Presti\u017c: %d / %d pkt   \u00b7   odblokowane opcje: %d" % [
+		y += 56.0
+	# career strip — quiet
+	c.draw_string(_font, Vector2(0, 668),
+		"prestiż %d / %d   ·   odblokowane opcje %d" % [
 			MetaCatalog.available_prestige(), Achievements.points_total(), Meta.unlocked_count()],
-		HORIZONTAL_ALIGNMENT_CENTER, 1280, 14, ACH_TIER_COL["gold"])
+		HORIZONTAL_ALIGNMENT_CENTER, 1280, 12, COL_DIM)
 	c.draw_string(_font, Vector2(1180, 700), "v" + VERSION,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	# CRT scanlines over everything - the broadcast look.
-	for sy in range(0, 720, 4):
-		c.draw_line(Vector2(0, sy), Vector2(1280, sy), Color(0, 0, 0, 0.05), 1.0)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(COL_DIM, 0.7))
+	# vignette + fine scanlines: the broadcast finish
+	for i in 8:
+		var va := 0.05 * (8 - i) / 8.0
+		c.draw_rect(Rect2(0, i * 6, 1280, 6), Color(0, 0, 0, va))
+		c.draw_rect(Rect2(0, 720 - (i + 1) * 6, 1280, 6), Color(0, 0, 0, va))
+		c.draw_rect(Rect2(i * 8, 0, 8, 720), Color(0, 0, 0, va))
+		c.draw_rect(Rect2(1280 - (i + 1) * 8, 0, 8, 720), Color(0, 0, 0, va))
+	for sy in range(0, 720, 3):
+		c.draw_line(Vector2(0, sy), Vector2(1280, sy), Color(0, 0, 0, 0.035), 1.0)
+
+func _tracked_width(text: String, size: int, tracking: float) -> float:
+	var total := 0.0
+	for i in text.length():
+		total += _font.get_string_size(text[i], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + tracking
+	return total - tracking
+
+## Letter-tracked text, measured per glyph (correct on any font).
+## center_w > 0 centers the tracked run inside that width starting at pos.x.
+func _draw_tracked(c: CanvasItem, pos: Vector2, text: String, size: int,
+		col: Color, tracking: float, center_w: float = -1.0) -> void:
+	var widths: Array = []
+	var total := 0.0
+	for i in text.length():
+		var w: float = _font.get_string_size(text[i], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		widths.append(w)
+		total += w + tracking
+	total -= tracking
+	var x := pos.x
+	if center_w > 0.0:
+		x = pos.x + (center_w - total) / 2.0
+	for i in text.length():
+		c.draw_string(_font, Vector2(x, pos.y), text[i],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+		x += float(widths[i]) + tracking
 
 ## Thousands separator for the fake viewer counter (4 102 336).
 static func _fmt_int(n: int) -> String:
@@ -4952,19 +4977,14 @@ func _creator_begin_run() -> void:
 
 func _draw_creator(c: CanvasItem) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
-	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
-	# the title's studio backdrop, minus the logo block
-	for i in 16:
-		c.draw_rect(Rect2(0, i * 12, 1280, 12),
-			Color(0.32, 0.12, 0.42, 0.06 * (1.0 - i / 16.0)))
+	c.draw_rect(Rect2(0, 0, 1280, 720), Color(0.024, 0.035, 0.043))
 	var hor := 560.0
-	c.draw_rect(Rect2(0, hor - 6, 1280, 2), Color(COL_PURPLE, 0.18))
+	c.draw_line(Vector2(0, hor), Vector2(1280, hor), Color(COL_CYAN, 0.08), 1.0)
 	for k in 13:
 		var fx := (k - 6) / 6.0
 		c.draw_line(Vector2(640 + fx * 280.0, hor), Vector2(640 + fx * 1400.0, 720),
-			Color(COL_CYAN, 0.06), 1.0)
-	c.draw_string(_font, Vector2(0, 64), "REJESTRACJA UCZESTNIKA",
-		HORIZONTAL_ALIGNMENT_CENTER, 1280, 34, COL_CYAN)
+			Color(COL_CYAN, 0.04), 1.0)
+	_draw_tracked(c, Vector2(0, 60), "REJESTRACJA UCZESTNIKA", 28, COL_CYAN, 6.0, 1280.0)
 	c.draw_string(_font, Vector2(0, 92), "Kanał 7 kompletuje twój profil przed zjazdem",
 		HORIZONTAL_ALIGNMENT_CENTER, 1280, 14, COL_DIM)
 	if _pending_daily:
