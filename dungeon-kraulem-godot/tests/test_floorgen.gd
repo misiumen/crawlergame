@@ -58,7 +58,16 @@ func _initialize() -> void:
 	var data := FloorGen.generate(1, 42, content)
 	_ck(data.has("rooms") and data.has("player") and data.has("start_cell"),
 		"generate returns the Floor data shape")
-	_ck((data["rooms"] as Array).size() >= 2, "floor 1 has at least 2 rooms")
+	_ck((data["rooms"] as Array).size() == 1, "a floor is ONE continuous board now")
+	var cont_b: Board = data["rooms"][0]["board"]
+	var carved := 0
+	for cy in cont_b.h:
+		for cx in cont_b.w:
+			if not cont_b.is_wall(Vector2i(cx, cy)):
+				carved += 1
+	_ck(carved > 150, "chambers are carved out of the rock (real floor area)")
+	_ck(bool((data["rooms"][0]["exits"].values()[0] as Dictionary).get("guarded", false)),
+		"the stairs are guarded")
 	_ck(data["player"].faction == "player", "data carries a player")
 	var fl = Floor.new(data)
 	_ck(fl.sim != null, "Floor consumes generated data and builds a sim")
@@ -127,7 +136,7 @@ func _initialize() -> void:
 
 	# --- no-content fallback still produces a valid floor ---
 	var fb := FloorGen.generate(1, 1, {})
-	_ck((fb["rooms"] as Array).size() >= 2, "empty content -> fallback floor still generates")
+	_ck((fb["rooms"] as Array).size() == 1, "empty content -> fallback floor still generates")
 
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

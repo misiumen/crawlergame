@@ -45,27 +45,10 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
 		# A single arena, one boss, the exit (= victory) gated until it falls.
 		rooms.append(_gen_boss_room(rng, floor_num, mon, env, stats, next_id, mods))
 	else:
-		var room_count: int = clampi(2 + (floor_num - 1) / 2, 2, 4)
-		for i in room_count:
-			rooms.append(_gen_room(rng, floor_num, i, room_count, mon, env, stats, next_id, mods))
-		_link_rooms(rooms)
-		# Phase E: from floor 2 up, every floor has ONE elite — the strongest enemy
-		# of the last room becomes an "Alfa" miniboss (more HP, hits harder, spiked
-		# silhouette + enrage via the miniboss tag). A guaranteed fight worth respecting.
-		if floor_num >= 2:
-			var last_ents: Dictionary = rooms[rooms.size() - 1]["entities"]
-			var best: CombatEntity = null
-			for id in last_ents:
-				var e: CombatEntity = last_ents[id]
-				if e.faction == "enemy" and (best == null or e.max_hp > best.max_hp):
-					best = e
-			if best != null:
-				best.max_hp = int(best.max_hp * 1.6)
-				best.hp = best.max_hp
-				best.to_hit += 1
-				if not best.tags.has("miniboss"):
-					best.tags.append("miniboss")
-				best.name_pl = "Alfa: " + best.name_pl
+		# S2: ONE continuous board — chambers carved from solid rock, joined by
+		# door gaps. Space is real: lure things between chambers, blow holes in
+		# the inner walls, refuse to walk into the guard's lair at all.
+		rooms.append(_gen_continuous(rng, floor_num, mon, env, stats, next_id, mods))
 
 	var player := CombatEntity.new(1, "Bezimienny", 100, 14, ["humanoid"])
 	player.faction = "player"
@@ -90,6 +73,197 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
 		"time_days": days,
 		"time_limit": days * 30,
 	}
+
+# ── Continuous-floor generation (S2) ─────────────────────────────────────────
+
+const SLOT_W := 11
+const SLOT_H := 9
+
+## One big board: a random walk over a 3x2 macro-grid picks 4-5 path chambers
+## (entry first, stairs last) plus up to 2 branch loot-chambers. Everything not
+## carved stays solid wall; walls off the outer border are bomb-destructible.
+static func _gen_continuous(rng: RandomNumberGenerator, floor_num: int,
+		mon: Dictionary, env: Dictionary, stats: Dictionary, next_id: Dictionary,
+		mods: Dictionary) -> Dictionary:
+	var enemy_mul: float = float(mods.get("enemy_mul", 1.0))
+	var object_mul: float = float(mods.get("object_mul", 1.0))
+	var pref_tags: Array = mods.get("object_tags", [])
+	var W: int = 3 * SLOT_W + 1
+	var H: int = 2 * SLOT_H + 1
+	var board := Board.new(W, H)
+	for y in H:
+		for x in W:
+			board.set_wall(Vector2i(x, y))
+	# macro path: a walk over slots (sx 0..2, sy 0..1)
+	var path: Array = []
+	var cur := Vector2i(0, rng.randi_range(0, 1))
+	path.append(cur)
+	var want: int = 4 + (1 if floor_num >= 3 else 0)
+	while path.size() < want:
+		var opts: Array = []
+		for d in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = cur + d
+			if n.x >= 0 and n.x < 3 and n.y >= 0 and n.y < 2 and not (n in path):
+				opts.append(n)
+		if opts.is_empty():
+			break
+		cur = opts[rng.randi_range(0, opts.size() - 1)]
+		path.append(cur)
+	# branches: loot chambers hanging off the path (not off the last slot)
+	var branches: Array = []
+	for i in range(path.size() - 1):
+		if branches.size() >= 2:
+			break
+		for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0)]:
+			var n2: Vector2i = (path[i] as Vector2i) + d
+			if n2.x >= 0 and n2.x < 3 and n2.y >= 0 and n2.y < 2 					and not (n2 in path) and not (n2 in branches):
+				branches.append(n2)
+				break
+	# carve chamber interiors (with a little size jitter)
+	var chambers: Array = []   # [{slot, rect}]
+	for sl in path + branches:
+		var ox: int = (sl as Vector2i).x * SLOT_W
+		var oy: int = (sl as Vector2i).y * SLOT_H
+		var inx: int = rng.randi_range(0, 1)
+		var iny: int = rng.randi_range(0, 1)
+		var r := Rect2i(ox + 1 + inx, oy + 1 + iny, SLOT_W - 1 - inx * 2, SLOT_H - 1 - iny * 2)
+		for y in range(r.position.y, r.position.y + r.size.y):
+			for x in range(r.position.x, r.position.x + r.size.x):
+				board.set_wall(Vector2i(x, y), false)
+		chambers.append({"slot": sl, "rect": r})
+	# door gaps between every connected slot pair
+	var carved: Array = path + branches
+	for ci in chambers.size():
+		var a: Vector2i = chambers[ci]["slot"]
+		for d in [Vector2i(1, 0), Vector2i(0, 1)]:
+			var b2: Vector2i = a + d
+			if not (b2 in carved):
+				continue
+			# is the pair actually linked (consecutive on path, or branch-parent)?
+			var linked := false
+			for i in range(path.size() - 1):
+				if (path[i] == a and path[i + 1] == b2) or (path[i] == b2 and path[i + 1] == a):
+					linked = true
+			if (a in branches) or (b2 in branches):
+				linked = true
+			if not linked:
+				continue
+			if d.x == 1:
+				var gx: int = (a.x + 1) * SLOT_W
+				var gy: int = a.y * SLOT_H + SLOT_H / 2 + rng.randi_range(-1, 1)
+				board.set_wall(Vector2i(gx, gy), false)
+				board.set_wall(Vector2i(gx - 1, gy), false)
+				board.set_wall(Vector2i(gx + 1, gy), false)
+			else:
+				var gy2: int = maxi(a.y, b2.y) * SLOT_H
+				var gx2: int = a.x * SLOT_W + SLOT_W / 2 + rng.randi_range(-1, 1)
+				board.set_wall(Vector2i(gx2, gy2), false)
+				board.set_wall(Vector2i(gx2, gy2 - 1), false)
+				board.set_wall(Vector2i(gx2, gy2 + 1), false)
+	var first_r: Rect2i = chambers[0]["rect"]
+	var last_r: Rect2i = chambers[path.size() - 1]["rect"]
+	var entry := Vector2i(first_r.position.x + 1, first_r.position.y + first_r.size.y / 2)
+	var stairs := Vector2i(last_r.position.x + last_r.size.x / 2,
+		last_r.position.y + last_r.size.y / 2)
+	# ── populate ──────────────────────────────────────────────────────────────
+	var entities: Dictionary = {}
+	var eligible := _biased_mob_keys(mon,
+		_eligible_mobs(mon, floor_num, false), mods.get("mob_tags", []))
+	var obj_keys: Array = _biased_object_keys(env, pref_tags)
+	var hz: String = str(mods.get("hazard_kind", ""))
+	for ci in chambers.size():
+		var r: Rect2i = chambers[ci]["rect"]
+		var is_first: bool = ci == 0
+		var is_stairs: bool = ci == path.size() - 1
+		var is_branch: bool = ci >= path.size()
+		# pillars: cover inside the chamber
+		for _i in rng.randi_range(1, 2):
+			var pc := Vector2i(rng.randi_range(r.position.x + 2, r.position.x + r.size.x - 3),
+				rng.randi_range(r.position.y + 2, r.position.y + r.size.y - 3))
+			if pc != entry and pc != stairs:
+				board.set_wall(pc)
+		# objects (branch chambers are the loot stashes)
+		var n_obj: int = int(round(rng.randi_range(1, 2) * object_mul)) + (3 if is_branch else 0)
+		for _i in n_obj:
+			var oc := _free_in_rect(board, rng, r, entry, stairs)
+			if oc == Vector2i(-1, -1) or obj_keys.is_empty():
+				break
+			var ekey: String = obj_keys[rng.randi_range(0, obj_keys.size() - 1)]
+			var obj := _make_object(ekey, env[ekey], next_id["v"])
+			obj.cell = oc
+			board.place(obj.id, oc)
+			entities[obj.id] = obj
+			next_id["v"] += 1
+		# hazard pools
+		if hz != "" and not is_first:
+			for _i in rng.randi_range(1, 2):
+				var hc := _free_in_rect(board, rng, r, entry, stairs)
+				if hc != Vector2i(-1, -1):
+					board.set_hazard(hc, hz)
+		# enemies: none in the entry chamber, a pack elsewhere
+		var n_en: int = 0 if is_first else clampi(int(round((1 + floor_num / 2) * enemy_mul)), 1, 3)
+		if is_branch:
+			n_en = 1
+		for _i in n_en:
+			var ec := _free_in_rect(board, rng, r, entry, stairs)
+			if ec == Vector2i(-1, -1) or eligible.is_empty():
+				break
+			var mkey: String = eligible[rng.randi_range(0, eligible.size() - 1)]
+			var foe := _make_mob(mkey, mon[mkey], stats.get(mkey), next_id["v"], floor_num)
+			foe.cell = ec
+			foe.aware = false
+			board.place(foe.id, ec)
+			entities[foe.id] = foe
+			next_id["v"] += 1
+		# the stairs chamber breeds the GUARD: its strongest dweller goes Alfa
+		if is_stairs:
+			var best: CombatEntity = null
+			for id in entities:
+				var e: CombatEntity = entities[id]
+				if e.faction == "enemy" and r.has_point(e.cell) 						and (best == null or e.max_hp > best.max_hp):
+					best = e
+			if best != null:
+				best.max_hp = int(best.max_hp * 1.6)
+				best.hp = best.max_hp
+				best.to_hit += 1
+				if not best.tags.has("miniboss"):
+					best.tags.append("miniboss")
+				best.name_pl = "Alfa: " + best.name_pl
+	# an NPC somewhere mid-path (~40%)
+	if rng.randf() < 0.4 and path.size() > 2:
+		var midr: Rect2i = chambers[path.size() / 2]["rect"]
+		var nc := _free_in_rect(board, rng, midr, entry, stairs)
+		if nc != Vector2i(-1, -1):
+			var npc := CombatEntity.new(next_id["v"], "", 1, 10, ["npc", "non_combat"])
+			npc.faction = "npc"
+			npc.affordances = ["talk"]
+			npc.dialogue_tree_key = Dialogue.random_tree_key(rng)
+			npc.name_pl = Dialogue.tree_speaker(npc.dialogue_tree_key)
+			npc.cell = nc
+			board.place(npc.id, nc)
+			entities[npc.id] = npc
+			next_id["v"] += 1
+	# Repair pass: if a random object plugged a door gap, clear the path.
+	_ensure_reachable(board, entry, stairs, entities)
+	return {
+		"name": str(mods.get("label", "Sektor")),
+		"board": board,
+		"entities": entities,
+		"entry": entry,
+		"door": stairs,
+		"is_last": true,
+		"exits": {stairs: {"descend": true, "guarded": true}},
+	}
+
+## A free cell inside a chamber rect, off the entry/stairs. (-1,-1) if none.
+static func _free_in_rect(board: Board, rng: RandomNumberGenerator, r: Rect2i,
+		entry: Vector2i, stairs: Vector2i) -> Vector2i:
+	for _try in 30:
+		var c := Vector2i(rng.randi_range(r.position.x, r.position.x + r.size.x - 1),
+			rng.randi_range(r.position.y, r.position.y + r.size.y - 1))
+		if c != entry and c != stairs and board.is_free(c):
+			return c
+	return Vector2i(-1, -1)
 
 # ── Room generation ───────────────────────────────────────────────────────────
 

@@ -8,6 +8,8 @@ const DMG_PHYSICAL := "physical"
 const DMG_ELECTRIC := "electric"
 const DMG_FIRE := "fire"
 const DMG_ACID := "acid"
+const DMG_EXPLOSION := "explosion"
+const DMG_CRUSH := "crush"
 const DMG_COLD := "cold"
 
 var board: Board
@@ -17,6 +19,7 @@ var player_ap: int = 2           # action points this round (move/hit 1, aimed 2
 var player_ap_max: int = 2
 var round_completed := false     # set when the enemy phase just ran (view: tick the floor)
 var lure: Dictionary = {}        # thrown decoy: {"cell": Vector2i, "turns": int}
+var bombs: Array = []            # placed charges: [{cell: Vector2i, timer: int}]
 var round_num: int = 1
 var side: String = "player"
 var over: bool = false       # terminally over (player dead) — blocks input
@@ -147,6 +150,32 @@ func _apply_damage(target: CombatEntity, base: int, dmg_type: String,
 	if not target.is_alive():
 		board.clear(target.cell)
 		evs.append({"type": "death", "target": target.id})
+		if target.faction == "enemy":
+			evs += _style_credit(target, dmg_type)
+	return evs
+
+## The audience pays for INVENTION: the first kill by a new method this run
+## triples the take; an enemy that never laid eyes on you is a spectacle.
+const METHOD_PL := {
+	"physical": "OSTRZE", "fire": "OGIEŃ", "electric": "PRĄD", "acid": "KWAS",
+	"explosion": "EKSPLOZJA", "crush": "ZGNIECENIE", "poison": "TRUCIZNA",
+	"cold": "MRÓZ",
+}
+
+func _style_credit(target: CombatEntity, dmg_type: String) -> Array:
+	var evs: Array = []
+	var p: CombatEntity = player()
+	var methods: Dictionary = p.flags.get("kill_methods", {})
+	var seen_before: bool = methods.has(dmg_type)
+	methods[dmg_type] = int(methods.get(dmg_type, 0)) + 1
+	p.flags["kill_methods"] = methods
+	if not seen_before:
+		evs.append({"type": "novel_kill", "method": METHOD_PL.get(dmg_type, dmg_type)})
+		evs += _change_audience(6, "novel_kill")
+	if not bool(target.flags.get("seen_player", false)):
+		evs.append({"type": "unseen_kill", "name": target.name_pl})
+		evs += _change_audience(5, "unseen_kill")
+		_add_affinity("environment", 1)
 	return evs
 
 func _roll_hit(bonus: int, ac: int) -> bool:
@@ -269,6 +298,31 @@ func player_shove(dir: Vector2i) -> Array:
 	var target: CombatEntity = entities[occ]
 	var land: Vector2i = adj + dir
 	var evs: Array = [{"type": "shove", "target": target.id, "dir": dir}]
+	if target.faction == "object":
+		# furniture is a weapon: free cell -> it slides; an enemy -> CRUSHED
+		# under it; a wall -> it shatters where it stands.
+		var locc: int = board.occupant_at(land)
+		if board.is_free(land):
+			board.move(target.cell, land)
+			target.cell = land
+			evs.append({"type": "move", "id": target.id, "to": land})
+		elif locc != -1 and entities.has(locc) and entities[locc].faction == "enemy":
+			var victim: CombatEntity = entities[locc]
+			evs += _apply_damage(victim, 5, DMG_CRUSH)
+			if victim.is_alive():
+				victim.add_status("stunned", 1)
+				victim.intent = {}
+				evs.append({"type": "slam", "id": victim.id, "name": victim.name_pl})
+			target.hp = 0; target.alive = false
+			board.clear(target.cell)
+			evs.append({"type": "obj_break", "id": target.id, "name": target.name_pl})
+		else:
+			target.hp = 0; target.alive = false
+			board.clear(target.cell)
+			evs.append({"type": "obj_break", "id": target.id, "name": target.name_pl})
+		_add_affinity("environment", 1)
+		evs += _after_player_action(3)
+		return evs
 	if target.has_status("guard"):
 		target.statuses.erase("guard")   # a shove breaks the stance
 		evs.append({"type": "guard_break", "id": target.id})
@@ -327,7 +381,117 @@ func player_throw(kind: String, cell: Vector2i) -> Array:
 		"lure":
 			lure = {"cell": cell, "turns": 2}
 			evs.append({"type": "lure_set", "cell": cell})
+			# the decoy SCREAMS where it lands — ears near IT wake up (they heard
+			# a noise, they did not see you; ZAOCZNE stays on the table)
+			for le in enemies_alive():
+				var ld: Vector2i = (le.cell - cell).abs()
+				if maxi(ld.x, ld.y) <= 6 and not le.aware:
+					le.aware = true
+					evs.append({"type": "notice", "id": le.id})
 	evs += _after_player_action(5)   # throwing is noisy — that can be the point
+	return evs
+
+## Plant a charge on your own or an adjacent free cell. Fuse: 5 rounds.
+func player_place_bomb(cell: Vector2i) -> Array:
+	if over or side != "player":
+		return []
+	var p: CombatEntity = player()
+	var d: Vector2i = (cell - p.cell).abs()
+	if maxi(d.x, d.y) > 1 or board.is_wall(cell) \
+			or (board.occupant_at(cell) != -1 and board.occupant_at(cell) != player_id):
+		return [{"type": "none", "action": "bomb"}]
+	bombs.append({"cell": cell, "timer": 5})
+	var evs: Array = [{"type": "bomb_placed", "cell": cell}]
+	evs += _after_player_action(1)
+	return evs
+
+## Detonation: damage by ring, INNER walls crumble, objects die, gas pockets
+## sympathize, other charges chain — and the bang pulls every ear to the crater.
+func _explode(cell: Vector2i, radius: int, chain: Array) -> Array:
+	var evs: Array = [{"type": "explosion", "cell": cell, "radius": radius}]
+	chain.append(cell)
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var c: Vector2i = cell + Vector2i(dx, dy)
+			if not board.in_bounds(c):
+				continue
+			var ring: int = maxi(absi(dx), absi(dy))
+			if board.is_wall(c) and c.x > 0 and c.y > 0 and c.x < board.w - 1 and c.y < board.h - 1:
+				board.set_wall(c, false)
+				evs.append({"type": "wall_break", "cell": c})
+			var occ: int = board.occupant_at(c)
+			if occ != -1 and occ != -2 and entities.has(occ):
+				var t: CombatEntity = entities[occ]
+				if t.faction == "object":
+					t.hp = 0; t.alive = false
+					board.clear(c)
+					evs.append({"type": "death", "target": t.id})
+				elif t.is_alive():
+					evs += _apply_damage(t, maxi(4, 14 - 4 * ring), DMG_EXPLOSION)
+			if board.hazard_at(c) == "gas" and ring > 0:
+				board.set_hazard(c, "")
+				evs += _explode(c, 1, chain)
+	# secondary fires near the crater
+	for _i in 2:
+		var fc: Vector2i = cell + Vector2i(rng.randi_range(-1, 1), rng.randi_range(-1, 1))
+		if board.in_bounds(fc) and not board.is_wall(fc) and board.hazard_at(fc) == "":
+			board.set_hazard(fc, "fire")
+	# chain other charges caught in the blast
+	for b in bombs.duplicate():
+		var bc: Vector2i = b["cell"]
+		if bc in chain:
+			continue
+		if maxi(absi(bc.x - cell.x), absi(bc.y - cell.y)) <= radius:
+			bombs.erase(b)
+			evs += _explode(bc, 2, chain)
+	# the bang: wake everything nearby and pull it to the crater
+	for e in enemies_alive():
+		var dd: Vector2i = (e.cell - cell).abs()
+		if maxi(dd.x, dd.y) <= 12:
+			e.aware = true
+	lure = {"cell": cell, "turns": 1}
+	return evs
+
+func _tick_bombs() -> Array:
+	var evs: Array = []
+	for b in bombs.duplicate():
+		b["timer"] = int(b["timer"]) - 1
+		evs.append({"type": "bomb_tick", "cell": b["cell"], "timer": b["timer"]})
+		if int(b["timer"]) <= 0:
+			bombs.erase(b)
+			evs += _explode(b["cell"], 2, [])
+	return evs
+
+## The world breathes once per round: fire spreads to flammable matter, gas
+## kisses flame, anyone STANDING in a fire keeps burning.
+func _environment_round() -> Array:
+	var evs: Array = []
+	var fires: Array = []
+	for c in board.hazards:
+		if str(board.hazards[c]) == "fire":
+			fires.append(c)
+	for fc in fires:
+		for d in DIRS8:
+			var n: Vector2i = (fc as Vector2i) + d
+			if not board.in_bounds(n):
+				continue
+			if board.hazard_at(n) == "gas":
+				board.set_hazard(n, "")
+				evs += _explode(n, 1, [])
+				continue
+			var occ: int = board.occupant_at(n)
+			if occ != -1 and entities.has(occ):
+				var t: CombatEntity = entities[occ]
+				if t.faction == "object" and (t.tags.has("flammable") or t.tags.has("wood")) \
+						and rng.randf() < 0.35:
+					t.hp = 0; t.alive = false
+					board.clear(n)
+					board.set_hazard(n, "fire")
+					evs.append({"type": "ignite", "cell": n, "name": t.name_pl})
+	for id in entities.keys():
+		var e: CombatEntity = entities[id]
+		if e.is_alive() and e.faction != "object" and board.hazard_at(e.cell) == "fire":
+			evs += _apply_damage(e, 2, DMG_FIRE)
 	return evs
 
 func player_interact() -> Array:
@@ -918,6 +1082,11 @@ func _after_player_action(noise_radius: int = 0, cost: int = 1) -> Array:
 		evs.append({"type": "heal", "target": player_id, "amount": 1})
 	if pl.mana < pl.max_mana:               # slow mana regen between casts
 		pl.mana += 1
+	evs += _tick_bombs()
+	evs += _environment_round()
+	if not over:
+		evs += _check_end()
+	evs += _award_kill_xp()
 	side = "player"
 	round_num += 1
 	player_ap = player_ap_max
@@ -963,6 +1132,8 @@ func _update_awareness(noise_radius: int) -> Array:
 		var cheby: int = maxi(d.x, d.y)
 		var sees: bool = cheby <= SIGHT and board.has_los(e.cell, p.cell)
 		var hears: bool = noise_radius > 0 and cheby <= noise_radius
+		if sees:
+			e.flags["seen_player"] = true
 		if sees or hears:
 			e.aware = true
 			evs.append({"type": "notice", "id": e.id})

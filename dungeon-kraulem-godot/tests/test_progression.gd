@@ -93,18 +93,22 @@ func _initialize() -> void:
 	# ── The door-bounce fix: entering a room must not instantly send you back ──
 	var fl := Floor.new(FloorGen.generate(1, 4242, _content()))
 	# walk east until we change rooms (or give up after a generous bound)
-	var start_room := fl.current
-	var hops := 0
-	while fl.current == start_room and hops < 40:
-		fl.sim.player_move(Vector2i.RIGHT)
-		var t = fl.try_transition()
-		hops += 1
-	_ck(fl.current != start_room, "you can actually cross into the next room")
-	# Immediately probing the exit you arrived on must NOT bounce you back.
-	var entered := fl.current
-	var bounced = fl.try_transition()
-	_ck(bounced == null, "standing on the entry cell does not re-trigger the door")
-	_ck(fl.current == entered, "you stay in the room you just entered")
+	# S2: the descent is GUARDED — the gate checks the Alfa's pulse, not your route
+	fl.player.cell = fl.rooms[0]["door"]
+	fl.sim.board.place(fl.player.id, fl.player.cell)
+	fl._entered_on = Vector2i(-9999, -9999)
+	var blocked_g = fl.try_transition()
+	_ck(blocked_g != null and blocked_g.get("blocked", "") == "guard",
+		"the stairs refuse you while the guard lives")
+	for gid in fl.sim.entities:
+		var gge = fl.sim.entities[gid]
+		if gge is CombatEntity and "miniboss" in gge.tags:
+			gge.hp = 0; gge.alive = false
+	var open = fl.try_transition()
+	_ck(open != null and open.get("descend", false),
+		"kill the guard (ANY way) and the stairs open")
+	_ck(fl.descended, "the descent latches once opened")
+
 
 	# ── Companion ally: fights enemies, follows you otherwise ─────────────────
 	var ab := Board.new(6, 6)
@@ -494,7 +498,7 @@ func _initialize() -> void:
 			var fe: CombatEntity = r["entities"][id]
 			if "miniboss" in fe.tags:
 				f1_elite += 1
-	_ck(f1_elite == 0, "floor 1 stays elite-free (the on-ramp)")
+	_ck(f1_elite == 1, "every floor breeds exactly one stairs guard (Alfa)")
 
 	# ── Phase E: the Preacher origin ──────────────────────────────────────────
 	var prd: Dictionary = MetaCatalog.CATALOG.get("origin_kaznodzieja", {})
@@ -534,6 +538,65 @@ func _initialize() -> void:
 	var tf3: Dictionary = FloorGen.generate(3, 99, {})
 	_ck(int(tf1["time_limit"]) == (4 + 1) * 30, "floor 1 grants 5 days of turns")
 	_ck(int(tf3["time_days"]) > int(tf1["time_days"]), "deeper floors grant more days")
+
+	# ══ THE CARL TEST: kill the boss WITHOUT entering its lair ═══════════════
+	# Sneak along the blind corridor, stack charges at the lair's mouth, fall
+	# back, drop the screaming decoy ON the stack — the dinner bell does the rest.
+	var crlb := Board.from_ascii([
+		"##########",
+		"#........#",
+		"#........#",
+		"#.....#..#",
+		"#.....#..#",
+		"#........#",
+		"##########",
+	])
+	var crlp := CombatEntity.new(1, "Karol", 100, 14, ["humanoid"]); crlp.faction = "player"
+	crlp.cell = Vector2i(1, 5); crlb.place(1, crlp.cell)
+	var cboss := CombatEntity.new(2, "Goblin Alfa", 18, 12, ["humanoid", "monster", "miniboss"])
+	cboss.faction = "enemy"; cboss.aware = false; cboss.cell = Vector2i(8, 3); crlb.place(2, cboss.cell)
+	var crls := CombatSim.new(crlb, {1: crlp, 2: cboss}, 1, 21)
+	# r1: two steps in (the lair wall blocks its eyes)
+	crls.player_move(Vector2i.RIGHT); crls.player_move(Vector2i.RIGHT)
+	# r2: step to the mouth + plant charge ONE
+	crls.player_move(Vector2i.RIGHT)
+	crls.player_place_bomb(Vector2i(5, 5))
+	_ck(crlp.cell == Vector2i(4, 5) and not cboss.aware, "you sneak up while the guard sleeps")
+	# r3: plant charge TWO + start falling back
+	crls.player_place_bomb(Vector2i(5, 4))
+	crls.player_move(Vector2i.LEFT)
+	_ck(crls.bombs.size() == 2, "two charges stacked at the lair's mouth")
+	# r4: keep retreating
+	crls.player_move(Vector2i.LEFT); crls.player_move(Vector2i.LEFT)
+	# r5: from safety, the decoy lands ON the stack
+	crls.player_throw("lure", Vector2i(5, 5))
+	crls.player_move(Vector2i.UP)
+	_ck(cboss.aware and not bool(cboss.flags.get("seen_player", false)),
+		"the boss HEARD the decoy but never SAW you")
+	# r6+: stand still and enjoy the show
+	crls.player_wait()
+	if cboss.is_alive():
+		crls.player_wait()
+	_ck(not cboss.is_alive(), "the boss died to the mine — you never entered the lair")
+	_ck(crlp.hp >= 100, "and you never took a scratch (the level-up even healed you)")
+	var meth: Dictionary = crlp.flags.get("kill_methods", {})
+	_ck(meth.has("explosion"), "the kill is credited to EKSPLOZJA (novelty engine)")
+	_ck(not bool(cboss.flags.get("seen_player", false)),
+		"ZABÓJSTWO ZAOCZNE: it died without ever seeing you")
+
+	# the blast also breaches inner walls
+	var wb2 := Board.from_ascii([
+		"#######",
+		"#..#..#",
+		"#..#..#",
+		"#######",
+	])
+	var wp2 := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); wp2.faction = "player"
+	wp2.cell = Vector2i(1, 1); wb2.place(1, wp2.cell)
+	var wcs := CombatSim.new(wb2, {1: wp2}, 1, 22)
+	wcs._explode(Vector2i(2, 1), 2, [])
+	_ck(not wb2.is_wall(Vector2i(3, 1)), "an explosion breaches inner walls")
+	_ck(wb2.is_wall(Vector2i(0, 0)), "the outer shell holds (no escaping the show)")
 
 	# ── Character creator data (appearance) ───────────────────────────────────
 	var apd := Appearance.defaults()

@@ -366,18 +366,12 @@ func _attach_bodies() -> void:
 			e.attach_body(full)
 
 func _recenter() -> void:
-	# Iso stage: shift the origin right by the board height so the westernmost
-	# corner (0, h-1) keeps positive x; frame the camera on the stage center,
-	# left of the fixed log panel (playfield center ≈ 415).
+	# Continuous floors are bigger than the screen: the camera FOLLOWS the
+	# player (smoothly, in _process); here we just snap it on (re)entry.
 	_origin = Vector2(sim.board.h * ISO_W * 0.5 + ISO_W * 0.5, ISO_H * 1.5 + WALL_H)
+	_fit_zoom = 1.0
 	if _cam != null:
-		var center := (_cell_px(Vector2i.ZERO)
-			+ _cell_px(Vector2i(sim.board.w - 1, sim.board.h - 1))) * 0.5
-		# fill the playfield (left of the log panel): zoom to fit the stage
-		var ww := (sim.board.w + sim.board.h) * ISO_W * 0.5 + 80.0
-		var wh := (sim.board.w + sim.board.h) * ISO_H * 0.5 + WALL_H + 120.0
-		_fit_zoom = clampf(minf(780.0 / ww, 540.0 / wh), 0.75, 1.1)
-		_cam.position = center + Vector2((640.0 - 415.0) / _fit_zoom, -10.0)
+		_cam.position = _cell_px(sim.player().cell)
 		_cam.reset_smoothing()
 
 func _reset_visuals() -> void:
@@ -400,6 +394,10 @@ func _check_transition() -> void:
 		return
 	if r.get("blocked", "") == "boss":
 		_log_push("Boss blokuje wyjście. Najpierw go pokonaj.")
+		return
+	if r.get("blocked", "") == "guard":
+		_log_push("Strażnik piętra żyje — zejście zablokowane. Jak go usuniesz, to twoja sprawa.")
+		_play("deny")
 		return
 	if r.get("descend", false):
 		_add_banner("ZEJŚCIE NIŻEJ")
@@ -1090,6 +1088,12 @@ func _apply_loadout() -> void:
 	dec.effect = {"throw": "lure"}
 	dec.tags = ["electronic"]
 	floor.items.append(dec)
+	var chg := GameItem.new()
+	chg.name_pl = "Ładunek wybuchowy"
+	chg.category = GameItem.CAT_THROWN
+	chg.effect = {"place": "bomb"}
+	chg.tags = ["chem", "power"]
+	floor.items.append(chg)
 	var lo := MetaCatalog.loadout()
 	p.species_key = lo["species"]
 	p.origin_key = lo["origin"]
@@ -1372,6 +1376,12 @@ func _bench_attempt_now() -> void:
 func _item_use(idx: int) -> void:
 	if idx >= 0 and idx < floor.items.size():
 		var it: GameItem = floor.items[idx]
+		if it.category == GameItem.CAT_THROWN and it.effect.has("place"):
+			_throw_mode = {"kind": "bomb", "idx": idx, "place": true}
+			_craft_open = false
+			_log_push("Wskaż pole pod ładunek (obok siebie) — PPM odwołuje. Lont: 5 rund.")
+			queue_redraw()
+			return
 		if it.category == GameItem.CAT_THROWN and it.effect.has("throw"):
 			# cell-targeted: pick where it lands (range 4, line of sight)
 			_throw_mode = {"kind": str(it.effect["throw"]), "idx": idx}
@@ -2510,6 +2520,31 @@ func _animate(evs: Array) -> void:
 				_add_floater(int(e["id"]), "bez linii strzału", COL_DIM)
 			"lure_set":
 				_log_push("Wabik piszczy — wszystko, co ma uszy, idzie TAM.")
+			"bomb_placed":
+				_log_push("Ładunek uzbrojony. Pięć rund do huku.")
+				_play("click")
+			"explosion":
+				_play("explode")
+				_shake = maxf(_shake, 12.0)
+				_zoom_punch = maxf(_zoom_punch, 0.07)
+				_spawn_parts(_cell_px(e["cell"]), 26, Color(1.0, 0.62, 0.2), 150.0, 120.0, 0.8, 3.0)
+				_spawn_parts(_cell_px(e["cell"]), 14, Color(0.3, 0.3, 0.3), 80.0, -60.0, 1.2, 2.4)
+				_rebuild_world_lights()
+			"wall_break":
+				_spawn_parts(_cell_px(e["cell"]), 10, Color(0.45, 0.45, 0.5), 90.0, 160.0, 0.9, 2.6)
+				_play("crunch")
+			"ignite":
+				_log_push("%s zajmuje się ogniem!" % e.get("name", "Coś"))
+			"obj_break":
+				_add_floater(int(e["id"]), "W DRZAZGI", COL_AMBER)
+				_play("crunch")
+			"novel_kill":
+				_add_banner("NOWY SPOSÓB: %s  +6 WIDOWNI" % e.get("method", "?"))
+				_play("jackpot")
+			"unseen_kill":
+				_add_banner("ZABÓJSTWO ZAOCZNE  +5")
+				_play("chime")
+				_log_push("%s zginął, nie wiedząc nawet, że istniejesz. Widownia oszalała." % e.get("name", "Cel"))
 			"throw":
 				_play("whoosh")
 			"sneak":
@@ -2919,6 +2954,9 @@ func _process(dt: float) -> void:
 			if _shake > 0.0 else Vector2.ZERO
 		_zoom_punch = maxf(_zoom_punch - dt * 0.35, 0.0)
 		_cam.zoom = Vector2.ONE * _fit_zoom * (1.0 + _zoom_punch)
+		if sim != null and not _title:
+			var fol: Vector2 = _vpos.get(sim.player_id, _cell_px(sim.player().cell))
+			_cam.position = _cam.position.lerp(fol + Vector2(40.0, -20.0), minf(1.0, dt * 5.0))
 	# Particles: integrate, gravity, cull.
 	for pt in _parts:
 		pt.life = float(pt.life) - dt
@@ -3096,7 +3134,8 @@ func _draw() -> void:
 				if b.is_wall(tc):
 					continue
 				var dd: Vector2i = (tc - p.cell).abs()
-				if maxi(dd.x, dd.y) <= 4 and b.has_los(p.cell, tc):
+				var rng_max: int = 1 if bool(_throw_mode.get("place", false)) else 4
+				if maxi(dd.x, dd.y) <= rng_max and (rng_max == 1 or b.has_los(p.cell, tc)):
 					draw_polyline(_diamond_closed(_cell_px(tc), 9.0), Color(COL_AMBER, 0.35), 1.0)
 	_draw_preview()
 	# ── Pass 2: solids, far to near (screen y IS depth in 2:1 iso) ────────────
@@ -3149,6 +3188,17 @@ func _draw() -> void:
 			elif e3.faction == "object":    _draw_object(e3, apos, fade)
 			elif e3.faction == "npc":       _draw_npc(apos, fade)
 			else:                           _draw_enemy(e3, apos, fade, flashing)
+	# planted charges: black sphere, sparking fuse, fat countdown
+	for bsim in sim.bombs:
+		var bpx := _cell_px(bsim["cell"])
+		_draw_ellipse(bpx + Vector2(0, 4), 9, 4, Color(0, 0, 0, 0.4))
+		draw_circle(bpx + Vector2(0, -4), 7.5, Color(0.10, 0.10, 0.12))
+		draw_arc(bpx + Vector2(0, -4), 7.5, 0, TAU, 14, Color(0.35, 0.35, 0.4), 1.2)
+		draw_line(bpx + Vector2(0, -11), bpx + Vector2(4, -16), Color(0.55, 0.45, 0.3), 1.5)
+		if fmod(tnow * 4.0, 1.0) < 0.5:
+			draw_circle(bpx + Vector2(4, -16), 1.8, COL_AMBER)
+		draw_string(_font, bpx + Vector2(-4, -20), str(bsim["timer"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_RED)
 	_draw_intent()
 	_draw_drone(ppx, tnow)
 	# Particles ride above entities.
@@ -3911,7 +3961,6 @@ func _draw_preview() -> void:
 
 func _draw_hud(c: CanvasItem) -> void:
 	var p := sim.player()
-	_draw_minimap(c)
 	# ── Broadcast HUD: floor + collapse bar, contestant card, audience meter,
 	# fading ticker. Everything else lives in screens (Tab/C/I/Esc). ───────────
 	_draw_tracked(c, Vector2(40, 32), "PIĘTRO %d — %s" % [floor.depth, floor.current_name()],
@@ -5387,11 +5436,16 @@ func _draw_ticker(c: CanvasItem) -> void:
 func _throw_at(cell: Vector2i) -> void:
 	var idx: int = int(_throw_mode.get("idx", -1))
 	var kind: String = str(_throw_mode.get("kind", ""))
+	var _throw_mode_place: bool = bool(_throw_mode.get("place", false))
 	_throw_mode = {}
 	if idx < 0 or idx >= floor.items.size():
 		queue_redraw()
 		return
-	var evs: Array = sim.player_throw(kind, cell)
+	var evs: Array
+	if bool(_throw_mode_place):
+		evs = sim.player_place_bomb(cell)
+	else:
+		evs = sim.player_throw(kind, cell)
 	for ev in evs:
 		if str(ev.get("type", "")) == "none":
 			_log_push("Za daleko albo bez linii rzutu.")

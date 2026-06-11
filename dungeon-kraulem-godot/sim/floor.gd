@@ -176,6 +176,13 @@ func try_transition() -> Variant:
 		# A gated exit (boss arena) won't open until the room is cleared.
 		if ex.get("requires_clear", false) and not sim.enemies_alive().is_empty():
 			return {"blocked": "boss"}
+		# A guarded exit: the floor's Alfa must die first (HOW is your business —
+		# blade, fire, bomb from another chamber... the gate only checks the pulse).
+		if ex.get("guarded", false):
+			for id in sim.entities:
+				var ge = sim.entities[id]
+				if ge is CombatEntity and ge.is_alive() and "miniboss" in ge.tags:
+					return {"blocked": "guard"}
 		descended = true
 		return {"descend": true}
 	enter(int(ex["to"]), ex["at"])
