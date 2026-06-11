@@ -166,6 +166,8 @@ func _ready() -> void:
 
 const FINAL_FLOOR := 6   # descending from here wins the run
 var _run_seed: int = 20260605
+var _pending_daily := false      # title asked for the daily gauntlet
+var _daily_run := false          # this run uses the shared date seed
 
 func _build() -> void:
 	_title = false
@@ -194,13 +196,17 @@ func _build() -> void:
 			_maybe_spawn_crawler()
 			return
 	# Fresh run.
-	_run_seed = _new_seed()
+	_daily_run = _pending_daily
+	_pending_daily = false
+	_run_seed = _daily_seed() if _daily_run else _new_seed()
 	var data := FloorGen.generate(1, _run_seed, content)
 	data["companion"] = _make_companion()    # pet ally from the loadout, if any
 	floor = Floor.new(data)
 	sim = floor.sim
 	_hint = data.get("hint", "")
 	_log = ["Piętro 1. Zaczynasz zjazd. Rozbieraj, kuj, walcz — i schodź głębiej."]
+	if _daily_run:
+		_log.append("BIEG DNIA %s — cała galaktyka gra dziś na tym samym torze." 			% Time.get_date_string_from_system())
 	_apply_loadout()               # bake the meta-progression loadout into this fresh run
 	_arm_floor_traits()
 	sim.refill_mana()
@@ -215,6 +221,12 @@ func _build() -> void:
 func _new_seed() -> int:
 	# Varies per launch (Math.random/argless Date are unavailable in this harness).
 	return int(Time.get_ticks_usec()) & 0x7fffffff
+
+## Daily gauntlet: everyone who presses [D] today gets the SAME floors.
+func _daily_seed() -> int:
+	var d := Time.get_date_dict_from_system()
+	var n: int = int(d.year) * 10000 + int(d.month) * 100 + int(d.day)
+	return (n * 2654435761) & 0x7fffffff
 
 ## Entity content pulled from the Data autoload (empty -> FloorGen fallback).
 func _content_bundle() -> Dictionary:
@@ -510,6 +522,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_open_ach_screen(); return
 		if kc == KEY_M:
 			_meta_screen = true; _meta_scroll = 0.0; queue_redraw(); return
+		if kc == KEY_D:
+			Save.clear()
+			_pending_daily = true
+			_build()
+			return
 		if kc == KEY_N:
 			Save.clear()
 		if kc == KEY_ENTER or kc == KEY_KP_ENTER or kc == KEY_N or kc == KEY_SPACE:
@@ -819,6 +836,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 	match z.get("kind", ""):
 		"title_continue", "title_start": _build()
 		"title_new":         Save.clear(); _build()
+		"title_daily":       Save.clear(); _pending_daily = true; _build()
 		"summary_continue":
 			if _summary_lock <= 0.0:
 				_summary = {}; _summary_lines = []; _done = false; _build()
@@ -991,6 +1009,8 @@ func _apply_loadout() -> void:
 			if it != null: floor.items.append(it)
 		if eff.has("trait"):
 			p.species_trait = str(eff["trait"])
+		if eff.has("otrait"):
+			p.origin_trait = str(eff["otrait"])
 		if eff.has("audience_min") and floor.audience != null:
 			floor.audience.min_rating = int(eff["audience_min"])
 		if eff.has("audience") and floor.audience != null:
@@ -1914,6 +1934,8 @@ func _resolve_speak(intent: String, line: String, wild: bool) -> void:
 		_advance_floor_turn(); queue_redraw(); return
 	if wild: dc += 4
 	var roll := _narr_rng.randi_range(1, 20) + p.stat_mod("CHA")
+	if p.origin_trait == "preacher":
+		roll += 3   # the Preacher's word cuts deeper
 	var crit := roll >= dc + 8 or (dc >= 16 and roll >= dc)
 	var ok := roll >= dc
 	var partial := roll >= dc - 4
@@ -2254,6 +2276,9 @@ func _animate(evs: Array) -> void:
 				var col: Color = COL_CYAN if e.get("dmg_type") == "electric" else COL_RED
 				_add_floater(tid, "-%d" % e["amount"], col)
 				_play("crit" if int(e["amount"]) >= 12 else "hit")
+				if tid == sim.player_id and floor.player.hp <= floor.player.max_hp / 4:
+					_hint_once("low_hp",
+						"Mało zdrowia! Warsztat [I] → PRZEDMIOTY i użyj apteczki, albo wycofaj się do innego pokoju.")
 				_shake = maxf(_shake, 5.0 if e["amount"] >= 12 else 2.5)
 				_spawn_parts(_vpos.get(tid, _cell_px(Vector2i.ZERO)),
 					mini(4 + int(e["amount"]) / 3, 12), _dmg_spark_color(str(e.get("dmg_type", ""))))
@@ -2525,6 +2550,20 @@ func _narrate(category: String) -> void:
 		_log_push("Konferansjer: " + line)
 		_play("blip")   # the host's voice, Animal-Crossing style
 
+## Phase E onboarding: one-time contextual tips. Stored on the player's flags,
+## so they survive saves and never repeat within a run.
+func _hint_once(key: String, text: String) -> void:
+	if floor == null:
+		return
+	var seen: Array = floor.player.flags.get("hints_seen", [])
+	if key in seen:
+		return
+	seen.append(key)
+	floor.player.flags["hints_seen"] = seen
+	_log_push("PORADNIK: " + text)
+	_play("chime")
+	queue_redraw()
+
 func _log_push(line: String) -> void:
 	_log.append(line)
 	if _log.size() > 9:
@@ -2713,6 +2752,11 @@ func _process(dt: float) -> void:
 				for me in sim.enemies_alive():
 					if me.aware:
 						mood = "combat"
+						_hint_once("first_combat",
+							"Walka! Kliknij wroga — pasek celu zdradza jego STYL i kontrę. [T] celuje w część ciała, Shift+kierunek pcha.")
+						if "miniboss" in me.tags:
+							_hint_once("alfa",
+								"ALFA — wzmocniony wódz piętra: więcej zdrowia, celniejsze ciosy. Celowanie [T] w nogi spowalnia.")
 						break
 		_sfx.music(mood)
 	# Biome mood: ambient grade + the player light track the active theme.
@@ -3222,6 +3266,12 @@ func _draw_title(c: CanvasItem) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
 		_zone(Rect2(176, y - 24, 520, 34), "title_start")
 		y += 38
+	# Daily gauntlet — one shared seed per calendar day
+	c.draw_string(_font, Vector2(184, y + 22),
+		"◆  Bieg dnia — wspólny tor całej galaktyki   [D]",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_PURPLE)
+	_zone(Rect2(176, y - 2, 520, 32), "title_daily")
+	y += 38
 	# Achievements gallery entry
 	c.draw_string(_font, Vector2(184, y + 22),
 		"🏆  Osiągnięcia  (%d / %d)   [A]" % [Achievements.count_unlocked(), Achievements.total()],
@@ -4477,16 +4527,16 @@ func _draw_craft_panel(c: CanvasItem) -> void:
 	c.draw_line(Vector2(px + 12, py + 42), Vector2(px + W - 12, py + 42), COL_GRID, 1.0)
 
 	if mode_bench:
-		_draw_bench_panel(px, py, W, H)
+		_draw_bench_panel(c, px, py, W, H)
 	else:
-		_draw_items_panel(px, py, W, H)
+		_draw_items_panel(c, px, py, W, H)
 
-func _draw_bench_panel(px: float, py: float, W: float, H: float) -> void:
+func _draw_bench_panel(c: CanvasItem, px: float, py: float, W: float, H: float) -> void:
 	var mat_keys := sim.materials.keys()
 	# Left: materials list
-	draw_string(_font, Vector2(px + 16, py + 54), "MATERIAŁY",
+	c.draw_string(_font, Vector2(px + 16, py + 54), "MATERIAŁY",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER)
-	draw_string(_font, Vector2(px + 16, py + 70), "(kliknij lub cyfra = dorzuć na stół)",
+	c.draw_string(_font, Vector2(px + 16, py + 70), "(kliknij lub cyfra = dorzuć na stół)",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COL_DIM)
 	for i in mat_keys.size():
 		var mat: String = mat_keys[i]
@@ -4494,25 +4544,25 @@ func _draw_bench_panel(px: float, py: float, W: float, H: float) -> void:
 		var tags := Crafting.material_tags(mat)
 		var mrect := Rect2(px + 12, yy - 16, 300, 42)
 		if _hover(mrect):
-			draw_rect(mrect, Color(COL_CYAN, 0.10))
-		draw_string(_font, Vector2(px + 16, yy),
+			c.draw_rect(mrect, Color(COL_CYAN, 0.10))
+		c.draw_string(_font, Vector2(px + 16, yy),
 			"%d. %s x%d" % [i + 1, mat, int(sim.materials[mat])],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 15, COL_BRIGHT)
 		_zone(mrect, "bench_mat", i)
 		var tag_x := px + 20
 		for t in tags:
 			var tw := float(_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x) + 16
-			draw_rect(Rect2(tag_x, yy + 18, tw, 18), Color(0.12, 0.18, 0.24, 0.8), true, 0.0, false)
-			draw_rect(Rect2(tag_x, yy + 18, tw, 18), COL_CYAN, false, 1.0)
-			draw_string(_font, Vector2(tag_x + 8, yy + 31), t,
+			c.draw_rect(Rect2(tag_x, yy + 18, tw, 18), Color(0.12, 0.18, 0.24, 0.8), true, 0.0, false)
+			c.draw_rect(Rect2(tag_x, yy + 18, tw, 18), COL_CYAN, false, 1.0)
+			c.draw_string(_font, Vector2(tag_x + 8, yy + 31), t,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_CYAN)
 			tag_x += tw + 4
 
 	# Center: bench slots
 	var bx := px + 340.0
-	draw_string(_font, Vector2(bx, py + 54), "STÓŁ  (max 6 slotów)",
+	c.draw_string(_font, Vector2(bx, py + 54), "STÓŁ  (max 6 slotów)",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_CYAN)
-	draw_string(_font, Vector2(bx, py + 70), "kliknij slot = zdejmij   ·   Wytwórz / Enter = spróbuj",
+	c.draw_string(_font, Vector2(bx, py + 70), "kliknij slot = zdejmij   ·   Wytwórz / Enter = spróbuj",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COL_DIM)
 	for i in 6:
 		var sx := bx + (i % 3) * 150.0
@@ -4521,24 +4571,24 @@ func _draw_bench_panel(px: float, py: float, W: float, H: float) -> void:
 		var srect := Rect2(sx, sy, 140, 68)
 		var hot := filled and _hover(srect)
 		var bc := (COL_RED if hot else COL_CYAN) if filled else COL_GRID
-		draw_rect(srect, Color(0.20, 0.12, 0.14, 0.9) if hot else Color(0.10, 0.14, 0.20, 0.9))
-		draw_rect(srect, bc, false, 2.0)
+		c.draw_rect(srect, Color(0.20, 0.12, 0.14, 0.9) if hot else Color(0.10, 0.14, 0.20, 0.9))
+		c.draw_rect(srect, bc, false, 2.0)
 		if filled:
-			draw_string(_font, Vector2(sx + 70, sy + 34), _bench_slots[i],
+			c.draw_string(_font, Vector2(sx + 70, sy + 34), _bench_slots[i],
 				HORIZONTAL_ALIGNMENT_CENTER, -1, 15, COL_BRIGHT)
-			draw_string(_font, Vector2(sx + 70, sy + 54), "(zdejmij)" if hot else "",
+			c.draw_string(_font, Vector2(sx + 70, sy + 54), "(zdejmij)" if hot else "",
 				HORIZONTAL_ALIGNMENT_CENTER, -1, 11, COL_RED)
 			_zone(srect, "bench_remove", i)
 		else:
-			draw_string(_font, Vector2(sx + 70, sy + 38), "pusty",
+			c.draw_string(_font, Vector2(sx + 70, sy + 38), "pusty",
 				HORIZONTAL_ALIGNMENT_CENTER, -1, 13, COL_DIM)
 	# Wytwórz button (bottom-left, clear of the preview column)
 	if not _bench_slots.is_empty():
 		var wb := Rect2(px + 16, py + H - 64, 300, 36)
 		var wh := _hover(wb)
-		draw_rect(wb, Color(0.12, 0.22, 0.14, 0.95) if wh else Color(0.10, 0.16, 0.11, 0.9))
-		draw_rect(wb, COL_GREEN, false, 2.0)
-		draw_string(_font, Vector2(px + 166, py + H - 40), "WYTWÓRZ",
+		c.draw_rect(wb, Color(0.12, 0.22, 0.14, 0.95) if wh else Color(0.10, 0.16, 0.11, 0.9))
+		c.draw_rect(wb, COL_GREEN, false, 2.0)
+		c.draw_string(_font, Vector2(px + 166, py + H - 40), "WYTWÓRZ",
 			HORIZONTAL_ALIGNMENT_CENTER, -1, 18, COL_GREEN)
 		_zone(wb, "bench_attempt")
 
@@ -4552,62 +4602,62 @@ func _draw_bench_panel(px: float, py: float, W: float, H: float) -> void:
 		var known: bool = _bench_preview.get("known", false)
 		var risk: String = _bench_preview.get("risk_label", "")
 		# Fuzzy description
-		draw_string(_font, Vector2(bx, preview_y), fuzzy,
+		c.draw_string(_font, Vector2(bx, preview_y), fuzzy,
 			HORIZONTAL_ALIGNMENT_LEFT, 440, 14, COL_BRIGHT)
-		draw_string(_font, Vector2(bx, preview_y + 24),
+		c.draw_string(_font, Vector2(bx, preview_y + 24),
 			"Próba: k20 + INT vs DC %d%s" % [dc, "  (przepis znany)" if known else ""],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 		# Stability bar
 		var bar_w := 280.0
-		draw_string(_font, Vector2(bx, preview_y + 48), "Stabilność",
+		c.draw_string(_font, Vector2(bx, preview_y + 48), "Stabilność",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
-		draw_rect(Rect2(bx + 90, preview_y + 42, bar_w, 14),
+		c.draw_rect(Rect2(bx + 90, preview_y + 42, bar_w, 14),
 			Color(0.15, 0.12, 0.10), true, 0.0, false)
-		draw_rect(Rect2(bx + 90, preview_y + 42, bar_w * stab / 100.0, 14),
+		c.draw_rect(Rect2(bx + 90, preview_y + 42, bar_w * stab / 100.0, 14),
 			COL_AMBER, true, 0.0, false)
-		draw_string(_font, Vector2(bx + 90 + bar_w + 6, preview_y + 53),
+		c.draw_string(_font, Vector2(bx + 90 + bar_w + 6, preview_y + 53),
 			"%d%%" % stab, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_BRIGHT)
 		# Risk label
-		draw_string(_font, Vector2(bx, preview_y + 68),
+		c.draw_string(_font, Vector2(bx, preview_y + 68),
 			"Ryzyko: " + risk, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_RED)
 		# Outcome tiers
 		var tiers: Array = _bench_preview.get("tiers", [])
 		var tier_colors := [COL_GREEN, COL_BRIGHT, COL_AMBER, COL_DIM, COL_RED]
 		for i in tiers.size():
 			var tier_name: String = tiers[i][0]; var tier_desc: String = tiers[i][1]
-			draw_string(_font, Vector2(bx, preview_y + 96 + i * 20), tier_name,
+			c.draw_string(_font, Vector2(bx, preview_y + 96 + i * 20), tier_name,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tier_colors[i], TextServer.JUSTIFICATION_NONE)
-			draw_string(_font, Vector2(bx + 90, preview_y + 96 + i * 20), tier_desc,
+			c.draw_string(_font, Vector2(bx + 90, preview_y + 96 + i * 20), tier_desc,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tier_colors[i])
 
 	# Right: recipe book
 	var rx := px + 820.0
-	draw_string(_font, Vector2(rx, py + 54), "TWOJE RECEPTURY",
+	c.draw_string(_font, Vector2(rx, py + 54), "TWOJE RECEPTURY",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_GREEN)
 	if floor.discovered_recipes.is_empty():
-		draw_string(_font, Vector2(rx, py + 80), "Brak. Eksperymentuj tagami.",
+		c.draw_string(_font, Vector2(rx, py + 80), "Brak. Eksperymentuj tagami.",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	else:
 		for i in floor.discovered_recipes.size():
 			var rec: Dictionary = floor.discovered_recipes[i]
 			var ry2 := py + 78 + i * 42
-			draw_string(_font, Vector2(rx, ry2), "+ " + rec.get("name", "?"),
+			c.draw_string(_font, Vector2(rx, ry2), "+ " + rec.get("name", "?"),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_GREEN)
 			var tag_str: String = ", ".join(rec.get("tags", []))
-			draw_string(_font, Vector2(rx + 14, ry2 + 18), tag_str,
+			c.draw_string(_font, Vector2(rx + 14, ry2 + 18), tag_str,
 				HORIZONTAL_ALIGNMENT_LEFT, 310, 11, COL_DIM)
-	draw_string(_font, Vector2(px + 14, py + H - 20),
+	c.draw_string(_font, Vector2(px + 14, py + H - 20),
 		"Nie znasz przepisów na starcie. Eksperymentujesz tagami; co uda się raz — zapamiętujesz.",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
-func _draw_items_panel(px: float, py: float, W: float, _H: float) -> void:
+func _draw_items_panel(c: CanvasItem, px: float, py: float, W: float, _H: float) -> void:
 	var cy := py + 60.0
 	# Items
-	draw_string(_font, Vector2(px + 16, cy), "PRZEDMIOTY",
+	c.draw_string(_font, Vector2(px + 16, cy), "PRZEDMIOTY",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
 	cy += 22
 	if floor.items.is_empty():
-		draw_string(_font, Vector2(px + 16, cy), "Brak.", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+		c.draw_string(_font, Vector2(px + 16, cy), "Brak.", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 		cy += 20
 	else:
 		for i in floor.items.size():
@@ -4615,35 +4665,35 @@ func _draw_items_panel(px: float, py: float, W: float, _H: float) -> void:
 			var rcol := Rarity.color(item.rarity)
 			var irect := Rect2(px + 12, cy - 16, W - 24, 34)
 			if _hover(irect):
-				draw_rect(irect, Color(rcol, 0.12))
-			draw_string(_font, Vector2(px + 16, cy),
+				c.draw_rect(irect, Color(rcol, 0.12))
+			c.draw_string(_font, Vector2(px + 16, cy),
 				"%d. %s   — użyj" % [i + 1, item.display_name()],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, rcol)
-			draw_string(_font, Vector2(px + 30, cy + 16), item.short_desc(),
+			c.draw_string(_font, Vector2(px + 30, cy + 16), item.short_desc(),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 			_zone(irect, "item_use", i)
 			cy += 36
 	cy += 10
-	draw_line(Vector2(px + 12, cy), Vector2(px + W - 12, cy), COL_GRID, 1.0)
+	c.draw_line(Vector2(px + 12, cy), Vector2(px + W - 12, cy), COL_GRID, 1.0)
 	cy += 12
 	# Boxes
-	draw_string(_font, Vector2(px + 16, cy), "SKRZYNKI",
+	c.draw_string(_font, Vector2(px + 16, cy), "SKRZYNKI",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
 	cy += 22
 	if floor.boxes.is_empty():
-		draw_string(_font, Vector2(px + 16, cy), "Brak.", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+		c.draw_string(_font, Vector2(px + 16, cy), "Brak.", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	else:
 		for i in floor.boxes.size():
 			var box := floor.boxes[i] as GameBox
 			var bcol := Rarity.color(box.rarity)
 			var brect := Rect2(px + 12, cy - 16, W - 24, 26)
 			if _hover(brect):
-				draw_rect(brect, Color(bcol, 0.12))
-			draw_string(_font, Vector2(px + 16, cy),
+				c.draw_rect(brect, Color(bcol, 0.12))
+			c.draw_string(_font, Vector2(px + 16, cy),
 				"%d. %s   — otwórz" % [i + 1 + floor.items.size(), box.display_name()],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, bcol)
 			_zone(brect, "box_open", i)
 			cy += 26
-	draw_string(_font, Vector2(px + 16, cy + 20),
+	c.draw_string(_font, Vector2(px + 16, cy + 20),
 		"kliknij przedmiot = użyj · kliknij skrzynkę = otwórz · ([1–9] / Enter też działają)",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)

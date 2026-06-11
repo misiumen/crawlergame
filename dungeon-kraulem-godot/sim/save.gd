@@ -63,7 +63,7 @@ static func _player_dict(p) -> Dictionary:
 		"level": p.level, "xp": p.xp, "skill_points": p.skill_points,
 		"mana": p.mana, "max_mana": p.max_mana,
 		"species_key": p.species_key, "origin_key": p.origin_key, "trait": p.species_trait,
-		"magic_affinity": p.magic_affinity,
+		"magic_affinity": p.magic_affinity, "origin_trait": p.origin_trait,
 		"equipment": _equipment_dict(p.equipment),
 		"flags": p.flags.duplicate(true),
 		"relationships": p.relationships.duplicate(true),
@@ -124,6 +124,7 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 	p.origin_key = str(pd.get("origin_key", ""))
 	p.species_trait = str(pd.get("trait", ""))
 	p.magic_affinity = str(pd.get("magic_affinity", ""))
+	p.origin_trait = str(pd.get("origin_trait", ""))
 	p.max_mana = int(pd.get("max_mana", 3))
 	p.mana = int(pd.get("mana", p.max_mana))
 	p.equipment = {}

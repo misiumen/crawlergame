@@ -49,6 +49,23 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
 		for i in room_count:
 			rooms.append(_gen_room(rng, floor_num, i, room_count, mon, env, stats, next_id, mods))
 		_link_rooms(rooms)
+		# Phase E: from floor 2 up, every floor has ONE elite — the strongest enemy
+		# of the last room becomes an "Alfa" miniboss (more HP, hits harder, spiked
+		# silhouette + enrage via the miniboss tag). A guaranteed fight worth respecting.
+		if floor_num >= 2:
+			var last_ents: Dictionary = rooms[rooms.size() - 1]["entities"]
+			var best: CombatEntity = null
+			for id in last_ents:
+				var e: CombatEntity = last_ents[id]
+				if e.faction == "enemy" and (best == null or e.max_hp > best.max_hp):
+					best = e
+			if best != null:
+				best.max_hp = int(best.max_hp * 1.6)
+				best.hp = best.max_hp
+				best.to_hit += 1
+				if not best.tags.has("miniboss"):
+					best.tags.append("miniboss")
+				best.name_pl = "Alfa: " + best.name_pl
 
 	var player := CombatEntity.new(1, "Bezimienny", 100, 14, ["humanoid"])
 	player.faction = "player"
@@ -114,7 +131,9 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 		next_id["v"] += 1
 
 	# Enemies (deeper floors = more, harder). Room 0 a touch lighter.
-	var eligible := _eligible_mobs(mon, floor_num, false)
+	# The biome's mob_tags triple the weight of on-theme monsters (distinct rosters).
+	var eligible := _biased_mob_keys(mon,
+		_eligible_mobs(mon, floor_num, false), mods.get("mob_tags", []))
 	var n_enemy: int = clampi(int(round((floor_num / 2 + idx) * enemy_mul)), 0, 4)
 	if idx == 0:
 		n_enemy = maxi(0, n_enemy - 1)
@@ -216,6 +235,22 @@ static func _eligible_mobs(mon: Dictionary, floor_num: int, allow_boss: bool) ->
 			out.append(key)
 	if out.is_empty():   # never strand the generator
 		out = mon.keys()
+	return out
+
+## Weight eligible mobs toward the biome's preferred tags (3x). A biome with no
+## mob_tags — or no matching monsters — degrades gracefully to the flat pool.
+static func _biased_mob_keys(mon: Dictionary, eligible: Array, mob_tags: Array) -> Array:
+	if mob_tags.is_empty():
+		return eligible
+	var out: Array = []
+	for key in eligible:
+		out.append(key)
+		var tags: Array = (mon[key] as Dictionary).get("tags", [])
+		for t in mob_tags:
+			if t in tags:
+				out.append(key)
+				out.append(key)
+				break
 	return out
 
 static func _tag_floor_min(tags: Array) -> int:

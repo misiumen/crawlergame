@@ -58,6 +58,7 @@ const CATALOG: Dictionary = {
 	"origin_sponsor_reject":   {"kind": "origin", "label": "Niechciane Dziecko Sponsorów", "reward": "Każdy sponsor startuje z uwagą −5, ale desperacja zaostrza refleks (+1 ZRĘ).", "cost": 30, "effect": {"sponsor_all": -5, "stats": {"DEX": 1}}},
 	"origin_byly_konferansjer":{"kind": "origin", "label": "Były Konferansjer", "reward": "Konferansjer mówi o tobie ze współczuciem: +8 widowni, +1 CHA.", "cost": 40, "effect": {"audience": 8, "stats": {"CHA": 1}}},
 	"origin_dziedzic_k7":      {"kind": "origin", "label": "Dziedzic Kanału 7", "reward": "Wbudowany mikrofon kierunkowy: +10 widowni i markowa czapka.", "cost": 50, "effect": {"audience": 10, "items": ["sponsor_kepi"]}},
+	"origin_kaznodzieja":      {"kind": "origin", "label": "Kaznodzieja", "reward": "+2 CHA, −1 SIŁ. SŁOWO TO BROŃ: +3 do perswazji [K], a twoi nawróceni gorliwiej szerzą wiarę.", "cost": 45, "effect": {"stats": {"CHA": 2, "STR": -1}, "otrait": "preacher"}},
 
 	# ── Start perks (passive — all owned perks auto-apply each run) ───────────
 	"perk_lapowka_dla_portiera":{"kind": "start_perk", "label": "Łapówka dla portiera", "reward": "Startujesz z dodatkowym złomem w kieszeni (3).", "cost": 18, "effect": {"materials": {"złom": 3}}},
@@ -105,7 +106,7 @@ const ORDER: Array = [
 	"species_bezimienny", "species_mutant_chemiczny", "species_grzybica", "species_cyborg_recyklingu",
 	"species_pamietajacy", "species_kolyski_anti_hosta", "species_stary_uczestnik", "species_bez_twarzy", "species_ferromanta_meta",
 	"origin_debiutant", "origin_drugi_cykl", "origin_sponsorowany", "origin_zhanbiony_showman", "origin_wieczny_stazysta",
-	"origin_sponsor_reject", "origin_byly_konferansjer", "origin_dziedzic_k7",
+	"origin_sponsor_reject", "origin_byly_konferansjer", "origin_dziedzic_k7", "origin_kaznodzieja",
 	"perk_lapowka_dla_portiera", "perk_insiderskie_info", "perk_stara_legitymacja", "perk_lyzka_cudu", "perk_rzemieslnik_terminala",
 	"perk_okopowy_weteran", "perk_handlarz_pakietow", "perk_taneczne_nogi", "perk_dzikus_z_arena", "perk_skapy_jak_widz", "perk_kolekcjoner",
 	"item_mikrofon_anty_hosta", "item_obrazek_finalu", "item_skarpetka_pulkownika", "item_mosiezny_pierscien_producenta",

@@ -408,5 +408,42 @@ func _initialize() -> void:
 	cvs._enemy_turn()
 	_ck(cvp.hp == pre_hp, "a charmed enemy does not attack you")
 
+	# ── Phase E: guaranteed Alfa elite per floor (from floor 2 up) ────────────
+	var phe: Dictionary = FloorGen.generate(3, 4242, {})
+	var phe_rooms: Array = phe["rooms"]
+	var last_ents: Dictionary = phe_rooms[phe_rooms.size() - 1]["entities"]
+	var elite_n := 0
+	var enemy_n := 0
+	var elite_named := false
+	for id in last_ents:
+		var le: CombatEntity = last_ents[id]
+		if le.faction == "enemy":
+			enemy_n += 1
+			if "miniboss" in le.tags:
+				elite_n += 1
+				elite_named = le.name_pl.begins_with("Alfa: ")
+	_ck(enemy_n == 0 or elite_n == 1, "floor 3's last room holds exactly one Alfa elite")
+	_ck(enemy_n == 0 or elite_named, "the elite is named Alfa: <name>")
+	var phe1: Dictionary = FloorGen.generate(1, 4242, {})
+	var f1_elite := 0
+	for r in phe1["rooms"]:
+		for id in r["entities"]:
+			var fe: CombatEntity = r["entities"][id]
+			if "miniboss" in fe.tags:
+				f1_elite += 1
+	_ck(f1_elite == 0, "floor 1 stays elite-free (the on-ramp)")
+
+	# ── Phase E: the Preacher origin ──────────────────────────────────────────
+	var prd: Dictionary = MetaCatalog.CATALOG.get("origin_kaznodzieja", {})
+	_ck(not prd.is_empty(), "Kaznodzieja origin exists in the catalog")
+	_ck(str((prd.get("effect", {}) as Dictionary).get("otrait", "")) == "preacher",
+		"Kaznodzieja grants the preacher origin-trait")
+	# zealot chain conversion: a preacher's converts proselytize at 35%, others 22%
+	var prp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); prp.faction = "player"
+	prp.origin_trait = "preacher"
+	var prb := Board.new(4, 4); prb.place(1, Vector2i(0, 0)); prp.cell = Vector2i(0, 0)
+	var prs := CombatSim.new(prb, {1: prp}, 1, 7)
+	_ck(prs.player().origin_trait == "preacher", "the sim sees the preacher trait")
+
 	print("=== %d checks, %d failed ===" % [_n, _f])
 	quit(_f)

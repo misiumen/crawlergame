@@ -904,7 +904,8 @@ func _ally_turn() -> Array:
 			for e in foes:
 				if board.is_adjacent(a.cell, e.cell):
 					near = e; break
-			if near != null and rng.randf() < 0.22:
+			var chain_p := 0.35 if player().origin_trait == "preacher" else 0.22
+			if near != null and rng.randf() < chain_p:
 				convert_enemy(near)
 				evs.append({"type": "convert", "id": near.id, "name": near.name_pl, "chained": true})
 				continue
