@@ -539,7 +539,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _summary.is_empty():
 		if _summary_lock <= 0.0 and (kc == KEY_ENTER or kc == KEY_KP_ENTER):
 			_summary = {}; _summary_lines = []; _done = false
-			_build()
+			_title = true
+			queue_redraw()
 		return
 
 	# Character sheet: Esc/C closes.
@@ -841,7 +842,9 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"title_daily":       Save.clear(); _pending_daily = true; _build()
 		"summary_continue":
 			if _summary_lock <= 0.0:
-				_summary = {}; _summary_lines = []; _done = false; _build()
+				_summary = {}; _summary_lines = []; _done = false
+				_title = true
+				queue_redraw()
 		"dlg":               _dlg_advance(i)
 		"route":             if i < _route_offer.size(): _descend_into(_route_offer[i])
 		"class":             _accept_class(i)
@@ -2576,6 +2579,21 @@ func _hint_once(key: String, text: String) -> void:
 	_play("chime")
 	queue_redraw()
 
+## Word-wrap `s` to `max_w` pixels at font `size`. Returns the lines.
+func _wrap_text(s: String, max_w: float, size: int) -> Array:
+	var lines: Array = []
+	var cur := ""
+	for w in s.split(" "):
+		var cand: String = w if cur == "" else cur + " " + w
+		if cur != "" and _font.get_string_size(cand, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > max_w:
+			lines.append(cur)
+			cur = str(w)
+		else:
+			cur = cand
+	if cur != "":
+		lines.append(cur)
+	return lines
+
 func _log_push(line: String) -> void:
 	_log.append(line)
 	if _log.size() > 9:
@@ -2765,7 +2783,10 @@ func _process(dt: float) -> void:
 					if me.aware:
 						mood = "combat"
 						_hint_once("first_combat",
-							"Walka! Kliknij wroga — pasek celu zdradza jego STYL i kontrę. [T] celuje w część ciała, Shift+kierunek pcha.")
+							"Walka! Kliknij wroga — pasek celu zdradza jego styl i kontrę. [T] celuje w część ciała, Shift+kierunek pcha.")
+						if not sim.board.hazards.is_empty():
+							_hint_once("hazard_shove",
+								"Na tym piętrze czyhają zagrożenia środowiskowe — pchnięciem [PPM] wepchniesz w nie wroga.")
 						if "miniboss" in me.tags:
 							_hint_once("alfa",
 								"ALFA — wzmocniony wódz piętra: więcej zdrowia, celniejsze ciosy. Celowanie [T] w nogi spowalnia.")
@@ -3749,10 +3770,11 @@ func _draw_hud(c: CanvasItem) -> void:
 	var foe := _focused_enemy()
 	if foe != null and foe.is_alive():
 		var st := "śpi" if not foe.aware else ("GARDA" if foe.has_status("guard") else "ściga cię")
-		c.draw_string(_font, Vector2(40, 676),
-			"%s  HP %d/%d  [%s]  ·  %s"
-			% [foe.name_pl, foe.hp, foe.max_hp, st, _kind_hint(foe.body_kind())],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
+		var fl := _wrap_text("%s  HP %d/%d  [%s]  ·  %s"
+			% [foe.name_pl, foe.hp, foe.max_hp, st, _kind_hint(foe.body_kind())], 760.0, 13)
+		for i in mini(fl.size(), 2):
+			c.draw_string(_font, Vector2(40, 660 + i * 18), str(fl[i]),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER)
 	# Tracked floor objective (real, with progress + payout) — and a nav hint below.
 	if floor != null and not floor.objective.is_empty():
 		var done: bool = bool(floor.objective.get("done", false))
@@ -3769,10 +3791,15 @@ func _draw_hud(c: CanvasItem) -> void:
 	c.draw_rect(Rect2(lx, 110, lw, 360), COL_GRID, false, 1.0)
 	c.draw_string(_font, Vector2(lx + 12, 132), "DZIENNIK",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
+	var disp: Array = []
 	for i in _log.size():
-		var alpha := 0.5 + 0.5 * float(i + 1) / _log.size()
-		c.draw_string(_font, Vector2(lx + 12, 158 + i * 22), _log[i],
-			HORIZONTAL_ALIGNMENT_LEFT, lw - 24, 14, Color(COL_BRIGHT, alpha))
+		disp += _wrap_text(_log[i], lw - 24, 14)
+	if disp.size() > 14:
+		disp = disp.slice(disp.size() - 14)
+	for i in disp.size():
+		var alpha := 0.5 + 0.5 * float(i + 1) / disp.size()
+		c.draw_string(_font, Vector2(lx + 12, 158 + i * 22), disp[i],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(COL_BRIGHT, alpha))
 	if _banner != "" and _banner_t > 0.0:
 		var ba: float = clampf(_banner_t / 0.6, 0.0, 1.0)   # fade out over the last 0.6s
 		c.draw_string(_font, Vector2(260, 330), _banner,
@@ -4469,9 +4496,9 @@ func _draw_run_summary(c: CanvasItem) -> void:
 		c.draw_string(_font, Vector2(140, y), ls, HORIZONTAL_ALIGNMENT_LEFT, 1000, 18, col)
 		y += 26.0
 	c.draw_string(_font, Vector2(140, 690),
-		"Odblokowano łącznie opcji: %d   ·   kliknij lub [Enter] — od nowa" % Meta.unlocked_count(),
+		"Odblokowano łącznie opcji: %d   ·   kliknij lub [Enter] — menu główne" % Meta.unlocked_count(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
-	_zone(Rect2(0, 0, 1280, 720), "summary_continue")   # click anywhere to restart
+	_zone(Rect2(0, 0, 1280, 720), "summary_continue")   # click anywhere -> main menu
 
 ## The Syndicate's class pitch: 3 candidates, pick with number keys.
 func _draw_class_offer(c: CanvasItem) -> void:
@@ -4525,14 +4552,16 @@ func _draw_body_readout(c: CanvasItem, lx: float, lw: float) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 		return
 	var st := "śpi" if not e.aware else "ściga cię"
-	c.draw_string(_font, Vector2(lx + 12, top + 22),
-		"CIAŁO: %s  ·  HP %d/%d  ·  %s" % [e.name_pl, e.hp, e.max_hp, st],
+	c.draw_string(_font, Vector2(lx + 12, top + 22), "CIAŁO: " + e.name_pl,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
+	c.draw_string(_font, Vector2(lx + 12, top + 40),
+		"HP %d/%d  ·  %s" % [e.hp, e.max_hp, st],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 	if e.body == null:
-		c.draw_string(_font, Vector2(lx + 12, top + 46),
+		c.draw_string(_font, Vector2(lx + 12, top + 62),
 			"(prosta istota — brak stref trafień)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 		return
-	var y := top + 48.0
+	var y := top + 64.0
 	for pkey in e.body.order:
 		var p: Dictionary = e.body.part(pkey)
 		var sev: String = p["severity"]

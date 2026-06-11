@@ -22,6 +22,7 @@ const BIOMES: Dictionary = {
 		"enemy_mul": 1.6, "object_mul": 1.0, "trap_mul": 1.0,
 		"object_tags": [],
 		"mob_tags": ["humanoid"],
+		"hazard_kind": "fire",
 	},
 	"pulapki": {
 		"label": "Sektor Pułapek Sponsora",
@@ -58,6 +59,7 @@ const BIOMES: Dictionary = {
 		"enemy_mul": 1.4, "object_mul": 0.9, "trap_mul": 1.4,
 		"object_tags": ["metal", "hazard"],
 		"mob_tags": ["humanoid", "undead"],
+	"hazard_kind": "fire",
 	},
 	"zoo_korporacyjne": {
 		"label": "Zoo Korporacyjne",
@@ -65,6 +67,7 @@ const BIOMES: Dictionary = {
 		"enemy_mul": 1.3, "object_mul": 1.1, "trap_mul": 0.8,
 		"object_tags": ["organic", "fragile"],
 		"mob_tags": ["organic", "insect", "robactwo"],
+	"hazard_kind": "water",
 	},
 	"muzeum_spektakli": {
 		"label": "Muzeum Spektakli",
@@ -122,6 +125,7 @@ static func mods_for(key: String) -> Dictionary:
 		"trap_mul": float(b.get("trap_mul", 1.0)),
 		"object_tags": (b.get("object_tags", []) as Array).duplicate(),
 		"mob_tags": (b.get("mob_tags", []) as Array).duplicate(),
+		"hazard_kind": str(b.get("hazard_kind", "")),
 	}
 
 static func label_of(key: String) -> String:

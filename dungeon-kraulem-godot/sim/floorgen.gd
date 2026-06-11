@@ -9,10 +9,10 @@ extends RefCounted
 ## generate() returns the SAME dict shape as Encounters.floor(), so Floor.new()
 ## consumes it unchanged: {rooms, player, inv, start, start_cell, hint}.
 
-const MIN_W := 9
-const MAX_W := 15
-const MIN_H := 7
-const MAX_H := 9
+const MIN_W := 10
+const MAX_W := 16
+const MIN_H := 8
+const MAX_H := 10
 
 # Fallback content if the caller passes nothing (keeps headless tests trivial).
 const FALLBACK_MON := {
@@ -108,9 +108,26 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 	var door := Vector2i(w - 2, h / 2)          # east doorway (interior, near wall)
 	var is_last := idx == total - 1
 
+	# Interior pillars: cover that breaks line of sight — you can scout, regroup,
+	# or sneak past. The corridor row (entry.y) stays clear, so the room is always
+	# passable and _ensure_reachable keeps its guarantee.
+	for _i in rng.randi_range(2, 4):
+		var pc := Vector2i(rng.randi_range(2, w - 3), rng.randi_range(2, h - 3))
+		if pc.y != entry.y and pc != entry and pc != door:
+			board.set_wall(pc)
+
 	# A conductive trap appears more often deeper (and per the route's trap bias).
 	if rng.randf() < minf((0.3 + floor_num * 0.08) * trap_mul, 0.95):
 		_place_trap(board, rng, entry, door)
+
+	# Biome hazard pools (fire craters, flooded gratings): real cells you can
+	# bait — or SHOVE — enemies into. Never on the corridor row.
+	var hz: String = str(mods.get("hazard_kind", ""))
+	if hz != "":
+		for _i in rng.randi_range(1, 2) + floor_num / 3:
+			var hc := Vector2i(rng.randi_range(2, w - 3), rng.randi_range(2, h - 3))
+			if hc.y != entry.y and hc != entry and hc != door and board.hazard_at(hc) == "":
+				board.set_hazard(hc, hz)
 
 	var entities: Dictionary = {}
 	# Objects to dismantle (1..3).
@@ -143,6 +160,14 @@ static func _gen_room(rng: RandomNumberGenerator, floor_num: int, idx: int, tota
 		var cell := _free_interior(board, rng, entry, door)
 		if cell == Vector2i(-1, -1):
 			break
+		# Keep spawns away from the doorway — you get a beat to read the room
+		# before anything can reach you.
+		for _retry in 6:
+			if absi(cell.x - entry.x) + absi(cell.y - entry.y) >= 5:
+				break
+			var c2 := _free_interior(board, rng, entry, door)
+			if c2 != Vector2i(-1, -1):
+				cell = c2
 		var mkey: String = eligible[rng.randi_range(0, eligible.size() - 1)]
 		var foe := _make_mob(mkey, mon[mkey], stats.get(mkey), next_id["v"], floor_num)
 		foe.cell = cell

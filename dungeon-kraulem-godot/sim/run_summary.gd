@@ -16,8 +16,8 @@ const ANTI_HOST_DEATH_LINES: Array = [
 ]
 
 const DEATH_LOG_LINES: Array = [
-	"Ostatnia myśl: „nie tak to miało wyglądać”. Tradycyjna.",
-	"Tracisz nitkę. Reszta jest hałasem.",
+	"Ostatnia myśl: „nie tak to miało wyglądać”. Klasyka gatunku.",
+	"Obraz się urywa. Dalej już tylko szum.",
 ]
 
 ## Snapshot the run. `floor` is the Floor sim-state; `victory` true if you
