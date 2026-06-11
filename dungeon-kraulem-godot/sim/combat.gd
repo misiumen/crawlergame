@@ -13,6 +13,10 @@ const DMG_COLD := "cold"
 var board: Board
 var entities: Dictionary = {}
 var player_id: int = 0
+var player_ap: int = 2           # action points this round (move/hit 1, aimed 2)
+var player_ap_max: int = 2
+var round_completed := false     # set when the enemy phase just ran (view: tick the floor)
+var lure: Dictionary = {}        # thrown decoy: {"cell": Vector2i, "turns": int}
 var round_num: int = 1
 var side: String = "player"
 var over: bool = false       # terminally over (player dead) — blocks input
@@ -159,6 +163,7 @@ func player_move(dir: Vector2i) -> Array:
 	var occ: int = board.occupant_at(dest)
 	var evs: Array = []
 	var noise: int = 0
+	var act_cost: int = 1
 	if occ != -1 and occ != player_id:
 		var t: CombatEntity = entities[occ]
 		if t.faction == "object":
@@ -171,6 +176,8 @@ func player_move(dir: Vector2i) -> Array:
 			return [{"type": "crawler", "id": t.id}]    # bump a rival crawler = parley
 		if t.faction == "ally":
 			return [{"type": "blocked", "reason": "ally"}]   # don't swing at your own pet
+		if aim_zone != "":
+			act_cost = 2   # a called shot eats the whole round's focus
 		evs += _player_attack(t)
 		noise = 3   # a melee swing is heard by nearby enemies (but not the whole floor)
 	elif board.is_free(dest):
@@ -180,7 +187,7 @@ func player_move(dir: Vector2i) -> Array:
 		evs += _on_enter_cell(p)
 	else:
 		return [{"type": "blocked"}]
-	evs += _after_player_action(noise)
+	evs += _after_player_action(noise, act_cost)
 	return evs
 
 func _player_attack(target: CombatEntity) -> Array:
@@ -271,7 +278,17 @@ func player_shove(dir: Vector2i) -> Array:
 		evs.append({"type": "move", "id": target.id, "to": land})
 		evs += _on_enter_cell(target)
 	else:
+		# Slammed into a wall (or another body): hurt, STUNNED, intent cancelled.
 		evs += _apply_damage(target, 2, DMG_PHYSICAL)
+		if target.is_alive():
+			target.add_status("stunned", 1)
+			target.intent = {}
+			evs.append({"type": "slam", "id": target.id, "name": target.name_pl})
+		var owall: int = board.occupant_at(land)
+		if owall != -1 and owall != player_id and entities.has(owall):
+			var bystander: CombatEntity = entities[owall]
+			if bystander.faction != "object":
+				evs += _apply_damage(bystander, 2, DMG_PHYSICAL)
 	evs += _after_player_action()
 	return evs
 
@@ -279,7 +296,38 @@ func player_wait() -> Array:
 	if over or side != "player":
 		return []
 	var evs: Array = [{"type": "wait"}]
-	evs += _after_player_action()
+	evs += _after_player_action(0, 99)   # end the round outright
+	return evs
+
+## Throw a crafted thing at a cell (range 4, needs line of sight). 1 AP.
+## "acid": auto-hits the cell + splashes neighbours. "lure": enemies retarget.
+func player_throw(kind: String, cell: Vector2i) -> Array:
+	if over or side != "player":
+		return []
+	var p: CombatEntity = player()
+	var d: Vector2i = (cell - p.cell).abs()
+	if maxi(d.x, d.y) > 4 or not board.has_los(p.cell, cell):
+		return [{"type": "none", "action": "throw"}]
+	var evs: Array = [{"type": "throw", "kind": kind, "cell": cell}]
+	match kind:
+		"acid":
+			var occ: int = board.occupant_at(cell)
+			if occ != -1 and occ != player_id and entities.has(occ):
+				var t: CombatEntity = entities[occ]
+				evs += _apply_damage(t, rng.randi_range(3, 8), DMG_ACID)
+				if t.is_alive():
+					t.add_status("corroded", 2)
+			for dd in DIRS8:
+				var occ2: int = board.occupant_at(cell + dd)
+				if occ2 != -1 and occ2 != player_id and entities.has(occ2):
+					var t2: CombatEntity = entities[occ2]
+					if t2.faction != "object":
+						evs += _apply_damage(t2, 2, DMG_ACID)
+			_add_affinity("environment", 1)
+		"lure":
+			lure = {"cell": cell, "turns": 2}
+			evs.append({"type": "lure_set", "cell": cell})
+	evs += _after_player_action(5)   # throwing is noisy — that can be the point
 	return evs
 
 func player_interact() -> Array:
@@ -836,18 +884,28 @@ func _change_audience(delta: int, source: String = "") -> Array:
 
 # ── Turn flow ─────────────────────────────────────────────────────────────────
 
-func _after_player_action(noise_radius: int = 0) -> Array:
+func _after_player_action(noise_radius: int = 0, cost: int = 1) -> Array:
+	round_completed = false
+	_round_noise = maxi(_round_noise, noise_radius)
+	player_ap -= cost
+	var evs: Array = _check_end()
+	if over:
+		return evs
+	evs += _award_kill_xp()
+	if player_ap > 0:
+		# Round still open: awareness updates now (noise carries), enemies wait.
+		evs += _update_awareness(_round_noise)
+		return evs
+	# ── Round closes: allies act, awareness, enemies EXECUTE then DECLARE ─────
 	if _curse_rounds > 0:
 		_curse_rounds -= 1
 		if _curse_rounds <= 0:
 			_curse_to_hit = 0
-	var evs: Array = _check_end()
-	if over:
-		return evs
 	evs += _ally_turn()          # your pet acts on your side, first
 	if not over:
 		evs += _check_end()
-	evs += _update_awareness(noise_radius)
+	evs += _update_awareness(_round_noise)
+	_round_noise = 0
 	side = "enemies"
 	evs += _enemy_turn()
 	if not over:
@@ -862,7 +920,17 @@ func _after_player_action(noise_radius: int = 0) -> Array:
 		pl.mana += 1
 	side = "player"
 	round_num += 1
+	player_ap = player_ap_max
+	round_completed = true
+	evs.append({"type": "round_end"})
+	if not lure.is_empty():
+		lure["turns"] = int(lure["turns"]) - 1
+		if int(lure["turns"]) <= 0:
+			lure = {}
+			evs.append({"type": "lure_end"})
 	return evs
+
+var _round_noise: int = 0
 
 ## Grant the player XP for any enemy that has died since we last looked (covers
 ## both melee kills and damage-over-time deaths). Level-ups bump max HP + heal a
@@ -974,156 +1042,165 @@ func _ally_attack(a: CombatEntity, target: CombatEntity) -> Array:
 	return evs
 
 func _enemy_turn() -> Array:
+	# Phase 1 — EXECUTE: every declared intent goes off, aimed at a CELL, and
+	# hits WHATEVER stands there (friendly fire is real). You dodge a declared
+	# strike by not being in the cell — or by parking something else in it.
 	var evs: Array = []
 	var p: CombatEntity = player()
 	for e in enemies_alive():
-		if not e.aware:
+		if e.intent.is_empty():
 			continue
-		# A shocked or head-stunned enemy loses its turn entirely.
-		if e.has_status("shocked") or e.has_status("stunned"):
-			var why: String = "stunned" if e.has_status("stunned") else "shocked"
-			evs.append({"type": "skip", "id": e.id, "reason": why})
+		var it: Dictionary = e.intent
+		e.intent = {}
+		if e.has_status("stunned") or e.has_status("shocked"):
+			evs.append({"type": "skip", "id": e.id, "reason": "stunned"})
 			continue
-		# Talked-down minds: a charmed enemy won't attack YOU. If it was incited it
-		# turns on its own kind; otherwise it just stands down, confused.
-		if e.has_status("charmed"):
-			if e.flags.get("incited", false):
-				evs += _incited_turn(e)
-			else:
-				evs.append({"type": "skip", "id": e.id, "reason": "charmed"})
+		if e.has_status("charmed") and not e.flags.get("incited", false):
+			evs.append({"type": "skip", "id": e.id, "reason": "charmed"})
 			continue
-		# ── Fighting styles by body class (combat depth: each archetype demands a
-		# different answer — see the focused-target hint in the HUD). ────────────
-		var kind: String = e.body_kind()
-		var pd: int = maxi(absi(p.cell.x - e.cell.x), absi(p.cell.y - e.cell.y))
-		# Elite: enrages below half HP (+2 damage for the rest of the fight).
-		if kind == "elite" and e.hp * 2 < e.max_hp and not e.flags.get("enraged", false):
-			e.flags["enraged"] = true
-			evs.append({"type": "enrage", "id": e.id, "name": e.name_pl})
-		# Mech: a ranged shooter — keeps its distance and zaps through line of sight.
-		# Break LOS or close the gap; standing in the open is what kills you.
-		if kind == "mech" and e.can_move() and not e.is_hobbled():
-			if pd <= 1:
-				var back: Vector2i = e.cell + Vector2i(signi(e.cell.x - p.cell.x), signi(e.cell.y - p.cell.y))
-				if board.is_free(back):
-					board.move(e.cell, back); e.cell = back
-					evs.append({"type": "move", "id": e.id, "to": back})
-					evs += _on_enter_cell(e)   # backing onto a hazard still hurts
-					pd = maxi(absi(p.cell.x - e.cell.x), absi(p.cell.y - e.cell.y))
-			if pd >= 2 and pd <= 3 and board.has_los(e.cell, p.cell):
-				evs.append({"type": "attack", "attacker": e.id, "target": player_id, "ranged": true})
-				if _roll_hit(e.to_hit if e.dmg_dice != "" else 2,
-						_eff_ac(p) + ClassFeatures.passive_bonus(p, "ac") + _curse_to_hit):
-					evs += _apply_damage(p, rng.randi_range(2, 5), DMG_ELECTRIC)
+		var cell: Vector2i = it.get("cell", e.cell)
+		match str(it.get("kind", "")):
+			"strike":
+				evs += _execute_hit(e, cell, false)
+			"zap":
+				if board.has_los(e.cell, cell):
+					evs.append({"type": "attack", "attacker": e.id, "target": -1, "ranged": true})
+					evs += _execute_hit(e, cell, true)
 				else:
-					evs.append({"type": "miss", "attacker": e.id, "target": player_id})
-				if not p.is_alive():
-					break
-				continue
-		# Beast: pounces two straight tiles onto you — don't stand in its lane.
-		if kind == "beast" and pd == 2 and e.can_move() and not e.is_hobbled():
-			var dvec: Vector2i = p.cell - e.cell
-			if dvec.x == 0 or dvec.y == 0 or absi(dvec.x) == absi(dvec.y):
-				var mid: Vector2i = e.cell + Vector2i(signi(dvec.x), signi(dvec.y))
-				if board.is_free(mid):
-					board.move(e.cell, mid); e.cell = mid
+					evs.append({"type": "fizzle", "id": e.id})
+			"pounce":
+				if board.is_free(cell):
+					board.move(e.cell, cell); e.cell = cell
 					evs.append({"type": "pounce", "id": e.id, "name": e.name_pl})
-					evs.append({"type": "move", "id": e.id, "to": mid})
-					evs += _on_enter_cell(e)   # a pounce onto a hazard is its problem
-		# Target the player if adjacent; otherwise swat your pet if IT is adjacent
-		# (the "protect the mascot" tension — the companion can be downed).
-		var victim: CombatEntity = null
-		if board.is_adjacent(e.cell, p.cell):
-			victim = p
-		else:
-			for a in allies_alive():
-				if board.is_adjacent(e.cell, a.cell):
-					victim = a; break
-		if victim != null:
-			evs.append({"type": "attack", "attacker": e.id, "target": victim.id})
-			# A disarmed (broken-arm) enemy swings weaker.
-			var atk_bonus: int = 0 if e.has_status("disarmed") else 2
-			# Survivor's passive + occultist's Curse make the PLAYER harder to hit.
-			var vac: int = _eff_ac(victim)
-			if victim == p:
-				vac += ClassFeatures.passive_bonus(p, "ac") + _curse_to_hit
-			# Content-driven enemies carry their own to-hit; fall back to the default.
-			var eatk: int = (e.to_hit if e.dmg_dice != "" else atk_bonus)
-			if e.has_status("disarmed"):
-				eatk -= 2
-			if _roll_hit(eatk, vac):
-				var base: int = Dice.roll(e.dmg_dice, rng) if e.dmg_dice != "" else rng.randi_range(1, 4) + 1
-				if e.has_status("disarmed"):
-					base = maxi(1, base - 2)
-				if e.flags.get("enraged", false):
-					base += 2
-				# Vermin swarm: each other bug ganging the same victim feeds the bite.
-				if kind == "bug":
-					var pack := 0
-					for o in enemies_alive():
-						if o.id != e.id and o.body_kind() == "bug" and board.is_adjacent(o.cell, victim.cell):
-							pack += 1
-					base += mini(pack, 2)
-				evs += _apply_damage(victim, base, DMG_PHYSICAL)
-				if victim != p and not victim.is_alive():
-					evs.append({"type": "ally_down", "id": victim.id, "name": victim.name_pl})
-			else:
-				evs.append({"type": "miss", "attacker": e.id, "target": victim.id})
-		elif not e.can_move():
-			# Locomotion destroyed — it can't close the gap, only thrash in place.
-			evs.append({"type": "skip", "id": e.id, "reason": "crippled"})
-		elif e.is_hobbled() or e.has_status("slowed"):
-			# One broken leg: it can't chase at speed — kite it.
-			evs.append({"type": "skip", "id": e.id, "reason": "hobbled"})
-		else:
-			var step: Vector2i = _step_toward(e.cell, p.cell)
-			if step != e.cell and board.is_free(step):
-				board.move(e.cell, step)
-				e.cell = step
-				evs.append({"type": "move", "id": e.id, "to": step})
-				evs += _on_enter_cell(e)
+					evs.append({"type": "move", "id": e.id, "to": cell})
+					evs += _on_enter_cell(e)
+				else:
+					var occ: int = board.occupant_at(cell)
+					if occ != -1 and entities.has(occ):
+						evs.append({"type": "pounce", "id": e.id, "name": e.name_pl})
+						evs += _execute_hit(e, cell, false)
 		if not p.is_alive():
 			break
+	# Phase 2 — DECLARE: move now, telegraph the next blow (drawn on the board).
+	if p.is_alive():
+		for e in enemies_alive():
+			if not e.aware:
+				continue
+			if e.has_status("stunned") or e.has_status("shocked"):
+				continue
+			if e.has_status("charmed") and not e.flags.get("incited", false):
+				continue
+			evs += _declare_intent(e)
 	evs += _tick_dots()
 	for id in entities:
 		(entities[id] as CombatEntity).tick_statuses()
 	return evs
 
-## An incited enemy attacks its own kind: it goes for the nearest OTHER enemy
-## (or any crawler), closing in or striking — you turned the room on itself.
-func _incited_turn(e: CombatEntity) -> Array:
+## A declared hit lands automatically on whatever occupies the cell now.
+func _execute_hit(e: CombatEntity, cell: Vector2i, ranged: bool) -> Array:
 	var evs: Array = []
-	var tgt: CombatEntity = null
-	var best := 1 << 30
-	for id in entities:
-		var o: CombatEntity = entities[id]
-		if o.id == e.id or not o.is_alive():
-			continue
-		if o.faction != "enemy" and o.faction != "crawler":
-			continue
-		var d: int = maxi(absi(o.cell.x - e.cell.x), absi(o.cell.y - e.cell.y))
-		if d < best:
-			best = d; tgt = o
-	if tgt == null:
-		evs.append({"type": "skip", "id": e.id, "reason": "charmed"})
+	var occ: int = board.occupant_at(cell)
+	if occ == -1 or occ == e.id or not entities.has(occ):
+		evs.append({"type": "whiff", "id": e.id, "cell": cell})
 		return evs
-	if board.is_adjacent(e.cell, tgt.cell):
-		tgt.aware = true
-		evs.append({"type": "attack", "attacker": e.id, "target": tgt.id, "ally": true})
-		if _roll_hit(e.to_hit if e.dmg_dice != "" else 2, _eff_ac(tgt)):
-			var base: int = Dice.roll(e.dmg_dice, rng) if e.dmg_dice != "" else rng.randi_range(1, 4) + 1
-			evs += _apply_damage(tgt, base, DMG_PHYSICAL)
-		else:
-			evs.append({"type": "miss", "attacker": e.id, "target": tgt.id})
+	var victim: CombatEntity = entities[occ]
+	if victim.faction == "object":
+		evs.append({"type": "whiff", "id": e.id, "cell": cell})
+		return evs
+	var base: int
+	if ranged:
+		base = rng.randi_range(2, 5)
 	else:
-		var step := _step_toward(e.cell, tgt.cell)
-		if step != e.cell and board.is_free(step):
-			board.move(e.cell, step); e.cell = step
-			evs.append({"type": "move", "id": e.id, "to": step})
+		base = Dice.roll(e.dmg_dice, rng) if e.dmg_dice != "" else rng.randi_range(1, 4) + 1
+		if e.has_status("disarmed"):
+			base = maxi(1, base - 2)
+		if e.flags.get("enraged", false):
+			base += 2
+		if e.body_kind() == "bug":
+			var pack := 0
+			for o in enemies_alive():
+				if o.id != e.id and o.body_kind() == "bug" and board.is_adjacent(o.cell, victim.cell):
+					pack += 1
+			base += mini(pack, 2)
+	evs.append({"type": "attack", "attacker": e.id, "target": victim.id, "ranged": ranged})
+	evs += _apply_damage(victim, base, DMG_ELECTRIC if ranged else DMG_PHYSICAL)
+	if victim.faction == "enemy" and not victim.is_alive():
+		# an enemy walked into a colleague's declared blow — the crowd LOVES it
+		evs += _note_tag("env_kill")
+		evs += _change_audience(4, "friendly_fire")
+	if victim.faction == "ally" and not victim.is_alive():
+		evs.append({"type": "ally_down", "id": victim.id, "name": victim.name_pl})
 	return evs
 
-## Apply damage-over-time from lingering statuses (burning/poisoned/corroded) to
-## every living entity, then return the events. Runs once per round.
+## Move toward the prey, then telegraph next round's action (cell-targeted).
+func _declare_intent(e: CombatEntity) -> Array:
+	var evs: Array = []
+	var p: CombatEntity = player()
+	var kind: String = e.body_kind()
+	# elites enrage the moment they bleed below half
+	if kind == "elite" and e.hp * 2 < e.max_hp and not e.flags.get("enraged", false):
+		e.flags["enraged"] = true
+		evs.append({"type": "enrage", "id": e.id, "name": e.name_pl})
+	# the prey: the lure if one is out, an incited target, else you (or your pet)
+	var prey_cell: Vector2i = p.cell
+	if not lure.is_empty():
+		prey_cell = lure["cell"]
+	elif e.flags.get("incited", false):
+		var best: CombatEntity = null
+		var bd := 999
+		for o in enemies_alive():
+			if o.id == e.id:
+				continue
+			var dd: Vector2i = (o.cell - e.cell).abs()
+			var ch: int = maxi(dd.x, dd.y)
+			if ch < bd:
+				bd = ch; best = o
+		if best != null:
+			prey_cell = best.cell
+	var pd: int = maxi(absi(prey_cell.x - e.cell.x), absi(prey_cell.y - e.cell.y))
+	# Mech: keeps range, telegraphs a zap on your CURRENT cell.
+	if kind == "mech" and e.can_move() and not e.is_hobbled():
+		if pd <= 1:
+			var back: Vector2i = e.cell + Vector2i(signi(e.cell.x - prey_cell.x), signi(e.cell.y - prey_cell.y))
+			if board.is_free(back):
+				board.move(e.cell, back); e.cell = back
+				evs.append({"type": "move", "id": e.id, "to": back})
+				evs += _on_enter_cell(e)
+				pd = maxi(absi(prey_cell.x - e.cell.x), absi(prey_cell.y - e.cell.y))
+		if pd >= 2 and pd <= 3 and board.has_los(e.cell, prey_cell):
+			e.intent = {"kind": "zap", "cell": prey_cell}
+			return evs
+	# Beast: telegraphs a two-tile pounce along its lane.
+	if kind == "beast" and pd == 2 and e.can_move() and not e.is_hobbled():
+		var dvec: Vector2i = prey_cell - e.cell
+		if dvec.x == 0 or dvec.y == 0 or absi(dvec.x) == absi(dvec.y):
+			e.intent = {"kind": "pounce", "cell": prey_cell}
+			return evs
+	# Everyone else: close in (movement happens NOW), then telegraph a strike.
+	if board.is_adjacent(e.cell, prey_cell):
+		e.intent = {"kind": "strike", "cell": prey_cell}
+		return evs
+	# pet adjacent? swat it instead
+	for a in allies_alive():
+		if board.is_adjacent(e.cell, a.cell):
+			e.intent = {"kind": "strike", "cell": a.cell}
+			return evs
+	if not e.can_move():
+		evs.append({"type": "skip", "id": e.id, "reason": "crippled"})
+		return evs
+	if e.is_hobbled() or e.has_status("slowed"):
+		evs.append({"type": "skip", "id": e.id, "reason": "hobbled"})
+		return evs
+	var step: Vector2i = _step_toward(e.cell, prey_cell)
+	if step != e.cell and board.is_free(step):
+		board.move(e.cell, step)
+		e.cell = step
+		evs.append({"type": "move", "id": e.id, "to": step})
+		evs += _on_enter_cell(e)
+	if e.is_alive() and board.is_adjacent(e.cell, prey_cell):
+		e.intent = {"kind": "strike", "cell": prey_cell}
+	return evs
+
 func _tick_dots() -> Array:
 	var evs: Array = []
 	for id in entities.keys():

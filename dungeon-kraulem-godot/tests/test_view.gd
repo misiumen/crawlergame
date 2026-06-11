@@ -30,8 +30,10 @@ func _initialize() -> void:
 	_ck(bv._event_line({"type": "notice", "id": 2}) != "", "narration: notice -> line")
 
 	var r0: int = bv.sim.round_num
-	bv.handle_dir(Vector2i.RIGHT)        # a real move ends the player turn
-	_ck(bv.sim.round_num > r0, "an action advances the round")
+	bv.handle_dir(Vector2i.RIGHT)        # 1 AP — the round stays open
+	_ck(bv.sim.round_num == r0 and bv.sim.player_ap == 1, "one action leaves the round open (AP)")
+	bv.handle_wait()                     # flush -> enemy phase runs
+	_ck(bv.sim.round_num > r0, "ending the turn advances the round")
 
 	for i in 6:
 		bv._process(0.016)               # manual frames (no main loop under -s)
@@ -47,7 +49,7 @@ func _initialize() -> void:
 		if (line as String).begins_with("Konferansjer:"):
 			narrated = true
 	_ck(narrated, "konferansjer narrates the successful craft")
-	bv._animate(bv.sim.player_use_item(0))
+	bv._animate(bv.sim.player_use_item(bv.floor.items.size() - 1))   # the fresh craft (starter throwables sit first)
 	_ck(bv.sim.player().coating == "electric", "using the crafted coating arms the weapon")
 
 	# the craft panel opens/closes and draws without crashing
@@ -76,6 +78,7 @@ func _initialize() -> void:
 	# class offer: force a dominant playstyle, advance a turn, expect the picker
 	bv.floor.player.affinity = {"melee": 12, "tech": 1}
 	bv.floor.turn = 10
+	bv.sim.round_completed = true   # the offer fires on round close now
 	bv._advance_floor_turn()
 	_ck(not bv._class_offer.is_empty(), "a dominant playstyle opens the class offer")
 	for i in 2:

@@ -177,6 +177,7 @@ const FINAL_FLOOR := 6   # descending from here wins the run
 var _run_seed: int = 20260605
 var _pending_daily := false      # title asked for the daily gauntlet
 var _reset_arm := false          # pause debug: achievements-wipe confirm armed
+var _throw_mode: Dictionary = {} # aiming a thrown item: {"kind": ..., "idx": ...}
 var _creator_screen := false     # pre-run character creator (identity + looks)
 var _appearance: Dictionary = Appearance.defaults()
 var _cr_hover_desc := ""         # creator: reward text of the hovered identity row
@@ -496,6 +497,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
 				_journal_scroll = maxf(0.0, _journal_scroll - 56.0); queue_redraw(); return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
+			if not _throw_mode.is_empty() and _can_take_board_input():
+				_throw_at(_cell_from_mouse(mb.position))
+				return
 			# On-screen buttons/options first. Reverse order so panels drawn LAST
 			# (modals on top) win over board-HUD zones underneath them.
 			for j in range(_click_zones.size() - 1, -1, -1):
@@ -505,6 +509,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _can_take_board_input():
 				_click_primary(_cell_from_mouse(mb.position))
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
+			if not _throw_mode.is_empty():
+				_throw_mode = {}
+				_log_push("Rzut odwołany.")
+				queue_redraw()
+				return
 			if _can_take_board_input():
 				_click_shove(_cell_from_mouse(mb.position))
 		return
@@ -1068,6 +1077,19 @@ func _apply_loadout() -> void:
 	var nm := str(_appearance.get("name", "")).strip_edges()
 	if nm != "":
 		p.name_pl = nm
+	# Starter improvisation kit: one acid bottle, one decoy. Craft more later.
+	var acid := GameItem.new()
+	acid.name_pl = "Butelka kwasu"
+	acid.category = GameItem.CAT_THROWN
+	acid.effect = {"throw": "acid"}
+	acid.tags = ["chem", "fragile"]
+	floor.items.append(acid)
+	var dec := GameItem.new()
+	dec.name_pl = "Wabik dźwiękowy"
+	dec.category = GameItem.CAT_THROWN
+	dec.effect = {"throw": "lure"}
+	dec.tags = ["electronic"]
+	floor.items.append(dec)
 	var lo := MetaCatalog.loadout()
 	p.species_key = lo["species"]
 	p.origin_key = lo["origin"]
@@ -1349,6 +1371,14 @@ func _bench_attempt_now() -> void:
 
 func _item_use(idx: int) -> void:
 	if idx >= 0 and idx < floor.items.size():
+		var it: GameItem = floor.items[idx]
+		if it.category == GameItem.CAT_THROWN and it.effect.has("throw"):
+			# cell-targeted: pick where it lands (range 4, line of sight)
+			_throw_mode = {"kind": str(it.effect["throw"]), "idx": idx}
+			_craft_open = false
+			_log_push("Wskaż pole rzutu (zasięg 4) — PPM odwołuje.")
+			queue_redraw()
+			return
 		_animate(sim.player_use_item(idx))
 		_craft_open = false
 	queue_redraw()
@@ -1902,6 +1932,10 @@ func _advance_floor_turn() -> void:
 	if sim.over and sim.outcome == "lose" and _summary.is_empty():
 		_end_run(false)
 		return
+	if not sim.round_completed:
+		queue_redraw()
+		return
+	sim.round_completed = false
 	var new_boxes := floor.advance_turn()
 	for b in new_boxes:
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
@@ -2465,6 +2499,19 @@ func _animate(evs: Array) -> void:
 			"pounce":
 				_add_floater(int(e["id"]), "SKOK!", COL_AMBER)
 				_play("pounce")
+			"slam":
+				_add_floater(int(e["id"]), "OGŁUSZONY!", COL_AMBER)
+				_play("clang")
+				_shake = maxf(_shake, 4.0)
+			"whiff":
+				_add_floater(int(e["id"]), "w pustkę", COL_DIM)
+				_play("whoosh")
+			"fizzle":
+				_add_floater(int(e["id"]), "bez linii strzału", COL_DIM)
+			"lure_set":
+				_log_push("Wabik piszczy — wszystko, co ma uszy, idzie TAM.")
+			"throw":
+				_play("whoosh")
 			"sneak":
 				_add_floater(int(e["target"]), "Z ZASKOCZENIA!", COL_CYAN)
 				_log_push("Cios z zaskoczenia — śpiący przeciwnik nie zdążył się zasłonić.")
@@ -3029,7 +3076,6 @@ func _draw() -> void:
 				draw_colored_polygon(PackedVector2Array([ctr + Vector2(0, -ISO_H / 2.0),
 					ctr + Vector2(-ISO_W / 2.0, 0), ctr + Vector2(-ISO_W * 0.22, ISO_H * 0.10)]),
 					Color(0, 0, 0, 0.22))
-			draw_polyline(_diamond_closed(ctr, 0.0), Color(th.grid, 0.30), 1.0)
 			_draw_iso_pattern(ctr, c, th)
 			_draw_floor_prop(Rect2(ctr - Vector2(TILE / 2.0, TILE * 0.72), Vector2(TILE, TILE)), c, th)
 			_draw_iso_hazard(ctr, c, b, tnow)
@@ -3039,6 +3085,19 @@ func _draw() -> void:
 			Vector2i(1,1), Vector2i(-1,1), Vector2i(1,-1), Vector2i(-1,-1)]:
 		if b.is_free(p.cell + d):
 			draw_polyline(_diamond_closed(_cell_px(p.cell + d), 8.0), Color(COL_PLAYER, 0.30), 1.0)
+	# grid on demand: the hovered cell, and the throw range when aiming
+	var hov := _cell_from_mouse(Vector2.ZERO)
+	if b.in_bounds(hov) and not b.is_wall(hov):
+		draw_polyline(_diamond_closed(_cell_px(hov), 2.0), Color(COL_PLAYER, 0.5), 1.0)
+	if not _throw_mode.is_empty():
+		for ty in b.h:
+			for tx in b.w:
+				var tc := Vector2i(tx, ty)
+				if b.is_wall(tc):
+					continue
+				var dd: Vector2i = (tc - p.cell).abs()
+				if maxi(dd.x, dd.y) <= 4 and b.has_los(p.cell, tc):
+					draw_polyline(_diamond_closed(_cell_px(tc), 9.0), Color(COL_AMBER, 0.35), 1.0)
 	_draw_preview()
 	# ── Pass 2: solids, far to near (screen y IS depth in 2:1 iso) ────────────
 	var order: Array = []
@@ -3802,23 +3861,37 @@ func _intent_pill(pos: Vector2, txt: String, col: Color) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
 
 func _draw_intent() -> void:
-	var p := sim.player()
+	# Telegraphs: every declared intent is drawn — marked cell + dashed line.
+	# This is the puzzle: the cell WILL be hit; just don't be in it.
 	for id in sim.entities:
 		var e: CombatEntity = sim.entities[id]
 		if e.faction != "enemy" or not e.is_alive(): continue
 		var ep: Vector2 = _vpos.get(id, _cell_px(e.cell))
 		if not e.aware:
-			_intent_pill(ep + Vector2(0, -24), "śpi", COL_DIM)
+			_intent_pill(ep + Vector2(0, -26), "śpi", COL_DIM)
 			continue
-		if sim.board.is_adjacent(e.cell, p.cell):
-			_intent_pill(ep + Vector2(0, -24), "atak!", COL_RED)
-		else:
-			# only the NEXT step glows — no spaghetti of red lines
-			var step: Vector2i = e.cell + Vector2i(signi(p.cell.x-e.cell.x), signi(p.cell.y-e.cell.y))
-			var sp := _cell_px(step)
-			draw_rect(Rect2(sp - Vector2(TILE/2.0-2, TILE/2.0-2), Vector2(TILE-5,TILE-5)),
-				Color(COL_RED, 0.10))
-			draw_circle(ep + Vector2(0, -22), 2.5, Color(COL_RED, 0.85))
+		if e.intent.is_empty():
+			continue
+		var tcell: Vector2i = e.intent["cell"]
+		var tpx := _cell_px(tcell)
+		var icol: Color = COL_CYAN if str(e.intent.get("kind", "")) == "zap" else COL_RED
+		var pulse := 0.5 + 0.3 * sin(Time.get_ticks_msec() * 0.006)
+		draw_colored_polygon(_diamond(tpx, 6.0), Color(icol, 0.08 + 0.10 * pulse))
+		draw_polyline(_diamond_closed(tpx, 6.0), Color(icol, 0.85), 1.2)
+		var from := ep + Vector2(0, -10)
+		var dirv := tpx - from
+		var L := dirv.length()
+		if L > 12.0:
+			var nrm := dirv / L
+			var seg := 0.0
+			while seg < L - 10.0:
+				draw_line(from + nrm * seg, from + nrm * minf(seg + 6.0, L - 10.0),
+					Color(icol, 0.55), 1.4)
+				seg += 11.0
+			var tip := tpx - nrm * 9.0
+			var perp := Vector2(-nrm.y, nrm.x)
+			draw_colored_polygon(PackedVector2Array([tpx, tip + perp * 4.0, tip - perp * 4.0]),
+				Color(icol, 0.9))
 
 func _draw_preview() -> void:
 	var p := sim.player()
@@ -3839,168 +3912,44 @@ func _draw_preview() -> void:
 func _draw_hud(c: CanvasItem) -> void:
 	var p := sim.player()
 	_draw_minimap(c)
-	# Title bar
-	c.draw_string(_font, Vector2(40, 36),
-		"PIĘTRO %d — %s  ·  Runda %d  ·  tura: %s"
-		% [floor.depth if floor else 1, floor.current_name() if floor else "?", sim.round_num,
-		   "TY" if sim.side == "player" else "wrogowie"],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COL_CYAN)
-	# Level + XP bar (top-right of the title row)
-	var xb := Rect2(640, 24, 260, 16)
-	c.draw_rect(xb, Color(0.08, 0.10, 0.13, 0.9))
-	var frac: float = clampf(float(p.xp) / maxf(1.0, float(p.xp_to_next())), 0.0, 1.0)
-	c.draw_rect(Rect2(xb.position, Vector2(xb.size.x * frac, xb.size.y)), COL_GAS)
-	c.draw_rect(xb, COL_GRID, false, 1.0)
-	var lvl_txt := "POZIOM %d   XP %d/%d" % [p.level, p.xp, p.xp_to_next()]
+	# ── Broadcast HUD: floor + collapse bar, contestant card, audience meter,
+	# fading ticker. Everything else lives in screens (Tab/C/I/Esc). ───────────
+	_draw_tracked(c, Vector2(40, 32), "PIĘTRO %d — %s" % [floor.depth, floor.current_name()],
+		13, COL_CYAN, 2.0)
+	var trem: int = maxi(0, floor.time_limit - floor.turn)
+	var tb := Rect2(40, 44, 540, 5)
+	c.draw_rect(tb, Color(0.08, 0.10, 0.13, 0.9))
+	c.draw_rect(Rect2(tb.position, Vector2(tb.size.x * clampf(float(trem) / float(maxi(1, floor.time_limit)), 0.0, 1.0), 5)),
+		Color(COL_AMBER if trem > 30 else COL_RED, 0.85))
+	for dmark in range(1, floor.time_days):
+		var dx := tb.position.x + tb.size.x * float(dmark) / float(floor.time_days)
+		c.draw_line(Vector2(dx, tb.position.y), Vector2(dx, tb.position.y + 5), Color(0, 0, 0, 0.6), 1.0)
+	c.draw_string(_font, Vector2(tb.position.x + tb.size.x + 10, 51),
+		"runie za %d tur" % trem, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+		COL_AMBER if trem > 30 else COL_RED)
+	var goal_ln := "Cel: znajdź zejście [>]"
+	if not floor.objective.is_empty():
+		goal_ln += "   ·   kontrakt: %s" % Objectives.describe(floor.objective)
+	c.draw_string(_font, Vector2(40, 66), goal_ln, HORIZONTAL_ALIGNMENT_LEFT, 700, 11,
+		Color(COL_DIM, 0.9))
+	if fmod(Time.get_ticks_msec() / 1000.0, 1.6) < 1.0:
+		c.draw_circle(Vector2(1036, 28), 4.0, COL_RED)
+	c.draw_string(_font, Vector2(1048, 33), "NA ŻYWO", HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
+		Color(0.92, 0.95, 0.97))
 	if p.skill_points > 0:
-		lvl_txt += "   ·   %d pkt [L]" % p.skill_points
-	c.draw_string(_font, Vector2(xb.position.x, 20), lvl_txt,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER if p.skill_points > 0 else COL_DIM)
-	# Who you are this run (the meta loadout)
-	if p.species_key != "" and p.species_key != "species_bezimienny":
-		var spn: String = MetaCatalog.def_of(p.species_key).get("label", "?")
-		var ogn: String = MetaCatalog.def_of(p.origin_key).get("label", "?")
-		c.draw_string(_font, Vector2(xb.position.x, 56), "Jesteś: %s  ·  %s" % [spn, ogn],
-			HORIZONTAL_ALIGNMENT_LEFT, 320, 12, META_KIND_COL["species"])
-	# Controls hint (mouse-first) — clipped to 580px so it can't run under the
-	# top-right level/species readout.
-	c.draw_string(_font, Vector2(40, 60),
-		"WSAD / LPM ruch  ·  PPM pchnij  ·  E użyj/rozmawiaj  ·  I warsztat  ·  Tab dziennik  ·  T zaklęcia",
-		HORIZONTAL_ALIGNMENT_LEFT, 580, 13, COL_DIM)
-	# Weapon / coating / armor — led by your own HP so it's always on screen.
-	var wln := "HP %d/%d   ·   Broń: nóż" % [p.hp, p.max_hp]
-	if p.coating == "electric": wln += "  [PRĄD x%d]" % p.coating_charges
-	elif p.coating == "poison": wln += "  [TRUCIZNA x%d]" % p.coating_charges
-	if p.bonus_damage > 0:      wln += "  +%d obr." % p.bonus_damage
-	wln += "   ·   AC %d" % (p.ac + p.armor_bonus())
-	var worn: Array = []
-	for slot in p.equipment:
-		if p.equipment[slot] != null:
-			worn.append((p.equipment[slot] as GameItem).name_pl)
-	if not worn.is_empty():
-		wln += "   ·   Pancerz: " + ", ".join(worn)
-	wln += "   ·   Mana %d/%d [T]" % [p.mana, p.max_mana]
-	c.draw_string(_font, Vector2(40, 80), wln, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
-	# INT stat
-	var int_str := "INT %d (+%d)" % [p.int_xp, p.int_mod()]
-	c.draw_string(_font, Vector2(40, 98), int_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	# Class + active readiness — or, before you have one, your building playstyle
-	# (so the eventual class offer is visibly EARNED, not a random pop-up).
-	if p.class_key != "":
-		var gate := ClassFeatures.can_use_active(p, floor.depth)
-		var ready := "gotowa" if bool(gate[0]) else "użyta"
-		var cstr := "Klasa: %s   ·   [F] %s (%s)" % [Classes.name_of(p.class_key),
-			ClassFeatures.active_name(p.class_key), ready]
-		var ccol := COL_AMBER if bool(gate[0]) else COL_DIM
-		c.draw_string(_font, Vector2(220, 98), cstr, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ccol)
-	else:
-		c.draw_string(_font, Vector2(220, 98),
-			"Styl: %s   (→ klasa)" % Classes.style_summary(p, 3),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	# Materials — icon chips instead of a text wall
-	c.draw_string(_font, Vector2(40, 116), "Materiały:", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_AMBER)
-	var mx := 130.0
-	if sim.materials.is_empty():
-		c.draw_string(_font, Vector2(mx, 116), "—", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
-	for k in sim.materials:
-		if mx > 760.0: break
-		_draw_icon(c, str(k), Vector2(mx + 7, 111), COL_AMBER)
-		var cnt := "x%d" % int(sim.materials[k])
-		c.draw_string(_font, Vector2(mx + 17, 116), cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_BRIGHT)
-		mx += 24.0 + _font.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-	# Inventory: list the actual item names (not just a count) so you can see what
-	# you're carrying without opening the workshop.
-	var inv_parts: Array = []
-	if not floor.items.is_empty():
-		var names: Array = []
-		for it in floor.items:
-			names.append((it as GameItem).name_pl)
-		var shown: String = ", ".join(names.slice(0, 4))
-		if names.size() > 4:
-			shown += " +%d" % (names.size() - 4)
-		inv_parts.append("Przedmioty (%d): %s" % [floor.items.size(), shown])
-	if not floor.boxes.is_empty():
-		inv_parts.append("Skrzynki: %d" % floor.boxes.size())
-	# Companion + its ability readiness
-	if floor.companion != null and floor.companion.is_alive():
-		var comp: CombatEntity = floor.companion
-		var ready: bool = int(comp.flags.get("ability_floor", -1)) != floor.depth
-		inv_parts.append("Towarzysz: %s  [G] %s" % [comp.name_pl, "gotów" if ready else "użyty"])
-	if not inv_parts.is_empty():
-		c.draw_string(_font, Vector2(40, 134), " | ".join(inv_parts),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_GREEN)
-	# Audience + top sponsors
-	if floor.audience:
-		var aud := floor.audience
-		var band_col := COL_DIM
-		match aud.band():
-			"warming": band_col = COL_AMBER
-			"hot":     band_col = COL_RED
-			"viral":   band_col = COL_CYAN
-		c.draw_string(_font, Vector2(40, 152),
-			"Widownia: %d  [%s]" % [aud.rating, aud.band_label()],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, band_col)
-	if floor.sponsors:
-		var top := floor.sponsors.top_ranked(2)
-		if not top.is_empty():
-			var parts2: Array = []
-			for skey in top:
-				var sdata := floor.sponsors.get_sponsor(skey)
-				var nm: String = sdata.get("name_fallback", skey).substr(0, 12)
-				var gp := floor.sponsors.gift_progress(skey)
-				# Show attention + progress to next gift, so you SEE the box coming.
-				var prog := "  %d→%d📦" % [int(gp[0]), int(gp[1])] if int(gp[1]) > 0 else "  (max)"
-				parts2.append("%s %s%s" % [nm, floor.sponsors.mood(skey), prog])
-			c.draw_string(_font, Vector2(40, 168), "Sponsorzy: " + " | ".join(parts2),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
-	# Focused-target readout: who you're fighting + HOW to fight it. The hint is
-	# the counterplay for its body class — combat depth has to be legible.
-	var foe := _focused_enemy()
-	if foe != null and foe.is_alive():
-		var st := "śpi" if not foe.aware else ("GARDA" if foe.has_status("guard") else "ściga cię")
-		var fl := _wrap_text("%s  HP %d/%d  [%s]  ·  %s"
-			% [foe.name_pl, foe.hp, foe.max_hp, st, _kind_hint(foe.body_kind())], 760.0, 13)
-		for i in mini(fl.size(), 2):
-			c.draw_string(_font, Vector2(40, 660 + i * 18), str(fl[i]),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER)
-	# THE goal of every floor: reach the stairs before the collapse.
-	if floor != null:
-		var trem2: int = floor.time_limit - floor.turn
-		var doba: int = clampi(floor.turn / 30 + 1, 1, floor.time_days)
-		var tcol: Color = COL_AMBER if trem2 > 30 else COL_RED
-		c.draw_string(_font, Vector2(40, 700),
-			"Cel: zejście [>]  ·  DOBA %d/%d, runie za %d tur" % [doba, floor.time_days, maxi(0, trem2)],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, tcol)
-	# Optional sponsor contract, quiet, on the right.
-	if floor != null and not floor.objective.is_empty():
-		var done: bool = bool(floor.objective.get("done", false))
-		c.draw_string(_font, Vector2(520, 700),
-			"Kontrakt (opcja): " + Objectives.describe(floor.objective),
-			HORIZONTAL_ALIGNMENT_LEFT, 300, 12, COL_GREEN if done else Color(COL_DIM, 0.9))
-	elif _hint != "":
-		c.draw_string(_font, Vector2(40, 700), "Wskazówka: " + _hint,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	# DZIENNIK log panel — screen-fixed on the right (the board no longer defines
-	# screen positions; the camera frames it left of this panel).
-	var lx := 830.0
-	var lw := 1280 - lx - 24
-	c.draw_rect(Rect2(lx, 110, lw, 360), Color(0.08, 0.10, 0.13, 0.9))
-	c.draw_rect(Rect2(lx, 110, lw, 360), COL_GRID, false, 1.0)
-	_draw_tracked(c, Vector2(lx + 12, 132), "DZIENNIK", 13, COL_CYAN, 2.0)
-	var disp: Array = []
-	for i in _log.size():
-		disp += _wrap_text(_log[i], lw - 24, 14)
-	if disp.size() > 14:
-		disp = disp.slice(disp.size() - 14)
-	for i in disp.size():
-		var alpha := 0.5 + 0.5 * float(i + 1) / disp.size()
-		c.draw_string(_font, Vector2(lx + 12, 158 + i * 22), disp[i],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(COL_BRIGHT, alpha))
+		c.draw_string(_font, Vector2(40, 84), "[L] punkty rozwoju: +%d" % p.skill_points,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_AMBER)
+	if not _throw_mode.is_empty():
+		c.draw_string(_font, Vector2(0, 96), "— WSKAŻ POLE RZUTU (PPM odwołuje) —",
+			HORIZONTAL_ALIGNMENT_CENTER, 1280, 13, COL_AMBER)
+	_draw_portrait_card(c, p)
+	_draw_audience_meter(c)
+	_draw_ticker(c)
 	if _banner != "" and _banner_t > 0.0:
 		var ba: float = clampf(_banner_t / 0.6, 0.0, 1.0)   # fade out over the last 0.6s
 		c.draw_string(_font, Vector2(260, 330), _banner,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(COL_BRIGHT, ba))
-	_draw_body_readout(c, lx, lw)
+	_draw_target_panel(c)
 	# Exactly ONE in-game modal at a time (priority order), so nothing ever stacks.
 	# (the craft panel is handled earlier in _draw_ui as an exclusive screen)
 	if not _box_anim.is_empty():
@@ -4762,19 +4711,19 @@ func _passive_summary(key: String) -> String:
 		parts.append("%s +%d" % [PASSIVE_PL.get(k, k), int(tbl[k])])
 	return ", ".join(parts) if not parts.is_empty() else "—"
 
-## The large combat readout: the focused enemy's procedural body, part by part,
-## colored by severity, marked with wound icons, with the aimed zone highlighted.
-func _draw_body_readout(c: CanvasItem, lx: float, lw: float) -> void:
+## Contextual target panel: appears ONLY when you have a target. Body zones
+## stay clickable (aiming) and the counterplay hint lives here too.
+func _draw_target_panel(c: CanvasItem) -> void:
 	var e := _focused_enemy()
-	var top := 484.0
-	c.draw_rect(Rect2(lx, top, lw, 224), Color(0.08, 0.10, 0.13, 0.9))
-	c.draw_rect(Rect2(lx, top, lw, 224), COL_GRID, false, 1.0)
 	if e == null:
-		c.draw_string(_font, Vector2(lx + 12, top + 24), "CIAŁO — brak celu",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 		return
+	var lx := 920.0
+	var lw := 1280 - lx - 20
+	var top := 430.0
+	c.draw_rect(Rect2(lx, top, lw, 250), Color(0.05, 0.07, 0.09, 0.94))
+	c.draw_rect(Rect2(lx, top, lw, 250), Color(COL_AMBER, 0.4), false, 1.0)
 	var st := "śpi" if not e.aware else "ściga cię"
-	c.draw_string(_font, Vector2(lx + 12, top + 22), "CIAŁO: " + e.name_pl,
+	c.draw_string(_font, Vector2(lx + 12, top + 22), e.name_pl,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	c.draw_string(_font, Vector2(lx + 12, top + 40),
 		"HP %d/%d  ·  %s  ·  trafienie ~%d%%" % [e.hp, e.max_hp, st, sim.hit_chance(e)],
@@ -5370,3 +5319,86 @@ func _draw_drone(ppos: Vector2, t: float) -> void:
 	draw_line(dp + Vector2(9, -4), dp + Vector2(14, -9), Color(0.28, 0.36, 0.42), 1.5)
 	if fmod(t, 1.2) < 0.7:
 		draw_circle(dp + Vector2(6, -1), 1.8, COL_RED)
+
+
+# ── S1 broadcast HUD ───────────────────────────────────────────────────────────
+
+func _draw_portrait_card(c: CanvasItem, p: CombatEntity) -> void:
+	var r := Rect2(20, 592, 256, 108)
+	c.draw_rect(r, Color(0.05, 0.07, 0.09, 0.93))
+	c.draw_rect(r, Color(COL_CYAN, 0.35), false, 1.0)
+	c.draw_rect(Rect2(r.position, Vector2(2, r.size.y)), Color(COL_CYAN, 0.8))
+	var ap: Dictionary = p.flags.get("appearance", {})
+	_draw_figure(c, r.position + Vector2(36, 92), 1.7, ap)
+	_draw_tracked(c, r.position + Vector2(74, 22), p.name_pl.to_upper().substr(0, 12),
+		13, Color(0.92, 0.96, 0.99), 2.0)
+	var hpb := Rect2(r.position.x + 74, r.position.y + 32, 162, 9)
+	var hf := clampf(float(p.hp) / float(maxi(1, p.max_hp)), 0.0, 1.0)
+	c.draw_rect(hpb, Color(0.10, 0.08, 0.08))
+	c.draw_rect(Rect2(hpb.position, Vector2(hpb.size.x * hf, 9)),
+		COL_GREEN if hf > 0.5 else (COL_AMBER if hf > 0.25 else COL_RED))
+	var xpb := Rect2(hpb.position.x, hpb.position.y + 11, 162, 3)
+	c.draw_rect(xpb, Color(0.08, 0.10, 0.13))
+	c.draw_rect(Rect2(xpb.position, Vector2(xpb.size.x
+		* clampf(float(p.xp) / maxf(1.0, float(p.xp_to_next())), 0.0, 1.0), 3)), COL_GAS)
+	c.draw_string(_font, hpb.position + Vector2(0, 26), "HP %d/%d   ·   pancerz %d" % [p.hp, p.max_hp, p.ac + p.armor_bonus()],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COL_DIM)
+	# AP pips — the round's economy at a glance
+	c.draw_string(_font, r.position + Vector2(74, 86), "PA", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COL_DIM)
+	for i in sim.player_ap_max:
+		var ctr := r.position + Vector2(104.0 + i * 24.0, 82.0)
+		if i < sim.player_ap:
+			c.draw_circle(ctr, 7.0, COL_AMBER)
+		c.draw_arc(ctr, 7.0, 0, TAU, 16, Color(COL_AMBER, 0.65), 1.4)
+	# mana dots
+	if p.max_mana > 0:
+		for i in mini(p.max_mana, 8):
+			var mc := r.position + Vector2(104.0 + i * 13.0, 98.0)
+			if i < p.mana:
+				c.draw_circle(mc, 3.2, COL_CYAN)
+			c.draw_arc(mc, 3.2, 0, TAU, 10, Color(COL_CYAN, 0.5), 1.0)
+
+func _draw_audience_meter(c: CanvasItem) -> void:
+	if floor.audience == null:
+		return
+	var aud := floor.audience
+	var r := Rect2(1006, 648, 254, 44)
+	_draw_tracked(c, r.position + Vector2(0, 10), "WIDOWNIA", 10, Color(COL_DIM, 0.9), 3.0)
+	c.draw_string(_font, r.position + Vector2(200, 10), str(aud.rating),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_PURPLE)
+	var bar := Rect2(r.position.x, r.position.y + 18, 254, 8)
+	c.draw_rect(bar, Color(0.10, 0.08, 0.13))
+	c.draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(aud.rating / 100.0, 0.0, 1.0), 8)),
+		COL_PURPLE)
+	c.draw_string(_font, r.position + Vector2(0, 40), aud.band_label(),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(COL_DIM, 0.8))
+
+func _draw_ticker(c: CanvasItem) -> void:
+	var n := mini(_log.size(), 3)
+	for i in n:
+		var idx := _log.size() - n + i
+		var age := n - 1 - i
+		var a := 1.0 - 0.32 * float(age)
+		c.draw_string(_font, Vector2(300, 642.0 + i * 18.0), str(_log[idx]),
+			HORIZONTAL_ALIGNMENT_LEFT, 680, 12,
+			Color(0.86, 0.90, 0.94, a * 0.95) if age == 0 else Color(COL_DIM, a))
+
+## Execute the aimed throw and spend the item.
+func _throw_at(cell: Vector2i) -> void:
+	var idx: int = int(_throw_mode.get("idx", -1))
+	var kind: String = str(_throw_mode.get("kind", ""))
+	_throw_mode = {}
+	if idx < 0 or idx >= floor.items.size():
+		queue_redraw()
+		return
+	var evs: Array = sim.player_throw(kind, cell)
+	for ev in evs:
+		if str(ev.get("type", "")) == "none":
+			_log_push("Za daleko albo bez linii rzutu.")
+			queue_redraw()
+			return
+	floor.items.remove_at(idx)
+	_play("whoosh")
+	_spawn_parts(_cell_px(cell), 8, Color(0.6, 0.9, 0.4) if kind == "acid" else COL_AMBER, 60.0)
+	_animate(evs)
+	_advance_floor_turn()

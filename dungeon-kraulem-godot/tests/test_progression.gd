@@ -144,7 +144,8 @@ func _initialize() -> void:
 	var rp := CombatEntity.new(1, "Grzyb", 100, 14, ["humanoid"]); rp.faction = "player"
 	rp.cell = Vector2i(1, 1); rp.species_trait = "regen"; rp.hp = 50
 	var rcs := CombatSim.new(rb, {1: rp}, 1, 1); rb.place(1, rp.cell)
-	rcs.player_move(Vector2i.RIGHT)              # one action → one round → +1 regen
+	rcs.player_move(Vector2i.RIGHT)              # 1 AP spent — the round is open
+	rcs.player_wait()                            # flush the round → regen ticks
 	_ck(rp.hp == 51, "the regen trait heals 1 HP per round")
 
 	# salvage_heal: recycling patches the cyborg
@@ -289,7 +290,9 @@ func _initialize() -> void:
 	var zcs := CombatSim.new(zb, {1: zp, 2: zm}, 1, 5)
 	zb.place(1, zp.cell); zb.place(2, zm.cell)
 	var zhp := zp.hp
-	zcs._enemy_turn()
+	zcs._enemy_turn()   # round 1: the mech DECLARES the zap (telegraph on board)
+	_ck(str(zm.intent.get("kind", "")) == "zap", "the mech telegraphs its zap a round ahead")
+	zcs._enemy_turn()   # round 2: the declared zap goes off
 	_ck(zp.hp < zhp, "a mech zaps the player from 3 tiles away")
 	_ck(maxi(absi(zm.cell.x - zp.cell.x), absi(zm.cell.y - zp.cell.y)) >= 2, "the mech keeps its distance")
 
@@ -300,11 +303,71 @@ func _initialize() -> void:
 	pbeast.cell = Vector2i(3, 1); pbeast.aware = true
 	var pcs := CombatSim.new(pb, {1: pp, 2: pbeast}, 1, 6)
 	pb.place(1, pp.cell); pb.place(2, pbeast.cell)
-	var p_evs := pcs._enemy_turn()
+	pcs._enemy_turn()   # round 1: the pounce is telegraphed at your CURRENT cell
+	_ck(str(pbeast.intent.get("kind", "")) == "pounce", "the beast telegraphs its pounce")
+	var pounce_cell: Vector2i = pbeast.intent["cell"]
+	pp.cell = Vector2i(1, 0); pb.move(Vector2i(1, 1), pp.cell)   # you SIDESTEP
+	var p_evs := pcs._enemy_turn()   # round 2: the pounce lands on the empty cell
 	var pounced := false
 	for ev in p_evs:
 		if ev.get("type") == "pounce": pounced = true
-	_ck(pounced and pb.is_adjacent(pbeast.cell, pp.cell), "a beast pounces from 2 tiles into melee")
+	_ck(pounced and pbeast.cell == pounce_cell and pp.hp == 100,
+		"a dodged pounce hits the CELL, not you (Into-the-Breach rule)")
+
+	# ── S1: declared strikes hit whatever stands in the cell (friendly fire) ──
+	var ffb := Board.new(6, 3)
+	var ffp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); ffp.faction = "player"
+	ffp.cell = Vector2i(2, 1); ffb.place(1, ffp.cell)
+	var ffa := CombatEntity.new(2, "Zbir", 30, 10, ["humanoid", "monster"]); ffa.faction = "enemy"
+	ffa.aware = true; ffa.cell = Vector2i(1, 1); ffb.place(2, ffa.cell)
+	var ffb2 := CombatEntity.new(3, "Drugi", 30, 10, ["humanoid", "monster"]); ffb2.faction = "enemy"
+	ffb2.aware = true; ffb2.cell = Vector2i(4, 1); ffb2.statuses["charmed"] = 9; ffb.place(3, ffb2.cell)
+	var ffs := CombatSim.new(ffb, {1: ffp, 2: ffa, 3: ffb2}, 1, 9)
+	ffs._enemy_turn()
+	_ck(str(ffa.intent.get("kind", "")) == "strike", "an adjacent enemy telegraphs a strike at your cell")
+	var struck: Vector2i = ffa.intent["cell"]
+	# park the charmed THUG in the declared cell and step away
+	ffb.move(ffp.cell, Vector2i(2, 0)); ffp.cell = Vector2i(2, 0)
+	ffb.move(ffb2.cell, struck); ffb2.cell = struck
+	var ff_hp := ffb2.hp
+	ffs._enemy_turn()
+	_ck(ffb2.hp < ff_hp and ffp.hp == 100,
+		"the declared strike hits whoever stands in the cell — friendly fire")
+
+	# ── S1: shove into a wall = stun + the intent is cancelled ────────────────
+	var swb := Board.new(5, 3)
+	for wx in 5:
+		swb.set_wall(Vector2i(wx, 0))
+	var swp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); swp.faction = "player"
+	swp.cell = Vector2i(2, 2); swb.place(1, swp.cell)
+	var swe := CombatEntity.new(2, "Zbir", 30, 10, ["humanoid", "monster"]); swe.faction = "enemy"
+	swe.aware = true; swe.cell = Vector2i(2, 1); swb.place(2, swe.cell)
+	swe.intent = {"kind": "strike", "cell": swp.cell}
+	var sws := CombatSim.new(swb, {1: swp, 2: swe}, 1, 10)
+	sws.player_shove(Vector2i(0, -1))   # slam him into the wall behind
+	_ck(swe.has_status("stunned") and swe.intent.is_empty(),
+		"a wall slam stuns and CANCELS the telegraphed strike")
+
+	# ── S1: AP economy — two actions per round ────────────────────────────────
+	var apb := Board.new(6, 3)
+	var app := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); app.faction = "player"
+	app.cell = Vector2i(1, 1); apb.place(1, app.cell)
+	var aps := CombatSim.new(apb, {1: app}, 1, 11)
+	aps.player_move(Vector2i.RIGHT)
+	_ck(aps.player_ap == 1 and not aps.round_completed, "the first action leaves 1 AP, round open")
+	aps.player_move(Vector2i.RIGHT)
+	_ck(aps.player_ap == 2 and aps.round_completed, "the second action closes the round and resets AP")
+
+	# ── S1: the lure retargets a telegraph ────────────────────────────────────
+	var lub := Board.new(8, 5)
+	var lup := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); lup.faction = "player"
+	lup.cell = Vector2i(1, 2); lub.place(1, lup.cell)
+	var lue := CombatEntity.new(2, "Zbir", 30, 10, ["humanoid", "monster"]); lue.faction = "enemy"
+	lue.aware = true; lue.cell = Vector2i(3, 2); lub.place(2, lue.cell)
+	var lus := CombatSim.new(lub, {1: lup, 2: lue}, 1, 12)
+	lus.player_throw("lure", Vector2i(5, 2))   # range is 4
+	lus.player_wait()
+	_ck(lue.cell.x > 3, "a thrown lure pulls the enemy toward the decoy, not you")
 
 	# spectral: bare physical swings sometimes pass straight through
 	var phb := Board.new(5, 3)

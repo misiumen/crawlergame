@@ -12,6 +12,7 @@ var hp: int = 1
 var ac: int = 10
 var cell: Vector2i = Vector2i.ZERO
 var statuses: Dictionary = {}    # status name -> turns remaining
+var intent: Dictionary = {}      # telegraphed next action: {kind: strike|zap|pounce, cell}
 var faction: String = "enemy"    # "player" | "enemy" | "neutral" | "object"
 var alive: bool = true
 var aware: bool = true           # enemies: false = idle until they notice you
