@@ -37,7 +37,7 @@ const KIND_COST := {
 
 const CATALOG: Dictionary = {
 	# ── Always-available defaults (cost 0, owned from the start) ──────────────
-	"species_bezimienny": {"kind": "species", "label": "Bezimienny", "reward": "Standardowy uczestnik. Bez bonusów, bez wymówek.", "cost": 0, "effect": {}},
+	"species_bezimienny": {"kind": "species", "label": "Człowiek", "reward": "Gatunek bazowy. Bez bonusów, bez wymówek — czysta determinacja.", "cost": 0, "effect": {}},
 	"origin_debiutant":   {"kind": "origin", "label": "Debiutant", "reward": "Pierwszy raz na arenie. Widzowie nie mają oczekiwań.", "cost": 0, "effect": {}},
 
 	# ── Species (races) ──────────────────────────────────────────────────────

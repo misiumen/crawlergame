@@ -75,6 +75,9 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
 	if biome_label != "":
 		hint = "Piętro %d — %s. Schodź po schodach (>)." % [floor_num, biome_label]
 
+	# Collapse timer (the book's rule: deeper floors grant more days; the
+	# countdown only matters while you dawdle). One "day" = 30 turns.
+	var days: int = 4 + floor_num
 	return {
 		"rooms": rooms,
 		"player": player,
@@ -84,6 +87,8 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
 		"floor_num": floor_num,
 		"biome": mods.get("biome_key", ""),
 		"hint": hint,
+		"time_days": days,
+		"time_limit": days * 30,
 	}
 
 # ── Room generation ───────────────────────────────────────────────────────────

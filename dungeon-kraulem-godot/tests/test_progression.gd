@@ -466,9 +466,19 @@ func _initialize() -> void:
 			sn_again = true
 	_ck(not sn_again, "an aware enemy can't be sneak-struck")
 
+	# ── Collapse timer rides the floor data (book rule: deeper = more days) ───
+	var tf1: Dictionary = FloorGen.generate(1, 99, {})
+	var tf3: Dictionary = FloorGen.generate(3, 99, {})
+	_ck(int(tf1["time_limit"]) == (4 + 1) * 30, "floor 1 grants 5 days of turns")
+	_ck(int(tf3["time_days"]) > int(tf1["time_days"]), "deeper floors grant more days")
+
 	# ── Character creator data (appearance) ───────────────────────────────────
 	var apd := Appearance.defaults()
-	_ck(apd.size() == Appearance.SLOT_ORDER.size(), "appearance defaults cover every slot")
+	var ap_ok := true
+	for sl in Appearance.SLOT_ORDER:
+		if not apd.has(sl):
+			ap_ok = false
+	_ck(ap_ok and apd.has("name"), "appearance defaults cover every slot + the name")
 	var apc := Appearance.cycle(apd, "hair", -1)
 	_ck(int(apc["hair"]) == Appearance.HAIR.size() - 1, "appearance cycle wraps backwards")
 	_ck(int(Appearance.cycle(apc, "hair", 1)["hair"]) == 0, "appearance cycle wraps forwards")

@@ -68,6 +68,7 @@ static func defaults() -> Dictionary:
 	var d: Dictionary = {}
 	for k in SLOT_ORDER:
 		d[k] = 0
+	d["name"] = ""
 	return d
 
 ## Current option dict for a slot (index clamped, so stale saves never crash).
@@ -106,4 +107,5 @@ static func load_saved() -> Dictionary:
 		for k in SLOT_ORDER:
 			if (parsed as Dictionary).has(k):
 				d[k] = int(parsed[k])
+		d["name"] = str((parsed as Dictionary).get("name", ""))
 	return d

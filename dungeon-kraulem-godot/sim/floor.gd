@@ -18,6 +18,8 @@ var descended: bool = false
 var audience: AudienceState
 var sponsors: SponsorState
 var turn: int = 0
+var time_days: int = 5        # collapse budget, in dungeon days
+var time_limit: int = 150     # collapse budget, in turns (30/day)
 var class_offered: bool = false   # once we've offered a class, don't nag again
 
 var depth: int = 1                 # how many floors deep this run is (1-based)
@@ -42,6 +44,8 @@ func _init(data: Dictionary) -> void:
 	audience = data.get("audience", null) if data.get("audience", null) is AudienceState else AudienceState.new()
 	sponsors = data.get("sponsors", null) if data.get("sponsors", null) is SponsorState else SponsorState.new()
 	class_offered = bool(data.get("class_offered", false))
+	time_days = int(data.get("time_days", 5))
+	time_limit = int(data.get("time_limit", 150))
 	objective = data.get("objective", {}) if data.get("objective", {}) is Dictionary else {}
 	companion = data.get("companion", null) if data.get("companion", null) is CombatEntity else null
 	enter(int(data.get("start", 0)), data["start_cell"])

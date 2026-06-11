@@ -53,7 +53,7 @@ static func write(floor, seed_value: int) -> void:
 
 static func _player_dict(p) -> Dictionary:
 	return {
-		"hp": p.hp, "max_hp": p.max_hp, "ac": p.ac,
+		"hp": p.hp, "max_hp": p.max_hp, "ac": p.ac, "name": p.name_pl,
 		"class_key": p.class_key, "affinity": p.affinity.duplicate(true),
 		"int_xp": p.int_xp, "coating": p.coating, "coating_charges": p.coating_charges,
 		"bonus_damage": p.bonus_damage,
@@ -105,6 +105,7 @@ static func rebuild_floor(save_dict: Dictionary, content: Dictionary):
 	var pd: Dictionary = save_dict.get("player", {})
 	var p = fdata["player"]
 	p.max_hp = int(pd.get("max_hp", p.max_hp))
+	p.name_pl = str(pd.get("name", p.name_pl))
 	p.hp = int(pd.get("hp", p.hp))
 	p.ac = int(pd.get("ac", p.ac))
 	p.class_key = pd.get("class_key", "")

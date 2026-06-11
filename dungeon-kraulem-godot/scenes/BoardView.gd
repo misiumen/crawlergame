@@ -375,7 +375,7 @@ func _recenter() -> void:
 		# fill the playfield (left of the log panel): zoom to fit the stage
 		var ww := (sim.board.w + sim.board.h) * ISO_W * 0.5 + 80.0
 		var wh := (sim.board.w + sim.board.h) * ISO_H * 0.5 + WALL_H + 120.0
-		_fit_zoom = clampf(minf(780.0 / ww, 560.0 / wh), 0.8, 1.5)
+		_fit_zoom = clampf(minf(780.0 / ww, 540.0 / wh), 0.75, 1.1)
 		_cam.position = center + Vector2((640.0 - 415.0) / _fit_zoom, -10.0)
 		_cam.reset_smoothing()
 
@@ -542,6 +542,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			queue_redraw()
 		elif kc == KEY_ENTER or kc == KEY_KP_ENTER:
 			_creator_begin_run()
+		elif kc == KEY_BACKSPACE:
+			var nm0 := str(_appearance.get("name", ""))
+			_appearance["name"] = nm0.substr(0, maxi(0, nm0.length() - 1))
+			queue_redraw()
+		else:
+			var u: int = event.unicode
+			if u >= 32 and u != 127 and str(_appearance.get("name", "")).length() < 14:
+				_appearance["name"] = str(_appearance.get("name", "")) + char(u)
+				queue_redraw()
 		return
 
 	# Title screen: Enter continues a save (or opens the creator), N forces a
@@ -554,6 +563,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if kc == KEY_D:
 			_pending_daily = true
 			_open_creator()
+			return
+		if kc == KEY_O:
+			_pause_screen = true
+			_reset_arm = false
+			_play("open")
+			queue_redraw()
 			return
 		if kc == KEY_N:
 			_pending_daily = false
@@ -724,10 +739,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	var shove := Input.is_key_pressed(KEY_SHIFT)
 	var dir := Vector2i.ZERO
 	match kc:
-		KEY_LEFT,  KEY_A: dir = Vector2i.LEFT
-		KEY_RIGHT, KEY_D: dir = Vector2i.RIGHT
-		KEY_UP,    KEY_W: dir = Vector2i.UP
-		KEY_DOWN,  KEY_S: dir = Vector2i.DOWN
+		# Screen-relative on the iso stage: W = up on SCREEN (cell NW+NE blend
+		# = the (-1,-1) diagonal), and so on. What you press is where you go.
+		KEY_LEFT,  KEY_A: dir = Vector2i(-1, 1)
+		KEY_RIGHT, KEY_D: dir = Vector2i(1, -1)
+		KEY_UP,    KEY_W: dir = Vector2i(-1, -1)
+		KEY_DOWN,  KEY_S: dir = Vector2i(1, 1)
 		KEY_SPACE, KEY_PERIOD: handle_wait(); return   # Space = pass the turn
 		KEY_E:      handle_interact(); return
 		_: return
@@ -883,6 +900,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"title_start":       _pending_daily = false; _open_creator()
 		"title_new":         _pending_daily = false; _open_creator()
 		"title_daily":       _pending_daily = true; _open_creator()
+		"title_opts":        _pause_screen = true; _reset_arm = false; _play("open"); queue_redraw()
 		"creator_back":      _creator_screen = false; _play("close"); queue_redraw()
 		"creator_start":     _creator_begin_run()
 		"cr_species":        MetaCatalog.set_species(z.get("s", "")); _play("click"); queue_redraw()
@@ -1047,6 +1065,9 @@ func _make_companion() -> CombatEntity:
 func _apply_loadout() -> void:
 	var p := floor.player
 	p.flags["appearance"] = _appearance.duplicate()
+	var nm := str(_appearance.get("name", "")).strip_edges()
+	if nm != "":
+		p.name_pl = nm
 	var lo := MetaCatalog.loadout()
 	p.species_key = lo["species"]
 	p.origin_key = lo["origin"]
@@ -1885,6 +1906,29 @@ func _advance_floor_turn() -> void:
 	for b in new_boxes:
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
 		_add_floater(sim.player_id, "PACZKA!", COL_AMBER)
+	# The collapse countdown: the floor WILL close (book rules). Warnings, then
+	# the stage comes down on whoever is still on it.
+	var trem: int = floor.time_limit - floor.turn
+	if trem == 60:
+		_log_push("Konferansjer: Dwie doby do zawalenia piętra. Schody czekają.")
+		_play("sting")
+	elif trem == 30:
+		_log_push("Konferansjer: OSTATNIA DOBA. Loch zaczyna trzeszczeć.")
+		_banner = "PIĘTRO NIEDŁUGO RUNIE"
+		_banner_t = 2.5
+		_play("sting")
+		_shake = maxf(_shake, 5.0)
+	elif trem == 10:
+		_banner = "UCIEKAJ DO ZEJŚCIA"
+		_banner_t = 2.5
+		_play("sting")
+		_shake = maxf(_shake, 7.0)
+	elif trem <= 0 and _summary.is_empty():
+		_log_push("Piętro zawala się. Transmisja z twojego sektora urywa się w pół klatki.")
+		floor.player.hp = 0
+		floor.player.alive = false
+		_end_run(false)
+		return
 	# Biome gimmick: an occasional flavor quirk with a tiny mechanical nudge (not
 	# right at the start of a floor — let the player settle in first).
 	if floor.turn >= 8 and floor.turn % 8 == 0:
@@ -1904,8 +1948,14 @@ func _advance_floor_turn() -> void:
 			_event = beat
 			_log_push("Przerwa w akcji: %s" % _event.get("intro", ""))
 			queue_redraw()
-	# The Syndicate may now read your style and offer a class.
-	if _class_offer.is_empty():
+	# The Syndicate may now read your style and offer a class — but never
+	# mid-fight; the pitch waits until nothing is hunting you.
+	var calm := true
+	for ce in sim.enemies_alive():
+		if ce.aware:
+			calm = false
+			break
+	if _class_offer.is_empty() and calm:
 		var offer := floor.check_class_offer()
 		if not offer.is_empty():
 			_class_offer = offer
@@ -3015,10 +3065,13 @@ func _draw() -> void:
 		if it["kind"] == "wall":
 			var wc2: Vector2i = it["cell"]
 			var alpha := 1.0
-			# set pieces never hide the star of the show
+			# the front rim of the stage stays see-through — never hide the floor
+			if wc2.y == b.h - 1 or wc2.x == b.w - 1:
+				alpha = 0.40
+			# and set pieces never hide the star of the show
 			if wc2.x + wc2.y > psum and wc2.x + wc2.y - psum <= 3 \
 					and absf(_cell_px(wc2).x - ppx.x) < ISO_W * 1.2:
-				alpha = 0.42
+				alpha = minf(alpha, 0.42)
 			_draw_wall_prism(_cell_px(wc2), wc2, th, alpha)
 		else:
 			var e3: CombatEntity = it["e"]
@@ -3071,6 +3124,8 @@ func _draw_ui(c: CanvasItem) -> void:
 		return
 	if _title:
 		_draw_title(c)
+		if _pause_screen:
+			_draw_pause(c)
 		_draw_toasts(c)
 		return
 	if sim == null: return
@@ -3222,7 +3277,7 @@ func _draw_char(c: CanvasItem) -> void:
 func _draw_pause(c: CanvasItem) -> void:
 	c.draw_rect(Rect2(0, 0, 1280, 720), Color(0, 0, 0, 0.6))
 	var r := Rect2(440, 140, 400, 454)
-	_panel(c, r, COL_CYAN, "PAUZA")
+	_panel(c, r, COL_CYAN, "USTAWIENIA" if _title else "PAUZA")
 	var y := r.position.y + 72.0
 	for row in [["Master", "Głośność"], ["Music", "Muzyka"], ["SFX", "Efekty"]]:
 		var vol: float = _sfx.get_volume(row[0]) if _sfx != null else 0.0
@@ -3237,8 +3292,11 @@ func _draw_pause(c: CanvasItem) -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
 			_zone(vb, "vol", int(pair[0]), str(row[0]))
 		y += 42.0
-	for r2 in [["Osiągnięcia", "pause_ach"], ["Pełny ekran [F11]", "pause_full"],
-			["Wznów [Esc]", "pause_resume"], ["Wyjdź do tytułu (zapis zostaje)", "pause_quit"]]:
+	var prows: Array = [["Osiągnięcia", "pause_ach"], ["Pełny ekran [F11]", "pause_full"],
+		["Zamknij [Esc]" if _title else "Wznów [Esc]", "pause_resume"]]
+	if not _title:
+		prows.append(["Wyjdź do tytułu (zapis zostaje)", "pause_quit"])
+	for r2 in prows:
 		var b2 := Rect2(r.position.x + 24, y - 16, r.size.x - 48, 30)
 		var h2 := _hover(b2)
 		c.draw_rect(b2, Color(COL_CYAN, 0.18 if h2 else 0.07))
@@ -3427,6 +3485,7 @@ func _draw_title(c: CanvasItem) -> void:
 	rows.append(["EKWIPUNEK SEZONU", "%s · %s" % [
 		MetaCatalog.def_of(lo["species"]).get("label", "?"),
 		MetaCatalog.def_of(lo["origin"]).get("label", "?")], "M", "meta_open"])
+	rows.append(["USTAWIENIA", "głośność · pełny ekran · reset osiągnięć", "O", "title_opts"])
 	var y := 372.0
 	for row in rows:
 		var label: String = str(row[0])
@@ -3668,8 +3727,22 @@ func _draw_exits() -> void:
 			draw_arc(ctr, 8.0 + ring * 16.0, 0, TAU, 24, Color(COL_GREEN, 0.5 * (1.0 - ring)), 1.5)
 			_draw_glyph(">", cell, COL_GREEN)
 		else:
-			draw_polyline(_diamond_closed(ctr, 7.0), Color(COL_AMBER, 0.55), 1.5)
-			_draw_glyph("+", cell, COL_AMBER)
+			var fwd: bool = int(ex.get("to", 0)) > floor.current
+			var pcol := COL_AMBER if fwd else COL_DIM
+			draw_colored_polygon(_diamond(ctr, 6.0), Color(pcol, 0.10))
+			draw_polyline(_diamond_closed(ctr, 6.0), Color(pcol, 0.7), 1.4)
+			# doorway pillars + lintel rising from the N and S corners
+			var pn := ctr + Vector2(0, -ISO_H / 2.0)
+			var ps := ctr + Vector2(0, ISO_H / 2.0)
+			for pp in [pn, ps]:
+				draw_rect(Rect2(pp + Vector2(-3, -42), Vector2(6, 42)), Color(pcol.darkened(0.2), 0.9))
+				draw_rect(Rect2(pp + Vector2(-3, -42), Vector2(6, 42)), Color(0, 0, 0, 0.35), false, 1.0)
+			draw_line(pn + Vector2(0, -42), ps + Vector2(0, -42), Color(pcol, 0.9), 4.0)
+			var lbl := "DALEJ" if fwd else "POWRÓT"
+			var lw2: float = _font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+			draw_rect(Rect2(ctr.x - lw2 / 2.0 - 5, ctr.y - 62, lw2 + 10, 15), Color(0.03, 0.045, 0.06, 0.9))
+			draw_string(_font, Vector2(ctr.x - lw2 / 2.0, ctr.y - 51), lbl,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, pcol)
 
 func _draw_minimap(c: CanvasItem) -> void:
 	if floor == null: return
@@ -3693,10 +3766,26 @@ func _draw_minimap(c: CanvasItem) -> void:
 			c.draw_line(Vector2(rx + 34, 39), Vector2(rx + 46, 39), COL_DIM, 1.0)
 
 func _draw_object(e: CombatEntity, pos: Vector2, fade: float) -> void:
-	var col := Color("8a6a3a") if "wood" in e.tags else Color("6a7280")
-	col.a = fade
-	draw_rect(Rect2(pos - Vector2(15, 12), Vector2(30, 24)), col)
-	draw_rect(Rect2(pos - Vector2(15, 12), Vector2(30, 24)), Color(0, 0, 0, 0.45 * fade), false, 1.0)
+	# A small iso cube standing on the tile — crate, console, furniture.
+	var col := Color("8a6a3a") if "wood" in e.tags else Color("5d6673")
+	var hw := 15.0
+	var hh := 8.0
+	var hgt := 18.0
+	var base := pos + Vector2(0, 4)
+	var topc := base + Vector2(0, -hgt)
+	draw_colored_polygon(PackedVector2Array([base + Vector2(-hw, 0), base + Vector2(0, hh),
+		base + Vector2(0, hh - hgt), base + Vector2(-hw, -hgt)]),
+		Color(col.darkened(0.30), fade))
+	draw_colored_polygon(PackedVector2Array([base + Vector2(0, hh), base + Vector2(hw, 0),
+		base + Vector2(hw, -hgt), base + Vector2(0, hh - hgt)]),
+		Color(col.darkened(0.10), fade))
+	draw_colored_polygon(PackedVector2Array([topc + Vector2(0, -hh), topc + Vector2(hw, 0),
+		topc + Vector2(0, hh), topc + Vector2(-hw, 0)]),
+		Color(col.lightened(0.18), fade))
+	draw_line(base + Vector2(-hw, -hgt * 0.5), base + Vector2(0, hh - hgt * 0.5),
+		Color(0, 0, 0, 0.30 * fade), 1.0)
+	draw_polyline(PackedVector2Array([base + Vector2(-hw, -hgt), topc + Vector2(0, hh),
+		base + Vector2(hw, -hgt)]), Color(col.lightened(0.35), fade), 1.0)
 
 func _draw_ellipse(center: Vector2, rx: float, ry: float, col: Color) -> void:
 	var pts := PackedVector2Array()
@@ -3874,11 +3963,20 @@ func _draw_hud(c: CanvasItem) -> void:
 		for i in mini(fl.size(), 2):
 			c.draw_string(_font, Vector2(40, 660 + i * 18), str(fl[i]),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_AMBER)
-	# Tracked floor objective (real, with progress + payout) — and a nav hint below.
+	# THE goal of every floor: reach the stairs before the collapse.
+	if floor != null:
+		var trem2: int = floor.time_limit - floor.turn
+		var doba: int = clampi(floor.turn / 30 + 1, 1, floor.time_days)
+		var tcol: Color = COL_AMBER if trem2 > 30 else COL_RED
+		c.draw_string(_font, Vector2(40, 700),
+			"Cel: zejście [>]  ·  DOBA %d/%d, runie za %d tur" % [doba, floor.time_days, maxi(0, trem2)],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, tcol)
+	# Optional sponsor contract, quiet, on the right.
 	if floor != null and not floor.objective.is_empty():
 		var done: bool = bool(floor.objective.get("done", false))
-		c.draw_string(_font, Vector2(40, 700), "Zadanie: " + Objectives.describe(floor.objective),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_GREEN if done else COL_AMBER)
+		c.draw_string(_font, Vector2(520, 700),
+			"Kontrakt (opcja): " + Objectives.describe(floor.objective),
+			HORIZONTAL_ALIGNMENT_LEFT, 300, 12, COL_GREEN if done else Color(COL_DIM, 0.9))
 	elif _hint != "":
 		c.draw_string(_font, Vector2(40, 700), "Wskazówka: " + _hint,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
@@ -4650,11 +4748,18 @@ func _draw_class_offer(c: CanvasItem) -> void:
 		_zone(box, "class", i)
 		cy += 126.0
 
+const PASSIVE_PL := {
+	"hp_max": "maks. HP", "unarmed_dmg": "obrażenia wręcz", "ac": "pancerz",
+	"trap_crit": "kryt. pułapek", "crafting": "rzemiosło", "ranged_hit": "celność rzutów",
+	"heal_mul": "moc leczenia", "mental_resist": "odporność umysłu",
+	"social": "perswazja", "stealth_init": "zaskoczenie",
+}
+
 func _passive_summary(key: String) -> String:
 	var parts: Array = []
 	var tbl: Dictionary = ClassFeatures.PASSIVES.get(key, {})
 	for k in tbl:
-		parts.append("%s +%d" % [k, int(tbl[k])])
+		parts.append("%s +%d" % [PASSIVE_PL.get(k, k), int(tbl[k])])
 	return ", ".join(parts) if not parts.is_empty() else "—"
 
 ## The large combat readout: the focused enemy's procedural body, part by part,
@@ -5050,9 +5155,18 @@ func _draw_creator(c: CanvasItem) -> void:
 	c.draw_colored_polygon(pts, Color(COL_CYAN, 0.08))
 	pts.append(pts[0])
 	c.draw_polyline(pts, Color(COL_CYAN, 0.45), 1.5)
-	_draw_figure(c, Vector2(640, 524.0 + sin(t * 1.4) * 2.0), 6.0, _appearance)
-	c.draw_string(_font, Vector2(450, 568), str(MetaCatalog.def_of(lo["species"]).get("label", "?")),
-		HORIZONTAL_ALIGNMENT_CENTER, 380, 14, COL_CYAN)
+	_draw_figure(c, Vector2(640, 514.0 + sin(t * 1.4) * 2.0), 5.6, _appearance)
+	# the hero's NAME — type it, it goes on the broadcast
+	var nm := str(_appearance.get("name", ""))
+	var caret := "_" if fmod(t, 1.0) < 0.55 else " "
+	var ndisp := (nm if nm != "" else "") + caret
+	c.draw_string(_font, Vector2(450, 552), "IMIĘ:", HORIZONTAL_ALIGNMENT_CENTER, 100, 12, COL_DIM)
+	c.draw_string(_font, Vector2(450, 552), "        " + ndisp,
+		HORIZONTAL_ALIGNMENT_CENTER, 380, 16, COL_BRIGHT)
+	c.draw_line(Vector2(560, 558), Vector2(760, 558), Color(COL_CYAN, 0.5), 1.0)
+	c.draw_string(_font, Vector2(450, 576), "(pisz z klawiatury — %s)" % (
+		str(MetaCatalog.def_of(lo["species"]).get("label", "?"))),
+		HORIZONTAL_ALIGNMENT_CENTER, 380, 11, COL_DIM)
 	# hovered identity reward, under the pedestal
 	if _cr_hover_desc != "":
 		var dl := _wrap_text(_cr_hover_desc, 380.0, 12)
@@ -5061,13 +5175,16 @@ func _draw_creator(c: CanvasItem) -> void:
 				HORIZONTAL_ALIGNMENT_CENTER, 380, 12, COL_DIM)
 		_cr_hover_desc = ""
 
-	# Start + back.
-	var sb := Rect2(490, 636, 300, 46)
+	# Start + back — boxless, brand typography.
+	var sb := Rect2(440, 630, 400, 50)
 	var sh := _hover(sb)
-	c.draw_rect(sb, Color(COL_GREEN, 0.25 if sh else 0.12))
-	c.draw_rect(sb, COL_GREEN if sh else Color(COL_GREEN, 0.5), false, 2.0)
-	c.draw_string(_font, Vector2(sb.position.x, sb.position.y + 30), ">>  ROZPOCZNIJ ZJAZD   [Enter]",
-		HORIZONTAL_ALIGNMENT_CENTER, sb.size.x, 17, COL_BRIGHT)
+	_draw_tracked(c, Vector2(440, 660), "ROZPOCZNIJ ZJAZD", 22,
+		COL_GREEN if sh else Color(0.90, 0.96, 0.99, 0.95), 4.0, 400.0)
+	var bw2 := _tracked_width("ROZPOCZNIJ ZJAZD", 22, 4.0)
+	c.draw_line(Vector2(640 - bw2 / 2.0, 670), Vector2(640 + bw2 / 2.0, 670),
+		Color(COL_GREEN, 0.85 if sh else 0.4), 1.0)
+	c.draw_string(_font, Vector2(640 + bw2 / 2.0 + 14, 660), "[Enter]",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(COL_DIM, 0.8))
 	_zone(sb, "creator_start")
 	var bb := Rect2(56, 684, 180, 26)
 	c.draw_string(_font, Vector2(bb.position.x, bb.position.y + 18), "<  Wróć   [Esc]",
