@@ -168,6 +168,7 @@ func _ready() -> void:
 const FINAL_FLOOR := 6   # descending from here wins the run
 var _run_seed: int = 20260605
 var _pending_daily := false      # title asked for the daily gauntlet
+var _reset_arm := false          # pause debug: achievements-wipe confirm armed
 var _daily_run := false          # this run uses the shared date seed
 
 func _build() -> void:
@@ -664,7 +665,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# [Esc] pause + settings (only when nothing else holds the input)
 	if kc == KEY_ESCAPE and _can_take_board_input():
-		_pause_screen = true; _play("open"); queue_redraw(); return
+		_pause_screen = true; _reset_arm = false; _play("open"); queue_redraw(); return
 
 	# [L] open the skill-point allocation modal (if you've banked any)
 	if kc == KEY_L:
@@ -867,7 +868,17 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"event_fork":        _event_choose(i)
 		"speak_pick":        _speak_pick(i)
 		"char_unequip":      _unequip(z.get("s", ""))
-		"pause_resume":      _pause_screen = false; _play("close"); queue_redraw()
+		"pause_resume":      _pause_screen = false; _reset_arm = false; _play("close"); queue_redraw()
+		"pause_reset_ach":
+			if _reset_arm:
+				Achievements.reset()
+				_reset_arm = false
+				_log_push("DEBUG: osiągnięcia i statystyki wyzerowane.")
+				_play("deny")
+			else:
+				_reset_arm = true
+				_play("click")
+			queue_redraw()
 		"pause_full":
 			var wm2 := DisplayServer.window_get_mode()
 			DisplayServer.window_set_mode(
@@ -3054,7 +3065,7 @@ func _draw_char(c: CanvasItem) -> void:
 ## Pause + settings: volumes (the Sfx buses), fullscreen, quit to title.
 func _draw_pause(c: CanvasItem) -> void:
 	c.draw_rect(Rect2(0, 0, 1280, 720), Color(0, 0, 0, 0.6))
-	var r := Rect2(440, 180, 400, 372)
+	var r := Rect2(440, 160, 400, 414)
 	_panel(c, r, COL_CYAN, "PAUZA")
 	var y := r.position.y + 72.0
 	for row in [["Master", "Głośność"], ["Music", "Muzyka"], ["SFX", "Efekty"]]:
@@ -3080,6 +3091,20 @@ func _draw_pause(c: CanvasItem) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
 		_zone(b2, str(r2[1]))
 		y += 40.0
+	# Hidden debug corner: wipe achievements + lifetime stats (two-step confirm).
+	c.draw_line(Vector2(r.position.x + 24, y - 6), Vector2(r.position.x + r.size.x - 24, y - 6),
+		Color(COL_GRID, 0.8), 1.0)
+	var db := Rect2(r.position.x + 24, y + 2, r.size.x - 48, 26)
+	var dbh := _hover(db)
+	if dbh or _reset_arm:
+		c.draw_rect(db, Color(COL_RED, 0.18 if _reset_arm else 0.08))
+		c.draw_rect(db, Color(COL_RED, 0.7), false, 1.0)
+	c.draw_string(_font, Vector2(db.position.x + 10, db.position.y + 18),
+		"NA PEWNO? Kliknij ponownie — bez odwrotu" if _reset_arm
+			else "· debug · wyzeruj osiągnięcia i statystyki",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
+		COL_RED if (_reset_arm or dbh) else Color(COL_DIM, 0.5))
+	_zone(db, "pause_reset_ach")
 
 func _draw_glyph(s: String, c: Vector2i, col: Color) -> void:
 	draw_string(_font, _cell_px(c) + Vector2(-6, 8), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, col)
@@ -3245,63 +3270,140 @@ func _draw_player(e: CombatEntity, pos: Vector2, fade: float) -> void:
 		draw_rect(Rect2(pos.x - 17, pos.y + 18, 34 * frac, 5), Color(hpc, fade))
 
 func _draw_title(c: CanvasItem) -> void:
+	var t := Time.get_ticks_msec() / 1000.0
 	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
-	# Title
+	# Studio smoke: purple haze sinking from the lighting rig.
+	for i in 20:
+		c.draw_rect(Rect2(0, i * 12, 1280, 12),
+			Color(0.32, 0.12, 0.42, 0.085 * (1.0 - i / 20.0)))
+	# Synthwave arena floor: glowing horizon + perspective grid rolling at us.
+	var hor := 492.0
+	c.draw_rect(Rect2(0, hor - 26, 1280, 26), Color(COL_PURPLE, 0.05))
+	c.draw_rect(Rect2(0, hor - 8, 1280, 3), Color(COL_PURPLE, 0.22))
+	for k in 15:
+		var fx := (k - 7) / 7.0
+		c.draw_line(Vector2(640 + fx * 300.0, hor), Vector2(640 + fx * 1500.0, 720),
+			Color(COL_CYAN, 0.085), 1.0)
+	for k in 9:
+		var phs := fmod(t * 0.22 + k / 9.0, 1.0)
+		var yy := hor + phs * phs * 228.0
+		c.draw_line(Vector2(0, yy), Vector2(1280, yy), Color(COL_CYAN, 0.04 + 0.10 * phs), 1.0)
+	# Drifting studio motes (dust in the spotlights).
+	for i in 36:
+		var h := (i * 2654435761) & 0x7fffffff
+		var mx := fmod(float(h % 1280) + t * (5.0 + float(h % 7) * 2.5), 1280.0)
+		var my := 30.0 + float((h >> 8) % 430) + sin(t * 0.8 + float(i)) * 6.0
+		var mc := COL_CYAN if i % 3 != 0 else COL_PURPLE
+		c.draw_circle(Vector2(mx, my), 1.0 + float(h % 3) * 0.6, Color(mc, 0.16))
+
+	# NA ZYWO badge - the show never stops broadcasting.
+	c.draw_rect(Rect2(1014, 36, 230, 78), Color(0.07, 0.04, 0.07, 0.85))
+	c.draw_rect(Rect2(1014, 36, 230, 78), Color(COL_RED, 0.75), false, 1.0)
+	if fmod(t, 1.2) < 0.72:
+		c.draw_circle(Vector2(1038, 58), 6.0, COL_RED)
+	c.draw_string(_font, Vector2(1052, 64), "NA ŻYWO",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 17, COL_BRIGHT)
+	var viewers := 4102336 + Achievements.points_total() * 117 + int(sin(t * 0.7) * 1800.0)
+	c.draw_string(_font, Vector2(1028, 86), "widzów: " + _fmt_int(viewers),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+	c.draw_string(_font, Vector2(1028, 104), "KANAŁ 7 · SEZON 1",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(COL_PURPLE, 0.95))
+	# tiny audio equalizer under the badge - the broadcast is loud
+	for eb in 12:
+		var eh := 5.0 + absf(sin(t * (2.1 + eb * 0.37) + eb)) * 17.0
+		c.draw_rect(Rect2(1030 + eb * 18, 138 - eh, 10, eh), Color(COL_CYAN, 0.4))
+
+	# Neon crown medallion over the logo.
+	var cw := PackedVector2Array([Vector2(186, 150), Vector2(186, 128), Vector2(198, 140),
+		Vector2(210, 120), Vector2(222, 140), Vector2(234, 128), Vector2(234, 150), Vector2(186, 150)])
+	c.draw_polyline(cw, Color(COL_AMBER, 0.30), 6.0)
+	c.draw_polyline(cw, COL_AMBER, 1.6)
+
+	# Logo: layered neon glow + a nervous studio-light flicker.
+	var flick := 0.86 + 0.14 * sin(t * 9.0) * sin(t * 3.7)
+	for off in [Vector2(-3, 0), Vector2(3, 0), Vector2(0, -2), Vector2(0, 3)]:
+		c.draw_string(_font, Vector2(180, 230) + (off as Vector2), "DUNGEON KRAULEM",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 72, Color(COL_PURPLE, 0.16))
+	for off in [Vector2(-1.5, 0.0), Vector2(1.5, 1.0)]:
+		c.draw_string(_font, Vector2(180, 230) + (off as Vector2), "DUNGEON KRAULEM",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 72, Color(COL_CYAN, 0.30 * flick))
 	c.draw_string(_font, Vector2(180, 230), "DUNGEON KRAULEM",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 72, COL_CYAN)
-	c.draw_string(_font, Vector2(184, 274), "galaktyczne reality show z lochów",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 72, Color(0.86, 0.97, 1.0, flick))
+	# underline with a light sweeping along it
+	c.draw_rect(Rect2(184, 246, 656, 2), Color(COL_CYAN, 0.35))
+	c.draw_rect(Rect2(184 + fmod(t * 260.0, 590.0), 246, 66, 2), COL_BRIGHT)
+	c.draw_string(_font, Vector2(186, 280), "galaktyczne reality show z lochów",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_DIM)
-	# Options (click them, or press the key)
+
+	# Menu rows (click them, or press the key).
 	var has_save := Save.has_save()
-	var y := 380.0
-	if has_save:
-		c.draw_string(_font, Vector2(184, y), "▶  Kontynuuj zjazd   [Enter]",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
-		_zone(Rect2(176, y - 24, 520, 34), "title_continue")
-		c.draw_string(_font, Vector2(184, y + 38), "▶  Nowy bieg (porzuca zapis)   [N]",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_AMBER)
-		_zone(Rect2(176, y + 14, 520, 34), "title_new")
-		y += 76
-	else:
-		c.draw_string(_font, Vector2(184, y), "▶  Zacznij bieg   [Enter]",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
-		_zone(Rect2(176, y - 24, 520, 34), "title_start")
-		y += 38
-	# Daily gauntlet — one shared seed per calendar day
-	c.draw_string(_font, Vector2(184, y + 22),
-		"◆  Bieg dnia — wspólny tor całej galaktyki   [D]",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_PURPLE)
-	_zone(Rect2(176, y - 2, 520, 32), "title_daily")
-	y += 38
-	# Achievements gallery entry
-	c.draw_string(_font, Vector2(184, y + 22),
-		"🏆  Osiągnięcia  (%d / %d)   [A]" % [Achievements.count_unlocked(), Achievements.total()],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_AMBER)
-	_zone(Rect2(176, y - 2, 520, 32), "ach_open")
-	# Loadout & meta-progression entry
 	var lo := MetaCatalog.loadout()
-	c.draw_string(_font, Vector2(184, y + 54),
-		"🧬  Ekwipunek sezonu  (%s · %s)   [M]" % [
-			MetaCatalog.def_of(lo["species"]).get("label", "?"),
-			MetaCatalog.def_of(lo["origin"]).get("label", "?")],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_GREEN)
-	_zone(Rect2(176, y + 32, 520, 30), "meta_open")
-	c.draw_string(_font, Vector2(184, y + 82),
-		"Prestiż: %d / %d pkt    ·    odblokowane opcje: %d" % [
+	var rows: Array = []
+	if has_save:
+		rows.append(["Kontynuuj zjazd", "wracasz na piętro z zapisu", "Enter", "title_continue", COL_CYAN])
+		rows.append(["Nowy bieg", "porzuca obecny zapis", "N", "title_new", COL_AMBER])
+	else:
+		rows.append(["Zacznij bieg", "świeży zjazd do Lochu", "Enter", "title_start", COL_CYAN])
+	rows.append(["Bieg dnia", "wspólny tor całej galaktyki — jeden seed dziennie", "D", "title_daily", COL_PURPLE])
+	rows.append(["Osiągnięcia  %d / %d" % [Achievements.count_unlocked(), Achievements.total()],
+		"galeria trofeów i pasmo prestiżu", "A", "ach_open", COL_AMBER])
+	rows.append(["Ekwipunek sezonu", "%s · %s" % [
+		MetaCatalog.def_of(lo["species"]).get("label", "?"),
+		MetaCatalog.def_of(lo["origin"]).get("label", "?")], "M", "meta_open", COL_GREEN])
+	var py := 312.0
+	var phh := rows.size() * 52.0 + 52.0
+	var pr := Rect2(150, py, 600, phh)
+	_panel(c, pr, COL_CYAN, "PANEL UCZESTNIKA")
+	var y := py + 40.0
+	for row in rows:
+		var rc := Rect2(pr.position.x + 16, y, pr.size.x - 32, 44)
+		var hov := _hover(rc)
+		var ac: Color = row[4]
+		c.draw_rect(rc, Color(ac, 0.16 if hov else 0.05))
+		c.draw_rect(rc, Color(ac, 0.9 if hov else 0.25), false, 1.0)
+		if hov:
+			c.draw_rect(Rect2(rc.position.x, rc.position.y, 3, rc.size.y), ac)
+		c.draw_string(_font, Vector2(rc.position.x + 16 + (4.0 if hov else 0.0), y + 19), str(row[0]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, COL_BRIGHT if hov else Color(COL_BRIGHT, 0.88))
+		c.draw_string(_font, Vector2(rc.position.x + 16, y + 36), str(row[1]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
+		var kw := 22.0 + str(row[2]).length() * 9.0
+		var kr := Rect2(rc.position.x + rc.size.x - kw - 10, y + 10, kw, 24)
+		c.draw_rect(kr, Color(0.10, 0.13, 0.18, 0.9))
+		c.draw_rect(kr, Color(ac, 0.6), false, 1.0)
+		c.draw_string(_font, Vector2(kr.position.x + 8, kr.position.y + 17), str(row[2]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ac)
+		_zone(rc, str(row[3]))
+		y += 52.0
+	c.draw_string(_font, Vector2(166, py + phh + 24),
+		"Prestiż: %d / %d pkt   ·   odblokowane opcje: %d" % [
 			MetaCatalog.available_prestige(), Achievements.points_total(), Meta.unlocked_count()],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ACH_TIER_COL["gold"])
-	# Controls primer (mouse-first)
-	c.draw_string(_font, Vector2(184, 632),
-		"MYSZ:  lewy = atak / rozmowa / ruch / wybór opcji      prawy = pchnięcie wroga",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
-	c.draw_string(_font, Vector2(184, 658),
-		"KLAWISZE:  WSAD/strzałki ruch · Shift pchnij · Spacja czekaj · E rozbierz/rozmawiaj",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
-	c.draw_string(_font, Vector2(184, 678),
-		"           I warsztat · T celuj w strefę · F umiejętność · 1–9 wybór · Esc zamknij",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ACH_TIER_COL["gold"])
+
+	# Controls primer (mouse-first) + version.
+	c.draw_string(_font, Vector2(166, 666),
+		"MYSZ: lewy = działaj · prawy = pchnięcie      KLAWISZE: WSAD ruch · E użyj · I warsztat",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(COL_CYAN, 0.85))
+	c.draw_string(_font, Vector2(166, 688),
+		"T celuj · F umiejętność · C karta postaci · Spacja czekaj · Esc menu",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 	c.draw_string(_font, Vector2(1180, 700), "v" + VERSION,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+	# CRT scanlines over everything - the broadcast look.
+	for sy in range(0, 720, 4):
+		c.draw_line(Vector2(0, sy), Vector2(1280, sy), Color(0, 0, 0, 0.05), 1.0)
+
+## Thousands separator for the fake viewer counter (4 102 336).
+static func _fmt_int(n: int) -> String:
+	var sv := str(n)
+	var out := ""
+	var cnt := 0
+	for i in range(sv.length() - 1, -1, -1):
+		out = sv[i] + out
+		cnt += 1
+		if cnt % 3 == 0 and i > 0:
+			out = " " + out
+	return out
 
 func _draw_boss(pos: Vector2, fade: float, flashing: bool) -> void:
 	var body := COL_RED if flashing else COL_PURPLE
