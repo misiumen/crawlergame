@@ -76,6 +76,7 @@ var _event: Dictionary = {}           # active mid-floor decision beat (non-empt
 var _speak: Dictionary = {}           # freeform persuasion prompt: {target_id, text, mode, options}
 var _journal_screen := false          # knowledge journal overlay (clues + rumors)
 var _journal_scroll := 0.0
+var _journal_tab := 0            # 0 ślady · 1 plotki · 2 receptury
 const META_KIND_COL := {
 	"species":    Color(0.55, 0.92, 0.98),
 	"origin":     Color(1.00, 0.84, 0.27),
@@ -594,7 +595,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Knowledge journal: scroll + close.
 	if _journal_screen:
-		if kc == KEY_ESCAPE or kc == KEY_J:
+		if kc == KEY_TAB:
+			_journal_tab = (_journal_tab + 1) % 3
+			_journal_scroll = 0.0
+			_play("click")
+			queue_redraw(); return
+		if kc == KEY_ESCAPE:
 			_journal_screen = false; queue_redraw()
 		elif kc == KEY_DOWN: _journal_scroll += 80.0; queue_redraw()
 		elif kc == KEY_UP:   _journal_scroll = maxf(0.0, _journal_scroll - 80.0); queue_redraw()
@@ -602,7 +608,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Persuasion prompt in fallback mode: number keys pick an improvised line.
 	if not _speak.is_empty() and _speak.get("mode", "") == "fallback":
-		if kc == KEY_ESCAPE or kc == KEY_K:
+		if kc == KEY_ESCAPE:
 			_speak = {}; queue_redraw(); return
 		var mi := kc - KEY_1
 		if mi >= 0 and mi < (_speak.get("options", []) as Array).size():
@@ -611,7 +617,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Spellbook grabs input: number keys cast a KNOWN spell, Esc closes.
 	if _spellbook:
-		if kc == KEY_ESCAPE or kc == KEY_Z:
+		if kc == KEY_ESCAPE or kc == KEY_T:
 			_spellbook = false; queue_redraw(); return
 		var ks: Array = Spells.known(sim.player())
 		var si := kc - KEY_1
@@ -660,21 +666,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if kc == KEY_G:
 		_use_companion_ability(); return
 
-	# [Z] open/close the spellbook
-	if kc == KEY_Z:
+	# [T] open/close the spellbook
+	if kc == KEY_T:
 		_spellbook = not _spellbook; queue_redraw(); return
 
-	# [J] open/close the knowledge journal
-	if kc == KEY_J:
-		_journal_screen = not _journal_screen; _journal_scroll = 0.0; queue_redraw(); return
-
-	# [K] speak to the nearest mind — freeform social engineering (hidden road)
-	if kc == KEY_K:
-		_open_speak(); return
-
-	# [O] view achievements mid-run ([A] is taken by movement; on the title it's [A])
-	if kc == KEY_O:
-		_open_ach_screen(); return
+	# [Tab] the contestant's notes: opens the journal, then cycles its sections
+	if kc == KEY_TAB:
+		_journal_screen = true
+		_journal_scroll = 0.0
+		queue_redraw(); return
 
 	# [C] character sheet (stats, equipment with unequip, traits, spells)
 	if kc == KEY_C:
@@ -704,8 +704,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _craft_open:
 		_handle_craft_input(kc); return
 
-	# [T] cycle the aimed body zone of the focused enemy (-> harder hit, your pick)
-	if kc == KEY_T:
+	# [V] cycle the aimed body zone (mouse-first: clicking a part also aims)
+	if kc == KEY_V:
 		_cycle_aim(); return
 
 	var shove := Input.is_key_pressed(KEY_SHIFT)
@@ -875,6 +875,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"dlg":               _dlg_advance(i)
 		"route":             if i < _route_offer.size(): _descend_into(_route_offer[i])
 		"class":             _accept_class(i)
+		"journal_tab":       _journal_tab = i; _journal_scroll = 0.0; queue_redraw()
 		"tab_bench":         _craft_mode = "bench"; queue_redraw()
 		"tab_items":         _craft_mode = "items"; queue_redraw()
 		"craft_close":       _craft_open = false; queue_redraw()
@@ -899,6 +900,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"speak_pick":        _speak_pick(i)
 		"char_unequip":      _unequip(z.get("s", ""))
 		"pause_resume":      _pause_screen = false; _reset_arm = false; _play("close"); queue_redraw()
+		"pause_ach":         _pause_screen = false; _open_ach_screen()
 		"pause_reset_ach":
 			if _reset_arm:
 				Achievements.reset()
@@ -1340,7 +1342,7 @@ func _push_ach_toast(d: Dictionary) -> void:
 		"points": int(Achievements.TIER_POINTS.get(tier, 1)), "t": 0.0, "ttl": 5.2})
 	_log_push("OSIĄGNIĘCIE: " + d.get("name", "?") + "!")
 	if sim != null:
-		_add_floater(sim.player_id, "★ " + d.get("name", "?"), _ach_tier_color(tier))
+		_add_floater(sim.player_id, "* " + d.get("name", "?"), _ach_tier_color(tier))
 	_shake = maxf(_shake, 4.0 if (tier == "gold" or tier == "platinum") else 2.0)
 	if tier == "gold" or tier == "platinum":
 		_ach_flash = maxf(_ach_flash, 0.7)
@@ -1819,7 +1821,19 @@ func handle_wait() -> void:
 
 func handle_interact() -> void:
 	floor.player.flags["consec_waits"] = 0
-	_animate(sim.player_interact())
+	var evs: Array = sim.player_interact()
+	var acted := false
+	for ev in evs:
+		if str(ev.get("type", "none")) != "none":
+			acted = true
+	if not acted:
+		# Nothing to use — E becomes "speak": persuasion through conversation,
+		# not a separate hidden keybind.
+		var t := _nearest_mind()
+		if t != null:
+			_open_speak()
+			return
+	_animate(evs)
 	_advance_floor_turn()
 
 ## Build the end-of-run results, record meta unlocks, and switch to the screen.
@@ -2446,8 +2460,8 @@ func _animate(evs: Array) -> void:
 					_add_floater(sim.player_id, "ZWÓJ ROZSYPUJE SIĘ", COL_DIM)
 					_log_push("Litery rozpływają ci się przed oczami. Magia nie dla ciebie.")
 				else:
-					_add_floater(sim.player_id, "✦ +zaklęcie", COL_PURPLE)
-					_log_push("Uczysz się zaklęcia: %s. (otwórz księgę [Z])" % e.get("name", "?"))
+					_add_floater(sim.player_id, "+ zaklęcie", COL_PURPLE)
+					_log_push("Uczysz się zaklęcia: %s. (otwórz księgę [T])" % e.get("name", "?"))
 					_shake = maxf(_shake, 3.0)
 			"class_active":
 				_add_floater(sim.player_id, str(e.get("name", "")).to_upper(), COL_AMBER)
@@ -2464,7 +2478,7 @@ func _animate(evs: Array) -> void:
 			"companion_blocked":
 				_log_push(str(e.get("reason", "Towarzysz nie może teraz pomóc.")))
 			"spell_cast":
-				_add_floater(sim.player_id, "✦ " + str(e.get("name", "Zaklęcie")), COL_PURPLE)
+				_add_floater(sim.player_id, "+ " + str(e.get("name", "Zaklęcie")), COL_PURPLE)
 				_play("cast")
 				_log_push("Rzucasz: %s." % e.get("name", "?"))
 				_shake = maxf(_shake, 3.0)
@@ -2811,13 +2825,13 @@ func _process(dt: float) -> void:
 					if me.aware:
 						mood = "combat"
 						_hint_once("first_combat",
-							"Walka! Kliknij wroga — pasek celu zdradza jego styl i kontrę. [T] celuje w część ciała, Shift+kierunek pcha.")
+							"Walka! Kliknij wroga — pasek celu zdradza jego styl i kontrę. Klikaj części ciała, by celować; Shift+kierunek pcha.")
 						if not sim.board.hazards.is_empty():
 							_hint_once("hazard_shove",
 								"Na tym piętrze czyhają zagrożenia środowiskowe — pchnięciem [PPM] wepchniesz w nie wroga.")
 						if "miniboss" in me.tags:
 							_hint_once("alfa",
-								"ALFA — wzmocniony wódz piętra: więcej zdrowia, celniejsze ciosy. Celowanie [T] w nogi spowalnia.")
+								"ALFA — wzmocniony wódz piętra: więcej zdrowia, celniejsze ciosy. Celuj w nogi, by go spowolnić.")
 						break
 		_sfx.music(mood)
 	# Biome mood: ambient grade + the player light track the active theme.
@@ -3000,12 +3014,33 @@ func _draw_ui(c: CanvasItem) -> void:
 	if not _summary.is_empty():
 		_draw_run_summary(c)
 		return
+	if _craft_open:
+		# The workshop owns the screen — opaque, no HUD bleeding through.
+		c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
+		_draw_craft_panel(c)
+		return
 	_draw_hud(c)
 	if _pause_screen:
 		_draw_pause(c)
 	# Floor/room transition: a quick fade-in from black over everything.
 	if _wipe > 0.0:
 		c.draw_rect(Rect2(0, 0, 1280, 720), Color(0, 0, 0, clampf(_wipe, 0.0, 1.0)))
+
+## RECEPTURY section of the journal: what crafting has taught you so far.
+func _draw_journal_recipes(c: CanvasItem, top: float, bottom: float) -> void:
+	var disc: Array = floor.discovered_recipes if floor != null else []
+	if disc.is_empty():
+		c.draw_string(_font, Vector2(60, 130),
+			"Żadnych sprawdzonych receptur. Warsztat [I]: dorzucaj materiały i eksperymentuj.",
+			HORIZONTAL_ALIGNMENT_LEFT, 1100, 16, COL_DIM)
+		return
+	var y := top + 24.0
+	for r in disc:
+		if y > bottom:
+			break
+		c.draw_string(_font, Vector2(74, y), "• " + str(r),
+			HORIZONTAL_ALIGNMENT_LEFT, 1100, 15, COL_BRIGHT)
+		y += 26.0
 
 ## Take a worn piece off and put it back in the pocket (Phase C gap-fix).
 func _unequip(slot: String) -> void:
@@ -3123,7 +3158,7 @@ func _draw_char(c: CanvasItem) -> void:
 ## Pause + settings: volumes (the Sfx buses), fullscreen, quit to title.
 func _draw_pause(c: CanvasItem) -> void:
 	c.draw_rect(Rect2(0, 0, 1280, 720), Color(0, 0, 0, 0.6))
-	var r := Rect2(440, 160, 400, 414)
+	var r := Rect2(440, 140, 400, 454)
 	_panel(c, r, COL_CYAN, "PAUZA")
 	var y := r.position.y + 72.0
 	for row in [["Master", "Głośność"], ["Music", "Muzyka"], ["SFX", "Efekty"]]:
@@ -3139,8 +3174,8 @@ func _draw_pause(c: CanvasItem) -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_BRIGHT)
 			_zone(vb, "vol", int(pair[0]), str(row[0]))
 		y += 42.0
-	for r2 in [["Pełny ekran [F11]", "pause_full"], ["Wznów [Esc]", "pause_resume"],
-			["Wyjdź do tytułu (zapis zostaje)", "pause_quit"]]:
+	for r2 in [["Osiągnięcia", "pause_ach"], ["Pełny ekran [F11]", "pause_full"],
+			["Wznów [Esc]", "pause_resume"], ["Wyjdź do tytułu (zapis zostaje)", "pause_quit"]]:
 		var b2 := Rect2(r.position.x + 24, y - 16, r.size.x - 48, 30)
 		var h2 := _hover(b2)
 		c.draw_rect(b2, Color(COL_CYAN, 0.18 if h2 else 0.07))
@@ -3469,7 +3504,10 @@ func _draw_boss(pos: Vector2, fade: float, flashing: bool) -> void:
 	draw_circle(pos, 21, Color(0.20, 0.06, 0.10, fade))
 	draw_arc(pos, 21, 0, TAU, 28, body, 3.0)
 	draw_circle(pos + Vector2(0, -2), 12, Color(0.62, 0.20, 0.28, fade))
-	draw_string(_font, pos + Vector2(-8, -20), "♛", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, COL_AMBER)
+	var crn := PackedVector2Array([pos + Vector2(-9, -22), pos + Vector2(-9, -30),
+		pos + Vector2(-4, -25), pos + Vector2(0, -33), pos + Vector2(4, -25),
+		pos + Vector2(9, -30), pos + Vector2(9, -22), pos + Vector2(-9, -22)])
+	draw_colored_polygon(crn, COL_AMBER)
 
 func _draw_npc(pos: Vector2, fade: float) -> void:
 	var col := COL_PURPLE; col.a = fade
@@ -3720,7 +3758,7 @@ func _draw_hud(c: CanvasItem) -> void:
 	# Controls hint (mouse-first) — clipped to 580px so it can't run under the
 	# top-right level/species readout.
 	c.draw_string(_font, Vector2(40, 60),
-		"Ruch: WSAD / LPM  ·  PPM pchnij  ·  E rozbierz  ·  I warsztat  ·  K/J/Z/O panele",
+		"WSAD / LPM ruch  ·  PPM pchnij  ·  E użyj/rozmawiaj  ·  I warsztat  ·  Tab dziennik  ·  T zaklęcia",
 		HORIZONTAL_ALIGNMENT_LEFT, 580, 13, COL_DIM)
 	# Weapon / coating / armor — led by your own HP so it's always on screen.
 	var wln := "HP %d/%d   ·   Broń: nóż" % [p.hp, p.max_hp]
@@ -3734,7 +3772,7 @@ func _draw_hud(c: CanvasItem) -> void:
 			worn.append((p.equipment[slot] as GameItem).name_pl)
 	if not worn.is_empty():
 		wln += "   ·   Pancerz: " + ", ".join(worn)
-	wln += "   ·   Mana %d/%d [Z]" % [p.mana, p.max_mana]
+	wln += "   ·   Mana %d/%d [T]" % [p.mana, p.max_mana]
 	c.draw_string(_font, Vector2(40, 80), wln, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_CYAN)
 	# INT stat
 	var int_str := "INT %d (+%d)" % [p.int_xp, p.int_mod()]
@@ -3849,6 +3887,7 @@ func _draw_hud(c: CanvasItem) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(COL_BRIGHT, ba))
 	_draw_body_readout(c, lx, lw)
 	# Exactly ONE in-game modal at a time (priority order), so nothing ever stacks.
+	# (the craft panel is handled earlier in _draw_ui as an exclusive screen)
 	if not _box_anim.is_empty():
 		_draw_box_open(c)
 	elif not _levelup.is_empty():
@@ -3869,8 +3908,6 @@ func _draw_hud(c: CanvasItem) -> void:
 		_draw_spellbook(c)
 	elif not _speak.is_empty():
 		_draw_speak(c)
-	elif _craft_open:
-		_draw_craft_panel(c)
 	_draw_toasts(c)
 
 ## VS-style achievement toasts: tier-framed panels that slide in from the right,
@@ -3968,7 +4005,7 @@ func _draw_ach_screen(c: CanvasItem) -> void:
 		c.draw_rect(Rect2(x, y, 5, ch), Color(tcol, 1.0 if got else 0.35))   # tier spine
 		var hidden: bool = a.get("hidden", false)
 		if got:
-			c.draw_string(_font, Vector2(x + 14, y + 22), "★ " + a.get("name", key),
+			c.draw_string(_font, Vector2(x + 14, y + 22), "* " + a.get("name", key),
 				HORIZONTAL_ALIGNMENT_LEFT, cw - 70, 15, COL_BRIGHT)
 			c.draw_string(_font, Vector2(x + cw - 58, y + 22), _tier_label(tier),
 				HORIZONTAL_ALIGNMENT_LEFT, 54, 10, tcol)
@@ -3994,7 +4031,7 @@ func _draw_ach_screen(c: CanvasItem) -> void:
 		var bar_h := view_h * (view_h / content_h)
 		var bar_y := top + (view_h - bar_h) * (_ach_scroll / max_scroll)
 		c.draw_rect(Rect2(1240, bar_y, 5, bar_h), Color(COL_AMBER, 0.6))
-	c.draw_string(_font, Vector2(60, 702), "[Esc] / klik — powrót   ·   kółko myszy / [↑][↓] — przewijaj",
+	c.draw_string(_font, Vector2(60, 702), "[Esc] / klik — powrót   ·   kółko lub strzałki przewijają",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 	_zone(Rect2(40, 692, 420, 26), "ach_back")
 
@@ -4098,7 +4135,7 @@ func _draw_meta_screen(c: CanvasItem) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, COL_BRIGHT)
 	_zone(back, "meta_back")
 	c.draw_string(_font, Vector2(60, 706),
-		"[Esc]/[M] powrót   ·   kółko / [↑][↓] przewijaj   ·   kliknij KUP by odblokować, WYBIERZ by założyć",
+		"[Esc]/[M] powrót   ·   kółko lub strzałki przewijają   ·   kliknij KUP by odblokować, WYBIERZ by założyć",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
 
 ## Vampire-Survivors-style lootbox reveal: a slot reel of rarity tiles spins and
@@ -4146,7 +4183,7 @@ func _draw_box_open(c: CanvasItem) -> void:
 			COL_BG if centered else Color(0, 0, 0, 0.5))
 	# centre marker
 	c.draw_rect(Rect2(cx - 52, reel_y - 60, 104, 120), Color(rcol, 0.0), false, 2.0)
-	c.draw_string(_font, Vector2(cx - 10, reel_y - 66), "▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, COL_BRIGHT)
+	c.draw_colored_polygon(PackedVector2Array([Vector2(cx - 9, reel_y - 80), Vector2(cx + 9, reel_y - 80), Vector2(cx, reel_y - 64)]), COL_BRIGHT)
 
 	# ── The snap flash (bigger for a lucky 3/5) ──
 	var tier: int = int(_box_anim.get("tier", 1))
@@ -4178,7 +4215,7 @@ func _draw_box_open(c: CanvasItem) -> void:
 			var ecol: Color = e["color"]; ecol.a = pop
 			var rowy := y + i * 34
 			c.draw_rect(Rect2(cx - 250, rowy - 16, 500 * pop, 28), Color(e["color"], 0.14 * pop))
-			c.draw_string(_font, Vector2(cx - 240, rowy + 4), "✦  " + str(e["label"]),
+			c.draw_string(_font, Vector2(cx - 240, rowy + 4), "+  " + str(e["label"]),
 				HORIZONTAL_ALIGNMENT_LEFT, 480, 18, ecol)
 		if entries.is_empty():
 			c.draw_string(_font, Vector2(cx - 200, 410), "(pusto — pech)",
@@ -4265,14 +4302,34 @@ func _draw_route_offer(c: CanvasItem) -> void:
 ## Knowledge journal: every clue + rumor you've collected, with a reliability read.
 func _draw_journal(c: CanvasItem) -> void:
 	c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
-	var journal: Array = floor.player.flags.get("journal", [])
-	c.draw_string(_font, Vector2(60, 60), "DZIENNIK — wiedza i plotki  (%d)" % journal.size(),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 30, COL_CYAN)
+	c.draw_string(_font, Vector2(60, 60), "DZIENNIK", HORIZONTAL_ALIGNMENT_LEFT, -1, 30, COL_CYAN)
+	# Section tabs — Tab cycles, click picks.
+	var tabs := ["ŚLADY", "PLOTKI", "RECEPTURY"]
+	var tx := 280.0
+	for ti in tabs.size():
+		var sel: bool = ti == _journal_tab
+		var tw2 := float(_font.get_string_size(tabs[ti], HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x) + 28
+		var trc := Rect2(tx, 36, tw2, 32)
+		if sel:
+			c.draw_rect(trc, Color(COL_CYAN, 0.16))
+		c.draw_rect(trc, COL_CYAN if sel else COL_GRID, false, 1.0)
+		c.draw_string(_font, Vector2(tx + 14, 58), tabs[ti],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_BRIGHT if sel else COL_DIM)
+		_zone(trc, "journal_tab", ti)
+		tx += tw2 + 10.0
+	var top := 100.0; var bottom := 680.0
+	if _journal_tab == 2:
+		_draw_journal_recipes(c, top, bottom)
+		return
+	var journal: Array = []
+	for e in (floor.player.flags.get("journal", []) as Array):
+		var is_clue: bool = str((e as Dictionary).get("kind", "")) == "clue"
+		if (is_clue and _journal_tab == 0) or (not is_clue and _journal_tab == 1):
+			journal.append(e)
 	if journal.is_empty():
-		c.draw_string(_font, Vector2(60, 120),
+		c.draw_string(_font, Vector2(60, 130),
 			"Pusto. Czytaj tablice ogłoszeń, gadaj z rywalami, rozbieraj sprzęt — wiedza sama nie przyjdzie.",
 			HORIZONTAL_ALIGNMENT_LEFT, 1100, 16, COL_DIM)
-	var top := 100.0; var bottom := 680.0
 	var rh := 60.0
 	var content_h := journal.size() * rh
 	var max_scroll := maxf(0.0, content_h - (bottom - top))
@@ -4292,8 +4349,8 @@ func _draw_journal(c: CanvasItem) -> void:
 		c.draw_string(_font, Vector2(74, y + 42), e.get("text", ""),
 			HORIZONTAL_ALIGNMENT_LEFT, 1130, 14, COL_BRIGHT)
 	if max_scroll > 0.0:
-		c.draw_string(_font, Vector2(1160, 64), "▲▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
-	c.draw_string(_font, Vector2(60, 702), "[J]/[Esc] zamknij   ·   kółko / [↑][↓] przewijaj",
+		c.draw_string(_font, Vector2(1080, 64), "(przewijaj)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_DIM)
+	c.draw_string(_font, Vector2(60, 702), "[Tab] następna sekcja   ·   [Esc] zamknij   ·   kółko lub strzałki przewijają",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COL_DIM)
 
 ## Freeform persuasion prompt: type a line at a mind, or pick an improvised one.
@@ -4370,7 +4427,7 @@ func _draw_spellbook(c: CanvasItem) -> void:
 		if castable:
 			_zone(box, "cast", 0, key)
 		cy += rh
-	c.draw_string(_font, Vector2(px + 20, py + H - 16), "Klik / 1–9 rzuca w najbliższego wroga   ·   [Z]/[Esc] zamknij",
+	c.draw_string(_font, Vector2(px + 20, py + H - 16), "Klik / 1–9 rzuca w najbliższego wroga   ·   [T]/[Esc] zamknij",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_DIM)
 
 ## Mid-floor decision beat: an intro line + two clickable forks.
@@ -4645,7 +4702,7 @@ func _draw_body_readout(c: CanvasItem, lx: float, lw: float) -> void:
 		y += 22.0
 	# Aim hint
 	c.draw_string(_font, Vector2(lx + 12, top + 210),
-		"kliknij część lub [T] — celuj (teraz: %s)" % (_aim_zone_label(e)),
+		"kliknij część lub [V] — celuj (teraz: %s)" % (_aim_zone_label(e)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_AMBER)
 
 func _severity_color(sev: String) -> Color:
@@ -4658,11 +4715,11 @@ func _severity_color(sev: String) -> Color:
 
 func _wound_glyph(wound: String) -> String:
 	match wound:
-		"burn":    return "▲"
+		"burn":    return "^"
 		"shock":   return "ϟ"
 		"corrode": return "≈"
 		"freeze":  return "❄"
-		"bleed":   return "✦"
+		"bleed":   return "*"
 		"sever":   return "✂"
 	return "•"
 
@@ -4691,7 +4748,7 @@ func _draw_craft_panel(c: CanvasItem) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, tab2_col)
 	_zone(Rect2(px + 296, py + 6, 110, 26), "tab_items")
 	# Close button
-	c.draw_string(_font, Vector2(px + W - 24, py + 24), "✕  zamknij",
+	c.draw_string(_font, Vector2(px + W - 24, py + 24), "X  zamknij",
 		HORIZONTAL_ALIGNMENT_RIGHT, -1, 14, COL_DIM)
 	_zone(Rect2(px + W - 130, py + 6, 120, 26), "craft_close")
 	c.draw_line(Vector2(px + 12, py + 42), Vector2(px + W - 12, py + 42), COL_GRID, 1.0)
@@ -4700,6 +4757,15 @@ func _draw_craft_panel(c: CanvasItem) -> void:
 		_draw_bench_panel(c, px, py, W, H)
 	else:
 		_draw_items_panel(c, px, py, W, H)
+
+## Mechanical tags are English data keys; players see Polish.
+const TAG_PL := {
+	"conductive": "przewodzi", "electric": "prąd", "metal": "metal",
+	"edge": "ostrze", "chem": "chemia", "corrosive": "żrący",
+	"binding": "wiązanie", "soft": "miękkie", "container": "pojemnik",
+	"fragile": "kruche", "power": "zasilanie", "haft": "rękojeść",
+	"flammable": "łatwopalne", "light": "lekkie",
+}
 
 func _draw_bench_panel(c: CanvasItem, px: float, py: float, W: float, H: float) -> void:
 	var mat_keys := sim.materials.keys()
@@ -4721,10 +4787,11 @@ func _draw_bench_panel(c: CanvasItem, px: float, py: float, W: float, H: float) 
 		_zone(mrect, "bench_mat", i)
 		var tag_x := px + 20
 		for t in tags:
-			var tw := float(_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x) + 16
+			var tl: String = str(TAG_PL.get(t, t))
+			var tw := float(_font.get_string_size(tl, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x) + 16
 			c.draw_rect(Rect2(tag_x, yy + 18, tw, 18), Color(0.12, 0.18, 0.24, 0.8), true, 0.0, false)
 			c.draw_rect(Rect2(tag_x, yy + 18, tw, 18), COL_CYAN, false, 1.0)
-			c.draw_string(_font, Vector2(tag_x + 8, yy + 31), t,
+			c.draw_string(_font, Vector2(tag_x + 8, yy + 31), tl,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_CYAN)
 			tag_x += tw + 4
 
@@ -4744,14 +4811,14 @@ func _draw_bench_panel(c: CanvasItem, px: float, py: float, W: float, H: float) 
 		c.draw_rect(srect, Color(0.20, 0.12, 0.14, 0.9) if hot else Color(0.10, 0.14, 0.20, 0.9))
 		c.draw_rect(srect, bc, false, 2.0)
 		if filled:
-			c.draw_string(_font, Vector2(sx + 70, sy + 34), _bench_slots[i],
-				HORIZONTAL_ALIGNMENT_CENTER, -1, 15, COL_BRIGHT)
-			c.draw_string(_font, Vector2(sx + 70, sy + 54), "(zdejmij)" if hot else "",
-				HORIZONTAL_ALIGNMENT_CENTER, -1, 11, COL_RED)
+			c.draw_string(_font, Vector2(sx, sy + 34), _bench_slots[i],
+				HORIZONTAL_ALIGNMENT_CENTER, 140, 15, COL_BRIGHT)
+			c.draw_string(_font, Vector2(sx, sy + 54), "(zdejmij)" if hot else "",
+				HORIZONTAL_ALIGNMENT_CENTER, 140, 11, COL_RED)
 			_zone(srect, "bench_remove", i)
 		else:
-			c.draw_string(_font, Vector2(sx + 70, sy + 38), "pusty",
-				HORIZONTAL_ALIGNMENT_CENTER, -1, 13, COL_DIM)
+			c.draw_string(_font, Vector2(sx, sy + 38), "pusty",
+				HORIZONTAL_ALIGNMENT_CENTER, 140, 13, COL_DIM)
 	# Wytwórz button (bottom-left, clear of the preview column)
 	if not _bench_slots.is_empty():
 		var wb := Rect2(px + 16, py + H - 64, 300, 36)
