@@ -598,6 +598,26 @@ func _initialize() -> void:
 	_ck(not wb2.is_wall(Vector2i(3, 1)), "an explosion breaches inner walls")
 	_ck(wb2.is_wall(Vector2i(0, 0)), "the outer shell holds (no escaping the show)")
 
+	# ── S3: ramówka + hype ────────────────────────────────────────────────────
+	var s3f: Dictionary = FloorGen.generate(2, 555, {})
+	var s3sched: Array = s3f.get("schedule", [])
+	_ck(s3sched.size() >= 3, "the Director schedules at least 3 segments per floor")
+	var s3sorted := true
+	for si in range(1, s3sched.size()):
+		if int(s3sched[si]["turn"]) < int(s3sched[si - 1]["turn"]):
+			s3sorted = false
+	_ck(s3sorted, "segments come in broadcast order")
+	var s3f2: Dictionary = FloorGen.generate(2, 555, {})
+	_ck(str(s3f2["schedule"]) == str(s3sched), "the ramówka is deterministic per seed")
+	var hyb := Board.new(4, 4)
+	var hyp := CombatEntity.new(1, "Ty", 100, 14, ["humanoid"]); hyp.faction = "player"
+	hyp.cell = Vector2i(1, 1); hyb.place(1, hyp.cell)
+	var hys := CombatSim.new(hyb, {1: hyp}, 1, 31)
+	hys._change_audience(4, "test")
+	_ck(int(hyp.flags.get("hype", 0)) == 12, "audience gains feed hype at 3x")
+	hys.player_wait()
+	_ck(int(hyp.flags.get("hype", 0)) == 11, "turtling bleeds hype")
+
 	# ── Character creator data (appearance) ───────────────────────────────────
 	var apd := Appearance.defaults()
 	var ap_ok := true

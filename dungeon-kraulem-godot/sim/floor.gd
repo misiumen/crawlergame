@@ -20,6 +20,7 @@ var sponsors: SponsorState
 var turn: int = 0
 var time_days: int = 5        # collapse budget, in dungeon days
 var time_limit: int = 150     # collapse budget, in turns (30/day)
+var schedule: Array = []      # the Director's RAMOWKA: [{turn, kind}]
 var class_offered: bool = false   # once we've offered a class, don't nag again
 
 var depth: int = 1                 # how many floors deep this run is (1-based)
@@ -46,6 +47,7 @@ func _init(data: Dictionary) -> void:
 	class_offered = bool(data.get("class_offered", false))
 	time_days = int(data.get("time_days", 5))
 	time_limit = int(data.get("time_limit", 150))
+	schedule = data.get("schedule", [])
 	objective = data.get("objective", {}) if data.get("objective", {}) is Dictionary else {}
 	companion = data.get("companion", null) if data.get("companion", null) is CombatEntity else null
 	enter(int(data.get("start", 0)), data["start_cell"])

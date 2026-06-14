@@ -61,6 +61,15 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
 	# Collapse timer (the book's rule: deeper floors grant more days; the
 	# countdown only matters while you dawdle). One "day" = 30 turns.
 	var days: int = 4 + floor_num
+	# RAMOWKA: the Director schedules this floor's broadcast segments up front —
+	# you can SEE them coming on the top bar and plan around them.
+	var seg_kinds := ["zrzut", "lowca", "premia", "gaz"]
+	var schedule: Array = []
+	var seg_n: int = 3 + (1 if floor_num >= 3 else 0)
+	for si in seg_n:
+		var at: int = int(float(days * 30) * float(si + 1) / float(seg_n + 1)) \
+			+ rng.randi_range(-5, 5)
+		schedule.append({"turn": maxi(12, at), "kind": seg_kinds[(si + floor_num) % seg_kinds.size()]})
 	return {
 		"rooms": rooms,
 		"player": player,
@@ -72,6 +81,7 @@ static func generate(floor_num: int, seed_value: int, content: Dictionary = {},
 		"hint": hint,
 		"time_days": days,
 		"time_limit": days * 30,
+		"schedule": schedule,
 	}
 
 # ── Continuous-floor generation (S2) ─────────────────────────────────────────

@@ -142,7 +142,7 @@ func _initialize() -> void:
 	_ck(bv._bench_slots.is_empty(), "clicking a bench slot removes it")
 	bv._dispatch_zone({"kind": "bench_mat", "i": 0})
 	bv._dispatch_zone({"kind": "bench_attempt"})
-	_ck(not bv._craft_open and bv.floor.items.size() >= 1, "clicking WYTWÓRZ crafts + closes")
+	_ck(bv._craft_open and bv.floor.items.size() >= 1, "crafting keeps the workshop OPEN (keep building)")
 
 	# tab switch + item use via click
 	bv._craft_open = true; bv._craft_mode = "bench"

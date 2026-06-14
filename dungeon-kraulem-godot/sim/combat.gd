@@ -349,6 +349,9 @@ func player_shove(dir: Vector2i) -> Array:
 func player_wait() -> Array:
 	if over or side != "player":
 		return []
+	# turtling bores the audience — hype bleeds
+	var pw: CombatEntity = player()
+	pw.flags["hype"] = maxi(0, int(pw.flags.get("hype", 0)) - 1)
 	var evs: Array = [{"type": "wait"}]
 	evs += _after_player_action(0, 99)   # end the round outright
 	return evs
@@ -1030,11 +1033,16 @@ func _add_affinity(kind: String, amount: int = 1) -> void:
 	player().add_affinity(kind, amount)
 
 func _change_audience(delta: int, source: String = "") -> Array:
-	if _audience == null:
-		return []
 	# Showman doubles audience gains.
 	if delta > 0:
 		delta = int(round(delta * ClassFeatures.audience_multiplier(player())))
+	# every audience gain feeds HYPE — the player's spendable showmanship meter
+	# (ticks even on floors/tests without an AudienceState).
+	if delta > 0:
+		var pp: CombatEntity = player()
+		pp.flags["hype"] = mini(100, int(pp.flags.get("hype", 0)) + delta * 3)
+	if _audience == null:
+		return []
 	var crossing := _audience.change(delta, source)
 	var evs: Array = [{"type": "audience_change", "delta": delta,
 		"rating": _audience.rating, "band": _audience.band(),

@@ -178,6 +178,7 @@ var _run_seed: int = 20260605
 var _pending_daily := false      # title asked for the daily gauntlet
 var _reset_arm := false          # pause debug: achievements-wipe confirm armed
 var _throw_mode: Dictionary = {} # aiming a thrown item: {"kind": ..., "idx": ...}
+var _gift_open := false          # the audience-gift picker [B]
 var _creator_screen := false     # pre-run character creator (identity + looks)
 var _appearance: Dictionary = Appearance.defaults()
 var _cr_hover_desc := ""         # creator: reward text of the hovered identity row
@@ -705,6 +706,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	if kc == KEY_T:
 		_spellbook = not _spellbook; queue_redraw(); return
 
+	# [B] audience gifts — spend the hype you earned showing off
+	if kc == KEY_B:
+		_gift_open = not _gift_open
+		_play("open" if _gift_open else "close")
+		queue_redraw()
+		return
+	if _gift_open:
+		if kc == KEY_ESCAPE:
+			_gift_open = false
+			queue_redraw()
+		elif kc >= KEY_1 and kc <= KEY_4:
+			_gift_pick(kc - KEY_1)
+		return
+
 	# [Tab] the contestant's notes: opens the journal, then cycles its sections
 	if kc == KEY_TAB:
 		_journal_screen = true
@@ -925,6 +940,7 @@ func _dispatch_zone(z: Dictionary) -> void:
 		"route":             if i < _route_offer.size(): _descend_into(_route_offer[i])
 		"class":             _accept_class(i)
 		"journal_tab":       _journal_tab = i; _journal_scroll = 0.0; queue_redraw()
+		"gift":              _gift_pick(i)
 		"tab_bench":         _craft_mode = "bench"; queue_redraw()
 		"tab_items":         _craft_mode = "items"; queue_redraw()
 		"craft_close":       _craft_open = false; queue_redraw()
@@ -1313,6 +1329,9 @@ func _cycle_aim() -> void:
 	queue_redraw()
 
 func _handle_craft_input(kc: int) -> void:
+	if not _box_anim.is_empty():
+		_box_anim_advance()
+		return
 	if kc == KEY_ESCAPE:
 		_craft_open = false; queue_redraw(); return
 	if kc == KEY_TAB:
@@ -1370,7 +1389,6 @@ func _bench_attempt_now() -> void:
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
 	_bench_slots.clear()
 	_bench_preview = {}
-	_craft_open = false
 	queue_redraw()
 
 func _item_use(idx: int) -> void:
@@ -1390,7 +1408,6 @@ func _item_use(idx: int) -> void:
 			queue_redraw()
 			return
 		_animate(sim.player_use_item(idx))
-		_craft_open = false
 	queue_redraw()
 
 func _set_aim(pkey: String) -> void:
@@ -1841,7 +1858,6 @@ func _open_box(idx: int) -> void:
 	if idx < 0 or idx >= floor.boxes.size():
 		return
 	var box: GameBox = floor.boxes[idx]
-	_craft_open = false
 	var entries := _resolve_box(box)
 
 	# ── Lucky multiplier: like Vampire Survivors' 1/3/5 chests, roll for bonus
@@ -1950,6 +1966,11 @@ func _advance_floor_turn() -> void:
 	for b in new_boxes:
 		_log_push("Sponsor wysłał paczkę: " + b.display_name() + "!")
 		_add_floater(sim.player_id, "PACZKA!", COL_AMBER)
+	# RAMOWKA segments fire exactly when the bar said they would.
+	for seg in floor.schedule:
+		if int(seg.get("turn", -1)) == floor.turn and not bool(seg.get("done", false)):
+			seg["done"] = true
+			_run_segment(str(seg.get("kind", "")))
 	# The collapse countdown: the floor WILL close (book rules). Warnings, then
 	# the stage comes down on whoever is still on it.
 	var trem: int = floor.time_limit - floor.turn
@@ -3245,6 +3266,8 @@ func _draw_ui(c: CanvasItem) -> void:
 		# The workshop owns the screen — opaque, no HUD bleeding through.
 		c.draw_rect(Rect2(0, 0, 1280, 720), COL_BG)
 		_draw_craft_panel(c)
+		if not _box_anim.is_empty():
+			_draw_box_open(c)   # the reveal plays ON TOP; the workshop stays open
 		return
 	_draw_hud(c)
 	if _pause_screen:
@@ -3973,6 +3996,20 @@ func _draw_hud(c: CanvasItem) -> void:
 	for dmark in range(1, floor.time_days):
 		var dx := tb.position.x + tb.size.x * float(dmark) / float(floor.time_days)
 		c.draw_line(Vector2(dx, tb.position.y), Vector2(dx, tb.position.y + 5), Color(0, 0, 0, 0.6), 1.0)
+	# the Director's segments sit ON the bar — you can read the future
+	var next_seg: Dictionary = {}
+	for seg in floor.schedule:
+		var st: int = int(seg.get("turn", 0))
+		var sx := tb.position.x + tb.size.x * (1.0 - clampf(float(time_left_of(st)) / float(maxi(1, floor.time_limit)), 0.0, 1.0))
+		var sdone: bool = bool(seg.get("done", false)) or st <= floor.turn
+		c.draw_circle(Vector2(sx, tb.position.y + 2.5), 3.5,
+			Color(COL_DIM, 0.5) if sdone else COL_PURPLE)
+		if not sdone and next_seg.is_empty():
+			next_seg = seg
+	if not next_seg.is_empty():
+		c.draw_string(_font, Vector2(tb.position.x, 58),
+			"za %d tur: %s" % [int(next_seg["turn"]) - floor.turn, _seg_label(str(next_seg["kind"]))],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(COL_PURPLE, 0.9))
 	c.draw_string(_font, Vector2(tb.position.x + tb.size.x + 10, 51),
 		"runie za %d tur" % trem, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
 		COL_AMBER if trem > 30 else COL_RED)
@@ -3994,6 +4031,8 @@ func _draw_hud(c: CanvasItem) -> void:
 	_draw_portrait_card(c, p)
 	_draw_audience_meter(c)
 	_draw_ticker(c)
+	if _gift_open:
+		_draw_gifts(c, p)
 	if _banner != "" and _banner_t > 0.0:
 		var ba: float = clampf(_banner_t / 0.6, 0.0, 1.0)   # fade out over the last 0.6s
 		c.draw_string(_font, Vector2(260, 330), _banner,
@@ -5410,17 +5449,26 @@ func _draw_portrait_card(c: CanvasItem, p: CombatEntity) -> void:
 func _draw_audience_meter(c: CanvasItem) -> void:
 	if floor.audience == null:
 		return
-	var aud := floor.audience
-	var r := Rect2(1006, 648, 254, 44)
-	_draw_tracked(c, r.position + Vector2(0, 10), "WIDOWNIA", 10, Color(COL_DIM, 0.9), 3.0)
-	c.draw_string(_font, r.position + Vector2(200, 10), str(aud.rating),
+	var p2 := sim.player()
+	var hype: int = int(p2.flags.get("hype", 0))
+	var r := Rect2(1006, 640, 254, 56)
+	_draw_tracked(c, r.position + Vector2(0, 10), "HYPE", 10, Color(COL_DIM, 0.9), 3.0)
+	c.draw_string(_font, r.position + Vector2(220, 10), str(hype),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_PURPLE)
-	var bar := Rect2(r.position.x, r.position.y + 18, 254, 8)
+	var bar := Rect2(r.position.x, r.position.y + 16, 254, 9)
 	c.draw_rect(bar, Color(0.10, 0.08, 0.13))
-	c.draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(aud.rating / 100.0, 0.0, 1.0), 8)),
+	c.draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(hype / 100.0, 0.0, 1.0), 9)),
 		COL_PURPLE)
-	c.draw_string(_font, r.position + Vector2(0, 40), aud.band_label(),
+	if hype >= 30:
+		c.draw_circle(Vector2(bar.position.x + bar.size.x * hype / 100.0, bar.position.y + 4.5),
+			6.0, Color(0.85, 0.56, 0.96))
+	c.draw_string(_font, r.position + Vector2(0, 40),
+		"widownia %d · %s" % [floor.audience.rating, floor.audience.band_label()],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(COL_DIM, 0.8))
+	c.draw_string(_font, r.position + Vector2(0, 54),
+		"[B] PREZENT WIDZÓW" + ("" if hype >= 30 else " (od 30 hype)"),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+		COL_PURPLE if hype >= 30 else Color(COL_DIM, 0.6))
 
 func _draw_ticker(c: CanvasItem) -> void:
 	var n := mini(_log.size(), 3)
@@ -5456,3 +5504,119 @@ func _throw_at(cell: Vector2i) -> void:
 	_spawn_parts(_cell_px(cell), 8, Color(0.6, 0.9, 0.4) if kind == "acid" else COL_AMBER, 60.0)
 	_animate(evs)
 	_advance_floor_turn()
+
+
+# ── S3: the Director's RAMOWKA + audience gifts ────────────────────────────────
+
+func time_left_of(turn_at: int) -> int:
+	return maxi(0, floor.time_limit - turn_at)
+
+func _seg_label(kind: String) -> String:
+	match kind:
+		"zrzut":  return "ZRZUT SPONSORA"
+		"lowca":  return "WYPUSZCZENIE ŁOWCY"
+		"premia": return "PREMIA OGLĄDALNOŚCI"
+		"gaz":    return "AWARIA INSTALACJI"
+	return kind.to_upper()
+
+## A scheduled broadcast beat goes off. Telegraphed on the bar, so none of
+## these is a cheap shot — you had N turns to get ready.
+func _run_segment(kind: String) -> void:
+	_add_banner("SEGMENT: " + _seg_label(kind))
+	_play("sting")
+	match kind:
+		"lowca":
+			_spawn_hunter("Łowca z Ramówki")
+		"zrzut":
+			var box := GameBox.new("rezyser", "Zrzut Reżysera", Rarity.RARE)
+			floor.boxes.append(box)
+			_log_push("Reżyser dorzuca skrzynkę do puli — odbierz ją w warsztacie [I].")
+		"premia":
+			var pp := sim.player()
+			pp.flags["hype"] = mini(100, int(pp.flags.get("hype", 0)) + 20)
+			_add_floater(sim.player_id, "+20 HYPE", COL_PURPLE)
+			_log_push("Montażysta skleił twoje akcje w klip. Widownia podkręcona.")
+		"gaz":
+			var p := sim.player()
+			var placed := 0
+			for _try in 30:
+				if placed >= 3:
+					break
+				var gc: Vector2i = p.cell + Vector2i(sim.rng.randi_range(-6, 6), sim.rng.randi_range(-6, 6))
+				var gd: Vector2i = (gc - p.cell).abs()
+				if maxi(gd.x, gd.y) >= 3 and sim.board.is_free(gc) and sim.board.hazard_at(gc) == "":
+					sim.board.set_hazard(gc, "gas")
+					placed += 1
+			_log_push("Syk z rur — gdzieś niedaleko ulatnia się gaz. Ogień go znajdzie.")
+	queue_redraw()
+
+const GIFTS := [
+	{"name": "Zrzut apteczki", "desc": "+18 HP, natychmiast", "cost": 40},
+	{"name": "Dosyłka ładunku", "desc": "+1 Ładunek wybuchowy do kieszeni", "cost": 50},
+	{"name": "Bateria zaklęć", "desc": "pełna mana", "cost": 30},
+	{"name": "Doping widowni", "desc": "+1 PA w tej rundzie", "cost": 60},
+]
+
+func _gift_pick(i: int) -> void:
+	if i < 0 or i >= GIFTS.size() or sim == null:
+		return
+	var p := sim.player()
+	var hype: int = int(p.flags.get("hype", 0))
+	var cost: int = int(GIFTS[i]["cost"])
+	if hype < cost:
+		_log_push("Za mało hype'u (%d/%d). Daj widowni powód." % [hype, cost])
+		_play("deny")
+		return
+	p.flags["hype"] = hype - cost
+	match i:
+		0:
+			p.hp = mini(p.max_hp, p.hp + 18)
+			_add_floater(sim.player_id, "+18 HP", COL_GREEN)
+			_play("heal")
+		1:
+			var chg := GameItem.new()
+			chg.name_pl = "Ładunek wybuchowy"
+			chg.category = GameItem.CAT_THROWN
+			chg.effect = {"place": "bomb"}
+			chg.tags = ["chem", "power"]
+			floor.items.append(chg)
+			_play("gift")
+		2:
+			p.mana = p.max_mana
+			_add_floater(sim.player_id, "MANA MAX", COL_CYAN)
+			_play("chime")
+		3:
+			sim.player_ap += 1
+			_add_floater(sim.player_id, "+1 PA", COL_AMBER)
+			_play("fanfare")
+	_log_push("Prezent od widzów: %s. Pomachaj do kamery." % GIFTS[i]["name"])
+	_gift_open = false
+	queue_redraw()
+
+func _draw_gifts(c: CanvasItem, p: CombatEntity) -> void:
+	var hype: int = int(p.flags.get("hype", 0))
+	c.draw_rect(Rect2(0, 0, 1280, 720), Color(0, 0, 0, 0.45))   # dim the stage
+	var r := Rect2(450, 250, 380, 210)
+	c.draw_rect(r, Color(0.05, 0.07, 0.09, 0.98))
+	c.draw_rect(r, Color(COL_PURPLE, 0.6), false, 1.0)
+	_draw_tracked(c, r.position + Vector2(14, 20), "PREZENTY WIDZÓW", 13, COL_PURPLE, 2.0)
+	c.draw_string(_font, r.position + Vector2(300, 20), "HYPE %d" % hype,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_PURPLE)
+	var y := r.position.y + 46.0
+	for i in GIFTS.size():
+		var g: Dictionary = GIFTS[i]
+		var afford: bool = hype >= int(g["cost"])
+		var rc := Rect2(r.position.x + 10, y - 14, r.size.x - 20, 30)
+		var hov := _hover(rc)
+		if hov and afford:
+			c.draw_rect(rc, Color(COL_PURPLE, 0.12))
+		c.draw_string(_font, Vector2(rc.position.x + 8, y + 4),
+			"%d. %s — %s" % [i + 1, g["name"], g["desc"]],
+			HORIZONTAL_ALIGNMENT_LEFT, 300, 13,
+			(COL_BRIGHT if hov else Color(0.88, 0.92, 0.95)) if afford else Color(COL_DIM, 0.6))
+		c.draw_string(_font, Vector2(rc.position.x + rc.size.x - 40, y + 4), str(g["cost"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COL_PURPLE if afford else Color(COL_DIM, 0.6))
+		_zone(rc, "gift", i)
+		y += 34.0
+	c.draw_string(_font, r.position + Vector2(14, r.size.y - 12),
+		"[1-4] wybierz   ·   [B]/[Esc] zamknij", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COL_DIM)
